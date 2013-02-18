@@ -1,0 +1,7 @@
+from numpy import zeros_like
+def matrix_make(x,n):
+	x=zeros_like(n);
+    for i in range(list(0,n)):
+        for j in range(list(0,n)):
+        x[i][j]=abs(i-j)+1
+    return(x)

@@ -1,0 +1,397 @@
+	.file	"hello.d"
+	.text
+	.globl	_Dmain
+	.align	16, 0x90
+	.type	_Dmain,@function
+_Dmain:
+	.cfi_startproc
+	push	RAX
+.Ltmp1:
+	.cfi_def_cfa_offset 16
+	lea	RSI, QWORD PTR [.str30]
+	mov	EDX, 12
+	lea	RCX, QWORD PTR [.str29]
+	mov	RAX, QWORD PTR [_D3std5stdio6stdoutS3std5stdio4File]
+	mov	RDI, QWORD PTR [RAX]
+	mov	AL, 0
+	call	fprintf
+	cmp	EAX, -1
+	jg	.LBB0_2
+	xor	EAX, EAX
+	mov	EDX, 1604
+	mov	ECX, 32
+	mov	R8D, .str31
+	mov	RDI, RAX
+	mov	RSI, RAX
+	call	_D3std9exception7bailOutFNaNfAyamxAaZv
+.LBB0_2:
+	xor	EAX, EAX
+	pop	RDX
+	ret
+.Ltmp2:
+	.size	_Dmain, .Ltmp2-_Dmain
+	.cfi_endproc
+
+	.section	.text._D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv,"axG",@progbits,_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv,comdat
+	.weak	_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv
+	.align	16, 0x90
+	.type	_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv,@function
+_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv:
+	.cfi_startproc
+	push	RAX
+.Ltmp4:
+	.cfi_def_cfa_offset 16
+	lea	RAX, QWORD PTR [.str30]
+	mov	RCX, QWORD PTR [_D3std5stdio6stdoutS3std5stdio4File]
+	mov	RCX, QWORD PTR [RCX]
+	mov	EDX, EDI
+	mov	RDI, RCX
+	mov	QWORD PTR [RSP], RSI
+	mov	RSI, RAX
+	mov	RCX, QWORD PTR [RSP]
+	mov	AL, 0
+	call	fprintf
+	cmp	EAX, -1
+	jg	.LBB1_2
+	xor	EAX, EAX
+	mov	EDX, 1604
+	mov	ECX, 32
+	mov	R8D, .str31
+	mov	RDI, RAX
+	mov	RSI, RAX
+	call	_D3std9exception7bailOutFNaNfAyamxAaZv
+.LBB1_2:
+	pop	RAX
+	ret
+.Ltmp5:
+	.size	_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv, .Ltmp5-_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv
+	.cfi_endproc
+
+	.section	.text._D3std9exception14__T7enforceTbZ7enforceFNaNfbLAxaAyamZb,"axG",@progbits,_D3std9exception14__T7enforceTbZ7enforceFNaNfbLAxaAyamZb,comdat
+	.weak	_D3std9exception14__T7enforceTbZ7enforceFNaNfbLAxaAyamZb
+	.align	16, 0x90
+	.type	_D3std9exception14__T7enforceTbZ7enforceFNaNfbLAxaAyamZb,@function
+_D3std9exception14__T7enforceTbZ7enforceFNaNfbLAxaAyamZb:
+	.cfi_startproc
+	sub	RSP, 56
+.Ltmp7:
+	.cfi_def_cfa_offset 64
+	mov	AL, R9B
+	test	AL, 1
+	mov	QWORD PTR [RSP + 48], RSI
+	mov	BYTE PTR [RSP + 47], AL
+	mov	QWORD PTR [RSP + 32], R8
+	mov	QWORD PTR [RSP + 24], RCX
+	mov	QWORD PTR [RSP + 16], RDX
+	mov	QWORD PTR [RSP + 8], RDI
+	jne	.LBB2_2
+	jmp	.LBB2_1
+.LBB2_1:
+	mov	RDI, QWORD PTR [RSP + 24]
+	mov	RAX, QWORD PTR [RSP + 32]
+	call	RAX
+	mov	RDI, RAX
+	mov	RSI, RDX
+	mov	RDX, QWORD PTR [RSP + 8]
+	mov	RCX, QWORD PTR [RSP + 48]
+	mov	R8, QWORD PTR [RSP + 16]
+	call	_D3std9exception7bailOutFNaNfAyamxAaZv
+.LBB2_2:
+	mov	AL, BYTE PTR [RSP + 47]
+	add	RSP, 56
+	ret
+.Ltmp8:
+	.size	_D3std9exception14__T7enforceTbZ7enforceFNaNfbLAxaAyamZb, .Ltmp8-_D3std9exception14__T7enforceTbZ7enforceFNaNfbLAxaAyamZb
+	.cfi_endproc
+
+	.section	.text._D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv15__dgliteral1002MFZAxa,"axG",@progbits,_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv15__dgliteral1002MFZAxa,comdat
+	.weak	_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv15__dgliteral1002MFZAxa
+	.align	16, 0x90
+	.type	_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv15__dgliteral1002MFZAxa,@function
+_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv15__dgliteral1002MFZAxa:
+	xor	EAX, EAX
+	mov	QWORD PTR [RSP - 8], RAX
+	mov	RDX, QWORD PTR [RSP - 8]
+	ret
+.Ltmp9:
+	.size	_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv15__dgliteral1002MFZAxa, .Ltmp9-_D3std5stdio16__T7writelnTAyaZ7writelnFAyaZv15__dgliteral1002MFZAxa
+
+	.text
+	.align	16, 0x90
+	.type	_D5hello16__moduleinfoCtorZ,@function
+_D5hello16__moduleinfoCtorZ:
+	lea	RAX, QWORD PTR [_D5hello11__moduleRefZ]
+	mov	RCX, QWORD PTR [_Dmodule_ref]
+	mov	QWORD PTR [_D5hello11__moduleRefZ], RCX
+	mov	QWORD PTR [_Dmodule_ref], RAX
+	ret
+.Ltmp10:
+	.size	_D5hello16__moduleinfoCtorZ, .Ltmp10-_D5hello16__moduleinfoCtorZ
+
+	.type	_D3std6traits15__T8DemangleTkZ8Demangle6__initZ,@object
+	.section	.rodata._D3std6traits15__T8DemangleTkZ8Demangle6__initZ,"aG",@progbits,_D3std6traits15__T8DemangleTkZ8Demangle6__initZ,comdat
+	.weak	_D3std6traits15__T8DemangleTkZ8Demangle6__initZ
+	.align	8
+_D3std6traits15__T8DemangleTkZ8Demangle6__initZ:
+	.zero	24
+	.size	_D3std6traits15__T8DemangleTkZ8Demangle6__initZ, 24
+
+	.type	_D3std5array17__T8AppenderTAyaZ8Appender6__initZ,@object
+	.section	.rodata._D3std5array17__T8AppenderTAyaZ8Appender6__initZ,"aG",@progbits,_D3std5array17__T8AppenderTAyaZ8Appender6__initZ,comdat
+	.weak	_D3std5array17__T8AppenderTAyaZ8Appender6__initZ
+	.align	8
+_D3std5array17__T8AppenderTAyaZ8Appender6__initZ:
+	.zero	8
+	.size	_D3std5array17__T8AppenderTAyaZ8Appender6__initZ, 8
+
+	.type	_D3std5array17__T8AppenderTAyaZ8Appender4Data6__initZ,@object
+	.section	.rodata._D3std5array17__T8AppenderTAyaZ8Appender4Data6__initZ,"aG",@progbits,_D3std5array17__T8AppenderTAyaZ8Appender4Data6__initZ,comdat
+	.weak	_D3std5array17__T8AppenderTAyaZ8Appender4Data6__initZ
+	.align	8
+_D3std5array17__T8AppenderTAyaZ8Appender4Data6__initZ:
+	.zero	24
+	.size	_D3std5array17__T8AppenderTAyaZ8Appender4Data6__initZ, 24
+
+	.type	_D3std6format18__T10FormatSpecTaZ10FormatSpec6__initZ,@object
+	.section	.rodata._D3std6format18__T10FormatSpecTaZ10FormatSpec6__initZ,"aG",@progbits,_D3std6format18__T10FormatSpecTaZ10FormatSpec6__initZ,comdat
+	.weak	_D3std6format18__T10FormatSpecTaZ10FormatSpec6__initZ
+	.align	8
+_D3std6format18__T10FormatSpecTaZ10FormatSpec6__initZ:
+	.long	0
+	.long	2147483646
+	.byte	115
+	.byte	0
+	.byte	0
+	.byte	0
+	.zero	4
+	.zero	16
+	.zero	16
+	.zero	16
+	.size	_D3std6format18__T10FormatSpecTaZ10FormatSpec6__initZ, 64
+
+	.type	_D3std5array17__T8AppenderTAxaZ8Appender6__initZ,@object
+	.section	.rodata._D3std5array17__T8AppenderTAxaZ8Appender6__initZ,"aG",@progbits,_D3std5array17__T8AppenderTAxaZ8Appender6__initZ,comdat
+	.weak	_D3std5array17__T8AppenderTAxaZ8Appender6__initZ
+	.align	8
+_D3std5array17__T8AppenderTAxaZ8Appender6__initZ:
+	.zero	8
+	.size	_D3std5array17__T8AppenderTAxaZ8Appender6__initZ, 8
+
+	.type	_D3std5array17__T8AppenderTAxaZ8Appender4Data6__initZ,@object
+	.section	.rodata._D3std5array17__T8AppenderTAxaZ8Appender4Data6__initZ,"aG",@progbits,_D3std5array17__T8AppenderTAxaZ8Appender4Data6__initZ,comdat
+	.weak	_D3std5array17__T8AppenderTAxaZ8Appender4Data6__initZ
+	.align	8
+_D3std5array17__T8AppenderTAxaZ8Appender4Data6__initZ:
+	.zero	24
+	.size	_D3std5array17__T8AppenderTAxaZ8Appender4Data6__initZ, 24
+
+	.type	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray6__initZ,@object
+	.section	.rodata._D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray6__initZ,"aG",@progbits,_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray6__initZ,comdat
+	.weak	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray6__initZ
+	.align	8
+_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray6__initZ:
+	.zero	8
+	.size	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray6__initZ, 8
+
+	.type	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray4Slot6__initZ,@object
+	.section	.rodata._D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray4Slot6__initZ,"aG",@progbits,_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray4Slot6__initZ,comdat
+	.weak	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray4Slot6__initZ
+	.align	8
+_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray4Slot6__initZ:
+	.quad	0
+	.quad	0
+	.byte	118
+	.zero	7
+	.quad	0
+	.size	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray4Slot6__initZ, 32
+
+	.type	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray9Hashtable6__initZ,@object
+	.section	.rodata._D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray9Hashtable6__initZ,"aG",@progbits,_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray9Hashtable6__initZ,comdat
+	.weak	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray9Hashtable6__initZ
+	.align	8
+_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray9Hashtable6__initZ:
+	.zero	64
+	.size	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray9Hashtable6__initZ, 64
+
+	.type	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray5Range6__initZ,@object
+	.section	.rodata._D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray5Range6__initZ,"aG",@progbits,_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray5Range6__initZ,comdat
+	.weak	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray5Range6__initZ
+	.align	8
+_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray5Range6__initZ:
+	.zero	24
+	.size	_D6object53__T16AssociativeArrayTE3std6format6MangleTC8TypeInfoZ16AssociativeArray5Range6__initZ, 24
+
+	.type	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray6__initZ,@object
+	.section	.rodata._D6object26__T16AssociativeArrayTlThZ16AssociativeArray6__initZ,"aG",@progbits,_D6object26__T16AssociativeArrayTlThZ16AssociativeArray6__initZ,comdat
+	.weak	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray6__initZ
+	.align	8
+_D6object26__T16AssociativeArrayTlThZ16AssociativeArray6__initZ:
+	.zero	8
+	.size	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray6__initZ, 8
+
+	.type	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray4Slot6__initZ,@object
+	.section	.rodata._D6object26__T16AssociativeArrayTlThZ16AssociativeArray4Slot6__initZ,"aG",@progbits,_D6object26__T16AssociativeArrayTlThZ16AssociativeArray4Slot6__initZ,comdat
+	.weak	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray4Slot6__initZ
+	.align	8
+_D6object26__T16AssociativeArrayTlThZ16AssociativeArray4Slot6__initZ:
+	.zero	32
+	.size	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray4Slot6__initZ, 32
+
+	.type	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray9Hashtable6__initZ,@object
+	.section	.rodata._D6object26__T16AssociativeArrayTlThZ16AssociativeArray9Hashtable6__initZ,"aG",@progbits,_D6object26__T16AssociativeArrayTlThZ16AssociativeArray9Hashtable6__initZ,comdat
+	.weak	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray9Hashtable6__initZ
+	.align	8
+_D6object26__T16AssociativeArrayTlThZ16AssociativeArray9Hashtable6__initZ:
+	.zero	64
+	.size	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray9Hashtable6__initZ, 64
+
+	.type	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray5Range6__initZ,@object
+	.section	.rodata._D6object26__T16AssociativeArrayTlThZ16AssociativeArray5Range6__initZ,"aG",@progbits,_D6object26__T16AssociativeArrayTlThZ16AssociativeArray5Range6__initZ,comdat
+	.weak	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray5Range6__initZ
+	.align	8
+_D6object26__T16AssociativeArrayTlThZ16AssociativeArray5Range6__initZ:
+	.zero	24
+	.size	_D6object26__T16AssociativeArrayTlThZ16AssociativeArray5Range6__initZ, 24
+
+	.type	_D3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrie6__initZ,@object
+	.section	.rodata._D3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrie6__initZ,"aG",@progbits,_D3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrie6__initZ,comdat
+	.weak	_D3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrie6__initZ
+	.align	8
+_D3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrie6__initZ:
+	.zero	40
+	.size	_D3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrie6__initZ, 40
+
+	.type	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray6__initZ,@object
+	.section	.rodata._D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray6__initZ,"aG",@progbits,_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray6__initZ,comdat
+	.weak	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray6__initZ
+	.align	8
+_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray6__initZ:
+	.zero	8
+	.size	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray6__initZ, 8
+
+	.type	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray4Slot6__initZ,@object
+	.section	.rodata._D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray4Slot6__initZ,"aG",@progbits,_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray4Slot6__initZ,comdat
+	.weak	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray4Slot6__initZ
+	.align	8
+_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray4Slot6__initZ:
+	.zero	72
+	.size	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray4Slot6__initZ, 72
+
+	.type	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray9Hashtable6__initZ,@object
+	.section	.rodata._D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray9Hashtable6__initZ,"aG",@progbits,_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray9Hashtable6__initZ,comdat
+	.weak	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray9Hashtable6__initZ
+	.align	8
+_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray9Hashtable6__initZ:
+	.zero	64
+	.size	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray9Hashtable6__initZ, 64
+
+	.type	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray5Range6__initZ,@object
+	.section	.rodata._D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray5Range6__initZ,"aG",@progbits,_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray5Range6__initZ,comdat
+	.weak	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray5Range6__initZ
+	.align	8
+_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray5Range6__initZ:
+	.zero	24
+	.size	_D6object114__T16AssociativeArrayTxS3std8internal3uni12CodepointSetTS3std8internal3uni22__T13CodepointTrieVi8Z13CodepointTrieZ16AssociativeArray5Range6__initZ, 24
+
+	.type	_D3std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet142__T11SortedRangeTAyS3std8internal7uni_tab15UnicodePropertyS803std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet11__lambda961Z11SortedRange6__initZ,@object
+	.section	.rodata._D3std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet142__T11SortedRangeTAyS3std8internal7uni_tab15UnicodePropertyS803std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet11__lambda961Z11SortedRange6__initZ,"aG",@progbits,_D3std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet142__T11SortedRangeTAyS3std8internal7uni_tab15UnicodePropertyS803std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet11__lambda961Z11SortedRange6__initZ,comdat
+	.weak	_D3std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet142__T11SortedRangeTAyS3std8internal7uni_tab15UnicodePropertyS803std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet11__lambda961Z11SortedRange6__initZ
+	.align	8
+_D3std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet142__T11SortedRangeTAyS3std8internal7uni_tab15UnicodePropertyS803std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet11__lambda961Z11SortedRange6__initZ:
+	.zero	24
+	.size	_D3std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet142__T11SortedRangeTAyS3std8internal7uni_tab15UnicodePropertyS803std5regex13getUnicodeSetFNexAabbZxS3std8internal3uni12CodepointSet11__lambda961Z11SortedRange6__initZ, 24
+
+	.type	_D3std5array16__T8AppenderTAkZ8Appender6__initZ,@object
+	.section	.rodata._D3std5array16__T8AppenderTAkZ8Appender6__initZ,"aG",@progbits,_D3std5array16__T8AppenderTAkZ8Appender6__initZ,comdat
+	.weak	_D3std5array16__T8AppenderTAkZ8Appender6__initZ
+	.align	8
+_D3std5array16__T8AppenderTAkZ8Appender6__initZ:
+	.zero	8
+	.size	_D3std5array16__T8AppenderTAkZ8Appender6__initZ, 8
+
+	.type	_D3std5array16__T8AppenderTAkZ8Appender4Data6__initZ,@object
+	.section	.rodata._D3std5array16__T8AppenderTAkZ8Appender4Data6__initZ,"aG",@progbits,_D3std5array16__T8AppenderTAkZ8Appender4Data6__initZ,comdat
+	.weak	_D3std5array16__T8AppenderTAkZ8Appender4Data6__initZ
+	.align	8
+_D3std5array16__T8AppenderTAkZ8Appender4Data6__initZ:
+	.zero	24
+	.size	_D3std5array16__T8AppenderTAkZ8Appender4Data6__initZ, 24
+
+	.type	_D3std5range37__T11SortedRangeTAkVAyaa5_61203c2062Z11SortedRange6__initZ,@object
+	.section	.rodata._D3std5range37__T11SortedRangeTAkVAyaa5_61203c2062Z11SortedRange6__initZ,"aG",@progbits,_D3std5range37__T11SortedRangeTAkVAyaa5_61203c2062Z11SortedRange6__initZ,comdat
+	.weak	_D3std5range37__T11SortedRangeTAkVAyaa5_61203c2062Z11SortedRange6__initZ
+	.align	8
+_D3std5range37__T11SortedRangeTAkVAyaa5_61203c2062Z11SortedRange6__initZ:
+	.zero	16
+	.size	_D3std5range37__T11SortedRangeTAkVAyaa5_61203c2062Z11SortedRange6__initZ, 16
+
+	.type	_D3std5range40__T11SortedRangeTAxkVAyaa6_61203c3d2062Z11SortedRange6__initZ,@object
+	.section	.rodata._D3std5range40__T11SortedRangeTAxkVAyaa6_61203c3d2062Z11SortedRange6__initZ,"aG",@progbits,_D3std5range40__T11SortedRangeTAxkVAyaa6_61203c3d2062Z11SortedRange6__initZ,comdat
+	.weak	_D3std5range40__T11SortedRangeTAxkVAyaa6_61203c3d2062Z11SortedRange6__initZ
+	.align	8
+_D3std5range40__T11SortedRangeTAxkVAyaa6_61203c3d2062Z11SortedRange6__initZ:
+	.zero	16
+	.size	_D3std5range40__T11SortedRangeTAxkVAyaa6_61203c3d2062Z11SortedRange6__initZ, 16
+
+	.type	_D3std5range95__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa14_612e656e64203c3d20622e656e64Z11SortedRange6__initZ,@object
+	.section	.rodata._D3std5range95__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa14_612e656e64203c3d20622e656e64Z11SortedRange6__initZ,"aG",@progbits,_D3std5range95__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa14_612e656e64203c3d20622e656e64Z11SortedRange6__initZ,comdat
+	.weak	_D3std5range95__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa14_612e656e64203c3d20622e656e64Z11SortedRange6__initZ
+	.align	8
+_D3std5range95__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa14_612e656e64203c3d20622e656e64Z11SortedRange6__initZ:
+	.zero	16
+	.size	_D3std5range95__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa14_612e656e64203c3d20622e656e64Z11SortedRange6__initZ, 16
+
+	.type	_D3std5range103__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa18_612e7374617274203c3d20622e7374617274Z11SortedRange6__initZ,@object
+	.section	.rodata._D3std5range103__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa18_612e7374617274203c3d20622e7374617274Z11SortedRange6__initZ,"aG",@progbits,_D3std5range103__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa18_612e7374617274203c3d20622e7374617274Z11SortedRange6__initZ,comdat
+	.weak	_D3std5range103__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa18_612e7374617274203c3d20622e7374617274Z11SortedRange6__initZ
+	.align	8
+_D3std5range103__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa18_612e7374617274203c3d20622e7374617274Z11SortedRange6__initZ:
+	.zero	16
+	.size	_D3std5range103__T11SortedRangeTAyS3std8internal7uni_tab15CommonCaseEntryVAyaa18_612e7374617274203c3d20622e7374617274Z11SortedRange6__initZ, 16
+
+	.type	.str29,@object
+	.section	.rodata,"a",@progbits
+.str29:
+	.asciz	 "Hello,World!"
+	.size	.str29, 13
+
+	.type	.str30,@object
+.str30:
+	.asciz	 "%.*s\n"
+	.size	.str30, 6
+
+	.type	.str31,@object
+	.align	16
+.str31:
+	.asciz	 "/usr/local/include/d/std/stdio.d"
+	.size	.str31, 33
+
+	.type	.str94,@object
+.str94:
+	.asciz	 "hello"
+	.size	.str94, 6
+
+	.type	_D5hello8__ModuleZ,@object
+	.data
+	.globl	_D5hello8__ModuleZ
+	.align	16
+_D5hello8__ModuleZ:
+	.long	2147484672
+	.long	0
+	.quad	1
+	.quad	_D3std5stdio8__ModuleZ
+	.quad	.str94
+	.size	_D5hello8__ModuleZ, 32
+
+	.type	_D5hello11__moduleRefZ,@object
+	.align	8
+_D5hello11__moduleRefZ:
+	.quad	0
+	.quad	_D5hello8__ModuleZ
+	.size	_D5hello11__moduleRefZ, 16
+
+	.section	.ctors,"aw",@progbits
+	.align	8
+	.quad	_D5hello16__moduleinfoCtorZ
+
+	.section	".note.GNU-stack","",@progbits
