@@ -2,7 +2,7 @@ package cs671;
 import java.io.*;
 class Debug
 {
-  final static boolean DEBUG = true;
+  final static boolean DEBUG = true ;
   static FileWriter logger;
   static PrintWriter tracer;
   static void here (){
@@ -25,7 +25,8 @@ class Debug
       catch(IOException ex){}
     }
   }
-  static void here (String here_string){
+  static void here (Object here_){
+    String here_string=String.valueOf(here_);
     if (DEBUG) {
       String fullClassName = Thread.currentThread().
         getStackTrace()[2].getClassName();
@@ -45,6 +46,26 @@ class Debug
       catch(IOException ex){}
     }
   }
+  static void log (Object log_){
+    String log_string=String.valueOf(log_);
+    String fullClassName = Thread.currentThread().
+      getStackTrace()[2].getClassName();
+    String className = fullClassName.
+      substring(fullClassName.lastIndexOf(".") + 1);
+    String methodName = Thread.currentThread().
+      getStackTrace()[2].getMethodName();
+    int lineNumber = Thread.currentThread().
+      getStackTrace()[2].getLineNumber();
+    String message=(className + "."+ 
+                    methodName + "():" + lineNumber+
+                    "\nMessage: "+log_string);
+    try{
+      logger=new FileWriter("debug.log",true);
+      logger.write(message+"\n");
+      logger.close();
+    }
+    catch(IOException ex){}
+  }
   static void log (){
     String fullClassName = Thread.currentThread().
       getStackTrace()[2].getClassName();
@@ -58,14 +79,14 @@ class Debug
                     methodName + "():" + lineNumber);
     try{
       logger=new FileWriter("debug.log",true);
-        logger.write(message+"\n");
-        logger.close();
+      logger.write(message+"\n");
+      logger.close();
     }
     catch(IOException ex){}
   }
   static void trace (Throwable trace){
     try{
-      tracer=new PrintWriter(new FileWriter("debug.log",true),true);
+      tracer=new PrintWriter(new FileWriter("debug.log",true));
       tracer.println(trace.getLocalizedMessage());
       trace.fillInStackTrace();
       trace.printStackTrace(tracer);

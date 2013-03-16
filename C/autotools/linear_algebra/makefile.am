@@ -1,0 +1,18 @@
+ACLOCAL_AMFLAGS=-I m4
+
+bin_PROGRAMS = \
+	test_vector_dot \
+	test_vector_add
+
+test_vector_dot_SOURCES = test_vector_dot.c linear_algebra.h vector.c vector_dot.c
+
+test_vector_add_SOURCES = test_vector_add.c linear_algebra.h vector.c vector_add.c
+
+lib_LIBRARIES = liblinalg.a
+liblinalg_a_SOURCES=\
+	linear_algebra.h \
+	vector.c \
+	vector_add.c \
+	vector_doc.c \
+
+LDADD = liblinalg.a
