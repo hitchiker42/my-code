@@ -1,26 +1,27 @@
-(*  sig
-    val curry : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
-    val expand : ('a -> 'b -> 'c) -> 'a * 'b -> 'c
-    val eq : ''a -> ''a -> bool
-    val sub : int -> int -> int
-    val last : 'a list -> 'a
-    val most : 'a list -> 'a list
-    val natList : int -> int list
-    val sum : int list -> int
-    val prod : int list -> int
-    val sum2 : int list list -> int
-    val isLetter : char -> bool
-    val toLower : char -> char
-    val palindrome : string -> bool
-    val hanoi : int * 'a * 'a * 'a -> ('a * 'a) list
-    val intpow : int -> int -> int
-    val powint : int * int -> int
-    val multiply : (int * int) list -> int
-    val introot : int -> int
-    val primes : int -> int list
-    val filt : ''a list ref -> int
-    val isPerm : ''a list * ''a list -> bool
-  end
+(* sig
+  val curry : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
+  val expand : ('a -> 'b -> 'c) -> 'a * 'b -> 'c
+  val eq : ''a -> ''a -> bool
+  val sub : int -> int -> int
+  val last : 'a list -> 'a
+  val most : 'a list -> 'a list
+  val natList : int -> int list
+  val sum : int list -> int
+  val prod : int list -> int
+  val sum2 : int list list -> int
+  val isLetter : char -> bool
+  val toLower : char -> char
+  val palindrome : string -> bool
+  val hanoi : int * 'a * 'a * 'a -> ('a * 'a) list
+  val intpow : int -> int -> int
+  val powint : int * int -> int
+  val multiply : (int * int) list -> int
+  val introot : int -> int
+  val primes : int -> int list
+  val filt : ''a list ref -> int
+  val factor : int -> (int * int) list
+  val printFact : int -> string
+  val isPerm : ''a list * ''a list -> bool
 *)
 structure hw5 = struct
 fun curry f x y = f(x,y)
@@ -28,9 +29,6 @@ fun expand f (x,y) = f x y
 (*= is binding eq is testing*)
 fun eq x y = x=y
 fun sub x y = x-y
-(*last is already a fxn in the basis library....
-to be honest this is the exact same one as in the basis library
-there really aren't many other ways to write it*)
 
 (* heres a length function
 fun length l = let
@@ -41,22 +39,25 @@ fun length l = let
         len (0, l)
       end
 Now, I'm going to use the standard one since its more efficent*)
+(*last is already a fxn in the basis library....
+to be honest this is the exact same one as in the basis library
+there really aren't many other ways to write it*)
 fun last [] = raise List.Empty
 | last [x] = x
 | last (_::x) = last x
-fun most l = if length l > 1 then List.take(l,List.length l - 1) else l
+(*fun most l = if length l > 1 then List.take(l,List.length l - 1) else l*)
 fun most [] = raise List.Empty
   | most (x::[]) = []
   | most (x::y::[]) = x::[]
   | most (x::z) = x::(most z)
-(*natList aka seq 0 n*)
+(*natList aka seq 0 n && rev*)
 fun natList 0 = []
   | natList 1 = 1::[]
   | natList n = let
 (*tail recursion I think*)
       fun acc 0 r = r
         | acc n r = acc (n-1) (n::r)
-  in rev (acc n []) end
+  in acc n [] end
 (*this one is kinda silly, there are a million ways to do this*)
 fun sum [] = 0
   | sum (x::[]) = x
@@ -79,12 +80,12 @@ fun toLower c =
         if (ord c >=0x41 andalso ord c <=0x5A)
         then chr (ord c + 0x20)
         else c
-    else raise Chr
+    else c
 fun palindrome s = let
     val ca=explode s
     fun compress [] = []
       | compress (c::[]) = if isLetter c then (c::[]) else []
-      | compress (c::ca)  = if isLetter c then (c::(compress ca)) else (compress ca)
+      | compress (c::ca)  = if isLetter c then ((toLower c)::(compress ca)) else (compress ca)
     val c = compress ca
     (**)
     fun hdtl [x] = [x]
@@ -92,7 +93,7 @@ fun palindrome s = let
     fun test [] = true
       | test (x::[]) = true
       | test (x::y::[]) = (x=y)
-      | test l = test (hdtl l) andalso test (most l)
+      | test l = test (hdtl l) andalso test (most (tl l))
 in test c end
 (*move n-1 disks to B;
   move disk n to C;
@@ -163,7 +164,7 @@ fun filt l = let
     val xs = tl (!l)
     val f=fn y => x=y
     val g=(not o f)(*fn y =>not (f y);*)
-    val num = op+(List.length xs,1) - List.length (List.filter f xs)
+    val num =List.length (List.filter f (x::xs))
 in (l:=List.filter g xs;num) end
 fun factor n = let
     val primes = primes (introot n)
@@ -175,6 +176,7 @@ fun factor n = let
                                            else if (n mod p)=0 then
                                                decompose (op div(n,p)) (p::xs) (p::l)
                                            else decompose n xs l
+      | decompose n [] [] = n::[]
     (*formatting of answer
      we have a list factor::factor::factor....factor::[]
      need a list (factor,num)::(factor,num)*)
@@ -183,12 +185,20 @@ fun factor n = let
         let
         val q = hd(!x)
         val flt = filt x
-    in collect x ((flt,q)::l) end
-    fun collect  l = l
+    in collect x ((q,flt)::l) end
 
-    val facts = decompose n primes factors
+    val facts = decompose n (rev primes) factors
     val f_list = ref facts
-in collect f_list [] end
+in collect f_list ([]:(int*int) list) end
+
+fun printFact n=let
+    val factors=rev (factor n);
+    fun strpow (x:(int*int)) = if #2(x) = 1 then Int.toString(#1x) else
+                               concat (Int.toString(#1x)::"^"::Int.toString(#2x)::[])
+    fun acc [x] l = concat ((strpow x)::l)
+      | acc (x::xs) l = acc xs (" * "::(strpow x)::l)
+    val fact_str=acc factors []
+in print (concat ((Int.toString n)::" = "::fact_str::"\n"::[])) end
 (*
 list factors()
 fun factor n primes:
@@ -206,9 +216,9 @@ fun isPerm ([],[]) = true
   | isPerm ([],(z::[])) = false
   | isPerm ((x::xs),y) = let
       fun rot x (l::[]) [] = if l = x then [] else (l::[])
-      fun rot x (l::[]) z = if l = x then z else []
-      fun rot x [] z = []
-      fun rot x (l::ls) z = if l = x then (ls@z)
+        | rot x (l::[]) z = if l = x then z else []
+        | rot x [] z = []
+        | rot x (l::ls) z = if l = x then (ls@z)
                             else rot x ls (l::z)
   in isPerm (xs,(rot x y [])) end
 end

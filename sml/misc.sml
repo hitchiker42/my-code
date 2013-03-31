@@ -18,6 +18,20 @@ fun curry f x y = f(x,y)
 fun car x = hd x
 fun cdr x = tl x
 fun cons x y = op :: (x,y)
+fun des_car x = (x:=(cdr (!x));car(!x))
+fun seq n = let
+    fun build 0 l = l
+      | build n l = build (n-1) (n::l)
+in build n [] end
+fun dec n = let
+    val i = ref 0
+    val l = ref []
+    fun build i l n = if (!i)>n then (!l)
+                      else (l:=((!i)::(!l)); i:=((!i)+1);build i l n)in build i l n end
+fun arr_swap arr i j = let
+    val tempi = Array.sub (arr,i)
+    val tempj = Array.sub (arr,j)
+in (Array.update (arr,i,tempj);Array.update (arr,j,tempi)) end
 val list = fn z => Foldr.foldr ([], fn l => l) z
 val ` = fn z => Foldr.step1 (op ::) z
 fun add x y = op + (x,y)

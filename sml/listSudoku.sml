@@ -318,3 +318,14 @@ prepare(board)
 display(board)
 search(0, 0, board)
 print "Time taken:", time.clock() - start*)
+(* Ideas in py program, I think
+-variable solved 9*9
+-Build up list of all values in all open cells,
+filled in cells get the empty list & for each filled in cell solved--
+-Check through all cells, if cell has only one possible value fill in cell
+set to empty list && solved -- && clear that value from all cells in the
+same row collunm & square
+-for row,collumn and square check if only one open cell has a needed value
+(ie if we have 4 open cells in a row with possibilities (1,2,3),(1,3,4),(1,2,5,4)&(1,2) then cell 3 must be 5(cell 2 must then be 4, but we'll catch that later)
+-if puzzle not solved by this point then do guessing w/backtracking
+*)
