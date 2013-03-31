@@ -22,3 +22,5 @@
  * this results in a perodic solution with a recurrence time of Tr=30.4/pi    *
  * thus the default time to run is Tr.                                        *
  *****************************************************************************/
+#include "Misc.h"
+void help();

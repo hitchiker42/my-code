@@ -1,9 +1,10 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 int main(void){
   int x=0,guess=0;
-  srand ( time(NULL) );
+  srand ( time(0) );
   printf("\nGuess an integer from 1-15\n");
   scanf("%d" ,&guess);
   x=rand()%15;x+=1;

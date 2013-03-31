@@ -1,4 +1,6 @@
 bin_PROGRAMS = \
 	kDv
-#lib_LIBRARIES=
-kDv_SOURCES = kdv.c kdv.h integrate.c calculus.h
+lib_LIBRARIES= \
+	libcalculus.a
+kDv_SOURCES = kdv.c kdv.h calculus.c calculus.h Misc.h
+libcalculus_a_SOURCES=calculus.[ch]

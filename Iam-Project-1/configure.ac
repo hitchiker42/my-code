@@ -7,7 +7,7 @@ AM_INIT_AUTOMAKE([-Wall foreign])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 # Checks for programs.
-AC_PROG_CC [gcc]
+#AC_PROG_CC [gcc]
 
 AC_PROG_CC_C99
 if test -z "$CC" || test "$CC" = "no"; then
@@ -16,34 +16,31 @@ fi
 AM_PROG_CC_C_O
 
 #Need GCC extensions, so force std=gcc99
-CFLAGS="$CFLAGS -std=gnu99"
 
 # add -Wall if possible
-AX_CHECK_COMPILER_FLAGS([-Wall], [CFLAGS="$CFLAGS -Wall"])
-
+#AX_CHECK_COMPILER_FLAGS([-Wall], [CFLAGS="$CFLAGS -Wall"])
+#CFLAGS="$CFLAGS -std=gnu99"
 # find flags for using OpenMP
 AC_OPENMP
 CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 
-# link with the math library if needed
-AC_CHECK_LIB([m], [sin])
-
 # Check for debugging
-AC_ARG_ENABLE(debug,
-  AS_HELP_STRING([--disable-debug], [Turn off debugging]),
-  [case "${enableval}"
-     yes) debug=true ;;
-     no)  debug=false ;;
-     *) AC_MSG_ERROR(bad value ${enableval} for --enable-debug) ;;
-   esac],
-  [debug=true])
+#AC_ARG_ENABLE(debug,
+#  AS_HELP_STRING([--disable-debug], [Turn off debugging]),
+#  [case "${enableval}"
+#     yes) debug=true ;;
+#     no)  debug=false ;;
+#     *) AC_MSG_ERROR(bad value ${enableval} for --enable-debug) ;;
+#   esac],
+#  [debug=true])
 
-AS_IF([test "$debug" = "false"], [CPPFLAGS="${CPPFLAGS} -DNDEBUG"])
+#AS_IF([test "$debug" = "false"], [CPPFLAGS="${CPPFLAGS} -DNDEBUG"])
 
 # for library support
 AC_PROG_RANLIB
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
+#Check for gsl
 AC_CHECK_LIB([m],[cos])
 AC_CHECK_LIB([gslcblas],[cblas_dgemm])
 AC_CHECK_LIB([gsl],[gsl_blas_dgemm])
