@@ -1,27 +1,4 @@
 structure Misc = struct
-fun curry f x y = f(x,y)
-fun car x = hd x
-fun cdr x = tl x
-fun cons x y = x::y
-val list = fn z => Foldr.foldr ([], fn l => l) z
-val ` = fn z => Foldr.step1 (op ::) z
-fun add x y = x + y
-fun sub x y = x - y
-fun eql x y = x = y
-fun mult x y = x * y
-fun div x y = x / y
-fun last n::[] = n
-  | last x::xs = last (cdr xs)
-fun foldl f b l = let
-      fun f2 ([], b) = b
-        | f2 (a :: r, b) = f2 (r, f (a, b))
-      in
-        f2 (l, b)
-      end
-fun foldr f b l = foldl f b (rev l)
-end
-fun $ (a, f) = f a
-fun id x = x
 structure Fold =
    struct
       fun fold (a, f) g = g (a, f)
@@ -34,6 +11,39 @@ structure Foldr =
       fun step0 h = Fold.step0 (fn g => g o h)
       fun step1 h = Fold.step1 (fn (b, g) => g o (fn a => h (b, a)))
    end
+val load = use
+fun switch (x::xs) l = switch xs ((!x)::l)
+fun inc (y:(int*int) ref) = y:=((#1(!y))+1,#2(!y))
+fun curry f x y = f(x,y)
+fun car x = hd x
+fun cdr x = tl x
+fun cons x y = op :: (x,y)
+val list = fn z => Foldr.foldr ([], fn l => l) z
+val ` = fn z => Foldr.step1 (op ::) z
+fun add x y = op + (x,y)
+fun sub x y = op - (x,y)
+fun eql x y = op = (x,y)
+fun mult x y = op * (x,y)
+fun dv x y = op div (x,y)
+fun last (n::[]) = n
+  | last [] = raise Empty
+  | last (x::xs) = last (cdr xs)
+fun foldl f b l = let
+    fun f2 ([], b) = b
+      | f2 (a :: r, b) = f2 (r, f (a, b))
+in
+    f2 (l, b)
+end
+fun foldr f b l = foldl f b (rev l)
+fun loop n x f g h = if f n then h x else loop (g n) (h x) f g h
+       (*int n, list x, test fxn y, increment fxn g, and do fxn h*)
+fun for n f x = (*do f x n times*) if eql 0 n then x::[] else for (n-1) f (f(x))
+fun odd n = let
+    val f = fn (x::xs) => ((x+2)::x::xs)
+in for n f (3::2::[])
+end
+fun $ (a, f) = f a
+fun id x = x
 structure Printf =
    struct
       fun fprintf out =
@@ -56,3 +66,4 @@ structure Printf =
       val I = fn z => spec Int.toString z
       val R = fn z => spec Real.toString z
    end
+end
