@@ -12,36 +12,62 @@ structure Foldr =
       fun step1 h = Fold.step1 (fn (b, g) => g o (fn a => h (b, a)))
    end
 val load = use
-fun switch (x::xs) l = switch xs ((!x)::l)
 fun inc (y:(int*int) ref) = y:=((#1(!y))+1,#2(!y))
 fun curry f x y = f(x,y)
+(*lisp names*)
 fun car x = hd x
 fun cdr x = tl x
 fun cons x y = op :: (x,y)
+(*pop head off of a mutable list & return the removed element*)
 fun des_car x = (x:=(cdr (!x));car(!x))
+(*return list 1::2::3...::n::[]*)
 fun seq n = let
     fun build 0 l = l
       | build n l = build (n-1) (n::l)
 in build n [] end
+(*return a list n::n-1::n-2...0::[]*)
+val min = fn (i,j)=>if (i<j) then i else j
+val max = fn (i,j)=>if (i>j) then i else j
 fun dec n = let
     val i = ref 0
     val l = ref []
     fun build i l n = if (!i)>n then (!l)
                       else (l:=((!i)::(!l)); i:=((!i)+1);build i l n)in build i l n end
+val arr_to_list = fn y=>Array.foldr (op ::) [] y
+val sl_to_list = fn y=>ArraySlice.foldr (op ::) [] y
+
 fun arr_swap arr i j = let
     val tempi = Array.sub (arr,i)
     val tempj = Array.sub (arr,j)
-in (Array.update (arr,i,tempj);Array.update (arr,j,tempi)) end
+in (Array.update(arr,i,tempj);Array.update(arr,j,tempi)) end
+(*swap element k in array slice i with element l from array slice j*)
+fun sl_swap i j k l= let
+    val tempi = ArraySlice.sub(i,k)
+    val tempj= ArraySlice.sub(j,l)
+in (ArraySlice.update(i,k,tempj);ArraySlice.update(j,l,tempi)) end
 val list = fn z => Foldr.foldr ([], fn l => l) z
 val ` = fn z => Foldr.step1 (op ::) z
+(*prefix operators from builtin infixes*)
 fun add x y = op + (x,y)
 fun sub x y = op - (x,y)
 fun eql x y = op = (x,y)
 fun mult x y = op * (x,y)
 fun dv x y = op div (x,y)
+fun is_ws chr = if ord chr = 0x20 orelse 0x09<=(ord chr)<=0x0D then true
+                else false
+fun strip str =let
+    val chars = explode str
+    val f = (not o is_ws)
+in List.filter(f,chars) end
+(*last element of a list*)
 fun last (n::[]) = n
   | last [] = raise Empty
   | last (x::xs) = last (cdr xs)
+(*fun most l = if length l > 1 then List.take(l,List.length l - 1) else l*)
+fun most [] = raise List.Empty
+  | most (x::[]) = []
+  | most (x::y::[]) = x::[]
+  | most (x::z) = x::(most z)
 fun foldl f b l = let
     fun f2 ([], b) = b
       | f2 (a :: r, b) = f2 (r, f (a, b))

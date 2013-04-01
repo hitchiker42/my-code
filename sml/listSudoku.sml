@@ -1,16 +1,50 @@
+(*
+signature SUDOKU = sig
+eqtype grid
+exception Parse
+exception Unsolvable
+val parseString: string -> grid
+val parseFile: string -> grid
+val get: grid * int -> int
+val set: grid * int * int -> grid (* may modify the grid, or not *)
+val unsolved: grid -> int option
+val possibles: grid * int -> int list
+val valid: grid -> bool
+val print: grid -> unit
+val sudoku: grid -> grid
+end*)
+
 structure ListSudoku : SUDOKU = struct
 
-type grid = int list
+type grid = (int*int list) array
 
 exception Parse
 exception Unsolvable
-
-fun parseString _ = raise Fail "not implemented"
-fun get _ = raise Fail "not implemented"
-fun set _ = raise Fail "not implemented"
+use "misc.sml"
+val get = Array.sub
+val set = Array.update
+val seq9 = [1,2,3,4,5,6,7,8,9]
+val check = fn i=> if i<0 orelse i>80 then raise Subscript else ()
+(*ignore all whitespace,(run strip on given string)
+run explode on string, get char array, if array not len 81 raise exception
+for index i if 0x31 <= chr <= 0x39 then set(grid,i,(chr,[]))
+else set(grid,i,(0,[1,2,3,4,5,6,7,8,9]))*)
+fun init () = Array.array(81,(0,[]))
+val g = init ()
+fun parseString str = let
+    val chars = misc.strip str
+    fun set c = if 0x31<=(ord c)<=0x39 then set (g,i,(((ord c)-0x30),[]))
+                else set (g,i,(0,seq9))
+fun get (arr,i) = (check i;#1(get (arr,i)))
+fun set (arr,i,x) = (check i;set(arr,i,(x,[])))
+(* if for some element i in grid #1(i) = 0 then SOME(i)
+   else NONE*)
 fun unsolved _ = raise Fail "not implemented"
-fun possibles _ = raise Fail "not implemented"
+fun possibles (arr,i) = (check i;if #1(get (arr,i))>0 then #1(get (arr,i))
+                                 else #2(get (arr,i)))
+(*true iff grid filled and consistant*)
 fun valid _ = raise Fail "not implemented"
+(*Solves given grid*)
 fun sudoku _ = raise Fail "not implemented"
 
 fun parseFile file =
