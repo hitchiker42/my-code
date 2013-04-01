@@ -17,16 +17,16 @@ double rk4 (double (*fp)(double,double),double x,double t,double h);
   is replaced by an equivlant 5pt stencil.
   Need to solve a linear eq to find u_i^n+1 for each step.(ie implict method)*/
 //no idea what this should be 
-/*5_pt stencil,build in upto 3rd deritive, if given higher for now just raise
+
+/*5_pt stencil,built in upto 4th deritive, if given higher for now just raise
  *some kind of error*/
 double Stencil_5pt (double arr[],int i,int order,double (*fp)(double),double h);
-
-
-
-
-
-
-
-
-
-
+/* typedef struct {
+   int x_init;
+   int range;
+   double del_t;
+   double del_x;
+   double* x;
+   double (*fn)(double,double)
+} kdv_info;
+Idea for a struct to store info for a given set of conditions*/
