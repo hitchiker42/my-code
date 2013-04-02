@@ -20,7 +20,7 @@ type grid = (int*int list) array
 
 exception Parse
 exception Unsolvable
-use "misc.sml"
+val _ = use "misc.sml"
 val get = Array.sub
 val set = Array.update
 val seq9 = [1,2,3,4,5,6,7,8,9]
@@ -35,6 +35,7 @@ fun parseString str = let
     val chars = misc.strip str
     fun set c = if 0x31<=(ord c)<=0x39 then set (g,i,(((ord c)-0x30),[]))
                 else set (g,i,(0,seq9))
+in end
 fun get (arr,i) = (check i;#1(get (arr,i)))
 fun set (arr,i,x) = (check i;set(arr,i,(x,[])))
 (* if for some element i in grid #1(i) = 0 then SOME(i)
@@ -62,10 +63,7 @@ local
       | pr (x::l) n = (print (ts x);
                        if n mod 9 = 0 then print "\n" else print " ";
                        pr l (n+1))
-in
-fun print s = pr s 1
-end
-
+in fun print s = pr s 1 end
 end
 (*Sudoku Solver in python*)
 

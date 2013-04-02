@@ -20,10 +20,11 @@ fun cdr x = tl x
 fun cons x y = op :: (x,y)
 (*pop head off of a mutable list & return the removed element*)
 fun des_car x = (x:=(cdr (!x));car(!x))
+val des_hd = des_car
 (*return list 1::2::3...::n::[]*)
-fun seq n = let
-    fun build 0 l = l
-      | build n l = build (n-1) (n::l)
+fun seq m n = let
+    val stop = m
+    fun build n l = if n=m then l else build (n-1) (n::l)
 in build n [] end
 (*return a list n::n-1::n-2...0::[]*)
 val min = fn (i,j)=>if (i<j) then i else j
@@ -53,12 +54,13 @@ fun sub x y = op - (x,y)
 fun eql x y = op = (x,y)
 fun mult x y = op * (x,y)
 fun dv x y = op div (x,y)
-fun is_ws chr = if ord chr = 0x20 orelse 0x09<=(ord chr)<=0x0D then true
+fun is_ws chr = if ord chr = 0x20 orelse 0x09<=(ord chr) 
+                                         andalso (ord chr)<=0x0D then true
                 else false
 fun strip str =let
     val chars = explode str
     val f = (not o is_ws)
-in List.filter(f,chars) end
+in List.filter f chars end
 (*last element of a list*)
 fun last (n::[]) = n
   | last [] = raise Empty
@@ -82,6 +84,16 @@ fun odd n = let
     val f = fn (x::xs) => ((x+2)::x::xs)
 in for n f (3::2::[])
 end
+
+fun run_tests (t:(unit->bool) list) = let
+    val tests = ListPair.zip (t,(List.map Int.toString (seq 1 (List.length t))))
+    fun test (t,i) = if t() then concat ("Test"::i::"Passed"::[]) else
+                     concat ("Test"::i::"Failed"::[])
+in List.map test tests end
+fun print_list (l:string list)=let
+    val strings=ref l
+in while not ((!strings)=[]) do
+         print (concat ((des_car(strings))::"\n"::[])) end
 fun $ (a, f) = f a
 fun id x = x
 structure Printf =
