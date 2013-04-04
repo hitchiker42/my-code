@@ -1,3 +1,44 @@
+(*sig
+    structure Fold : <sig>
+    structure Foldr : <sig>
+    val load : string -> unit
+    val inc : (int * int) ref -> unit
+    val curry : ('a * 'b -> 'c) -> 'a -> 'b -> 'c
+    val car : 'a list -> 'a
+    val cdr : 'a list -> 'a list
+    val cons : 'a -> 'a list -> 'a list
+    val des_car : 'a list ref -> 'a
+    val des_hd : 'a list ref -> 'a
+    val seq : int -> int -> int list
+    val min : int * int -> int
+    val max : int * int -> int
+    val dec : int -> int list
+    val arr_to_list : 'a array -> 'a list
+    val sl_to_list : 'a ArraySlice.slice -> 'a list
+    val arr_swap : 'a array -> int -> int -> unit
+    val sl_swap : 'a ArraySlice.slice
+                  -> 'a ArraySlice.slice -> int -> int -> unit
+    val list : (('a -> 'a) * (('b list -> 'c) -> 'c) -> 'd) -> 'd
+    val ` : ('a list -> 'b) * 'c -> 'a -> (('a list -> 'b) * 'c -> 'd) -> 'd
+    val add : int -> int -> int
+    val sub : int -> int -> int
+    val eql : ''a -> ''a -> bool
+    val mult : int -> int -> int
+    val dv : int -> int -> int
+    val is_ws : char -> bool
+    val strip : string -> char list
+    val last : 'a list -> 'a
+    val most : 'a list -> 'a list
+    val foldl : ('a * 'b -> 'b) -> 'b -> 'a list -> 'b
+    val foldr : ('a * 'b -> 'b) -> 'b -> 'a list -> 'b
+    val loop : 'a -> 'b -> ('a -> bool) -> ('a -> 'a) -> ('b -> 'b) -> 'b
+    val for : int -> ('a -> 'a) -> 'a -> 'a list
+    val odd : int -> int list list
+    val run_tests : (unit -> bool) list -> string list
+    val print_list : string list -> unit
+    val $ : 'a * ('a -> 'b) -> 'b
+    val id : 'a -> 'a
+    structure Printf : <sig>*)
 structure Misc = struct
 structure Fold =
    struct

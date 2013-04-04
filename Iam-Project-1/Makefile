@@ -101,10 +101,10 @@ am__v_AR_0 = @echo "  AR      " $@;
 am__v_AR_1 = 
 libcalculus_a_AR = $(AR) $(ARFLAGS)
 libcalculus_a_LIBADD =
-am_libcalculus_a_OBJECTS =
+am_libcalculus_a_OBJECTS = calculus.$(OBJEXT)
 libcalculus_a_OBJECTS = $(am_libcalculus_a_OBJECTS)
 PROGRAMS = $(bin_PROGRAMS)
-am_kDv_OBJECTS = kdv.$(OBJEXT) calculus.$(OBJEXT)
+am_kDv_OBJECTS = kdv.$(OBJEXT) calculus.$(OBJEXT) main.$(OBJEXT)
 kDv_OBJECTS = $(am_kDv_OBJECTS)
 kDv_LDADD = $(LDADD)
 AM_V_P = $(am__v_P_$(V))
@@ -254,8 +254,8 @@ top_srcdir = .
 lib_LIBRARIES = \
 	libcalculus.a
 
-kDv_SOURCES = kdv.c kdv.h calculus.c calculus.h Misc.h
-libcalculus_a_SOURCES = calculus.[ch]
+kDv_SOURCES = kdv.c kdv.h calculus.c calculus.h Misc.h main.c
+libcalculus_a_SOURCES = calculus.c calculus.h Misc.h
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -397,6 +397,7 @@ distclean-compile:
 
 include ./$(DEPDIR)/calculus.Po
 include ./$(DEPDIR)/kdv.Po
+include ./$(DEPDIR)/main.Po
 
 .c.o:
 	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

@@ -1,3 +1,5 @@
+#ifndef CALCULUS_H
+#define CALCULUS_H
 #include "Misc.h"
 //let pd = partial deritive
 /*Rk4 let dx/dt=f(t,x) && x(t_0)=x_0, h=step size
@@ -15,12 +17,13 @@ double rk4 (double (*fp)(double,double),double x,double t,double h);
   let u_i^n = u(i\delx,n\delt), we want u_i^n+1(i.e next time step)
   (u_i^n+1 - u_i^n)/\delt=0.5*(F_i^n+1+F_i^N) where any deritive in F
   is replaced by an equivlant 5pt stencil.
-  Need to solve a linear eq to find u_i^n+1 for each step.(ie implict method)*/
+  Need to solve a linear eq to find u_i^n+1 for each step.(ie implict method)
+  This would replace rk4 as a time stepping method*/
 //no idea what this should be 
 
 /*5_pt stencil,built in upto 4th deritive, if given higher for now just raise
  *some kind of error*/
-double Stencil_5pt (double arr[],int i,int order,double (*fp)(double),double h);
+double Stencil_5pt (double* x,int i,int len,int order,double h);
 /* typedef struct {
    int x_init;
    int range;
@@ -30,3 +33,7 @@ double Stencil_5pt (double arr[],int i,int order,double (*fp)(double),double h);
    double (*fn)(double,double)
 } kdv_info;
 Idea for a struct to store info for a given set of conditions*/
+double secant_meth(double x1,double x2,double (*fp)(double),double err);
+
+double* map(double* x,int l,double(*fp)(double));
+#endif

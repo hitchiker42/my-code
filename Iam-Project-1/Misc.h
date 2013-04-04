@@ -1,13 +1,16 @@
 /*Global include file for kdv project, keep include lines outside of indivual
  *files also some shameless gcc only macros and such
  */
+#ifndef MISC_H
+#define MISC_H
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#define lambda(return_type, function_body) \
+#include "calculus.h"
+#define lambda(return_type,function_args,function_body)    \
 ({ \
-      return_type __fn__ function_body \
-          __fn__; \
+      return_type __fn__ function_args function_body \
+      __fn__;                                      \
 })
 #define for_each_array(fe_arrType, fe_arr, fe_fn_body)  \
   {                                                     \
@@ -25,3 +28,4 @@
   if(ptr == NULL){          \
   fprintf(stderr,"Memory allocation failed\n")\
     exit(EXIT_FAILURE)}
+#endif

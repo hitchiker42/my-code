@@ -33,8 +33,9 @@ fun init () = Array.array(81,(0,[]))
 val g = init ()
 fun parseString str = let
     val chars = misc.strip str
+    val chrs = ref chars
     fun set c = if 0x31<=(ord c)<=0x39 then set (g,i,(((ord c)-0x30),[]))
-                else set (g,i,(0,seq9))
+                else set (g,i,(0,seq9))     
 in end
 fun get (arr,i) = (check i;#1(get (arr,i)))
 fun set (arr,i,x) = (check i;set(arr,i,(x,[])))
