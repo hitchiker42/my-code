@@ -3,29 +3,29 @@
 double*
 seq(double init,double final,double step){
   int len=ceil((final-init)/step);
-  double* ret=malloc(len*sizeof(int));
+  double *val=malloc(len*sizeof(double));
   int i;
-#pragma omp parallel for 
+  //#pragma omp parallel for 
   for(i=0;i<len;i++){
-  ret[i]=i*step+init;
-}
-  return ret;
+  val[i]=i*step+init;
+  }
+  return val;
 }
 double 
  inital_u(double y){
-  return cos(M_PI*y);
+  return -12*pow(acosh(y),2);
 }
 double 
-  u_tstep(double u,double x,double t){
-  return cos(M_PI*(x-u*t));
+  u_tstep(double t,double u){
+  return t*u;
   //=sinx*cosut-cosxsin
 }
 /*getting derivites w.r.t x, 0 =du/dt+ d^3u/du^3 -6*u*du/dx*/
 double*
-  u_discrete(double* u,int len,double h){
+u_discrete(double* u,int len,double h){
   int i;
   double *u_x=malloc(len*sizeof(double));
-#pragma opm parallel for
+  //#pragma opm parallel for
   for(i=0;i<len;i++){
   u_x[i]=Stencil_5pt(u,i,len,3,h);
   u_x[i]+= -6*u[i]*Stencil_5pt(u,i,len,1,h);
@@ -33,35 +33,47 @@ double*
   return u_x;
 }
   //assume some function f_ut to get next u
-double
-u_step(double* u,double t_n,int len,double h,
-    double (*u_tstep)(double,double,double)){
+  //u_i_t+i=u_i+dt*(u_discrete)
+double*
+u_step(double* u,double* x,double t_n,int len,double h,
+    double (*u_tstep)(double,double)){
   int i;
+  //double x_i;
   double *u_t=malloc(len*sizeof(double));
-#pragma omp parallel for
+  //#pragma omp parallel for
   for(i=0;i<len;i++){
-  double u_step (double u_i,double t){
-  return sin(0-u_i*t);
-}
-    u_t[i]=rk4(&u_step,u[i],t_n,h);
+    // x_i=x[i];
+    u_t[i]=rk4(u_tstep,u[i],0,h);
   }
+  return u_t;
 }
        
 void
-update(double* u,double t_n,double h){}
-  void 
-  help (){
+update(double* u,double* x,double t_n,double h_x,double h_t,int len){
+  int i;
+  double* u_x=u_discrete(u,len,h_x);
+  double* u_t=u_step(u_x,x,t_n,len,h_t,&u_tstep);
+  //#pragma omp parallel for 
+  for(i=0;i<len;i++){
+    printf("u_t[i]:%f\t u_x[i]:%f\n",u_t[i],u_x[i]);
+    //not sure what this expression should be exactally
+    u[i]+=u_t[i]+u_x[i];
+  }
+  free(u_x);free(u_t);
+}
+void 
+help (){
   const char * help = "kdv -h [-d(0.1)] [-f(0)] [-i(0)] [-s(0.1)] [-r(40)]"
 "Command line interface to a Korteweg de Vires equation"
 "solver\nWhen run with no options runs the solver with:\n\tinital condition"
 " u=sin(pi*x)\n\tx inital value 0, final value 40 and step 0.1\n\t time step 0.1"
-"\n\tand using the gsl qgas interation method."
+"\n\tand using the gsl qgas interation method.\n"
 "Options:"
-"\t-h (--help,to be added) display this help and exit"
-"\t-d (--delta_x,tba) set the difference between successive x values"
-"\t-f (--function,tba) set the function to use for numerical integration"
-"\t-i (--xinit,tba) set the inital x value"
-"\t-s (--delta_t,tba) set the time step"
-"\t-r (--range,tba) set the range of x values (ie x max = x inital + range)";
+"\n\t-h (--help,to be added) display this help and exit"
+"\n\t-d (--delta_x,tba) set the difference between successive x values"
+"\n\t-f (--function,tba) set the function to use for numerical integration"
+"\n\t-i (--xinit,tba) set the inital x value"
+"\n\t-s (--delta_t,tba) set the time step"
+"\n\t-r (--range,tba) set the range of x values (ie x max = x inital + range)\n";
   printf(help);
 }

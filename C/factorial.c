@@ -8,3 +8,13 @@ int factorial(int n){
 
   return retval;
 }
+int fact_acc(int n,int acc){
+  if (n==0){
+    return acc;
+  } else {
+    return fact_acc((n-1),n*acc);
+  }
+}
+int tail_fact(int n){
+  return fact_acc(n,1);
+}

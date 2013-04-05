@@ -18,7 +18,7 @@ AM_PROG_CC_C_O
 #Need GCC extensions, so force std=gcc99
 
 # add -Wall if possible
-#AX_CHECK_COMPILER_FLAGS([-Wall], [CFLAGS="$CFLAGS -Wall"])
+#AX_CHECK_COMPILER_FLAGS([-Wall], [CFLAGS="$CFLAGS -Wall -g"])
 #CFLAGS="$CFLAGS -std=gnu99"
 # find flags for using OpenMP
 AC_OPENMP

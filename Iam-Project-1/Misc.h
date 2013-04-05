@@ -24,8 +24,24 @@
 
 #define HERE fprintf(stderr, "HERE at %s:%d (%s)\n", __FILE__, __LINE__, __FUNCTION__)
 
-#define malloc_check (ptr) {\
+#define mem_check(ptr) {\
   if(ptr == NULL){          \
-  fprintf(stderr,"Memory allocation failed\n")\
-    exit(EXIT_FAILURE)}
+    fprintf(stderr,"Memory allocation failed\n");   \
+    exit(EXIT_FAILURE);}}
+static inline void clone(double* src,double* dest,int len){
+  int i;
+#pragma omp parallel for
+  for(i=0;i<len;i++){
+    dest[i]=src[i];
+  }
+}
 #endif
+
+
+
+
+
+
+
+
+
