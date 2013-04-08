@@ -64,17 +64,30 @@ fun change _ 0 = []
       val total=x
       (*should turn l into a list of decending integers less than x*)
       val ls=quicksort (op >) (List.filter l (fn y=>(y<=total)))
+      val vec=VectorSlice.full (Vector.fromList ls)
       val sum=Misc.sum
       val Some=SOME val None=None
-      fun test [] y z = if (sum y) = z then Some(y) else None
+      fun test v 0 = Some v (*returns wrong thing*)
+      fun test v x = let 
+          val len = VectorSlice.length v
+          val i = 0
+          val y = x - VectorSlice.sub 0
+          val bool = true
+      in        while bool do (if i > len then None else
+                         val r = test VectorSlice.slice (v,i,None); (*Note Not finished like this*)
+                         if r = None then val i = i+1(*is this legal?*)
+                         else return Some r) (*need to figure out how to return*) end
+      fun result None = raise Cannot Change
+        | result Some(x) = x
+  in result (test vec x) end
 (*what we want to do is test x with all permutations of values in xs to see if
 some combination adds up to z, we store intrum combinations in y and decrement
 z by the values in y as we go along.
 Should be something like if some y in xs is <z then z-=y and if some q in
 (xs - y & values too big) <z etc etc...*)
-        | test (x::xs) y z = if (sum y) = z then z else
+(*        | test (x::xs) y z = if (sum y) = z then z else
                        let
-                           val ls2=List.filter xs (fn q =>((q+x)<=z))
+                           val ls2=List.filter xs (fn q =>((q+x)<=z))*)
                            (* for x in ls2 test x::rest*)
 fun changeBest _ = raise Fail "not implemented"
 (* Sudoku *)
