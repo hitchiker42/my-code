@@ -121,6 +121,10 @@ fun foldr f b l = foldl f b (rev l)
 fun loop n x f g h = if f n then h x else loop (g n) (h x) f g h
        (*int n, list x, test fxn y, increment fxn g, and do fxn h*)
 fun for n f x = (*do f x n times*) if eql 0 n then x::[] else for (n-1) f (f(x))
+fun sum l = foldl (op +) 0 l
+fun ifSome [] f = NONE
+  | ifSome (x::xs) f = if f x then SOME(x) else
+                       ifSome xs f
 fun odd n = let
     val f = fn (x::xs) => ((x+2)::x::xs)
 in for n f (3::2::[])
