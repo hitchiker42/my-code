@@ -55,6 +55,27 @@ fun mergeSort filt l = let
                            in if (filt(hd_r,last_l)) then sl
                                   else  merge l r sl end
 in (mergesort arr;Misc.arr_to_list return)end
+fun mergesort-simple filt l = let
+    val filt = filt
+    fun merge (l,r) = let
+        val res = ref []
+        fun merge2 [] [] x = rev (!x)
+          | merge2 l [] x = rev (l::(!x))
+          | merge2 [] r x = rev (r::(!x))
+          | merge2 (l::ls) (r::rs) x = if filt l r then
+                                           (x:=(l::(!x));merge2 ls (r::rs) x)
+                                       else (x:=(r::(!x));merge2 (l::ls) rs x)
+in merge2 l r res end
+    fun mergesort l = if len l = 1 then l else
+                      let val mid = len l/2
+                          val left = ref List.take l mid
+                          val right = ref List.drop l mid
+                      in (left:=mergesort (!left);
+                          right:=mergesort (!right);
+                          if filt(last (!left),hd (!right))
+                          then left@right else
+                          merge (left,right)) end
+in mergesort l end
 fun split [] = ([],[])
   | split [x] = ([x],[])
   | split l = let

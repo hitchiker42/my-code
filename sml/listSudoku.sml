@@ -24,6 +24,7 @@ val _ = use "misc.sml"
 val get = Array.sub
 val set = Array.update
 val seq9 = [1,2,3,4,5,6,7,8,9]
+val slice = ArraySlice.slice
 val check = fn i=> if i<0 orelse i>80 then raise Subscript else ()
 (*ignore all whitespace,(run strip on given string)
 run explode on string, get char array, if array not len 81 raise exception
@@ -37,8 +38,6 @@ fun parseString str = let
     fun set c = if 0x31<=(ord c)<=0x39 then set (g,i,(((ord c)-0x30),[]))
                 else set (g,i,(0,seq9))     
 in end
-fun get (arr,i) = (check i;#1(get (arr,i)))
-fun set (arr,i,x) = (check i;set(arr,i,(x,[])))
 (* if for some element i in grid #1(i) = 0 then SOME(i)
    else NONE*)
 fun unsolved _ = raise Fail "not implemented"
@@ -55,7 +54,38 @@ fun parseFile file =
     in
       parseString (input s) before closeIn s
     end
+(*fun row i a = sl_to_list (slice(a,(i-9),Some(i)))*)
+(*return row indices, rows go from 0-8*)
+fun row i = Misc.seq (i*9) (((i+1)*9)-1)
+(*return incices in column j, collumns are numbered 0-8*)
+fun column j a = let
+    val inc = fn n => n+9
+    val test = fn n => n>=81
+    val loop n f g x = if f n then rev x
+                         else loop (g n) f g (n::x)
+in loop j test inc [] end
+(*return the indices of a block, blocks are numbered:
+|1|2|3|
+|4|5|6|
+|7|8|9|*)
+fun block k a = let
+    val j = if k mod 3 = 1 then 0 else if k mod 3 = 2 then 3
+            else 6
+    val i = if j = 0 then k else if j = 3 then k-1 else k-2
+(*I'm too lazy to think of a function to do this*)
+in (9*(i-1)+j)::(9*(i-1)+j+1)::(9*(i-1)+j+2)::(9*i+j)::(9*i+j+1)::(9*i+j+2)::(9*(i+1)+j)::(9*(i+1)+j+1)::(9*(i+1)+j+2)::[] end
 
+(*set all values in section given by indices in l::ls that
+ *have only one possible value to that value*)
+fun singletons [] = ()
+  | singletons l::ls = if len #2get(a,l) = 1 then set (a,hd(l),[])
+                       else singletons ls
+fun main () =
+    (*setup board*)
+    (*board-old=copy board*)
+    (*for 0-8 in rows,columns,blocks do singletons*)
+    (*if board!=board-old goto start*)
+    (*for 0-8 in rows,columns,blocks do forced*)
 local
     open TextIO
     fun ts 0 = "."
@@ -65,6 +95,8 @@ local
                        if n mod 9 = 0 then print "\n" else print " ";
                        pr l (n+1))
 in fun print s = pr s 1 end
+fun get (arr,i) = (check i;#1(get (arr,i)))
+fun set (arr,i,x) = (check i;set(arr,i,(x,[])))
 end
 (*Sudoku Solver in python*)
 

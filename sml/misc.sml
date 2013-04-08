@@ -164,3 +164,9 @@ structure Printf =
       val R = fn z => spec Real.toString z
    end
 end
+(*prototype lisp style list
+datatype node = (a',ref node)
+fun car (a:node) = #1a
+fun cdr (a:node) = #2a
+fun cons (a:node) (b:node) = node(car(a),cdr(b))
+needs a lot more work*)
