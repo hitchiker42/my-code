@@ -25,8 +25,14 @@
 #ifndef KDV_H
 #define KDV_H
 #include "Misc.h"
-void help();
-double* seq(double init,double final,double step);
+void
+ help();
+double*
+seq(double init,double final,double step);
+double 
+inital_u(double y);
+void
+update(double* u,double* x,double t_n,double h_x,double h_t,int len);
 #endif
 /*x values are constant, so we need to find u values at each time t. We find u
  *inital via the inital conditions(Duh) and then find u at time t+1 by 2 steps

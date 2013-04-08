@@ -5,22 +5,23 @@ double rk4 (double (*fp)(double,double),double x,double t,double h){
   k_2 = (*fp)(t+0.5*h,x+0.5*h*k_1);
   k_3 = (*fp)(t+0.5*h,x+0.5*h*k_2);
   k_4 = (*fp)(t+h,x+h*k_3);
-  return x + h*(1.0/6)*(k_1+2*k_2+2*k_3+k_4);
+  return h*(1.0/6)*(k_1+2*k_2+2*k_3+k_4);
 }
 double Stencil_5pt (double *x,int i,int len,int order,double h){
-  unless(0<order<5,{return NAN;});
+  if(!(0<order<5)){
+    return NAN;
+  }
   double inf=INFINITY;
   double x_i_2=inf,x_i_1=inf,x_i=inf,x_i1=inf,x_i2=inf;
-  switch (i) {
-  case 0:
-    x_i_2=x[i+2];
-  case 1:
+  if(i<=1){
     x_i_1=x[i+1];
-    break;
+    if(i==0){
+      x_i_2=x[i+2];
+    }
   }
-  if (i>=len-1){
+  if (i>=len-2){
     x_i1=x[i-1];
-    if (i=len){
+    if (i==len-1){
       x_i2=x[i-2];
     }
   }
