@@ -35,6 +35,11 @@ static inline void clone(double* src,double* dest,int len){
     dest[i]=src[i];
   }
 }
+typedef struct {
+  double* u;
+  int len;
+  double d;
+} udis;
 #endif
 
 
