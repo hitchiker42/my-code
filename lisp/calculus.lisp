@@ -1,9 +1,12 @@
 (defun dot-prod (x y z)
+;;dot product of x and y, store in z
   (declare (type vector x y z))
   ;(let ((z (make-array (array-total-size x))))
   (dotimes (i (array-total-size x))
     (setf (svref z i) (* (svref x i) (svref y i)))))
 (defun 5pt-stencil (f i order x h)
+;;calculate the derivitive of a function approximated by x at point i
+;;through the use of a 5pt stencil finite differeren
   (declare (type function f)
            (type fixnum i order)
            (type (vector double-float) x)
@@ -25,12 +28,12 @@
            ;;maybe type vals float-list
            )
   (let ((k_1) (k_2) (k_3) (k_4))
-    (setf k_1 (f time x));perhaps apply f args
-    (setf k_2 (f (+ time (* 0.5 h)) (+ x (* 0.5 h k_1))))
-    (setf k_3 (f (+ time (* 0.5 h)) (+ x (* 0.5 h k_2))))
-    (setf k_4 (f (+ time h) (+ x (* h k_3))))
+    (setf k_1 (funcallf time x));perhaps apply f args
+    (setf k_2 (funcall f (+ time (* 0.5 h)) (+ x (* 0.5 h k_1))))
+    (setf k_3 (funcall f (+ time (* 0.5 h)) (+ x (* 0.5 h k_2))))
+    (setf k_4 (funcall f (+ time h) (+ x (* h k_3))))
     (+ x (* h (/ 1 6) (+ k_1 k_2 k_3 k_4)))))
 (defun scant-meth (x1 x2 f err)
   (declare (float x1 x2 err)
            (function f))
-  (let ((f-x1 (f x1)) (f-x2 (f x2)) )))
+  (let ((f-x1 (funcall f x1)) (f-x2 (funcall f x2)))))
