@@ -1,10 +1,7 @@
-(*top level definions and load misc structures*)
 val load = use
 (*useful infix operators*)
 infix += fun a += b = a:=(!a)+b
 infix -= fun a -= b = a:= (!a)-b
-infix != fun a != b = a<>b
-infix %  fun a % b = a mod b
 (*given a function f of a pair
  a <\f\> b is the same as f(a,b) or a </f/>*)
 infix  3 <\     fun x <\ f = fn y => f (x, y)     (* Left section      *)
@@ -24,22 +21,17 @@ fun sub x y = op - (x,y)
 fun eql x y = op = (x,y)
 fun mult x y = op * (x,y)
 fun dv x y = op div (x,y)
-fun car x = hd x
-fun cdr x = tl x
-fun cons x y = op :: (x,y)
-(*pop head off of a mutable list & return the removed element*)
-fun des_car x = (x:=(cdr (!x));car(!x))
-val des_hd = des_car
-fun snd (a,b) = b
-fun fst (a,b) = a
-val len = List.length
-(*fun run_tests (t:(unit->bool) list) = let
-    val tests = ListPair.zip (t,(List.map Int.toString (seq 1 (List.length t))))
-    fun test (t,i) = if t() then concat ("Test"::i::"Passed"::[]) else
-                     concat ("Test"::i::"Failed"::[])
-in List.map test tests end
-fun print_list (l:string list)=let
-    val strings=ref l
-in while not ((!strings)=[]) do
-         print (concat ((des_car(strings))::"\n"::[])) end
-*)
+structure Misc = struct
+val min = fn (i,j)=>if (i<j) then i else j
+val max = fn (i,j)=>if (i>j) then i else j
+val rand=Random.rand(0,(Int.fromLarge(Time.toSeconds (Time.now ()) mod (Int.toLarge (Option.valOf Int.maxInt)))));
+val randInt = fn () => Random.randInt rand
+fun loop n x f g h = if f n then h x else loop (g n) (h x) f g h
+       (*int n, list x, test fxn y, increment fxn g, and do fxn h*)
+fun for n f x = (*do f x n times*) if eql 0 n then x::[] else for (n-1) f (f(x))
+fun ifSome [] f = NONE
+  | ifSome (x::xs) f = if f x then SOME(x) else
+                       ifSome xs f
+(*why this?*)
+fun $ (a, f) = f a
+end

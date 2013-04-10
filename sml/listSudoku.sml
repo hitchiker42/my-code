@@ -14,35 +14,45 @@ val print: grid -> unit
 val sudoku: grid -> grid
 end*)
 
-structure ListSudoku : SUDOKU = struct
-
+structure ListSudoku (*: SUDOKU*) = struct
+(*grid is an array of int,int list pairs where the int is 0 for unsolved cells 
+ *and 1-9 for solved cells(where the value is the value of the solved cell)
+ *the int list is [] for solved cells and an array of possible values for 
+ *an unsolved cell,as an example take the row 1.3.5.62.8
+ *were there no other constraints this would be represented by
+ *[(1,[]),(0,[4,7,9]),(3,[]),(0,[4,7,9]),...
+ *(5,[]),(6,[]),(2,[]),(0,[4.7.9]),(8,[])]*)
 type grid = (int*int list) array
 
 exception Parse
 exception Unsolvable
-val _ = use "misc.sml"
-val get = Array.sub
-val set = Array.update
-val seq9 = [1,2,3,4,5,6,7,8,9]
+val _ = use "load.sml"
+val Get = Array.sub
+val Set = Array.update
+val seq9 = MiscList.seq 1 9
 val slice = ArraySlice.slice
-val check = fn i=> if i<0 orelse i>80 then raise Subscript else ()
+val check = fn i=> if i<0 || i>80 then raise Subscript else ()
+fun init () = Array.array(81,(0,[]))
+fun get (arr,i) = (check i;fst(Get (arr,i)))
+fun set (arr,i,x) = (check i;Set(arr,i,(x,[]));arr)
 (*ignore all whitespace,(run strip on given string)
 run explode on string, get char array, if array not len 81 raise exception
 for index i if 0x31 <= chr <= 0x39 then set(grid,i,(chr,[]))
 else set(grid,i,(0,[1,2,3,4,5,6,7,8,9]))*)
-fun init () = Array.array(81,(0,[]))
-val g = init ()
 fun parseString str = let
-    val chars = misc.strip str
-    val chrs = ref chars
-    fun set c = if 0x31<=(ord c)<=0x39 then set (g,i,(((ord c)-0x30),[]))
-                else set (g,i,(0,seq9))     
-in end
+    val chars = MiscString.strip str
+    val chrs = Array.fromList chars
+    val g = init ()
+    fun set i = let val c=ord (Get (chrs,i)) in
+        if 0x31<=c && c<=0x39 then Set (g,i,((c-0x30),[]))
+                else Set (g,i,(0,seq9)) end
+    fun loop i = if i=0 then () else (set (i-1);loop (i-1))
+in if Array.length chrs != 81 then raise Parse else (loop 81;g) end
 (* if for some element i in grid #1(i) = 0 then SOME(i)
    else NONE*)
 fun unsolved _ = raise Fail "not implemented"
-fun possibles (arr,i) = (check i;if #1(get (arr,i))>0 then #1(get (arr,i))
-                                 else #2(get (arr,i)))
+fun possibles (arr,i) = (check i;if fst((Get (arr,i)))>0 then fst((Get (arr,i)))::[]
+                                 else snd((Get (arr,i))))
 (*true iff grid filled and consistant*)
 fun valid _ = raise Fail "not implemented"
 (*Solves given grid*)
@@ -56,31 +66,39 @@ fun parseFile file =
     end
 (*fun row i a = sl_to_list (slice(a,(i-9),Some(i)))*)
 (*return row indices, rows go from 0-8*)
-fun row i = Misc.seq (i*9) (((i+1)*9)-1)
+fun row i = MiscList.seq (i*9) (((i+1)*9)-1)
 (*return incices in column j, collumns are numbered 0-8*)
-fun column j a = let
+fun column j  = let
     val inc = fn n => n+9
     val test = fn n => n>=81
-    val loop n f g x = if f n then rev x
+    fun loop n f g x = if f n then rev x
                          else loop (g n) f g (n::x)
 in loop j test inc [] end
 (*return the indices of a block, blocks are numbered:
 |1|2|3|
 |4|5|6|
 |7|8|9|*)
-fun block k a = let
-    val j = if k mod 3 = 1 then 0 else if k mod 3 = 2 then 3
-            else 6
-    val i = if j = 0 then k else if j = 3 then k-1 else k-2
+fun block k  = let
+    val j = (if (k % 3) = 0 then 0 else if (k % 3) = 1 then 3
+            else 6)
+    val i = (if j = 0 then k else if j = 3 then k-1 else k-2)
 (*I'm too lazy to think of a function to do this*)
-in (9*(i-1)+j)::(9*(i-1)+j+1)::(9*(i-1)+j+2)::(9*i+j)::(9*i+j+1)::(9*i+j+2)::(9*(i+1)+j)::(9*(i+1)+j+1)::(9*(i+1)+j+2)::[] end
+in (9*(i)+j)::(9*(i)+j+1)::(9*(i)+j+2)::(9*(i+1)+j)::(9*(i+1)+j+1)::(9*(i+1)+j+2)::(9*(i+2)+j)::(9*(i+2)+j+1)::(9*(i+2)+j+2)::[] end
 
 (*set all values in section given by indices in l::ls that
  *have only one possible value to that value*)
-fun singletons [] = ()
-  | singletons l::ls = if len #2get(a,l) = 1 then set (a,hd(l),[])
-                       else singletons ls
-fun main () =
+fun board_loop b f = let
+    fun iter 0 0 = []
+      | iter 0 j = iter 8 (j-1)
+      | iter i j = case j of
+                       1 => (f b (block i);iter (i-1) j)
+                         | 2 => (f b (column i);iter (i-1) j)
+                             | 3 => (f b (row i);iter (i-1) j)
+in iter 8 3 end
+fun singletons a [] = ()
+  | singletons a (l::ls) = (if len (snd(Get(a,l))) = 1 then Set(a,l,(hd(snd(Get(a,l))),[]))
+                         else ();singletons a ls)
+fun main () = ()
     (*setup board*)
     (*board-old=copy board*)
     (*for 0-8 in rows,columns,blocks do singletons*)
@@ -90,13 +108,11 @@ local
     open TextIO
     fun ts 0 = "."
       | ts x = Int.toString x
-    fun pr [] _ = ()
-      | pr (x::l) n = (print (ts x);
+    fun pr arr 81 = ()
+      | pr arr n = (print (ts (fst(Get(arr,n))));
                        if n mod 9 = 0 then print "\n" else print " ";
-                       pr l (n+1))
+                       pr arr (n+1))
 in fun print s = pr s 1 end
-fun get (arr,i) = (check i;#1(get (arr,i)))
-fun set (arr,i,x) = (check i;set(arr,i,(x,[])))
 end
 (*Sudoku Solver in python*)
 
