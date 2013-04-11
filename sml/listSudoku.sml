@@ -15,9 +15,9 @@ val sudoku: grid -> grid
 end*)
 
 structure ListSudoku (*: SUDOKU*) = struct
-(*grid is an array of int,int list pairs where the int is 0 for unsolved cells 
+(*grid is an array of int,int list pairs where the int is 0 for unsolved cells
  *and 1-9 for solved cells(where the value is the value of the solved cell)
- *the int list is [] for solved cells and an array of possible values for 
+ *the int list is [] for solved cells and an array of possible values for
  *an unsolved cell,as an example take the row 1.3.5.62.8
  *were there no other constraints this would be represented by
  *[(1,[]),(0,[4,7,9]),(3,[]),(0,[4,7,9]),...
@@ -50,14 +50,13 @@ fun parseString str = let
 in if Array.length chrs != 81 then raise Parse else (loop 81;g) end
 (* if for some element i in grid #1(i) = 0 then SOME(i)
    else NONE*)
-fun unsolved _ = raise Fail "not implemented"
-fun possibles (arr,i) = (check i;if fst((Get (arr,i)))>0 then fst((Get (arr,i)))::[]
+fun unsolved board = let
+    fun for ~1 arr = NONE
+    | for i arr = if (fst(Get(arr,i)) = 0) then SOME(i) else for (i-1) arr
+in for 80 board end
+fun possibles (arr,i) =
+    (check i;if fst((Get (arr,i)))>0 then fst((Get (arr,i)))::[]
                                  else snd((Get (arr,i))))
-(*true iff grid filled and consistant*)
-fun valid _ = raise Fail "not implemented"
-(*Solves given grid*)
-fun sudoku _ = raise Fail "not implemented"
-
 fun parseFile file =
     let open TextIO
         val s = openIn file
@@ -85,8 +84,8 @@ fun block k  = let
 (*I'm too lazy to think of a function to do this*)
 in (9*(i)+j)::(9*(i)+j+1)::(9*(i)+j+2)::(9*(i+1)+j)::(9*(i+1)+j+1)::(9*(i+1)+j+2)::(9*(i+2)+j)::(9*(i+2)+j+1)::(9*(i+2)+j+2)::[] end
 
-(*set all values in section given by indices in l::ls that
- *have only one possible value to that value*)
+(*run function f over all rows collums and blocks in the board
+ *for this to be of any worth function f must opperate by side effect only*)
 fun board_loop b f = let
     fun iter 0 0 = []
       | iter 0 j = iter 8 (j-1)
@@ -95,15 +94,86 @@ fun board_loop b f = let
                          | 2 => (f b (column i);iter (i-1) j)
                              | 3 => (f b (row i);iter (i-1) j)
 in iter 8 3 end
+(*test if board solved correctly*)
+exception Unsolved
+fun check b = let
+    fun chk b rcb = let
+        fun complete [] l =
+            if (MiscList.quickSort (op <) l) = (MiscList.seq 1 9)
+                        then () else raise Unsolved
+      | complete (x::xs) l = complete xs ((fst(Get(b,x)))::l)
+    in complete rcb [] end
+in board_loop b chk end
 fun singletons a [] = ()
-  | singletons a (l::ls) = (if len (snd(Get(a,l))) = 1 then Set(a,l,(hd(snd(Get(a,l))),[]))
-                         else ();singletons a ls)
-fun main () = ()
-    (*setup board*)
+  | singletons a (l::ls) = (if len (snd(Get(a,l))) = 1
+                            then Set(a,l,(hd(snd(Get(a,l))),[]))
+                            else ();singletons a ls)
+(*set any value in row/column/block represented by l that is 'forced'
+ *to be a certain value. where forced is defined as a space needing to
+ *be a specific number to fufill the 1-9 rule despite having multiple possible
+ *values remaining, ie. if space 5 is the only space in row 1 with an 8 it
+ *its list of possibles it is forced to be 8, regardless of weather or not it
+ *has other posable values*)
+fun forced a l = let
+    val collect = Array.array (9,[])
+    (*want to do, for i in snd(l) do for j in i
+        do set collect[i]=fst(l)::collect[i]
+      for i j in enum collect do if len j = 1 set fst a[hd j] to i
+          and set snd a[hd j] to [] and update board*)
+(*here i is a list of indices in a*)
+    val q = ref 0
+    fun fori [] = ()
+      | fori (x::xs) = let
+          val ls = snd(Get(a,x))(*array of possibles in a[x]*)
+          fun forj [] = ()
+            | forj (y::ys) =
+              (Set (collect,(!q),(y::(Get(collect,(!q)))));forj ys)
+      in (forj ls;q+=1;fori xs) end
+    fun forc ~1 = ()
+      | forc i = let
+          val c = Get (collect,i)
+      in (if len c = 1 then Set (a,(hd c),(i,[])) else ();forc (i-1))end
+in (fori l;forc 8) end
+fun getRCB i = let
+    val triple = Array.array (3,9)
+    val rows = Array.fromList (List.map row (MiscList.seq 0 8))
+    val cols = Array.fromList (List.map column (MiscList.seq 0 8))
+    val blks = Array.fromList (List.map block (MiscList.seq 0 8))
+    fun getsec x j ~1 = raise Subscript
+    | getsec x j i = if MiscList.contains (Get (x,i)) j then i
+                     else getsec x j (i-1)
+in [(getsec rows i 8),(getsec cols i 8),(getsec blks i 8)] end
+(*update possible values for all undecided cells in the same
+ *row,collumn and block as i*)
+fun update a i = let
+    val x = fst(Get(a,i))
+    val RCB = ref (getRCB x)
+    val row = row (MiscList.popl RCB)
+    val col = column (MiscList.popl RCB)
+    val blk = block (MiscList.popl RCB)
+    val check = fn k => k = x
+    val update = fn n=>Set (a,n,(fst(Get (a,n)),
+                                  List.filter check (snd(Get(a,n)))))
+    fun for j (l::ls) = if j = ~1 then () else (update l;for (j-1) ls)
+in (for 8 row;for 8 col;for 8 blk) end
+fun main board =
     (*board-old=copy board*)
     (*for 0-8 in rows,columns,blocks do singletons*)
     (*if board!=board-old goto start*)
     (*for 0-8 in rows,columns,blocks do forced*)
+    (*then guess and check*)
+while (unsolved board != NONE) do
+      let val old = MiscList.clone board
+          val _ = board_loop board singletons
+      in if board = old then (board_loop board forced;
+                              if board = old then
+                              (*guess*)() else ())
+         else () end
+(*true iff grid filled and consistant*)
+fun valid board = (check board;true)
+                  handle Unsolved => false
+(*Solves given grid*)
+fun sudoku board = main board
 local
     open TextIO
     fun ts 0 = "."

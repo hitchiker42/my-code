@@ -20,11 +20,19 @@ fun car x = hd x
 fun cdr x = tl x
 fun cons x y = op :: (x,y)
 (*pop head off of a mutable list & return the removed element*)
-fun des_car x = (x:=(cdr (!x));car(!x))
+fun des_car x = (let val y = (!x) in x:=(cdr y);car(y)end)
 val des_hd = des_car
+val popl = des_car
 val arr_to_list = fn y=>Array.foldr (op ::) [] y
 val sl_to_list = fn y=>ArraySlice.foldr (op ::) [] y
-
+fun quickSort filt (x::xs) = let
+    val f = List.filter
+    fun qs [] = []
+      | qs (x::[]) = (x::[])
+      | qs (x::xs) = let
+          val pred = fn y => filt (y,x)
+      in qs (f pred xs)@x::(qs (List.filter (not o pred) xs)) end
+in qs (x::xs) end
 (*shuffle order of arr, arr is modified in place & fxn returns ()*)
 fun shuffle arr =
     let 
@@ -35,6 +43,9 @@ in (while ((!i)>1) do (Array.update (arr,(!i),Array.sub (arr,(!k)));
                     Array.update (arr,(!k),(!temp));
                     i-=1;k:=Random.randRange(0,(!i)) rand;
                     temp:=Array.sub(arr,(!i)))) end
+fun contains l x = let
+    val check = fn n => n=x
+in List.exists check l end
 (*shuffles list via intermediate array*)
 fun listShuffle l = let
     val arr = Array.fromList l
@@ -61,7 +72,8 @@ fun dec n = let
     val i = ref 0
     val l = ref []
     fun build i l n = if (!i)>n then (!l)
-                      else (l:=((!i)::(!l)); i:=((!i)+1);build i l n)in build i l n end
+                      else (l:=((!i)::(!l)); i:=((!i)+1);build i l n)
+in build i l n end
 val arr_to_list = fn y=>Array.foldr (op ::) [] y
 val sl_to_list = fn y=>ArraySlice.foldr (op ::) [] y
 (*swap element i with j in array arr*)
@@ -76,7 +88,7 @@ fun sl_swap i j k l= let
 in (ArraySlice.update(i,k,tempj);ArraySlice.update(j,l,tempi)) end
 (*given an array an and index i return
 arr[i]::arr[i+1]...arr[len]::arr[0]...arr[i]*)
-fun rot arr i = let 
+fun rot arr i = let
     val mid = Array.sub (arr,i)
     val left = ArraySlice.slice (arr,0,SOME(i))
     val right = ArraySlice.slice (arr,(i+1),NONE)
@@ -90,4 +102,7 @@ fun seq m n = let
     fun build n l = if n=stop then l else build (n-1) (n::l)
 in build n [] end
 fun sum l = foldl (op +) 0 l
+fun clone arr = let
+    val temp = arr_to_list arr
+in Array.fromList temp end
 end
