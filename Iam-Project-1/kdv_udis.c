@@ -56,7 +56,7 @@ update(udis* u,double* x,double t_n,double h_t){
   for(i=0;i<len;i++){
     printf("u_t[i]:%f\t u_x[i]:%f\n",u_t[i],u_x[i]);
     //not sure what this expression should be exactally
-    u[i]+=u_t[i]+u_x[i];
+    (u->u)[i]+=u_t[i];
   }
   free(u_x);free(u_t);
 }

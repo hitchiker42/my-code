@@ -1,14 +1,17 @@
+(defpackage :kdv-calculus 
+  (:export :5pt-stencil
+           :rk4
+           :secant-meth))
 (defun dot-prod (x y z)
 ;;dot product of x and y, store in z
   (declare (type vector x y z))
   ;(let ((z (make-array (array-total-size x))))
   (dotimes (i (array-total-size x))
     (setf (svref z i) (* (svref x i) (svref y i)))))
-(defun 5pt-stencil (f i order x h)
+(defun 5pt-stencil (i order x h)
 ;;calculate the derivitive of a function approximated by x at point i
 ;;through the use of a 5pt stencil finite differeren
-  (declare (type function f)
-           (type fixnum i order)
+  (declare (type fixnum i order)
            (type (vector double-float) x)
            (type float h))
   (let ((xi-2 (aref x (- i 2)))
@@ -17,7 +20,8 @@
          (xi+1 (aref x (+ i 1)))
          (xi+2 (aref x (+ i 2))))
     (cond ((eq order 1)(/ (+ (- xi-2) (- xi-1) xi+1 xi+2) (* 6 h));1st deritive
-           (eq order 2)();2nd "      "
+           (eq order 2)(/ (+ (- xi-2) (* 16 xi-1) (* -30 xi)
+                             (16 * xi+1) (- xi+2)) (* 12 (expt h 2)));2nd "      "
            (eq order 3)();3rd "      "
            (eq order 4)();4th "      "
            t xi))))

@@ -1,5 +1,5 @@
 (defpackage :tucker.pathnames
-  (use :common-lisp))
+  (:use :common-lisp))
 (in-package :tucker.pathnames)
 ;;check if path name componant value exists and is defined
 (defun component-present-p (value)
