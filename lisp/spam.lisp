@@ -10,10 +10,12 @@
 
 (defun classification (score)
   "classify mail as spam or ham based on score"
-  (cond
-    ((<= score *max-ham-score*) 'ham)
-    ((>= score *max-spam-score*) 'spam)
-    (t 'unsure)))
+  (values
+   (cond
+     ((<= score *max-ham-score*) 'ham)
+     ((>= score *max-spam-score*) 'spam)
+     (t 'unsure))
+   score))
 
 (defclass word-feature ()
   ((word
@@ -115,6 +117,22 @@ from text using regexs and return as a set of strings"
     (and (zerop spam-count) (zerop ham-count))))
 (defun fisher (probs number-of-probs)
   "the fisher methods of combining probabilities"
-  (invese-chi-square
+  (inverse-chi-square
    (* -2 (reduce #'+ probs :key #'log))
    (* 2 number-of-probs)))
+(defun inverse-chi-square (value degrees-of-freedom)
+  (assert (evenp degrees-of-freedom))
+  (min
+   (loop with m = (/ value 2)
+        for i below (/ degrees-of-freedom 2)
+        for prob = (exp (- m)) then (* prob (/ m i))
+        summing prob)
+   1.0))
+;;Note corpus is a large set of messages of known type(spam or ham)
+(defun add-file-to-corpus (filename type corpus)
+  ;;add filename of type type to corpus
+  (vector-push-extend (list filename type) corpus))
+(defun add-directory-to-corpus (dir type corpus)
+  ;;add all files in dir to corpus with type type
+  (dolist (filename (list-directory dir))
+    (add-file-to-corpus filename type corpus)))

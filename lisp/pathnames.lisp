@@ -1,5 +1,8 @@
 (defpackage :tucker.pathnames
-  (:use :common-lisp))
+  (:use :common-lisp)
+  (:export :list-directory
+           :pathname-as-directory
+           :pathname-as-file))
 (in-package :tucker.pathnames)
 ;;check if path name componant value exists and is defined
 (defun component-present-p (value)
