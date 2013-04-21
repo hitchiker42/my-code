@@ -1,4 +1,4 @@
-(defpackage :tucker.pathnames
+(ppdefpackage :tucker.pathnames
   (:use :common-lisp)
   (:export :list-directory
            :pathname-as-directory
