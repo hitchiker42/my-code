@@ -1,3 +1,17 @@
+;;;Simple Bayesian spam filter
+;;;Works by training a filter with a series of spam and ham messages
+;;;in order to build up a database of words associated with spam and ham
+;;;messages. The filter then uses this database to decide if a given
+;;;mail is spam or not, the data collected from this mail is then added
+;;;to the database, so that the database evolves and adapts over time
+;;;to the kinds of words used in spam messages.
+;;;
+;;;There are some intresting details on how the filter decides if a message
+;;;is spam or not, but basically it compares the frequency of certain
+;;;words in spam messages vs non spam messages and calculates a probability
+;;;that the message is spam
+;;;
+;;;Needs Some work to be fully implementable
 (defpackage :tucker.spam
   (:use :common-lisp :tucker.pathnames))
 
@@ -130,9 +144,57 @@ from text using regexs and return as a set of strings"
    1.0))
 ;;Note corpus is a large set of messages of known type(spam or ham)
 (defun add-file-to-corpus (filename type corpus)
-  ;;add filename of type type to corpus
+  "add filename of type type to corpus"
   (vector-push-extend (list filename type) corpus))
 (defun add-directory-to-corpus (dir type corpus)
   ;;add all files in dir to corpus with type type
   (dolist (filename (list-directory dir))
     (add-file-to-corpus filename type corpus)))
+(defun test-classifier (corpus testing-fraction)
+  "train filter files from corpus saving testing-fraction% to test the\
+filter with after it is trained"
+  (clear-database)
+  (let* ((shuffled (shuffle-vector corpus))
+         (size (length corpus))
+         (train-on (floor (* size (- 1 testing-fraction)))))
+    (train-from-corpus shuffled :start 0 :end train-on)
+    (test-from-corpus shuffled :start train-on)))
+(defparameter *max-chars* (* 10 1024))
+(defun train-from-corpus (corpus &key (start 0) end)
+  "train filter using files from given corpus, by default use whole corpus\
+but takes keys for start and end indices"
+  (loop for idx from start below (or end (length corpus)) do
+       (destructuring-bind (file type) (aref corpus idx)
+         (train (start-of-file file *max-chars*) type))))
+(defun test-from-corpus (corpus &key (start 0) end)
+  "test filter using files from given corpus, by default use whole corpus\
+but takes keys for start and end indices"
+  (loop for idx from start below (or end (length corpus)) collect
+       (destructuring-bind (file type) (aref corpus idx)
+         (multiple-value-bind (classification score)
+             (classify (start-of-file file *max-chars*))
+           (list
+            :file file
+            :type type
+            :classification classification
+            :score score)))))
+;;misc functions
+(defun nshuffle-vector (vector)
+  "destructive vector randomization"
+  (loop for idx downfrom (1- (length vector)) to 1
+       for other = (random (1+ idx))
+       do (unless (= idx other)
+            (rotatef (aref vector idx) (aref vector other))))
+  vector)
+(defun shuffle-vector (vector)
+  "copy vector, then return randomized copy"
+  (nshuffle-vector (copy-seq vector)))
+(defun start-of-file (file max-chars)
+  "basically head, return first max-chars characters of the file"
+  (with-open-file (in file)
+    (let* ((length (min (file-length in) max-chars))
+           (text (make-string length))
+           (read (read-sequence text in)))
+      (if (< read length)
+          (subseq text 0 read)
+          text))))
