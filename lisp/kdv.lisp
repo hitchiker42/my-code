@@ -4,16 +4,16 @@
 (defun u-init (y) 
   (declare (type float y))
   (* -12 (expt (/ 1 (cosh y)) 2)))
+
 (defun u-discrete (u h)
 "calculate spacial deritives of u using finite differences"
   (declare (type (array float) u)
            (type float h))
   (let ((len (array-len u)))
-    (make-array len
-                :initial-contents 
-                (loop for i upto (- len 1) collecting (+ (5pt-stencil i 3 u h)
-                                                         (* (- 6) (aref u i) 
-                                                            (5pt-stencil i 1 u h)))))))
+    (make-array len :initial-contents
+                (loop for i upto (- len 1)
+                   collecting (+ (5pt-stencil i 3 u h) (* (- 6) (aref u i)
+                                                          (5pt-stencil i 1 u h)))))))
 (defun u-discrete-i (u h i)
   (declare (type (array float) u)
            (type float h)
@@ -31,12 +31,9 @@
 (defun update (u time dt dx)
   (declare (type (array float) u)
            (type float time dt dx))
-  (macrolet ((ustep (u i) `(lambda (a b) (u-discrete-i b ,dx ,i))))
-    (let* (;(ustep #'(lambda (a b) b));to plug into rk4
-           (len (array-len u)))
-   ; (format t "~{~g~%~}" (coerce u-dis 'list))
-      (make-array len :initial-contents (loop for i upto (- len 1)
-                                           collecting (rk4 (ustep i) dt (aref u i) time))))))
+  (flet ((ustep (x) (u-discrete x dx)))
+    (rk4-seq #'ustep dt u)))
+
 (defun main ()
   "run kdv simulation"
   (let* ((dx (/ pi 8))
