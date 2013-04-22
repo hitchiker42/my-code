@@ -1,4 +1,4 @@
-#include "kdv.h"
+#include "kdv_udis.h"
 #include <ctype.h>
 double*
 seq(double init,double final,double step){

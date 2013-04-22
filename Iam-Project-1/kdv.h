@@ -25,6 +25,7 @@
 #ifndef KDV_H
 #define KDV_H
 #include "Misc.h"
+#include "calculus.h"
 void
  help();
 double*

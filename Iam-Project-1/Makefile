@@ -49,7 +49,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-bin_PROGRAMS = kDv$(EXEEXT) KDv_udis$(EXEEXT)
+bin_PROGRAMS = kDv$(EXEEXT)
 subdir = .
 DIST_COMMON = $(am__configure_deps) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in $(srcdir)/config.h.in \
@@ -104,9 +104,6 @@ libcalculus_a_LIBADD =
 am_libcalculus_a_OBJECTS = calculus.$(OBJEXT)
 libcalculus_a_OBJECTS = $(am_libcalculus_a_OBJECTS)
 PROGRAMS = $(bin_PROGRAMS)
-KDv_udis_SOURCES = KDv_udis.c
-KDv_udis_OBJECTS = KDv_udis.$(OBJEXT)
-KDv_udis_LDADD = $(LDADD)
 am_kDv_OBJECTS = kdv.$(OBJEXT) calculus.$(OBJEXT) main.$(OBJEXT)
 kDv_OBJECTS = $(am_kDv_OBJECTS)
 kDv_LDADD = $(LDADD)
@@ -138,8 +135,8 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libcalculus_a_SOURCES) KDv_udis.c $(kDv_SOURCES)
-DIST_SOURCES = $(libcalculus_a_SOURCES) KDv_udis.c $(kDv_SOURCES)
+SOURCES = $(libcalculus_a_SOURCES) $(kDv_SOURCES)
+DIST_SOURCES = $(libcalculus_a_SOURCES) $(kDv_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -258,9 +255,8 @@ lib_LIBRARIES = \
 	libcalculus.a
 
 kDv_SOURCES = kdv.c kdv.h calculus.c calculus.h Misc.h main.c
-kDv_udis_SOURCES = kdv_udis.c calculus_udis.c kdv_udis.h calculus_udis.h\
-	Misc.h main_udis.c
-
+#kDv_udis_SOURCES = kdv_udis.c calculus_udis.c kdv_udis.h calculus_udis.h\
+#	Misc.h main_udis.c
 libcalculus_a_SOURCES = calculus.c calculus.h Misc.h
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
@@ -391,9 +387,6 @@ uninstall-binPROGRAMS:
 
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
-KDv_udis$(EXEEXT): $(KDv_udis_OBJECTS) $(KDv_udis_DEPENDENCIES) $(EXTRA_KDv_udis_DEPENDENCIES) 
-	@rm -f KDv_udis$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(KDv_udis_OBJECTS) $(KDv_udis_LDADD) $(LIBS)
 kDv$(EXEEXT): $(kDv_OBJECTS) $(kDv_DEPENDENCIES) $(EXTRA_kDv_DEPENDENCIES) 
 	@rm -f kDv$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(kDv_OBJECTS) $(kDv_LDADD) $(LIBS)
@@ -404,7 +397,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-include ./$(DEPDIR)/KDv_udis.Po
 include ./$(DEPDIR)/calculus.Po
 include ./$(DEPDIR)/kdv.Po
 include ./$(DEPDIR)/main.Po

@@ -1,5 +1,7 @@
 #ifndef KDV_UDIS_H
 #define KDV_UDIS_H
+#include "Misc.h"
+#include "calculus_udis.h"
 double* u_step(udis* u,double* x,double t_n,
                double (*u_tstep)(double,double));
 udis* u_discrete(udis* u);

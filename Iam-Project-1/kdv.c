@@ -13,7 +13,7 @@ seq(double init,double final,double step){
 }
 double 
  inital_u(double y){
-  return -12*pow(acosh(y),2);
+  return -12*pow((1/cosh(y)),2);
 }
 double 
   u_tstep(double t,double u){
@@ -55,7 +55,7 @@ update(double* u,double* x,double t_n,double h_x,double h_t,int len){
   double* u_t=u_step(u_x,x,t_n,len,h_t,&u_tstep);
   //#pragma omp parallel for 
   for(i=0;i<len;i++){
-    printf("u_t[i]:%f\t u_x[i]:%f\n",u_t[i],u_x[i]);
+    //printf("u_t[i]:%f\t u_x[i]:%f\n",u_t[i],u_x[i]);
     //not sure what this expression should be exactally
     u[i]+=u_t[i]+u_x[i];
   }

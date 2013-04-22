@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include "calculus.h"
 #define lambda(return_type,function_args,function_body)    \
 ({ \
       return_type __fn__ function_args function_body \
