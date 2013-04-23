@@ -1,0 +1,8 @@
+static const char compiler_data_text[] = 
+"common-lisp-user::dot-prod common-lisp-user::vector-sum (vector float) common-li"
+ "sp-user::5pt-stencil 0.5 1/6 common-lisp-user::rk4 common-lisp-user::rk4-seq com"
+ "mon-lisp-user::newton-fxn si::dodefpackage 0 0 0 0 0 si::set-documentation #:g20"
+ " #:g21 #:g22 #:g23 0 common-lisp-user::check common-lisp-user::next \"CALCULUS\" \""
+ "CL\" (\"5PT-STENCIL\" \"RK4\" \"RK4-SEQ\" \"VECTOR-SUM\") \"time independent rk4 across a "
+ "vector x\" ";
+#define compiler_data_text_size 410

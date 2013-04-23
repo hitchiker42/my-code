@@ -1,0 +1,42 @@
+
+#ifdef ECL_DYNAMIC_VV
+static cl_object *VV;
+#else
+static cl_object VV[VM];
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+static cl_object L1dot_prod(cl_object , cl_object );
+static cl_object L2vector_sum(cl_object , cl_object );
+static cl_object L35pt_stencil(cl_object , cl_object , cl_object , cl_object );
+static cl_object L4rk4(cl_object , cl_object , cl_object , cl_object , cl_object );
+static cl_object L9rk4_seq(cl_object , cl_object , cl_object );
+static cl_object LC5__g20(cl_narg, cl_object , ...);
+static cl_object LC6__g21(cl_narg, cl_object , ...);
+static cl_object LC7__g22(cl_narg, cl_object , ...);
+static cl_object LC8__g23(cl_narg, cl_object , ...);
+static cl_object L12newton_fxn(cl_object , cl_object , cl_object , cl_object );
+static cl_object LC11check(volatile cl_object  *, cl_object , cl_object );
+static cl_object LC10next(volatile cl_object  *, cl_object );
+static cl_object Cblock;
+#define VM 23
+#define VMtemp 4
+#define ECL_DEFINE_SETF_FUNCTIONS 
+#ifdef __cplusplus
+}
+#endif
+/*
+ * Exported Lisp functions
+ */
+#define compiler_cfuns_size 6
+static const struct ecl_cfun compiler_cfuns[] = {
+ /*t,m,narg,padding,name,block,entry*/
+{0,0,2,0,ecl_make_fixnum(10),ecl_make_fixnum(0),(cl_objectfn)L1dot_prod,ECL_NIL,ecl_make_fixnum(106)},
+{0,0,2,0,ecl_make_fixnum(11),ecl_make_fixnum(1),(cl_objectfn)L2vector_sum,ECL_NIL,ecl_make_fixnum(320)},
+{0,0,4,0,ecl_make_fixnum(12),ecl_make_fixnum(3),(cl_objectfn)L35pt_stencil,ECL_NIL,ecl_make_fixnum(469)},
+{0,0,5,0,ecl_make_fixnum(13),ecl_make_fixnum(6),(cl_objectfn)L4rk4,ECL_NIL,ecl_make_fixnum(1518)},
+{0,0,3,0,ecl_make_fixnum(14),ecl_make_fixnum(7),(cl_objectfn)L9rk4_seq,ECL_NIL,ecl_make_fixnum(2033)},
+{0,0,4,0,ecl_make_fixnum(20),ecl_make_fixnum(8),(cl_objectfn)L12newton_fxn,ECL_NIL,ecl_make_fixnum(3030)},
+};

@@ -1,0 +1,10 @@
+static const char compiler_data_text[] = 
+":calculus common-lisp-user::array-len common-lisp-user::u-init (array float) com"
+ "mon-lisp-user::u-discrete common-lisp-user::u-discrete-i common-lisp-user::updat"
+ "e 3.1415926535897932385l0 10.0 (vector float) :step \"temp\" \"At time ~e~%~{u:~e x"
+ ":~e~%~}\" common-lisp-user::main 0 si::dm-too-few-arguments si::dm-too-many-argum"
+ "ents 0 0 si::set-documentation common-lisp-user::5pt-stencil 0 0 common-lisp-use"
+ "r::rk4-seq common-lisp-user::ustep 0 common-lisp-user::seq si::coerce-to-list co"
+ "mmon-lisp-user::interleave \"calculate spacial deritives of u using finite differ"
+ "ences\" \"run kdv simulation\" ";
+#define compiler_data_text_size 588

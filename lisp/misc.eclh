@@ -1,0 +1,29 @@
+
+#ifdef ECL_DYNAMIC_VV
+static cl_object *VV;
+#else
+static cl_object VV[VM];
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+static cl_object L1seq(cl_narg, ...);
+#define L1seqkeys (&VV[5])
+static cl_object L2interleave(cl_object , cl_object );
+static cl_object Cblock;
+#define VM 9
+#define VMtemp 4
+#define ECL_DEFINE_SETF_FUNCTIONS 
+#ifdef __cplusplus
+}
+#endif
+/*
+ * Exported Lisp functions
+ */
+#define compiler_cfuns_size 2
+static const struct ecl_cfun compiler_cfuns[] = {
+ /*t,m,narg,padding,name,block,entry*/
+{0,0,-1,0,ecl_make_fixnum(3),ecl_make_fixnum(0),(cl_objectfn)L1seq,ECL_NIL,ecl_make_fixnum(70)},
+{0,0,2,0,ecl_make_fixnum(8),ecl_make_fixnum(1),(cl_objectfn)L2interleave,ECL_NIL,ecl_make_fixnum(229)},
+};

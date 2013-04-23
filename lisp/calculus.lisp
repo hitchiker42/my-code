@@ -1,4 +1,4 @@
-(defpackage :calculus 
+(defpackage :calculus
   (:export :5pt-stencil
            :rk4
            :rk4-seq
@@ -20,10 +20,10 @@
   (let* ((len (array-total-size x))
       (xi-2 (if (> 0 (- i 2)) (aref x (+ i (- len 2)))
                   (aref x (- i 2))))
-         (xi-1 (if (= 0 i) (aref x (- len 1))
+         (xi-1 (if (eql 0 i) (aref x (- len 1))
                    (aref x (- i 1))))
           (xi (aref x i))
-         (xi+1 (if (eql (- len 1) i) (aref x (- len 1))
+         (xi+1 (if (>= (- len 1) i) (aref x 0)
                    (aref x (+ i 1))))
          (xi+2  (if (>= 2 (- len i)) (aref x (- (- len i) 1))
           (aref x (+ i 2)))))
