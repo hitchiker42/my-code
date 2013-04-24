@@ -104,7 +104,7 @@ libcalculus_a_LIBADD =
 am_libcalculus_a_OBJECTS = calculus.$(OBJEXT)
 libcalculus_a_OBJECTS = $(am_libcalculus_a_OBJECTS)
 PROGRAMS = $(bin_PROGRAMS)
-am_kDv_OBJECTS = kdv.$(OBJEXT) calculus.$(OBJEXT) main.$(OBJEXT)
+am_kDv_OBJECTS = kdv_simple.$(OBJEXT) calculus.$(OBJEXT)
 kDv_OBJECTS = $(am_kDv_OBJECTS)
 kDv_LDADD = $(LDADD)
 AM_V_P = $(am__v_P_$(V))
@@ -254,7 +254,8 @@ top_srcdir = .
 lib_LIBRARIES = \
 	libcalculus.a
 
-kDv_SOURCES = kdv.c kdv.h calculus.c calculus.h Misc.h main.c
+#kDv_SOURCES = kdv.c kdv.h calculus.c calculus.h Misc.h main.c
+kDv_SOURCES = kdv_simple.c kdv_simple.h calculus.c calculus.h Misc.h
 #kDv_udis_SOURCES = kdv_udis.c calculus_udis.c kdv_udis.h calculus_udis.h\
 #	Misc.h main_udis.c
 libcalculus_a_SOURCES = calculus.c calculus.h Misc.h
@@ -398,8 +399,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 include ./$(DEPDIR)/calculus.Po
-include ./$(DEPDIR)/kdv.Po
-include ./$(DEPDIR)/main.Po
+include ./$(DEPDIR)/kdv_simple.Po
 
 .c.o:
 	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

@@ -14,26 +14,25 @@
                 (loop for i upto (- len 1)
                    collecting (+ (5pt-stencil i 3 u h) (* (- 6) (aref u i)
                                                           (5pt-stencil i 1 u h)))))))
-(defun u-discrete-i (u h i)
-  (declare (type (array float) u)
-           (type float h)
-           (type fixnum i))
-  (+ (5pt-stencil i 3 u h)
-     (* (- 6) (aref u i) 
-        (5pt-stencil i 1 u h))))
-#|  (let* ((len (array-len u))
-        (u-x (make-array len)))
-    (dotimes (i len)
-      (setf (svref u-x i) (+ (5pt-stencil i 3 u h)
-                             (* (- 6) (aref u i) 
-                                (5pt-stencil i 1 u h)))))
-    u-x))|#
+
 (defun update (u time dt dx)
   (declare (type (array float) u)
            (type float time dt dx))
   (flet ((ustep (x) (u-discrete x dx)))
     (rk4-seq #'ustep dt u)))
-
+(defun kdv-vector-sum (x y scale)
+  (make-array (array-total-size x) :initial-contents
+              (loop for i across x for j across y collecting (+ i (* j scale)))))
+(defun rk4-kdv (u dt dx)
+  (let* ((len (array-len u))
+         (k-1 (u-discrete u dx))
+         (k-2 (u-discrete (kdv-vector-sum u k-1 (* 0.5 dt)) dx))
+         (k-3 (u-discrete (kdv-vector-sum u k-2 (* 0.5 dt)) dx))
+         (k-4 (u-discrete (kdv-vector-sum u k-1 dt) dx)))
+    (make-array len :initial-contents (loop for i-1 across k-1
+                                           for i-2 across k-2 for i-3 across k-3
+                                           for i-4 across k-4 collecting 
+                                           (* (/ dt 6) (+ i-1 (* 2 i-2) (* 2 i-3) i-4))))))
 (defun main ()
   "run kdv simulation"
   (let* ((dx (/ pi 8))
@@ -53,6 +52,20 @@
                (format temp "At time ~e~%~{u:~e x:~e~%~}"
                        time (interleave (coerce u 'list) (coerce x 'list)))
                ;;update u
-               (setf u (update-u))
+               (setf u (vector-sum u (rk4-kdv u dt dx)))
                (setf time (+ time dt))))))))
 
+#|(defun u-discrete-i (u h i)
+  (declare (type (array float) u)
+           (type float h)
+           (type fixnum i))
+  (+ (5pt-stencil i 3 u h)
+     (* (- 6) (aref u i) 
+        (5pt-stencil i 1 u h))))
+#|  (let* ((len (array-len u))
+        (u-x (make-array len)))
+    (dotimes (i len)
+      (setf (svref u-x i) (+ (5pt-stencil i 3 u h)
+                             (* (- 6) (aref u i) 
+                                (5pt-stencil i 1 u h)))))
+    u-x))|#|#

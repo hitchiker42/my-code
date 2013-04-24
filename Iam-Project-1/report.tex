@@ -6,7 +6,16 @@
 \begin{document}
 \maketitle
 \section{Introduction}
-A program for soving the Korteweg-de-Vires partial differential equation
+A solver for the one dimensional Korteweg-de-Viers equation was written using C
+and parallized using openmpi. The resultant data was plotted with gnuplot in
+order to visualize the results. On inspection the plots are consistant with
+results for the methods and initial conditions used. The algorithms used are
+embarssingly parallel and so parallisation was trivial, and resulted in a
+noticable speed up in the code.
+\section{KdV Equation}
+The Korteweg-de-Vires is a one dimensional partial differential equation, 
+
+\end{document}A program for soving the Korteweg-de-Vires(KdV) partial differential equation
 A one dimensional equation used (among other things) to model shallow waves,
 in this case u is the height of the water above the sea floor
 The equation has the form:
@@ -18,7 +27,3 @@ u(x+Ln) = u(x,y) for all integers n; this implies the grid has a domain of
 the periodic boundary conditions imply that for at a boundary n where
 normally n-2,n-1,n,n+1,n+2 would be used to calculate n we use
 n-2,n-1,n,0,1
-
-\section{Numerical Analysis}
-
-\end{document}
