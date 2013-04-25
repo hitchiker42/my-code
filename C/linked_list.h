@@ -16,3 +16,5 @@ list cons(node* head,node* tail);
 int length(list l);
 node* cdr(node* cell);
 void* car(node* cell);
+node* new_node();
+void setf (void* var,void* val);
