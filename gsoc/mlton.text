@@ -1,0 +1,118 @@
+Contact Info
+Name:Tucker Pershing DiNapoli
+Phone: 603-641-4917
+School Email: tpm29@wildcats.unh.edu
+Personal Email: t.dinapoli42@gmail.com or Hitchiker42@gmail.com
+IRC Nick:TuckerD (on freenode)
+Github: https://github.com/hitchiker42
+
+Title: SIMD Support for Mlton
+
+Project Goal: To investigate and design a core set of SIMD primitives for the
+Mlton compilier. The project would consist of three parts: first would be a
+document outlining a core set of SIMD primitives for Mlton using the
+implementation of SIMD operations in other compilers (e.g gcc and clang) as a
+reference. Second would be to implement these primitives using x86-64(AMD 64)
+instructions, specifically sse instructions. Finally would be to develop an sml
+library to make these primitives available to the programmer.
+
+Project Plan: The first 1-2 weeks of the project would be spent researching and
+developing an api for SIMD primitives in Mlton, research would be done on
+implementation of SIMD instructions in other compilers and in determining
+operations that could be implemented on the widest variety of platforms. It is
+hoped this api will both provide information on the kinds of SIMD operations
+available and aid in development of implementations for different
+platforms. This api will provide a concrete example of work early on in the
+project as well as guide the rest of the project. The next part of the project,
+likely until the middle of the project time frame, would focus on implementing
+the api using x86-64 sse instructions, it is presumed that two main datatypes
+will be supported, integers and floating point numbers(single and double
+precision) and both of these types will be implemented. Some of this work will
+hopefully be done during the first 2 weeks as well, simply by necessity in
+testing the applicability different ideas. x86-64 is chosen as the
+infrastructure to support as this is the most familiar to the author and so
+little research on the assembly side of things would need to be done. The
+remainder of the project would be spent developing a library to provide
+implementation independent functions using the SIMD primitives. As there are a
+large number of possible functions and operations that could be optimize via
+SIMD operations the focus of this library will be to implement some important
+and simple functions (e.g vector length,search and map) to provide concrete
+examples of the use of the primitives leaving room for many additional
+functions to be added.
+
+Timeline:
+week 1: Research and Design of SIMD primitives api
+week 2: Deliver completed api and begin work on x86-64 implementation
+week 3: Work on x86-64 implementation, focus on integer operations
+week 4: (Optional) Deliver completed integer operations, focus on floating
+point operations
+week 5: Finish all work on x86-64 implementation, Deliver completed code for
+mid-term evaluation
+week 6: Research and begin work on sml library using simd primitives to
+optimize various core functions (Optional) Provide simple layout of library,
+with functions that will be implemented and ideas of functions to be
+implemented later
+week 7: Work on library, mainly utility code necessary for many different
+functions
+week 8-10: Continue Work on library, Delivering functions as they are completed
+and tested
+Rest of Time: Polish and test Code, Leave at least the last week for this so
+that the finished project is well tested and documented. Finally deliver
+completed code.
+40 Hours/week are planned for work on the project.
+
+Challenges/Risks: This project will mostly consist of new code so it will be
+important to keep it contact with the mentor and hopefully to consult with
+mlton users to determine the most useful operations. This seems a rather large
+project and so I have tried my best to break it down into as many small
+independent modules as possible (The api, the implementation of
+primitives(split into ints and floats) and the library as a set of independent
+functions), this will hopefully keep the work manageable and insure that the
+project will have tangible results even if unexpected difficulties are encountered.
+
+Why: SIMD instructions are included in almost all modern processor
+architectures and provide a sizable performance benefit in operations on
+vecorized data. As Mlton is an optimizing compiler the addition of SIMD
+instructions will be of great help in optimizing scientific or graphically
+intensive code. With a standard api and library implementing optimized basis
+functions it should be possible to implement auto-vectorization without too
+much effort, in the simplest cases just replacing a call to a standard function
+with the simd optimized version.
+
+Why Me: I am a senior physics student at the University of New Hampshire and am
+minoring in computer science. I have a strong interest in high performance
+computing, and have done extensive research on x86-64 simd instructions and
+their implementation in gcc compiler intrinsics  for a presentation in a course
+on high performance computing. The large majority of scientific code is written
+in either C or Fortran. However I personally prefer writing using a functional style,
+so this is a project with a tangible benefit to me personally, a better sml
+compiler gives me the ability to use more sml in my scientific projects. I
+enjoy programming in sml and working with SIMD instructions so I have strong
+personal motivation for working on this project. I don't have any experience on
+working on actual open source software, though I have worked on group projects
+using version control and have experience working with git so I feel I am
+capable of working on this project. I use open source software almost
+exclusively in both my academic and personal computing and would really like to
+give back to the open source community in some manner. I see the GSoC as being
+the perfect opportunity to get involved with open source software, and Mlton
+would be a project I would be happy to be involved with. I firmly believe I am
+capable of this project and am willing to put in the work that it will take to
+accomplish it.
+
+Synopsis
+If the format allows, start your proposal with a short summary, designed to convince the reviewer to read the rest of the proposal.
+
+Benefits to Community
+Don't forget to make your case for a benefit to the organization, not just to yourself.  Why would Google and your organization be proud to sponsor this work? How would open source or society as a whole benefit? What cool things would be demonstrated?
+
+Deliverables
+Include a brief, clear work breakdown structure with milestones and deadlines. Make sure to label deliverables as optional or required. You may want your plan to start by producing some kind of white paper, or planning the project in traditional Software Engineering style. It’s OK to include thinking time (“investigation”) in your work schedule. Deliverables should include investigation, coding and documentation.
+
+Related Work
+You should understand and communicate other people’s work that may be related to your own. Do your research, and make sure you understand how the project your are proposing fits into the target organization. Be sure to explain how the proposed work is different from similar related work.
+
+Biographical Information
+Keep your personal info brief. Be sure to communicate personal experiences and skills that might be relevant to the project. Summarize your education, work, and open source experience. List your skills and give evidence of your qualifications. Convince your organization that you can do the work. Any published work, successful open source projects and the like should definitely be mentioned.
+
+Follow the Rules
+Most organizations accept only plain text applications. Most organizations have a required application format. Many organizations have application length limits. In general, organizations will throw out your proposal if you fail to conform to these guidelines. If you feel you must have graphical or interactive content associated with your application, put just this content (not a copy of your proposal) on the web and provide an easy-to-type URL. Do not expect reviewers to follow this link.
