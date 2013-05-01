@@ -10,13 +10,14 @@ Title: Vectorization of Sequence functions using SSE compiler Intrinsics
 
 Project aims: To create optimized versions of several sequence functions using
 x86-64 SSE SIMD instructions. The number of functions that will be optimized
-will depend on the time it takes for each function, but at least: count, find/position,
-remove/delete, substitute/nsubstitute, search and replace will be implemented. Further functions to be
-implemented if time allows would be the map and reduce functions. These
-functions will be implemented with support for integer and floating point
-datatypes, as these are the supported simd datatypes in sbcl as of the time of
-this proposal, however should further datatypes (i.e bytes or chars) be added
-implementations useing these datatypes will be considered.
+will depend on the time it takes for each function, but at least: count,
+find/position, remove/delete, substitute/nsubstitute, search and replace will
+be implemented. Further functions to be implemented if time allows would be the
+map and reduce functions. These functions will be implemented with support for
+integer and floating point datatypes, as these are the supported simd datatypes
+in sbcl as of the time of this proposal, however should further datatypes (i.e
+bytes or chars) be added implementations useing these datatypes will be
+considered.
 
 Project Plan: During the first two weeks the find/position functions will be
 implemented, as these seems the most straightforward and will be an early
@@ -29,7 +30,27 @@ functions of search and replace. As these functions take two sequences as
 arguments and deal with subsequences they will likely be much more difficult to
 implement. Having only these two functions for the latter half leaves a buffer
 of time for any unexpected difficulties, should this not prove enough work then
-work will be done on implementing the map function. 
+work will be done on implementing the map function.
+
+Timeline: I intend to spend about 40 hours a week on the project, and to break
+my work up roughly as follows
+week 1:Planning and writing of utitly functions and macros for find/position
+week 2:Work on the find/position functions to have a deliverable for the first
+two weeks
+week 3-4:Planning and writing of utitly code for other one arguement sequence
+functions(that is only one argument is a sequence i.e. substitute,count,etc...)
+and consolidating code from find/position for use with these functions
+week 5-6:Work on and begin testing the rest of the one argument sequence
+functions
+week 6-7:Before midterm fininsh testing and do some profiling for the one
+arguement sequence functions to be able to deliver them for MidTerm
+week 8-10:Repeat the same process as for the one arguement functions for the
+functions that take two sequence arguements,(search and replace)
+week 10-12:Writing and Testing of the two argument sequence arguements
+(Note: If time permits in weeks 8-12 possibly work on the map function)
+week 12-end:Work on Testing and polishing all code such that it is presentable
+as a finished product by the end of the GSoC. If it seems useful write a
+package/library of utility simd functions from the ones I have used.
 
 Risks/Challenges: The biggest challenge in this project is working with the
 sbcl simd intrinsics, as simd instructions are a fairly new introduction to the
@@ -43,14 +64,14 @@ modular nature deals with what seems to be the biggest issue with GSoC
 projects, this being scope, a project being to large to complete or not
 large enough for the whole summer.
 
-Why Me: I feel I am an ideal candidate for this project as x86-64 SIMD instructions
-are something I have studied and worked with extensively both on the assembly
-level and as gcc compiler intrinsics. My area of study is in scientific
-computing and I enjoy writing scientific lisp code which by its very nature
-requires highly optimized code, and uses a large amount of vector
+Why Me: I feel I am an ideal candidate for this project as x86-64 SIMD
+instructions are something I have studied and worked with extensively both on
+the assembly level and as gcc compiler intrinsics. My area of study is in
+scientific computing and I enjoy writing scientific lisp code which by its very
+nature requires highly optimized code, and uses a large amount of vector
 operations. Thus this is an area of importance to me for my code, having simd
-optimized vector functions would help a lot in writing workable 
-high performance lisp code. I have never been really involved in an open source
+optimized vector functions would help a lot in writing workable high
+performance lisp code. I have never been really involved in an open source
 project before and so I would really like this opportunity to work on a project
 I find interesting and to become a part of an open source project I use often.
 
@@ -77,23 +98,4 @@ Hitchiker42@gmail.com) and asked a few questions on irc. I have no commitments
 that would conflict with gsoc if I am accepted for the project. I am very
 interested in this project and I feel I can do a good job on it, I hope to work
 on some aspect of sbcl even if not accepted for GSoC but I would really
-appreciate the opportunity provided by GSoC. 
-
-Application template
-
-Contact information : enough at the very least to communicate with you over e-mail and IRC.  Accepted students will likely also need to talk to mentors and the organization using voice.  Include here any web
-pages, blogs, code hosting organization profiles and the like that mentors should know about.
-
-Project Proposal : information about your proposed project.  Include
-
- 1. Project title;
- 2. Project aims (the ultimate goal);
- 3. Project plan: include a schedule with deliverables (normally in weekly or biweekly intervals), with specific reference to what you plan to have to show after the first two weeks, at mid-term, and at the
-    end;
- 4. Risks and challenges: what could go wrong with your proposal and plan?
- 5. A brief explanation of why this proposal is important or meaningful to you, and why you believe you are well-placed to perform this project.
-
-Background and experience : what are you studying?  What have you learnt in the past?  What other relevant projects have you worked on?  Have you had experience with Open Source software, as a user or a
-developer?  Include here links to any significant interaction with SBCL in the recent community bonding period.
-
-Any other information : anything else that might be relevant: for example, if accepted, will you have any commitments (study, work, vacation) over the period 17th June to 23rd September?
+appreciate the opportunity provided by GSoC.
