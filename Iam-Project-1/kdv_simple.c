@@ -67,14 +67,17 @@ int main(int argc,char** argv) {
     //#pragma omp parallel num_threads(2)
     //   {
     //#pragma omp single
-    snprintf(name,50,"%06d.acs",cnt);
-    //fprintf(stderr,name);
-    FILE* file=fopen(name,"w");
-    mem_check(file);
-    //  {
-    fprintf(file,"#data for time %.2f\n",time);
-    for(j=0;j<len;j++){
-      fprintf(file,"%10f\t%10f\n",j,x[j],(fabs(u[j])));
+    if(cnt % 10000 ==0){
+      snprintf(name,50,"%06d.acs",cnt);
+      //fprintf(stderr,name);
+      FILE* file=fopen(name,"w");
+      mem_check(file);
+      //  {
+      fprintf(file,"#data for time %.2f\n",time);
+      for(j=0;j<len;j++){
+        fprintf(file,"%10f\t%10f\n",j,x[j],(fabs(u[j])));
+      }
+      fclose(file);
     }
     //  }
     //#pragma omp single
@@ -85,7 +88,6 @@ int main(int argc,char** argv) {
     for(q2=0;q2<len;q2++){
       u_p[q2]=u[q2];
     }
-    fclose(file);
     cnt++;
   }
   snprintf(name,50,"%06d.acs",cnt);

@@ -1,5 +1,5 @@
-\documentclass[twoculumn]{article}
-\usepackage{fullpage}
+\documentclass{article}
+\usepackage{fullpage,mathtools,amsfonts}
 \author{Tucker DiNapoli}
 \title{Numerical Analysis of the Korteweg de Vires equation}
 
@@ -13,7 +13,38 @@ results for the methods and initial conditions used. The algorithms used are
 embarssingly parallel and so parallisation was trivial, and resulted in a
 noticable speed up in the code.
 \section{KdV Equation}
-The Korteweg-de-Vires is a one dimensional partial differential equation, 
+The Korteweg-de-Vires is a one dimensional partial differential
+equation, of the form \[\partial_tu+\partial_x^3u-6u\partial_xu=0\]
+The equation is primarily used to model waves in shallow water, and other
+similar phenomena. The equation can be analytically solved via the
+inverse scattering transform, or one of several numerical methods. The
+stable solutions of the KdV equation take the form of solitons, waves
+that move with a fixed shape.
+\subsection{Initial Conditions}
+In order to solve the KdV equation one must start with some sort of
+initial condition defining the state of the system. In this case the
+initial condition used was \[u(x)=-12\cdot csch(x)^2)\] the values of
+x used were x from \(x=-1.5\pi\) to \(x=1.5\pi\) by steps of
+\(\pi/32\).
+
+\section{Numerical Analysis}
+The techniques used in solving this problem were numerical
+differentiation using a 5 point finite difference scheme and
+Runga-Kutta forth order(rk4) time stepping. The KdV equation requires the
+first and third derivatives of u with respect to x these are
+calculated using the 5 point finite difference formula 
+\[\frac{\mathrm{d} u_n}{\mathrm{d} x}=\frac{C_1u_{n-2}+C_2u_{n-1}+C_3u_n+C_4u_{n+1}+C_5u_{n+2}}{C_6\Delta x^{C_7}}\]
+in this equation \(C_1-C_7\) constants dependent on the order of the
+derivative and \(\delta x\) is the x distance between \(u_n\) \&
+\(u_{n+1\). %put in actual coefficients?
+Looking at the KdV equation, once the derivatives of u have been found
+the time step of u can be calculated via the
+equation \[\partial_tu=-\partial_x^3u+6u\partial_xu\] by using rk4
+time steping.%maybe more?
+
+\section{Code}
+There are several pieces of source code that were written for this
+project 
 
 \end{document}A program for soving the Korteweg-de-Vires(KdV) partial differential equation
 A one dimensional equation used (among other things) to model shallow waves,

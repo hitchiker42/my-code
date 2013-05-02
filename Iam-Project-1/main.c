@@ -23,10 +23,12 @@ int main(int argc,char** argv){
     //   {
     //#pragma omp single 
     //  {
+    if(t%M_PI/8==0){
         fprintf(file,"#data for time %.2f\n",t);
         for(j=0;j<r;j++){
           fprintf(file,"Pt %d:%10f\t%10f\n",j,x[j],u_p[j]);
         }
+    }
         //  }
         //#pragma omp single
       update(u,x,t,d,s,r);

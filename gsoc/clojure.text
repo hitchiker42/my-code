@@ -1,56 +1,118 @@
- When submitting your application, be sure to include the following
-information: Contact information Contact Info Name:Tucker Pershing DiNapoli
+Contact Information
+Name:Tucker Pershing DiNapoli
 Phone: 603-641-4917 Location: Manchester NH, USA (Timezone:EST) School Email:
 tpm29@wildcats.unh.edu Personal Email: t.dinapoli42@gmail.com or
 Hitchiker42@gmail.com IRC Nick:TuckerD (on freenode) Github:
 https://github.com/hitchiker42
 
-Project information
-
-Tell us about the project you'd like to pursue.
-
 Title: Integration of Incanter and Core.Matrix
 
-Synopsis: Incanter is an R like statistical library for clojure and Core.Matrix
-is an api for matrix operations in clojure
+Synopsis: Incanter is an R like statistical library for clojure and
+Core.Matrix is an api for matrix operations in clojure. The goal of
+this project is to implement incanter by replacing The
+current numerical library(parallel colt) with core.matrix, providing a
+statistical library written in pure clojure. This will require
+analysis of the colt library and it's use in incater to determine how
+to best replace it with core.matrix. The work will primarily involve
+writing implementations of the required algorithms, while some work
+will also go into the code to glue together the two libraries.
 
-Give us a brief 1-2
-paragraph description of your project, including details such as the problem
-you are trying to resolve and how you plan on solving it.  Qualifications: What
-experience do you have that prepares you to undertake this project?  Community
-benefits: How would your project help the Clojure community?  Deliverables:
-What quantifiable results should your project produce?  Schedule: See below.:
+Qualifications:
+I am a senior physics student at the University of New Hampishire. I
+have taken courses on numerical analysis and high performance, so I
+have experience working with the kinds of algorithms used in a library
+in incanter. My work in these areas used C and the NumPy library of
+python, so I have experence working with matrices at a low level from
+C and using an api similar to core.matrix from NumPy. I have
+experience working with pure java and a basic understanding of jvm
+bytecode from a computer science class. My experience with lisp comes
+from using common lisp, I love the lisp language and style and
+personally I enjoy writing optimized numerical lisp code. My
+experience with clojure itself is limited, not having only used the 
+language as a makeshift java repl before I started looking into GSoC,
+having used clojure somewhat I was interested in the clojure offerings
+and decided to learn the language better. That said over the past month or
+so I have spent time learning clojure, the main difficulty in learning
+the language was simply the syntax, as the core ideas of the language
+are almost identical to common lisp. I feel I have enough of a working
+knowledge of clojure and its build system (leiningen) to be able to do
+this project, and will pick up more along the way.
 
-GSoC officially runs from 17 Jun–23 Sep, a period of 14 weeks.  Please create a
-detailed plan about what you hope to accomplish over this time, ideally in 1-
-to 2- week segments.  This plan serves two primary purposes:
+Community Benefits:
+Core.Matrix is a great project for clojure providing the language with
+a numerical library akin to NumPy. This project would help provide
+further support to this library, both by showing a fairly extensive
+practical use of the library and by providing several numerical
+algorithms that could be integrated into the main core.matrix
+library. The actual incanter implementation would be beneficial as
+well, providing a useful statistical library without having to rely on
+java code.
 
-    It shows us to what degree you have considered the problem.  We will be
-    able to see if the schedule seems realistic and well-considered.  If
-    selected, it will serve as a way to track your progress over the summer.
-    Granted, we all know that schedules can slip due to surprises within the
-    project, and so long as you show consistent progress you will be fine.
+Deliverables:
+There will be two main deliverables, the core.matrix backed incanter
+implementation itself and a library of useful numerical routines
+written using the core.matrix api functions. As an early indicator of
+progress there will be a report documenting the functions/algorithms
+necessary to re-implement incanter and how this will be done. Periodic
+progress will be visible as incanter is broken up into several modules
+and so each module can be delivered upon completion to show work being
+done. Based on the incanter api there are three modules depending on
+the colt library, which will have to be re-implemented, core,stats and
+zoo. Core will be completed for midterm and zoo and stats during the
+second half of the project.
 
-Other commitments
+Schedule:
+week 1:Work on understanding which aspects of incanter will need to be
+re-implemented and devising a set of functions and macros that will be
+useful throughout the project.
+week 2:Continued work on utility functions/macros and a formal write
+up of the algorithms that will need to be written this will be
+delivered to show progress.
+week 3-4: Work on incanter.core writing the core datatypes and
+functions of incanter in terms of core.matrix
+week 5-6: Work on incanter.core writing the more complicated
+functions, namely the matrix decomposition.
+week 7: Testing and profiling of the incanter.core implementation, to
+be delivered at midterm as an indicator of progress
+(Note:in weeks 5-7 additional work will likely be done on some other
+aspects of incanter beyond incanter.core)
+week 8-10: Implementation of incanter.stats, this is the
+largest and most complicated of the three modules and will likely
+require the most work, though hopefully much of the earlier code can
+be reused.
+week 11-12: Implementation of incanter.zoo, this is the smallest of the
+three modules, so if need be this can be pushed back, or if absolutely
+necessary dropped.
+week 13-14: Finishing touches and testing of all three
+modules. Writing of any additional glue code to integrate core.matrix
+and incanter. Packaging up useful routines into a reusable library to
+be delivered along with the implementation of incanter at the end of
+the project. Should work be completed early the additional time will
+be put into fleshing out this library with other numerical routines
+not needed for incanter.
 
-As a GSoC student, you will be paid by Google to be doing full-time work on
-your project.  As such, we need to know:
+Other Commitments:
+Should I be accepted for GSoC to work on clojure I will have no other
+commitments and will be able to devote at least 40hrs/week to working
+on my project. I am applying for other summer jobs/internships but the
+GSoC is my first choice and so if accepted I would forgo other offers
+in order to work on GSoc.
 
-    Does the GSoC conflict with exams at your university?  If so, we can be
-    flexible and adjust your project's schedule accordingly.  The important
-    thing is to let us know early.  Do you have any other significant summer
-    plans?  Are you getting married, going on vacation, or expecting to start a
-    job?  If so, please tell us how this will impact your project and how you
-    plan to handle it.  Are you applying to any other internships (outside of
-    GSoC) or summer employment?  If there is a good chance you will decline an
-    offer to work on a Clojure GSoC project in preference for something else,
-    please let us now.
-
-Other information
-
-    Why Clojure?  We are curious.  How did you hear about Clojure and GSoC?
-    Have you developed or contributed to open source projects?  If so, please
-    tell us which ones and provide links.  Are you applying as a student to
-    another GSoC organization?  If so, please let us know.  This will not
-    impact your application with Clojure, but will help us out in the event
-    that you are selected by us and someone else.
+Other information:
+I heard about GSoC through the use of open source software. I use
+open source software almost exclusively and while I have not worked on
+any open source projects (though I would really like to, which is why
+I'm applying to GSoC) I have run into code written for the GSoC
+before. As for why Clojure, I first ran into clojure while writing
+java code and looking for some kind of repl for java to test my code,
+I found both clojure and scala to work well for my style of
+programming(I write mostly functional programs, which makes writing
+java difficult sometimes). I am very interested by differing lisp
+dialects and implementations, but never had any real reason to learn
+more of the language until recently (partly because of armed bear
+common lisp, which provided a more familiar lisp on the jvm). I see
+this project as an opportunity to learn more about the subtle differences
+between clojure and other lisps, which is something I find
+interesting. I am applying to two other GSoC organizations (sbcl and
+mlton), but would be very happy to be able to work on clojure should I
+be accepted.

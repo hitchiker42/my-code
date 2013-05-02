@@ -14,10 +14,7 @@ will depend on the time it takes for each function, but at least: count,
 find/position, remove/delete, substitute/nsubstitute, search and replace will
 be implemented. Further functions to be implemented if time allows would be the
 map and reduce functions. These functions will be implemented with support for
-integer and floating point datatypes, as these are the supported simd datatypes
-in sbcl as of the time of this proposal, however should further datatypes (i.e
-bytes or chars) be added implementations useing these datatypes will be
-considered.
+integer and floating point datatypes. 
 
 Project Plan: During the first two weeks the find/position functions will be
 implemented, as these seems the most straightforward and will be an early
