@@ -11,26 +11,25 @@ double Stencil_5pt (double *x,int i,int len,int order,double h){
   if(!(0<order<5)){
     return NAN;
   }
-  double inf=INFINITY;
-  double x_i_2=inf,x_i_1=inf,x_i=inf,x_i1=inf,x_i2=inf;
-  if(i<=1){
-    x_i_1=x[i+1];
-    if(i==0){
-      x_i_2=x[i+2];
-    }
+  double x_i1,x_i2,x_i_1,x_i_2,x_i=x[i];
+  if(i==0){
+    x_i_1=x[len-1];x_i1=x[1];
+    x_i_2=x[len-2];x_i2=x[2];
+  } else if (i==1){
+    x_i_2=x[len-1];x_i2=x[3];
+    x_i_1=x[0];x_i1=x[2];
+  } else if (i==(len-1)){
+    x_i1=x[0];x_i_1=x[len-2];
+    x_i2=x[1];x_i_2=x[len-3];
+  } else if (i==(len-2)){
+    x_i2=x[0];x_i_2=x[len-3];
+    x_i1=x[len-1];x_i_1=x[len-4];
+  } else {
+  x_i2=x[i+2];
+  x_i1=x[i+1];
+  x_i_1=x[i-1];
+  x_i_2=x[i-2];
   }
-  if (i>=len-2){
-    x_i1=x[i-1];
-    if (i==len-1){
-      x_i2=x[i-2];
-    }
-  }
-  x_i=x[i];
-  if(x_i2==inf){x_i2=x[i+2];}
-  if(x_i1==inf){x_i1=x[i];}
-  if(x_i_1==inf){x_i_1=x[i-1];}
-  if(x_i_2==inf){x_i_2=x[i-2];}
-  
   switch (order) {
   case 0:
     return x_i;
