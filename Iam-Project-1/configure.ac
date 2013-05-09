@@ -37,6 +37,15 @@ CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 #AS_IF([test "$debug" = "false"], [CPPFLAGS="${CPPFLAGS} -DNDEBUG"])
 
 #latex support
+AC_DEFUN([AC_PROG_PDFLATEX],[
+AC_CHECK_PROGS(pdflatex,[pdflatex],no)
+export pdflatex;
+if test $pdflatex = "no" ;
+then
+	AC_MSG_ERROR([Unable to find a PDFLaTeX application]);
+fi
+AC_SUBST(pdflatex)
+])
 AC_PROG_PDFLATEX
 
 # for library support
@@ -45,8 +54,8 @@ m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
 
 #Check for gsl
 AC_CHECK_LIB([m],[cos])
-AC_CHECK_LIB([gslcblas],[cblas_dgemm])
-AC_CHECK_LIB([gsl],[gsl_blas_dgemm])
+#AC_CHECK_LIB([gslcblas],[cblas_dgemm])
+#AC_CHECK_LIB([gsl],[gsl_blas_dgemm])
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([Makefile])
