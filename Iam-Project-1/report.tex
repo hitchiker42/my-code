@@ -1,5 +1,5 @@
 \documentclass{article}
-\usepackage{fullpage,mathtools,amsfonts}
+\usepackage{fullpage,mathtools,amsfonts,graphics}
 \author{Tucker DiNapoli}
 \title{Numerical Analysis of the Korteweg de Vires equation}
 
@@ -36,7 +36,7 @@ respect to x these are calculated using the 5 point finite difference formula
 x}=\frac{C_1u_{n-2}+C_2u_{n-1}+C_3u_n+C_4u_{n+1}+C_5u_{n+2}}{C_6\Delta
 x^{C_7}}\] in this equation \(C_1-C_7\) constants dependent on the order of the
 derivative and \(\delta x\) is the x distance between \(u_n\) \&
-\(u_{n+1\). %put in actual coefficients?  Looking at the KdV equation, once the
+\(u_{n+1}\). %put in actual coefficients?  Looking at the KdV equation, once the
 derivatives of u have been found the time step of u can be calculated via the
 equation \[\partial_tu=-\partial_x^3u+6u\partial_xu\] by using rk4 time
 steping.%maybe more?
@@ -65,7 +65,7 @@ An attempt was made to insure all functions were pure, that is the
 functions do not modify their arguments. This is the approach used in many
 functional programming languages such as lisp,haskell,ml,etc. The advantage of
 this technique is that it makes paralleling the code trivial, for example the
-function u_discrete which calculates \(-\partial_x^3u+6u\partial_xu\) can be
+function u\_discrete which calculates \(-\partial_x^3u+6u\partial_xu\) can be
 run in a parallel for loop as the original array is not modified. While in this
 particular program there was not a huge benefit from this in more complicated
 programs the benefits of functional programming techniques can be significant
@@ -93,6 +93,7 @@ example plot below this is not at all like the data that was generated.
 \begin{figure}
   \centering
   \caption{KdV data}
+  \includegraphics[scale=0.5]{data}
 \end{figure}
 \subsection{Error Analysis}
 It is likely that the cause of this error is a small programming error. The
@@ -101,7 +102,19 @@ reasonable values used for the initial conditions and the space and time
 steps. Because the data is generated via iteration a small error (for example
 the addition/omission of a minus sign or accidental shifting of array indices)
 could cause the results to be completely different than the expected values.
-\section{Analysis of Development}
+\section{Conclusion}
+While the actual result of this project was not achieved much of the
+work done was solid and the knowledge gained through this project will
+be useful in the future. A simple analysis of the development process
+and its errors would be that the code was developed using bottom up
+programming which ultimately did not fit the programming language
+being used. A much more in-depth analysis is included as an
+appendix. A key lesson learned from this project is to start with
+writing specific code (in this case code specific to the kdv equation)
+and then after that code works to generalize to different problems (in
+this case other 1-D partial differential equations).
+\pagebreak
+\section{Appendix:Analysis of Development}
 Ultimately the development process for this project was flawed considering the
 programming language used. The way in which the author writes code is conducive
 to the use of a bottom up style of development. This style of development is
@@ -147,5 +160,4 @@ programming with no speed penalty, however if for some reason this is not a
 viable option better use of cling and safe use of the c pre-processor could be
 used to mitigate some of the challenges faced during programming in this
 project
-\section{Conclusion}
 \end{document}

@@ -43,7 +43,7 @@ rk4_array_kdv (double* u,int len,double dt,double dx){
 }
 int main(int argc,char** argv) {
   int range = (4 * M_PI),x_0=(-2.0 * M_PI);
-  double dx=(M_PI/32),dt=pow(dx,3),t_max=100;
+  double dx=(M_PI/32),dt=pow(dx,3),t_max=50;
   int len = 128;
   char name[50];
   double *x=malloc(len*sizeof(double));
@@ -58,7 +58,7 @@ int main(int argc,char** argv) {
   }
   //for printing to a file
   double time=0;
-  int j;int cnt=1;
+  int j;int cnt=0;
   /*  while (time<t_max) {
     u=vec_add_kdv(u,rk4_array_kdv(u,len,dt,dx),len,1);
     time+=dt;
@@ -69,8 +69,8 @@ int main(int argc,char** argv) {
     //#pragma omp parallel num_threads(2)
     //   {
     //#pragma omp single
-    if(cnt % 1000 ==0){
-      snprintf(name,50,"%06d.acs",cnt);
+    if(cnt % 5000 ==0){
+      snprintf(name,50,"%06d.txt",cnt);
       //fprintf(stderr,name);
       FILE* file=fopen(name,"w");
       mem_check(file);
@@ -100,6 +100,6 @@ int main(int argc,char** argv) {
   }
   fclose(file);
   system("mkdir -p kdv-data && rm -f kdv-data/*");
-  system("mv *.acs kdv-data");
+  system("mv *.txt kdv-data");
   return 0;
 }

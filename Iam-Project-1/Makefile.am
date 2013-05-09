@@ -7,3 +7,6 @@ kDv_SOURCES = kdv_simple.c kdv_simple.h calculus.c calculus.h Misc.h
 #kDv_udis_SOURCES = kdv_udis.c calculus_udis.c kdv_udis.h calculus_udis.h\
 	Misc.h main_udis.c
 libcalculus_a_SOURCES=calculus.c calculus.h Misc.h
+
+report: report.tex
+	pdflatex $^

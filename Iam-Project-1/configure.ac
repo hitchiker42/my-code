@@ -36,6 +36,9 @@ CFLAGS="$CFLAGS $OPENMP_CFLAGS"
 
 #AS_IF([test "$debug" = "false"], [CPPFLAGS="${CPPFLAGS} -DNDEBUG"])
 
+#latex support
+AC_PROG_PDFLATEX
+
 # for library support
 AC_PROG_RANLIB
 m4_ifdef([AM_PROG_AR], [AM_PROG_AR])
