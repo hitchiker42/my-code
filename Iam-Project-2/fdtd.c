@@ -11,52 +11,46 @@
 #include <math.h>
 #define NR_END 1 //Whats this
 #define FREE_ARG char* //And whats this 
-#define  PI (4.0*atan(1.0))
-#define  OMEGA (2.0*PI) //really should be TAU
-void updatePsi(void);
-void initialize(void);
-void update(int choice);
-void nrerror(char error_text[]);
-float *f1d(int nl, int nh);
-float **f2d(int nrl, int nrh, int ncl, int nch);
-void free_f1d(float *v, int nl, int nh);
-void free_f2d(float **m, int nrl, int nrh, int ncl, int nch);
+double *f1d(int nl, int nh);
+double **f2d(int nrl, int nrh, int ncl, int nch);
+void free_f1d(double *v, int nl, int nh);
+void free_f2d(double **m, int nrl, int nrh, int ncl, int nch);
 MPI_Comm MPI_SubComm,MPI_CartSubComm;
 int rank,nodes;
 //global variables
-//TODO:REPLACE FLOATS WITH DOUBLES
+//TODO:REPLACE DOUBLE*S WITH DOUBLES
 //GIVE VARIABLES MORE DESCRIPTIVE NAMES
 int choice, width, thickness, wavetype, px, py;
 double vscale, vmax, refindex;
 long int isave;
 char saveFilename[40];
 
-//What is this stuff
+//What is this stuff indices?
 int i,j,n,n2, imed,NX,NY,NT,NMED,NPML,NCB;
 int ia, ib, ja, jb, ic, jc;
 int isrc,jsrc;
 int tmpcolor;
 
 //physical constants?
-float rn,M, cabc, SIGMA_MAX, SPEED_OF_LIGHT;
-float lambda, delt, dels, l, ra, rb, r,s,btemp, etemp, temp;
+double rn,M, cabc, SIGMA_MAX, SPEED_OF_LIGHT;
+double lambda, delt, dels, l, ra, rb, r,s,btemp, etemp, temp;
 //Stuff te do with media
-float *epsr, *mur, *sigma, *cea, *ceb, *ch, *mr,*mi;
+double *eps_r, *mu_r, *sigma, *cea, *ceb, *ch, *mr,*mi;
 //Boundary Conditons?
-float *pxa, *pya, *qxa, *qya, *rxa, *rya;
-float *pxb, *pyb, *qxb, *qyb, *rxb, *ryb;
+double *pxa, *pya, *qxa, *qya, *rxa, *rya;
+double *pxb, *pyb, *qxb, *qyb, *rxb, *ryb;
 
 //This code as is allows multiple media,
 //I might leave things this way, or just simplify things
 //and use only one possible medium
 
-float ** media;
+double ** media;
 //Grids
-float **ex, **ey;
-float **dx, **dy;
-float **hz, **bz;
+double **ex, **ey;
+double **dx, **dy;
+double **hz, **bz;
 
-float *hiz,*eix, *eiy; /* incident fields */
+double *hiz,*eix, *eiy; /* incident fields */
 
 FILE  * outdata, * indata;
 char inputFilename[40], refIndexFilename[40];
@@ -64,6 +58,24 @@ int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
   atexit((void (*)())MPI_Finalize);
   //initialize grid, and parallel stuff
+  //total processes(size) and pid of each process
+  int nodes,rank; //declared in header
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nodes);
+  //define subcommunicator
+  //use the common value 0 instead of GridIndex to include all nodes in the same subcommunicator
+  //Why not just use MPI_Comm_create
+  MPI_Comm_split(MPI_COMM_WORLD,0,pid,&MPI_SubComm);
+  //set geometry close to a square
+  int nodes_y=nodes/2;
+  int nodes_x=(nodes-nodes_y);
+  //I suppose its better to use variables than contsants in function args
+  int ndims = 2;
+  int dims[2] = {nodes_x,nodes_y};
+  int periods[2] = {0,0};	//non-periodic
+  int reorder = 1;	//permit reorder
+  MPI_Cart_create(MPI_SubComm, ndims, dims, periods, reorder, &MPI_CartSubComm);
+  int rank_above,rank_behind,rank_left,rank_right;
   //for (n=0;n<tmax;n+=dt){
   //updatePsi()
   //if n%something=0{
@@ -100,16 +112,16 @@ void update(int choice){
     }
 
     for(i=0;i<=NMED;i++){
-      epsr[i] = mr[i]*mr[i]-mi[i]*mi[i];
-      sigma[i] = 4*PI*mi[i]*mr[i]/epsr[i];
-      mur[i] = 1.0;
+      eps_r[i] = mr[i]*mr[i]-mi[i]*mi[i];
+      sigma[i] = 4*PI*mi[i]*mr[i]/eps_r[i];
+      mu_r[i] = 1.0;
     }
 
     for(i=0;i<=NMED;i++){
       temp = 0.5*delt*sigma[i];
       cea[i] = (1.0-temp)/(1.0+temp);
-      ceb[i] = (delt/dels)/(epsr[i]*(1.0+temp));
-      ch[i] = delt/(mur[i]*dels);
+      ceb[i] = (delt/dels)/(eps_r[i]*(1.0+temp));
+      ch[i] = delt/(mu_r[i]*dels);
     }
 
 
@@ -145,7 +157,7 @@ void updatePsi(void)
     /* UPDATE INCIDENT FIELD */
     /* plane wave */
     if(wavetype==1){
-      hiz[0] = sin(OMEGA*rn*delt/vscale);
+      hiz[0] = sin(TAU*rn*delt/vscale);
       temp = hiz[NY-1];
       for(j=1;j<=NY-1;j++){
         hiz[j]= hiz[j] + ch[0]*(eix[j+1] - eix[j]);
@@ -172,7 +184,7 @@ void updatePsi(void)
 
     if(wavetype == 2){
       //point source
-      hz[py+ic-200][px+jc-200] = hz[py+ic-200][px+jc-200] + 50*sin(OMEGA*rn*delt/vscale);
+      hz[py+ic-200][px+jc-200] = hz[py+ic-200][px+jc-200] + 50*sin(TAU*rn*delt/vscale);
     }
 
 
@@ -274,13 +286,13 @@ void updatePsi(void)
 
 
 
-float *f1d(int nl, int nh)
-/* allocate a float vector with subscript range v[nl..nh] */
+double *f1d(int nl, int nh)
+/* allocate a double vector with subscript range v[nl..nh] */
 {
   int i;
-  float *v;
+  double *v;
 
-  v=(float *)malloc((size_t) ((nh-nl+1+NR_END)*sizeof(float)));
+  v=(double *)malloc((size_t) ((nh-nl+1+NR_END)*sizeof(double*)));
   if (!v) nrerror("allocation failure in f1d()");
 
   /* initialize to zero */
@@ -291,20 +303,20 @@ float *f1d(int nl, int nh)
 }
 
 
-float **f2d(int nrl, int nrh, int ncl, int nch)
-/* allocate a float matrix with subscript range m[nrl..nrh][ncl..nch] */
+double **f2d(int nrl, int nrh, int ncl, int nch)
+/* allocate a double matrix with subscript range m[nrl..nrh][ncl..nch] */
 {
   int i, j, nrow=nrh-nrl+1,ncol=nch-ncl+1;
-  float **m;
+  double **m;
 
   /* allocate pointers to rows */
-  m=(float **) malloc((size_t)((nrow+NR_END)*sizeof(float*)));
+  m=(double **) malloc((size_t)((nrow+NR_END)*sizeof(double**)));
   if (!m) nrerror("allocation failure 1 in f2d()");
   m += NR_END;
   m -= nrl;
 
   /* allocate rows and set pointers to them */
-  m[nrl]=(float *) malloc((size_t)((nrow*ncol+NR_END)*sizeof(float)));
+  m[nrl]=(double *) malloc((size_t)((nrow*ncol+NR_END)*sizeof(double*)));
   if (!m[nrl]) nrerror("allocation failure 2 in f2d()");
   m[nrl] += NR_END;
   m[nrl] -= ncl;
@@ -322,15 +334,15 @@ float **f2d(int nrl, int nrh, int ncl, int nch)
   return m;
 }
 
-void free_f2d(float **m, int nrl, int nrh, int ncl, int nch)
-/* free a float matrix allocated by matrix() */
+void free_f2d(double **m, int nrl, int nrh, int ncl, int nch)
+/* free a double matrix allocated by matrix() */
 {
   free((FREE_ARG) (m[nrl]+ncl-NR_END));
   free((FREE_ARG) (m+nrl-NR_END));
 }
 
-void free_f1d(float *v, int nl, int nh)
-/* free a float vector allocated with vector() */
+void free_f1d(double *v, int nl, int nh)
+/* free a double vector allocated with vector() */
 {
   free((FREE_ARG) (v+nl-NR_END));
 }
