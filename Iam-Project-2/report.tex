@@ -1,5 +1,35 @@
 \documentclass{article}
 \usepackage{mathtools,fullpage,graphics,amsfonts}
+\author{Tucker DiNapoli}
+\title{A 2-D Parallel Finite Difference Time Domain Solver Using MPI}
 \begin{document}
-
+\maketitle
+\section{Introduction}
+This project aimed to develop a parallel implementation of a two
+dimensional finite difference time domain(FDTD) solver implemented in C
+using mpi. The primary goal of the project was the implementation of
+parallization using MPI, so much of the base FDTD code was taken from
+other open source FDTD solvers.%\cite{something}
+The project thus consisted of two major parts, adapting the existing
+code(much of which was written in C++) and parallizing the code with
+MPI. 
+\section{Scientific Background}
+%what problem does fdtd solve
+\section{Numerical Analysis}
+%how how do we do fdtd
+\section{Code}%maybe a better name
+%quick intro
+\subsection{Existing Implementations}
+\subsection{Code Adaptation}
+%what code did I adapt and what did I do
+\subsection{Parallization}
+%what did I do generically(ie what parts did I split up)
+%where did i need to transfer info etc
+%Then How did I do this via mpi
+\section{Data}
+%hopefully show an example use of my code, try and do some profiling
+%Also do some examples of how does the parallization speed up the code
+\section{Conclusion}
+\bibliographystyle{ieeetr}
+\bibliography{E-M-Project}
 \end{document}

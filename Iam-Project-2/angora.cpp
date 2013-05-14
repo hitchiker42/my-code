@@ -190,47 +190,6 @@ int main(int argc, char *argv[])
         //http://www.gnu.org/s/libc/manual/html_node/Argp.html#Argp
         argp_parse (&argp, argc, argv, 0, 0, NULL);
 
-        //get the package version from the "config.h" file (stored in string format by autoconf in preprocessor macro PACKAGE_VERSION)
-#ifndef PACKAGE_VERSION
-        cout << "Warning: Package version variable ""PACKAGE_VERSION"" undefined. Assuming version ""0.0.0""." << endl << endl;
-        angora_version_major = 0;
-        angora_version_minor = 0;
-        angora_version_revision = 0;
-#else
-        //extract the major,minor and revision numbers from the string
-        char separator = '.';
-        string package_version_string = PACKAGE_VERSION;
-        //major version number
-        size_t first_sep_pos = package_version_string.find(separator);
-        string major_ver = package_version_string.substr(0,first_sep_pos);
-        istringstream major_ver_str(major_ver);
-        if (!(major_ver_str >> angora_version_major))
-        {
-                throw AngoraDeveloperException("Invalid major version number (" + major_ver + ") for the Angora package");
-        }
-        //major version number
-        size_t second_sep_pos = package_version_string.find(separator,first_sep_pos+1);
-        string minor_ver = package_version_string.substr(first_sep_pos+1,second_sep_pos-first_sep_pos-1);
-        istringstream minor_ver_str(minor_ver);
-        if (!(minor_ver_str >> angora_version_minor))
-        {
-                throw AngoraDeveloperException("Invalid minor version number (" + minor_ver + ") for the Angora package");
-        }
-        //revision number
-        string revision_num = package_version_string.substr(second_sep_pos+1);
-        istringstream revision_str(revision_num);
-        if (!(revision_str >> angora_version_revision))
-        {
-                throw AngoraDeveloperException("Invalid revision number (" + revision_num + ") for the Angora package");
-        }
-#endif
-
-        //print message if check mode is enabled
-        if ((check_mode)&&(rank==0))
-        {
-                cout << "Check mode enabled." << endl << endl;
-        }
-
         //read the Config object that holds the valid Angora settings
         const Config& validsettings = valid_angora_settings();
 

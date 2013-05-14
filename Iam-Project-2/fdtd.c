@@ -45,18 +45,19 @@ double *pxb, *pyb, *qxb, *qyb, *rxb, *ryb;
 //and use only one possible medium
 
 double ** media;
-//Grids
+//Grids Need to change to h instead of d
 double **ex, **ey;
 double **dx, **dy;
 double **hz, **bz;
 
-double *hiz,*eix, *eiy; /* incident fields */
+double *incident_hz,*incident_ex, *incident_ey; /* incident fields */
 
 FILE  * outdata, * indata;
 char inputFilename[40], refIndexFilename[40];
 int main(int argc,char *argv[]){
   MPI_Init(&argc,&argv);
   atexit((void (*)())MPI_Finalize);
+  //NOTE: NEED TO KNOW WHICH VARIABLES ARE GLOBAL AND WHICH ARE PROCESS LOCAL
   //initialize grid, and parallel stuff
   //total processes(size) and pid of each process
   int nodes,rank; //declared in header
@@ -65,17 +66,27 @@ int main(int argc,char *argv[]){
   //define subcommunicator
   //use the common value 0 instead of GridIndex to include all nodes in the same subcommunicator
   //Why not just use MPI_Comm_create
-  MPI_Comm_split(MPI_COMM_WORLD,0,pid,&MPI_SubComm);
+  MPI_Comm_split(MPI_COMM_WORLD,0,rank,&MPI_SubComm);
   //set geometry close to a square
   int nodes_y=nodes/2;
   int nodes_x=(nodes-nodes_y);
   //I suppose its better to use variables than contsants in function args
-  int ndims = 2;
+  int ndims = 2; //came from 3-D code
   int dims[2] = {nodes_x,nodes_y};
   int periods[2] = {0,0};	//non-periodic
   int reorder = 1;	//permit reorder
   MPI_Cart_create(MPI_SubComm, ndims, dims, periods, reorder, &MPI_CartSubComm);
+  //these need to be local
+  //each node needs to know its neighbors to transfer H info
   int rank_above,rank_behind,rank_left,rank_right;
+  MPI_Cart_shift(MPI_CartSubComm, 0, next, &rank_left, &rank_right);
+  MPI_Cart_shift(MPI_CartSubComm, 1, next, &rank_below, &rank_above);
+  //Now get cooridnates
+  int cart_coords[3];
+  MPI_Cart_coords(MPI_CartSubComm,rank,2,cart_coords);
+  rank_x = cart_coords[0];
+  rank_y = cart_coords[1];
+  //HERE:we need to initalize the actual grids and such
   //for (n=0;n<tmax;n+=dt){
   //updatePsi()
   //if n%something=0{
@@ -106,9 +117,9 @@ void update(int choice){
       }}
 
     for(j=0;j<=NY;j++){
-      eix[j] = 0;
-      eiy[j] = 0;
-      hiz[j] = 0;
+      incident_ex[j] = 0;
+      incident_ey[j] = 0;
+      incident_hz[j] = 0;
     }
 
     for(i=0;i<=NMED;i++){
@@ -157,13 +168,13 @@ void updatePsi(void)
     /* UPDATE INCIDENT FIELD */
     /* plane wave */
     if(wavetype==1){
-      hiz[0] = sin(TAU*rn*delt/vscale);
-      temp = hiz[NY-1];
+      incident_hz[0] = sin(TAU*rn*delt/vscale);
+      temp = incident_hz[NY-1];
       for(j=1;j<=NY-1;j++){
-        hiz[j]= hiz[j] + ch[0]*(eix[j+1] - eix[j]);
+        incident_hz[j]= incident_hz[j] + ch[0]*(incident_ex[j+1] - incident_ex[j]);
       } /* j*/
       /* absorbing boundary - one way */
-      hiz[NY]=temp + cabc*(hiz[NY-1]-hiz[NY]);
+      incident_hz[NY]=temp + cabc*(incident_hz[NY-1]-incident_hz[NY]);
     }
     /* UPDATE MAGNETIC FIELDS */
     for(i=0;i<=NX-1;i++){
@@ -194,33 +205,33 @@ void updatePsi(void)
 
       i = NPML + NCB-1;
       for(j=NPML+NCB;j<=NY-NPML-NCB-1;j++){
-        hz[i][j] = hz[i][j] + ch[0]*eiy[j];
+        hz[i][j] = hz[i][j] + ch[0]*incident_ey[j];
       }
 
       /* plane x = NX - NPML +1  */
       i = NX-NPML-NCB;
       for(j=NPML+NCB;j<=NY-NPML-NCB-1;j++){
-        hz[i][j] = hz[i][j] - ch[0]*eiy[j];
+        hz[i][j] = hz[i][j] - ch[0]*incident_ey[j];
       }
 
       /* plane y = npml +1 */
 
       j = NPML + NCB-1;
       for(i=NPML+NCB;i<=NX-NPML-NCB-1;i++){
-        hz[i][j] = hz[i][j] - ch[0]*eix[j];
+        hz[i][j] = hz[i][j] - ch[0]*incident_ex[j];
       }
 
       /* plane y = NY - npml - 1 */
 
       j = NY - NPML - NCB;
       for(i=NPML+NCB;i<=NX-NPML-NCB-1;i++){
-        hz[i][j] = hz[i][j] + ch[0]*eix[j];
+        hz[i][j] = hz[i][j] + ch[0]*incident_ex[j];
       }
 
 
       /* UPDATE INCIDENT FIELD */
       for(j=1;j<=NY;j++){
-        eix[j]= cea[0]*eix[j]+ ceb[0]*(hiz[j] - hiz[j-1]);
+        incident_ex[j]= cea[0]*incident_ex[j]+ ceb[0]*(incident_hz[j] - incident_hz[j-1]);
       } /* ijk */
     }
     /* ELECTRIC FIELDS */
@@ -257,27 +268,27 @@ void updatePsi(void)
 
       i = NPML + NCB;
       for(j=NPML+NCB;j<=NY-NPML-NCB-1;j++){
-        ey[i][j] = ey[i][j] + ceb[0]*hiz[j];
+        ey[i][j] = ey[i][j] + ceb[0]*incident_hz[j];
       }
 
       /* plane x = NX - NPML + NCB  */
       i = NX-NPML-NCB;
       for(j=NPML+NCB;j<=NY-NPML-NCB-1;j++){
-        ey[i][j] = ey[i][j] - ceb[0]*hiz[j];
+        ey[i][j] = ey[i][j] - ceb[0]*incident_hz[j];
       }
 
       /* plane y = npml +1 */
 
       j = NPML + NCB;
       for(i=NPML+NCB;i<NX-NPML-NCB-1;i++){
-        ex[i][j] = ex[i][j] - ceb[0]*hiz[j-1];
+        ex[i][j] = ex[i][j] - ceb[0]*incident_hz[j-1];
       }
 
       /* plane y = NY - npml - 1 */
 
       j = NY - NPML - NCB;
       for(i=NPML+NCB;i<NX-NPML-NCB-1;i++){
-        ex[i][j] = ex[i][j] + ceb[0]*hiz[j];
+        ex[i][j] = ex[i][j] + ceb[0]*incident_hz[j];
       }
     }
   }/* n iterations */

@@ -166,3 +166,17 @@ void initialize(void)
 
   n = 0;
 }
+void exchangeH(void){
+  //Example, Obviously SendBuf&RecvBuf need to be Process local
+  //Also we need to test for the edge values and deal with them 
+  //Also need to do a bit more research to decide where to swap stuff
+  int Hyxtag
+  SendBuf_Hy_x = hy(someindex);
+  MPI_Sendrecv(SendBuf_Hy_x->data,SendBuf_Hy_x->size,MPI_DOUBLE,rank_above,Hyxtag,
+               RecvBuf_Hy_x->data,RecvBuf_Hy_x->size,MPI_DOUBLE,rank_below,Hyxtag,MPI_CartSubComm,MPI_STATUS_IGNORE)
+  int Hxytag
+  SendBuf_Hx_y = hy(someindex);
+  MPI_Sendrecv(SendBuf_Hx_y->data,SendBuf_Hx_y->size,MPI_DOUBLE,rank_above,Hyxtag,
+               RecvBuf_Hx_y->data,RecvBuf_Hx_y->size,MPI_DOUBLE,rank_below,Hyxtag,MPI_CartSubComm,MPI_STATUS_IGNORE)
+
+              

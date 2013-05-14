@@ -17,4 +17,8 @@ void nrerror(char error_text[]);
 MPI_Comm MPI_SubComm,MPI_CartSubComm;
 extern int nodes,rank;
 extern int nodes_x,nodes_y;
-
+typedef struct {
+  int size;
+  double* data;
+  } MpiBuf;
+extern MpiBuf *SendBuf_Hy_x,*SendBuf_Hx_y,*RecvBuf_Hy_x,*RecvBuf_Hx_y;
