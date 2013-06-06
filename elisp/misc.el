@@ -6,11 +6,14 @@
      (setq seq-list (cons seq-count seq-list))
      (setq seq-count (+ seq-count ,step)))
      (princ (reverse  seq-list))))
+;;doesn't work
 (cl-defmacro my-dotimes (var end &rest body);; &key (start 0) (step (/ end (abs end))))
   `(lexical-let ((x 0))
      (while (<= (abs x) (abs ,end))
        (let ((',var x))
         (progn ,@body))
        (setq x (+ var 1)))))
-(defmacro body-test (&rest body)
-  `(progn ,@body))
+(defmacro stringify (&rest args)
+  `(concat
+    (cl-loop for i in (butlast ',args) concat (concat (symbol-name i) " "))
+    (symbol-name (car (last ',args)))))
