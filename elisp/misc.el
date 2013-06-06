@@ -1,0 +1,7 @@
+(cl-defmacro seq (&key (start 0) (end 10) (step 1))
+`(let ((seq-count ,start)
+       (seq-list ()))
+   (while (< seq-count ,end)
+     (setq seq-list (cons seq-count seq-list))
+     (setq seq-count (+ seq-count ,step)))
+     (princ (reverse  seq-list))))
