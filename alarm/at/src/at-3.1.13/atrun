@@ -1,0 +1,4 @@
+#! /bin/sh
+prefix=/usr
+exec_prefix=${prefix}
+exec /usr/bin/atd -s "$@"
