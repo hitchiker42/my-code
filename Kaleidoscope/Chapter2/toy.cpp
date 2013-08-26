@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <map>
-#include <string>
+#include <string.h>
 #include <vector>
 
 //===----------------------------------------------------------------------===//
@@ -26,64 +26,92 @@ static double NumVal;              // Filled in if tok_number
 
 /// gettok - Return the next token from standard input.
 int gettok() {
-  int i;
+  int i=0,haveDot=0;
   int LastChar = ' ';
-  (IdentifierStr = (calloc(100,sizeof(char)) != NULL)) || return -1;
+  (IdentifierStr = (calloc(100,sizeof(char)) != NULL)) || return -0xff;
   // Skip any whitespace.
-  while (isspace(LastChar))
+  while (isspace(LastChar)){
     LastChar = getchar();
-
-  if (isalpha(LastChar)) { // identifier: [a-zA-Z][a-zA-Z0-9]*
-    i=0;
+  }
+  // identifier: [a-zA-Z][a-zA-Z0-9]*
+  if (isalpha(LastChar)) {
     IdentifierStr[i] = LastChar;
-    while (isalnum((LastChar = getchar())))
-      IdentifierStr += LastChar;
+    while (isalnum((LastChar = getchar())) && i<100){
+      IdentifierStr[i++] = LastChar;
+    }
 
-    if (IdentifierStr == "def") return tok_def;
-    if (IdentifierStr == "extern") return tok_extern;
-    return tok_identifier;
-  }
-
-  if (isdigit(LastChar) || LastChar == '.') {   // Number: [0-9.]+
-    std::string NumStr;
+    if (!(strcmp(IdentifierStr,"def"))){
+      return tok_def;
+    } else if (!(strcmp(IdentifierStr,"extern"))){
+      return tok_extern;
+    } else {
+      return tok_identifier;
+    }
+  // Number: [0-9.]+
+  } else if (isdigit(LastChar) || (LastChar == '.' && haveDot++)){
+    char[100] NumStr;
     do {
-      NumStr += LastChar;
+      NumStr[i++] = LastChar;
       LastChar = getchar();
-    } while (isdigit(LastChar) || LastChar == '.');
-
-    NumVal = strtod(NumStr.c_str(), 0);
-    return tok_number;
-  }
-
-  if (LastChar == '#') {
-    // Comment until end of line.
-    do LastChar = getchar();
-    while (LastChar != EOF && LastChar != '\n' && LastChar != '\r');
-    
-    if (LastChar != EOF)
+    } while (isdigit(LastChar) || (LastChar == '.' && haveDot++) && i< 100);
+    if (haveDot > 1){
+      fprintf(stderr,"Parse Error found in %s\n",NumStr);
+      return -0xff;
+    } else {
+      NumVal = strtod(NumStr.c_str(), 0);
+      return tok_number;
+    }
+  // Comment until end of line.
+  } else if (LastChar == '#') {
+    do {
+      LastChar = getchar();
+    } while (LastChar != EOF && LastChar != '\n' && LastChar != '\r');
+    if (LastChar != EOF){
       return gettok();
-  }
-  
+    }
   // Check for end of file.  Don't eat the EOF.
-  if (LastChar == EOF)
+  } else if (LastChar == EOF){
     return tok_eof;
-
   // Otherwise, just return the character as its ascii value.
-  int ThisChar = LastChar;
-  LastChar = getchar();
-  return ThisChar;
+  } else {  
+    int ThisChar = LastChar;
+    LastChar = getchar();
+    return ThisChar;
+  }
 }
 
 //===----------------------------------------------------------------------===//
 // Abstract Syntax Tree (aka Parse Tree)
 //===----------------------------------------------------------------------===//
 
-/// ExprAST - Base class for all expression nodes.
-class ExprAST {
-public:
-  virtual ~ExprAST() {}
+//TODO: add in integers
+typedef struct CallExpr CallExpr;
+typedef struct BinExp BinExp;
+typedef struct Prototype Prototype;
+typedef union ExprAST ExprAST;
+union{
+  //pointers to everything but numbers, so sizeof(ExprAST)==sizeof(pointer)
+  double Number;
+  char * Name;
+  BinExp* Op;
+  CallExpr* fxnCall;
+} ExprAST;
+
+struct CallExpr {
+  const char* Name;
+  ExprAST** args;
 };
 
+struct BinExp {
+  char Op;
+  ExprAST LHS;
+  ExprAST RHS;
+};
+
+struct Prototype {
+  const char* Name;
+  const char** Args;
+}
 /// NumberExprAST - Expression class for numeric literals like "1.0".
 class NumberExprAST : public ExprAST {
   double Val;
