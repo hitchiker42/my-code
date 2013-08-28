@@ -16,18 +16,29 @@ typedef struct CallExpr CallExpr;
 typedef struct BinExp BinExp;
 typedef struct Prototype Prototype;
 typedef struct fxn FunctionAST;
-typedef union ExprAST ExprAST;
+typedef union untaggedExprAST untaggedExprAST;
+typedef struct ExprAST ExprAST
 
 struct CallExpr{
   const char* Name;
   ExprAST* args;
 };//128 bits(char* is 64 bits)
-union ExprAST {
+union untaggedExprAST {
   double Number; //Numbers, double precision only
   const char* Name; //Identifiers
   BinExp* Op; //Binary Expressions
   CallExpr fxnCall; //Function Calls
 };//bits = 128
+enum ExprASTtag {
+  Number = 1,
+  Name = 2,
+  Op = 3,
+  fxnCall = 4
+};
+struct ExprAST {
+  untaggedExprAST Expr;
+  ExprASTtag Tag;
+};//172 bits/three registers
 struct BinExp {
   ExprAST LHS;
   ExprAST RHS;
@@ -42,5 +53,11 @@ struct fxn {
   ExprAST Body;
 };//128 bits
 ExprAST ParseExpression();
+Prototype ParseExtern();
+FunctionAST ParseTopLevelExpr();
+FunctionAST ParseDefinition();
+Prototype ParsePrototype();
+ExprAST ParseBinOpRHS(int ExprPrec, ExprAST LHS);
+ExprAST ParsePrimary();
 #define getNextToken() (CurTok = gettok())
 #endif

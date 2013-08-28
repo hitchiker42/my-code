@@ -1,13 +1,13 @@
-#include "llvm/Analysis/Verifier.h"
+#include "llvm/Analysis.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
-#include <cstdio>
-#include <map>
-#include <string>
-#include <vector>
-using namespace llvm;
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
 
 //===----------------------------------------------------------------------===//
 // Lexer

@@ -102,7 +102,8 @@ ExprAST ParseIdentifierExpr(const char* id) {
   ExprAST retval;
   getNextToken();  // eat identifier.
   if (CurTok != '('){ // Simple variable ref.
-    retval.Name = id;
+    retval.Expr.Name = id;
+    retval.Tag = 2;
     return retval;
   } else {  // Call.
     int i;
@@ -126,7 +127,8 @@ ExprAST ParseIdentifierExpr(const char* id) {
   // Eat the ')'.
   getNextToken();
   CallExpr temp={id,Args};
-  retval.fxnCall=temp;
+  retval.Expr.fxnCall=temp;
+  retval.Tag = 4;
   return retval;
   }
 }
@@ -134,7 +136,8 @@ ExprAST ParseIdentifierExpr(const char* id) {
 // numberexpr = number
 ExprAST ParseNumberExpr() {
   ExprAST retval;
-  retval.Number = NumVal;
+  retval.Expr.Number = NumVal;
+  retval.Tag = 1;
   getNextToken(); // consume the number
   return retval;
 }
@@ -193,13 +196,18 @@ ExprAST ParseBinOpRHS(int ExprPrec, ExprAST LHS) {
     // Merge LHS/RHS.
     BinExp temp2 = {LHS, RHS, BinOp};
     *temp = temp2;
+    LHS.tag=3;
+    LHS.Expr.Op=temp;
   }
 }
 
 /// expression = primary binopRHS
 ExprAST ParseExpression() {
   ExprAST LHS = ParsePrimary();
-  return ParseBinOpRHS(0, LHS);
+  ExprAST retval;
+  retval = ParseBinOpRHS(0, LHS);
+  retval.tag = 3;
+  return retval;
 }
 
 /// prototype = id ( args )
@@ -239,7 +247,7 @@ FunctionAST ParseDefinition() {
 }
 
 /// toplevelexpr = expression
-static FunctionAST ParseTopLevelExpr() {
+FunctionAST ParseTopLevelExpr() {
   ExprAST body = ParseExpression();
   // Make an anonymous proto.
   Prototype proto = {"",0};
