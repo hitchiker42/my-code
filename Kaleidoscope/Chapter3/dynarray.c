@@ -60,3 +60,24 @@ dynarray* init_dynarray(int initsize,int threshold,int step,int element_size){
   value_type value;                             \
   } key_type##_##value_type##_map
 #endif
+//or more simply
+typedef struct{
+  unsigned char* data;
+  unsigned int len;
+  unsigned int elemsize;
+} dynarray;
+dynarray mk_dynarray(int initsize,int elemsize){
+  initsize = (initsize == 0 ? 20 : initsize);
+  unsigned char* temp=xmalloc(initsize*elemsize);
+  dynarray retval = {temp,initsize,elemsize};
+}
+inline void* dynarray_sub(dynarray arr,int index){
+  return (arr.data + index*arr.elemsize);
+}
+inline void dynarray_update(dynarray arr,int index,unsigned char* value){
+  if (index >= arr.len){
+    arr.len*=1.5;
+    arr.data=xrealloc(arr.len);
+  }
+  *(arr.data+index*arr.elemsize)=&value;
+}
