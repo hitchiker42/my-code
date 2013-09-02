@@ -1,7 +1,9 @@
-#include <llvm-c/core.h>
+#ifndef _CODEGEN_H_
+#define _CODEGEN_H_
+#include <llvm-c/Core.h>
 #include <llvm-c/Analysis.h>
-#include <llvm-c/Initialization.h>
 #include "parser.h"
+#include "xmalloc.h"
 #include <uthash.h>
 #include <string.h>
 #include <stdio.h>
@@ -15,11 +17,11 @@ typedef struct{
 extern LLVMVar* symbolTable;
 /*unhygenic macro, relies on an existing hash table named symbolTable*/
 #define addToSyntaxTable(/*LLVMVar*/ Var)\
-  HASH_ADD_KEYPTR(hh, symbolTable, name, strlen(Var->name), Var)
+  HASH_ADD_KEYPTR(hh, symbolTable, Var->name, strlen(Var->name), Var)
 //may not work, not sure
-inline LLVMVar* LookupSymbol(char* name){
+LLVMVar* LookupSymbol(const char* name){
   LLVMVar *temp;
   HASH_FIND_STR(symbolTable,name,temp);
   return temp;
 }
-#ifndef __CODEGEN_H__
+#endif

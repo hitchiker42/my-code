@@ -1,15 +1,12 @@
-##===- examples/Kaleidoscope/Makefile ----------------------*- Makefile -*-===##
-# 
-#                     The LLVM Compiler Infrastructure
-#
-# This file is distributed under the University of Illinois Open Source
-# License. See LICENSE.TXT for details.
-# 
-##===----------------------------------------------------------------------===##
-LEVEL=../..
-
-include $(LEVEL)/Makefile.config
-
-PARALLEL_DIRS:= Chapter2 Chapter3 Chapter4 Chapter5 Chapter6 Chapter7
-
-include $(LEVEL)/Makefile.common
+CC := clang
+CXX := clang++
+LLVM_MODULES := core jit
+XCFLAGS := $(shell llvm-config --cflags) -Wno-return-type $(CFLAGS) -g
+XCXXFLAGS := $(shell llvm-config --cxxflags)
+XLDFLAGS := $(shell llvm-config --ldflags) $(shell llvm-config --libs $(LLVM_MODULES))
+C_FILES := codegen.c parser.c
+.PHONY: all object
+all: object
+	$(CXX) $(wildcard *.o) $(XLDFLAGS) -o codegen
+object:
+	$(CC) $(C_FILES) $(XCFLAGS) -c

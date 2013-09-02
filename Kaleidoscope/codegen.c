@@ -1,188 +1,232 @@
 #include "codegen.h"
-
-
-
 //===----------------------------------------------------------------------===//
 // Code Generation
 //===----------------------------------------------------------------------===//
 
 LLVMModuleRef MainModule;
-LLVMBuilderRef Builder = LLVMCreateBuilderInContex(LLVMGetGlobalContex());
+LLVMBuilderRef Builder;
 LLVMVar* symbolTable = NULL;
-
-LLVMValueRef ErrorV(const char *Str) { Error(Str); return 0; }
-
-LLVMValueRef Codegen(ExprAST expr) {
-  switch(expr.tag){
-    case: Number
-      return LLVMConstReal(LLVMDoubleType(),expr.Expr.Number);
-    case: Name 
-  return ConstantFP::get(getGlobalContext(), APFloat(Val));
+jmp_buf proto,top_level,definition;
+LLVMValueRef ErrorV(const char *Str) {
+  fputs(Str,stderr);
+  return 0;
 }
-
+LLVMValueRef GenerateValFromName(ExprAST Var);
+LLVMValueRef GenerateBinaryExpr(ExprAST op);
+LLVMValueRef GenerateFxnCall(ExprAST Call);
+LLVMValueRef Codegen(ExprAST expr) {
+  switch(expr.Tag){
+    case Real:
+      return LLVMConstReal(LLVMDoubleType(),expr.Expr.real.dblVal);
+    case Name:
+      return GenerateValFromName(expr);
+    case Op:
+      return GenerateBinaryExpr(expr);
+    case fxnCall:
+      return GenerateFxnCall(expr);
+    default :
+      return ErrorV("Invalid Tag");
+  }
+}
 LLVMValueRef GenerateValFromName(ExprAST Var){
   if (Var.Tag != Name){
     return ErrorV("Expected a Variable Name");
   }
-  LLVMValueRef  V = (LookupSymbol(Var.Name))->value;
+  LLVMValueRef  V = (LookupSymbol(Var.Expr.Name))->value;
   return V ? V : ErrorV("Unknown variable name");
 }
 
 LLVMValueRef GenerateBinaryExpr(ExprAST op) {
-  if (op.Tag != Op){
+  if (op.Tag != Op || op.Expr.BinOp == NULL){
     return ErrorV("Expected a Binary Operator");
   }
-  LLVMValueRef L = Codegen(op.Expr->LHS);
-  LLVMValueRef R = Codegen(op.Expr->RHS);
-  if (L == 0 || R == 0){return 0;}
+  LLVMValueRef L = Codegen(op.Expr.BinOp->LHS);
+  LLVMValueRef R = Codegen(op.Expr.BinOp->RHS);
+  if (L == NULL || R == NULL){return NULL;}
   
-  switch (op.Expr->op) {
+  switch (op.Expr.BinOp->op) {
     case '+': return LLVMBuildFAdd(Builder,L, R, "addtmp");
     case '-': return LLVMBuildFSub(Builder,L, R, "subtmp");
     case '*': return LLVMBuildFMul(Builder,L, R, "multmp");
     case '<':
-      L = LLVMBuildFCmpULT(Builder,LLVMRealULT, R, "cmptmp");
+      L = LLVMBuildFCmp(Builder,LLVMRealULT, R, L, "cmptmp");
       // Convert bool 0/1 to double 0.0 or 1.0
-      return Builder.CreateUIToFP(Builder, L,LLVMDoubleType(),"booltmp");
+      return LLVMBuildUIToFP(Builder, L, LLVMDoubleType(),"booltmp");
     default: return ErrorV("invalid binary operator");
   }
 }
 
 LLVMValueRef GenerateFxnCall(ExprAST Call) {
-  if (Call.Tag != fnxCall){
+  if (Call.Tag != fxnCall){
     return ErrorV("Expected a function Call");
   }
+  int numArgs = Call.Expr.fxnCall->Argc;
   // Look up the name in the global module table.
-  LLVMValueRef CalleeFxn = LLVMGetNamedFunction(MainModule,Call.Expr->Name);
-  if (CalleeFxn == 0){
+  LLVMValueRef CalleeFxn = 
+    LLVMGetNamedFunction(MainModule,Call.Expr.fxnCall->Name);
+  if (CalleeFxn == NULL){
     return ErrorV("Unknown function referenced");
   }
-  int numArgs = Call.fxnCall->Argv;
   // If argument mismatch error.
-  if (LLVMCountParams(CalleeFxn) != numArgs){
+  if ((LLVMCountParams(CalleeFxn)) != numArgs){
+    fprintf(stderr,"%d args passed, wanted%d",(LLVMCountParams(CalleeFxn)),numArgs);
     return ErrorV("Incorrect # arguments passed");
   }
-  LLVMValueRef* Args=xmalloc(numArgs*sizeof(LLVMValueRef));//not sure on the size
-  unsigned int i,e;
-  for (i=0,e=numArgs;i != e; i++) {
-    Args[i]=Codegen(Args[i]));
-    if (ArgsV.back() == 0) return 0;
+  LLVMValueRef* Args=xmalloc(numArgs*sizeof(LLVMValueRef));//not sure about size
+  LLVMGetParams(CalleeFxn,Args);
+  unsigned int i,e=numArgs;
+  for (i=0; i!=e; i++) {
+    Args[i]=Codegen(Call.Expr.fxnCall->args[i]);
+    if (Args[i] == NULL) {return 0;}
   }
-  
-  return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
+  return LLVMBuildCall(Builder,CalleeFxn, Args, numArgs,"calltmp");
 }
 
-LLVMValueRef GeneratePrototype() {
+LLVMValueRef GeneratePrototype(Prototype *proto) {
   // Make the function type:  double(double,double) etc.
-  LLVMTypeRef* ArgTypes;
-  std::vector<Type*> Doubles(Args.size(),
-                             Type::getDoubleTy(getGlobalContext()));
-  FunctionType *FT = FunctionType::get(Type::getDoubleTy(getGlobalContext()),
-                                       Doubles, false);
-  
-  Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule);
-  
+  int numArgs=proto->Argc,i;
+  LLVMValueRef Params[numArgs],F;
+  LLVMTypeRef ArgTypes[numArgs],DoubleRef = LLVMDoubleType(),FT;
+  //for now all args are doubles;
+  for (i=0;i<numArgs;i++){
+    ArgTypes[i]=DoubleRef;
+  }
+  FT = LLVMFunctionType(DoubleRef,ArgTypes,numArgs,0);  
   // If F conflicted, there was already something named 'Name'.  If it has a
   // body, don't allow redefinition or reextern.
-  if (F->getName() != Name) {
-    // Delete the one we just made and get the existing one.
-    F->eraseFromParent();
-    F = TheModule->getFunction(Name);
-    
+  F=LLVMGetNamedFunction(MainModule,proto->Name);
+  if (F != NULL) {
     // If F already has a body, reject this.
-    if (!F->empty()) {
-      ErrorF("redefinition of function");
-      return 0;
-    }
-    
+    if (LLVMCountBasicBlocks(F) > 0) {
+      ErrorV("redefinition of function");
+      return NULL;
+    }    
     // If F took a different number of args, reject.
-    if (F->arg_size() != Args.size()) {
-      ErrorF("redefinition of function with different # args");
+    if (LLVMCountParams/*or LLVMGetNumOperands*/(F) != numArgs) {
+      ErrorV("redefinition of function with different # args");
       return 0;
     }
+  } else {
+    F=LLVMAddFunction(MainModule,proto->Name,FT);
   }
-  
   // Set names for all arguments.
-  unsigned Idx = 0;
-  for (Function::arg_iterator AI = F->arg_begin(); Idx != Args.size();
-       ++AI, ++Idx) {
-    AI->setName(Args[Idx]);
-    
-    // Add arguments to variable symbol table.
-    NamedValues[Args[Idx]] = AI;
+  LLVMGetParams(F,Params);
+  LLVMVar* curParam;
+  for(i=0;i<numArgs;i++){
+    curParam = xmalloc(sizeof(LLVMVar));//create variable
+    curParam->value = Params[i];//set variable value
+    curParam->name=proto->Argv[i];//set variable name
+    LLVMSetValueName(curParam->value,curParam->name);//this seems redundant    
+    addToSyntaxTable(curParam);//add to syntax table, duh
   }
-  
   return F;
 }
 
-Function *FunctionAST::Codegen() {
-  NamedValues.clear();
-  
-  Function *TheFunction = Proto->Codegen();
-  if (TheFunction == 0)
-    return 0;
-  
-  // Create a new basic block to start insertion into.
-  BasicBlock *BB = BasicBlock::Create(getGlobalContext(), "entry", TheFunction);
-  Builder.SetInsertPoint(BB);
-  
-  if (LLVMValueRef RetVal = Body->Codegen()) {
-    // Finish off the function.
-    Builder.CreateRet(RetVal);
-
-    // Validate the generated code, checking for consistency.
-    verifyFunction(*TheFunction);
-
-    return TheFunction;
+LLVMValueRef GenerateFunction(FunctionAST *fxn){
+  LLVMValueRef RetVal,NewFxn = GeneratePrototype(&fxn->Proto);
+  if (NewFxn == NULL){
+    return NULL;
   }
-  
-  // Error reading body, remove function.
-  TheFunction->eraseFromParent();
+  // Create a new basic block to start insertion into.
+  LLVMBasicBlockRef BB = LLVMAppendBasicBlock(NewFxn,fxn->Proto.Name);
+  LLVMPositionBuilderAtEnd(Builder,BB);
+  RetVal = Codegen(fxn->Body);
+  if (RetVal != NULL) {
+    // what do I do with this value
+    LLVMBuildRet(Builder,RetVal);
+    // Validate the generated code, checking for consistency.
+    if (LLVMVerifyFunction(NewFxn,LLVMPrintMessageAction)){
+      return ErrorV("Invalid Function");
+    } else {
+      return NewFxn;
+    }
+  }
+  LLVMDeleteFunction(NewFxn);
   return 0;
 }
 
 //===----------------------------------------------------------------------===//
 // Top-Level parsing and JIT Driver
 //===----------------------------------------------------------------------===//
-
-static void HandleDefinition() {
-  if (FunctionAST *F = ParseDefinition()) {
-    if (Function *LF = F->Codegen()) {
+FunctionAST*  ParseDefn() {
+  if (setjmp(definition)){
+    return 0;
+  } else {
+    FunctionAST* curFxn = xmalloc(sizeof(FunctionAST));
+    *curFxn = ParseDefinition(definition);
+    return curFxn;
+  }
+}
+Prototype*  ParseProto() {
+  if (setjmp(proto)){
+    return 0;
+  } else {
+    Prototype* curProto = xmalloc(sizeof(Prototype));
+    *curProto = ParsePrototype(proto);
+    return curProto;
+  }
+}
+FunctionAST*  ParseTopLevel() {
+  if (setjmp(top_level)){
+    return 0;
+  } else {
+    FunctionAST* curFxn = xmalloc(sizeof(FunctionAST));
+    *curFxn = ParseTopLevelExpr(top_level);
+    return curFxn;
+  }
+}
+void HandleDefinition() {
+  FunctionAST* F = ParseDefn();
+  if (F){
+    LLVMValueRef LF = GenerateFunction(F);
+    free(F);
+    if (LF){
       fprintf(stderr, "Read function definition:");
-      LF->dump();
+      LLVMDumpValue(LF);
+    } else {
+      getNextToken();
     }
   } else {
-    // Skip token for error recovery.
     getNextToken();
   }
 }
-
-static void HandleExtern() {
-  if (PrototypeAST *P = ParseExtern()) {
-    if (Function *F = P->Codegen()) {
+//needs some work still
+void HandleExtern() {
+  getNextToken();
+  Prototype* P = ParseProto();
+  if (P){
+    LLVMValueRef LP = GeneratePrototype(P);
+    free(P);
+    if (LP){
       fprintf(stderr, "Read extern: ");
-      F->dump();
-    }
+      LLVMDumpValue(LP);
+    } else {
+      getNextToken();
+    } 
   } else {
-    // Skip token for error recovery.
     getNextToken();
   }
 }
 
-static void HandleTopLevelExpression() {
+void HandleTopLevelExpression() {
   // Evaluate a top-level expression into an anonymous function.
-  if (FunctionAST *F = ParseTopLevelExpr()) {
-    if (Function *LF = F->Codegen()) {
+  FunctionAST *F = ParseTopLevel();
+  if(F){
+    LLVMValueRef LF = GenerateFunction(F);
+    free(F);
+    if(LF){
       fprintf(stderr, "Read top-level expression:");
-      LF->dump();
-    }
+      LLVMDumpValue(LF);
+    } else {
+      getNextToken();
+    } 
   } else {
-    // Skip token for error recovery.
     getNextToken();
   }
 }
 
 /// top ::= definition | external | expression | ';'
+//todo add readline support
 static void MainLoop() {
   while (1) {
     fprintf(stderr, "ready> ");
@@ -201,7 +245,6 @@ static void MainLoop() {
 //===----------------------------------------------------------------------===//
 
 /// putchard - putchar that takes a double and returns 0.
-extern "C" 
 double putchard(double X) {
   putchar((char)X);
   return 0;
@@ -212,27 +255,15 @@ double putchard(double X) {
 //===----------------------------------------------------------------------===//
 
 int main() {
-  LLVMContext &Context = getGlobalContext();
-
-  // Install standard binary operators.
-  // 1 is lowest precedence.
-  BinopPrecedence['<'] = 10;
-  BinopPrecedence['+'] = 20;
-  BinopPrecedence['-'] = 20;
-  BinopPrecedence['*'] = 40;  // highest.
-
   // Prime the first token.
   fprintf(stderr, "ready> ");
   getNextToken();
-
   // Make the module, which holds all the code.
-  TheModule = new Module("my cool jit", Context);
-
+  MainModule = LLVMModuleCreateWithName("my cool jit");
+  Builder = LLVMCreateBuilder();
   // Run the main "interpreter loop" now.
   MainLoop();
-
   // Print out all of the generated code.
-  TheModule->dump();
-
+  LLVMDumpModule(MainModule);
   return 0;
 }

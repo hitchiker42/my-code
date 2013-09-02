@@ -1,5 +1,11 @@
 #ifndef PARSER_H_
 #define PARSER_H_
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <string.h>
+#include <setjmp.h>
+#include "xmalloc.h"
 // The lexer returns tokens [0-255] if it is an unknown character, otherwise one
 // of these for known things.
 enum Token {
@@ -15,17 +21,19 @@ enum Token {
 typedef struct CallExpr CallExpr;
 typedef struct BinExp BinExp;
 typedef struct Prototype Prototype;
-typedef struct fxn FunctionAST;
+typedef struct FunctionAST FunctionAST;
 typedef union untaggedExprAST untaggedExprAST;
 typedef union floatAST floatAST;
 typedef struct wordAST wordAST;
 typedef struct valueAST valueAST;
+typedef union numberAST numberAST;
 typedef struct ExprAST ExprAST;
+typedef enum ExprASTtag ExprASTtag;
 
 struct CallExpr{//function call
   const char* Name;
   ExprAST* args;
-  int Argv;
+  int Argc;
 };//3 qwords
 union floatAST {//floating pt value
   float fltFal;
@@ -40,6 +48,10 @@ struct wordAST {//integral value
   } value;
   unsigned char sign;
 };
+union numberAST{
+  wordAST word;
+  floatAST real;
+};
 struct valueAST {//any numerical value
   numberAST value;
   unsigned char sign;
@@ -48,7 +60,7 @@ union untaggedExprAST {//any expression
   wordAST word;
   floatAST real;
   const char* Name; //Identifiers
-  BinExp* Op; //Binary Expressions
+  BinExp* BinOp; //Binary Expressions
   CallExpr* fxnCall; //Function Calls
 };//1 qwords
 enum ExprASTtag {//identifies the type of exprssions
@@ -69,19 +81,24 @@ struct BinExp {//Binary operation
 };//3 qwords
 struct Prototype {//function prototype
   const char* Name;
-  char** Argc;
-  int Argv;
+  char** Argv;
+  int Argc;
 };//3 qwords
-struct fxn {//function body
+struct FunctionAST {//function body
   Prototype Proto;
   ExprAST Body;
 };//128 bits
-ExprAST ParseExpression();
-Prototype ParseExtern();
-FunctionAST ParseTopLevelExpr();
-FunctionAST ParseDefinition();
-Prototype ParsePrototype();
-ExprAST ParseBinOpRHS(int ExprPrec, ExprAST LHS);
-ExprAST ParsePrimary();
-#define getNextToken() (CurTok = gettok())
+int Error(const char *Str,jmp_buf label);
+ExprAST ParseExpression(jmp_buf label);
+Prototype ParseExtern(jmp_buf label);
+FunctionAST ParseTopLevelExpr(jmp_buf label);
+FunctionAST ParseDefinition(jmp_buf label);
+Prototype ParsePrototype(jmp_buf label);
+ExprAST ParseBinOpRHS(int ExprPrec, ExprAST LHS,jmp_buf label);
+ExprAST ParsePrimary(jmp_buf label);
+int gettok();
+extern int CurTok;
+inline int getNextToken(){
+  return CurTok = gettok();
+}
 #endif

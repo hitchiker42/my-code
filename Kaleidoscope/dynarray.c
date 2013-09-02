@@ -5,41 +5,13 @@
 #define fatal(message)                          \
   fprintf(stderr,"Fatal Error:" message "\n");  \
   abort()
-inline void* xmalloc (size_t size){
-  register void* value = malloc(size);
-  if (value == 0){
-    fatal("virtual memory exhausted");
-  }
-  return value;
-}
-inline void* xrealloc (void* ptr, size_t size){
-  register void* value = realloc(ptr,size);
-  if (value == 0){
-    fatal ("Virtual memory exhausted");
-  }
-  return value;
-}
-typedef struct dynarray_common{
-  int size;
-  int threshold;
-  int step;
-  int elemsize;
-} dynarray_common;
-typedef struct dynarray{
-  void* array;
-  dynarray_common* metadata;
-} dynarray;
-#define mkdynarray_type(type,name)                   \
+/*#define mkdynarray_type(type,name)            \
   typedef struct {                              \
-  type* array;                                  \
-  dynarray_common* metadata;                    \
-  } name
-#define dynarray_ref(name,index)                     \
-  if (name.metadata->size-name.metadata->threshold <= index){    \
-    name.metadata->size+=name.metadata->step;        \
-    xrealloc(name.array,(name.metadata->size*name.metadata->elemsize));} \
-  name.array[index]
-dynarray* init_dynarray(int initsize,int threshold,int step,int element_size){
+  type* data;                                  \
+  int size;                                     \
+  int elemsize;                                 \
+  } name*/
+  dynarray* init_dynarray(int initsize,int threshold,int step,int element_size){
   if(initsize <= 0){
     initsize = 20;}
   if(threshold <=0){
@@ -53,15 +25,14 @@ dynarray* init_dynarray(int initsize,int threshold,int step,int element_size){
   retval->array = xmalloc(element_size*initsize);
   retval->metadata=temp;
   return retval;}
-      
+
 #define mkmap_type(key_type,value_type)                   \
   typedef struct{                               \
   key_type key;                                 \
   value_type value;                             \
   } key_type##_##value_type##_map
-#endif
+//#endif
 //or more simply
-/*
 typedef struct{
   unsigned char* data;
   unsigned int len;
@@ -82,4 +53,6 @@ inline void dynarray_update(dynarray arr,int index,unsigned char* value){
   }
   *(arr.data+index*arr.elemsize)=&value;
 }
-*/
+#define dynarray_ofType(type,name,initsize)     \
+  {xmalloc(initsize*sizeof(type)),initsize,sizeof(type)}
+#endif
