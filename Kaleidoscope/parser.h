@@ -98,7 +98,7 @@ ExprAST ParseBinOpRHS(int ExprPrec, ExprAST LHS,jmp_buf label);
 ExprAST ParsePrimary(jmp_buf label);
 int gettok();
 extern int CurTok;
-inline int getNextToken(){
+extern inline int getNextToken(){
   return CurTok = gettok();
 }
 #endif

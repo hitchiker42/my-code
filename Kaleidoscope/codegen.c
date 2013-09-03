@@ -2,18 +2,23 @@
 //===----------------------------------------------------------------------===//
 // Code Generation
 //===----------------------------------------------------------------------===//
-
+jmp_buf proto,top_level,definition;
 LLVMModuleRef MainModule;
 LLVMBuilderRef Builder;
+LLVMExecutionEngineRef JITEngine;
+LLVMPassManagerRef OurFPM;
+LLVMExecutionEngineRef JITEngine;
+LLVMPassManagerRef OurFPM;
 LLVMVar* symbolTable = NULL;
-jmp_buf proto,top_level,definition;
+LLVMVar* LookupSymbol(const char* name){
+  LLVMVar *temp;
+  HASH_FIND_STR(symbolTable,name,temp);
+  return temp;
+}
 LLVMValueRef ErrorV(const char *Str) {
   fputs(Str,stderr);
   return 0;
 }
-LLVMValueRef GenerateValFromName(ExprAST Var);
-LLVMValueRef GenerateBinaryExpr(ExprAST op);
-LLVMValueRef GenerateFxnCall(ExprAST Call);
 LLVMValueRef Codegen(ExprAST expr) {
   switch(expr.Tag){
     case Real:
@@ -32,7 +37,8 @@ LLVMValueRef GenerateValFromName(ExprAST Var){
   if (Var.Tag != Name){
     return ErrorV("Expected a Variable Name");
   }
-  LLVMValueRef  V = (LookupSymbol(Var.Expr.Name))->value;
+  LLVMVar* temp = LookupSymbol(Var.Expr.Name);
+  LLVMValueRef  V = temp->value;
   return V ? V : ErrorV("Unknown variable name");
 }
 
@@ -81,10 +87,9 @@ LLVMValueRef GenerateFxnCall(ExprAST Call) {
   }
   return LLVMBuildCall(Builder,CalleeFxn, Args, numArgs,"calltmp");
 }
-
-LLVMValueRef GeneratePrototype(Prototype *proto) {
+LLVMValueRef GeneratePrototype(Prototype *prototype) {
   // Make the function type:  double(double,double) etc.
-  int numArgs=proto->Argc,i;
+  int numArgs=prototype->Argc,i;
   LLVMValueRef Params[numArgs],F;
   LLVMTypeRef ArgTypes[numArgs],DoubleRef = LLVMDoubleType(),FT;
   //for now all args are doubles;
@@ -94,7 +99,9 @@ LLVMValueRef GeneratePrototype(Prototype *proto) {
   FT = LLVMFunctionType(DoubleRef,ArgTypes,numArgs,0);  
   // If F conflicted, there was already something named 'Name'.  If it has a
   // body, don't allow redefinition or reextern.
-  F=LLVMGetNamedFunction(MainModule,proto->Name);
+  F=NULL;
+  signal(SIGSEGV,SIG_IGN);
+  F=LLVMGetNamedFunction(MainModule,prototype->Name);
   if (F != NULL) {
     // If F already has a body, reject this.
     if (LLVMCountBasicBlocks(F) > 0) {
@@ -107,15 +114,16 @@ LLVMValueRef GeneratePrototype(Prototype *proto) {
       return 0;
     }
   } else {
-    F=LLVMAddFunction(MainModule,proto->Name,FT);
+    F=LLVMAddFunction(MainModule,prototype->Name,FT);
   }
+  signal(SIGSEGV,SIG_DFL);
   // Set names for all arguments.
   LLVMGetParams(F,Params);
   LLVMVar* curParam;
   for(i=0;i<numArgs;i++){
     curParam = xmalloc(sizeof(LLVMVar));//create variable
     curParam->value = Params[i];//set variable value
-    curParam->name=proto->Argv[i];//set variable name
+    curParam->name=prototype->Argv[i];//set variable name
     LLVMSetValueName(curParam->value,curParam->name);//this seems redundant    
     addToSyntaxTable(curParam);//add to syntax table, duh
   }
@@ -136,15 +144,22 @@ LLVMValueRef GenerateFunction(FunctionAST *fxn){
     LLVMBuildRet(Builder,RetVal);
     // Validate the generated code, checking for consistency.
     if (LLVMVerifyFunction(NewFxn,LLVMPrintMessageAction)){
-      return ErrorV("Invalid Function");
-    } else {
-      return NewFxn;
-    }
+      return ErrorV("Invalid Function");} 
+    LLVMRunFunctionPassManager(OurFPM,NewFxn);
+    return NewFxn;
   }
   LLVMDeleteFunction(NewFxn);
   return 0;
 }
+//===----------------------------------------------------------------------===//
+// "Library" functions that can be "extern'd" from user code.
+//===----------------------------------------------------------------------===//
 
+/// putchard - putchar that takes a double and returns 0.
+double putchard(double X) {
+  putchar((char)X);
+  return 0;
+}
 //===----------------------------------------------------------------------===//
 // Top-Level parsing and JIT Driver
 //===----------------------------------------------------------------------===//
@@ -217,6 +232,11 @@ void HandleTopLevelExpression() {
     if(LF){
       fprintf(stderr, "Read top-level expression:");
       LLVMDumpValue(LF);
+      //toplevel expr, function is void
+      double retval = 
+        LLVMGenericValueToFloat(LLVMDoubleType(),
+                                LLVMRunFunction(JITEngine,LF,0,0));
+      fprintf(stderr,"Evaluated to %f\n",retval);
     } else {
       getNextToken();
     } 
@@ -228,39 +248,44 @@ void HandleTopLevelExpression() {
 /// top ::= definition | external | expression | ';'
 //todo add readline support
 static void MainLoop() {
+  signal(SIGSEGV,SIG_IGN);
   while (1) {
     fprintf(stderr, "ready> ");
     switch (CurTok) {
-    case tok_eof:    return;
-    case ';':        getNextToken(); break;  // ignore top-level semicolons.
-    case tok_def:    HandleDefinition(); break;
-    case tok_extern: HandleExtern(); break;
-    default:         HandleTopLevelExpression(); break;
+      case tok_eof:    return;
+      case ';':        getNextToken(); break;  // ignore top-level semicolons.
+      case tok_def:    HandleDefinition(); break;
+      case tok_extern: HandleExtern(); break;
+      default:         HandleTopLevelExpression(); break;
     }
   }
 }
-
-//===----------------------------------------------------------------------===//
-// "Library" functions that can be "extern'd" from user code.
-//===----------------------------------------------------------------------===//
-
-/// putchard - putchar that takes a double and returns 0.
-double putchard(double X) {
-  putchar((char)X);
-  return 0;
-}
-
 //===----------------------------------------------------------------------===//
 // Main driver code.
 //===----------------------------------------------------------------------===//
-
 int main() {
+  char* error = xmalloc(100*sizeof(char));
+  //struct LLVMMCJITCompilerOptions  options;
+  LLVMPassManagerBuilderRef FPMBuilder = LLVMPassManagerBuilderCreate();
+  JITEngine=xmalloc(sizeof(LLVMExecutionEngineRef));
+  OurFPM=xmalloc(sizeof(LLVMPassManagerRef));
+  //create module & builder
+  MainModule = LLVMModuleCreateWithName("my cool jit");
+  Builder = LLVMCreateBuilder();
+  //create function pass manager for optimizations
+  OurFPM = LLVMCreateFunctionPassManagerForModule(MainModule);
+  LLVMPassManagerBuilderSetOptLevel(FPMBuilder,2);
+  LLVMPassManagerBuilderPopulateFunctionPassManager(FPMBuilder,OurFPM);
+  /*LLVMInitializeMCJITCompilerOptions(&options,2);
+  options.OptLevel=2;
+  options.EnableFastISel=0;
+  LLVMCreateMCJITCompilerForModule(&JITEngine,MainModule,&options,2,&error);*/
+  LLVMCreateMCJITCompilerForModule(&JITEngine,MainModule,0,0,&error);
+  LLVMInitializeFunctionPassManager(OurFPM);
+  LLVMInitializeNativeTarget();
   // Prime the first token.
   fprintf(stderr, "ready> ");
   getNextToken();
-  // Make the module, which holds all the code.
-  MainModule = LLVMModuleCreateWithName("my cool jit");
-  Builder = LLVMCreateBuilder();
   // Run the main "interpreter loop" now.
   MainLoop();
   // Print out all of the generated code.
