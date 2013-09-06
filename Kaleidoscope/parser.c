@@ -7,6 +7,7 @@ char IdStr[1000];  // Filled in if tok_identifier
 double NumVal;              // Filled in if tok_number
 int CurTok;
 int LastTok;
+int gensym_count=0;
 jmp_buf main_loop,external,top_level,definition;
 /// gettok - Return the next token from standard input.
 //on error break to main
@@ -250,7 +251,9 @@ FunctionAST ParseDefinition(jmp_buf label) {
 FunctionAST ParseTopLevelExpr(jmp_buf label) {
   ExprAST body = ParseExpression(label);
   // Make an anonymous proto.
-  Prototype proto = {"",0};
+  char* top_level_id = malloc(15*sizeof(char));
+  snprintf(top_level_id,14,"top_level_%d",gensym_count++);
+  Prototype proto = {top_level_id,0};
   FunctionAST fxn = {proto,body};
   return fxn;
 }

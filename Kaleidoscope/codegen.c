@@ -131,7 +131,7 @@ LLVMValueRef GeneratePrototype(Prototype *prototype) {
 }
 
 LLVMValueRef GenerateFunction(FunctionAST *fxn){
-  LLVMValueRef RetVal,NewFxn = GeneratePrototype(&fxn->Proto);
+  LLVMValueRef RetVal,NewFxn = GeneratePrototype(&(fxn->Proto));
   if (NewFxn == NULL){
     return NULL;
   }
@@ -149,7 +149,7 @@ LLVMValueRef GenerateFunction(FunctionAST *fxn){
     return NewFxn;
   }
   LLVMDeleteFunction(NewFxn);
-  return 0;
+  return ErrorV("Body of function is NULL");
 }
 //===----------------------------------------------------------------------===//
 // "Library" functions that can be "extern'd" from user code.
@@ -228,14 +228,15 @@ void HandleTopLevelExpression() {
   FunctionAST *F = ParseTopLevel();
   if(F){
     LLVMValueRef LF = GenerateFunction(F);
-    free(F);
+    //free(F);
     if(LF){
       fprintf(stderr, "Read top-level expression:");
       LLVMDumpValue(LF);
       //toplevel expr, function is void
+      LLVMGenericValueRef void_star=LLVMCreateGenericValueOfPointer(NULL);
       double retval = 
         LLVMGenericValueToFloat(LLVMDoubleType(),
-                                LLVMRunFunction(JITEngine,LF,0,0));
+                                LLVMRunFunction(JITEngine,LF,0,&void_star));
       fprintf(stderr,"Evaluated to %f\n",retval);
     } else {
       getNextToken();
@@ -280,7 +281,8 @@ int main() {
   options.OptLevel=2;
   options.EnableFastISel=0;
   LLVMCreateMCJITCompilerForModule(&JITEngine,MainModule,&options,2,&error);*/
-  LLVMCreateMCJITCompilerForModule(&JITEngine,MainModule,0,0,&error);
+  // LLVMCreateMCJITCompilerForModule(&JITEngine,MainModule,0,0,&error);
+  LLVMCreateInterpreterForModule(&JITEngine,MainModule,&error);
   LLVMInitializeFunctionPassManager(OurFPM);
   LLVMInitializeNativeTarget();
   // Prime the first token.

@@ -5,6 +5,10 @@
 datatype hd(cons ls){
   return ls.value;
 }
+cons Cons(cons l,cons ls){
+  tail(l)=&ls;
+  return l;
+}
 cons tl(cons ls){
   return ls.next;
 }
@@ -59,7 +63,7 @@ cons nreconc(cons ls,...){
   va_start(ap,ls);
   //not sure if this works
   while (ap != NULL) {
-    last(cur_loc).next=va_arg(ap,cons);
+    last(cur_loc).next=&va_arg(ap,cons);
     cur_loc=cur_loc.next;
   }
   return ls;

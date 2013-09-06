@@ -18,8 +18,8 @@ BIN = [01]
 "0b"{BIN}+ yylval=int_to_str(yytext[2],2); return TOK_INT;
 /*keywords / reserved words*/
 "val" return TOK_VAL_SIMPLE;
-"val rec" return TOK_VAL_RECURSIVE;
-"fun" return TOK_FUNCTION_DEF;
+"val rec" return TOK_VAL_REC;
+"fun" return TOK_FUN_DEF;
 "if" return TOK_IF;
 "then" return TOK_THEN;
 "else" return TOK_ELSE;
@@ -31,6 +31,13 @@ BIN = [01]
 "local" return TOK_LOCAL;
 "struct" return TOK_STRUCT;
 "case" return TOK_CASE;
+/*types*/
+"real" yylval = _real; return TOK_TYPE;
+"word" yylval = _word; return TOK_TYPE;
+"list"  yylval = _cons; return TOK_TYPE;
+"ref" yylval = _ref; return TOK_TYPE;
+"nil" yylval = _nil; return TOK_TYPE;
+"bool" yylval = _bool; return TOK_TYPE;
 (#|//).* /*one line comments*/
  /*c multiline comments*/
 "/*" {int c,nest=1;
