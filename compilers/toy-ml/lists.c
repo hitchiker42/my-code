@@ -18,7 +18,8 @@ cons last(cons ls){
     cur_loc=cur_loc.next;
   }
   return loc_ptr;
-cons list(...){
+}
+cons list(datatype head,...){
   va_list ap;
   cons retval,cur_loc;
   retval=xmalloc(sizeof(cons));
