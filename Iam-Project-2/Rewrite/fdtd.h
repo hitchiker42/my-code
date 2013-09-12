@@ -4,6 +4,8 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <getopt.h>
+#include <string.h>
 #include <math.h>
 #include <x86intrin.h>
 #include <mpi.h>
@@ -16,6 +18,11 @@ typedef __m128d m128d;
 typedef __m256d m256d;
 #endif
 #endif
+//macro purely for convience in creating & allocating all the fields
+#define create_field(name)                  \
+  double* name = xcalloc(grid_size,sizeof(double))
+#define opttol() strtol(optarg,NULL,10)
+#define opttod() strtod(optarg,NULL)
 /* Types */
 typedef struct field field;
 typedef struct cell cell;
@@ -49,25 +56,38 @@ extern const double episilon;
 extern const double mu;
 extern const double dt;
 extern const double dx;
+//min are assumed to be negitive
 extern const int x_min;
 extern const int x_max;
 extern const int y_min;
 extern const int y_max;
 extern const int z_min;
 extern const int z_max;
-
+extern const int grid_size;//max-min for x,y,z
 /* Functions */
-double get_value(double* field,point loc);
-double* get_ptr(double* field,point loc);
-double get_value_xyz(double* field,int x,int y,int z);
-double* get_ptr_xyz(double* field,int x,int y,int z);
-double updateHx(field H,field E,point loc);
-double updateHy(field H,field E,point loc);
-double updateHz(field H,field E,point loc);
-double updateEx(field H,field E,point loc);
-double updateEy(field H,field E,point loc);
-double updateEz(field H,field E,point loc);
+void updateHx(double* Hx, double* Hn, field E,point loc);
+void updateHy(double* Hy, double* Hn, field E,point loc);
+void updateHz(double* Hz, double* Hn, field E,point loc);
+void updateEx(double* Ex, double* En, field H,point loc);
+void updateEy(double* Ey, double* En, field H,point loc);
+void updateEz(double* Ez, double* En, field H,point loc);
+double (source*)(double);
 /* Function Definitions */
+static inline double get_value(double* arr,point loc){
+  //         x index, y index * x elem/y,z index * y elem/z  
+  return arr[(loc.x-x_min)+((loc.y-y_min)*(x_max-x_min))+
+             ((loc.z-z_min)*(y_max-y_min))];
+}
+static inline double* get_ptr(double* arr,point loc){
+  return arr+((loc.x-x_min)+((loc.y-y_min)*(x_max-x_min))+
+              ((loc.z-z_min)*(y_max-y_min)));
+}
+static inline double get_value_xyz(double* arr,int x,int y,int z){
+  return arr[(x-x_min)+((y-y_min)*(x_max-x_min))+((z-z_min)*(y_max-y_min))];
+}
+static inline double* get_ptr_xyz(double* arr,int x,int y,int z){
+  return arr+((x-x_min)+((y-y_min)*(x_max-x_min))+((z-z_min)*(y_max-y_min)));
+}
 static inline point incx(point loc){
   return (point){loc.x+1,loc.y,loc.z};
 }
@@ -123,19 +143,19 @@ for(k=z_min+1;k<z_max;k++){
       for(k=x_min+1;k<x_max;k++){
       #endif #ifdef __AVX__*/
     for(k=x_min+1;k<x_max;k+=4){
-    updateHx(H_n.x,E_n,(point){i,j,k});
+      updateHx(H_n.x,E_n,(point){i,j,k});
+    }
   }
-  }
-  }
+ }
 //etc...
 //for E fields
 for(k=z_min+1;k<z_max;k++){
-    for(j=y_min+1;j<y_max;j++){
+  for(j=y_min+1;j<y_max;j++){
     /*#ifndef __AVX__
       for(k=x_min+1;k<x_max;k++){
       #endif #ifdef __AVX__*/
     for(k=x_min+1;k<x_max;k+=4){
-    updateEx(H_n.x,E_n,(point){i,j,k});
+      updateEx(H_n.x,E_n,(point){i,j,k});
+    }
   }
-  }
-  }
+ }
