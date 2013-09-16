@@ -9,8 +9,9 @@
 typedef struct List List;
 //typedef struct List List;
 struct List{
-  Cons* fst;
-  Cons* lst;
+  Cons* first;
+  Cons* last;
+  Cons* cur_loc;
   int len;
 };
 Cons* cdr(Cons* ls);

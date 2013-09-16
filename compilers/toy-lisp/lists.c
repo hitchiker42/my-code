@@ -1,6 +1,6 @@
 #include "lists.h"
 /*I guess I could do something like this
-struct list{
+struct dbl_list{
   Cons* hd;
   Cons* tl;
   int len;

@@ -1,5 +1,6 @@
 #include "fdtd_consts.h"
 #include "fdtd.h"
+#include "fdtd_io.h"
 //constants
 inline void updateHx(double* Hx,double* Hn,field E,point loc){
 #ifndef __AVX__
@@ -10,7 +11,7 @@ inline void updateHx(double* Hx,double* Hn,field E,point loc){
         dt*mu*((get_value_xyz(E.y,loc.x+i,loc.y,loc.z+1)-
                 get_value_xyz(E.y,loc.x+i,loc.y,loc.z)) +
                (get_value_xyz(E.z,loc.x+i,loc.y,loc.z)-
-                get_vaule_xyz(E.z,loc.x+i,loc.y+1,loc.z)));
+                get_value_xyz(E.z,loc.x+i,loc.y+1,loc.z)));
     }
 #endif
 #ifdef __AVX__
@@ -104,6 +105,7 @@ inline void updateHz(double* Hz,double* Hn,field E,point loc){
 }
 inline void updateEx(double* Ex,double* En,field H,point loc){
 #ifndef __AVX__
+  int i;
   for(i=0;i<4;i++){
     *(get_ptr_xyz(En,loc.x+i,loc.y,loc.z))=
       (1-(sigma*dt/episilon))*get_value_xyz(Ex,loc.x+i,loc.y,loc.z)+
@@ -185,7 +187,6 @@ inline void updateEz(double* Ez, double* En, field H, point loc){
 int main(int argc,char** argv){
   int i,j,k;
   double t=0,t_max=30;
-  int wtemp = num_writes;
   int write_interval= t_max /num_writes;
   int write_time=write_interval;
   //create field is a macro to define and initalize a double array
@@ -207,10 +208,11 @@ int main(int argc,char** argv){
    *be pretty easy, in fact we could probably just use threads*/
   //lets say our initial conditon is E_z(i,j,k) for all -1=<i,j,k<=1
   //is E_z = 1000*sin(M_PI*pow(t,2))
+  init_dir("fdtd_data");
   while(t<t_max){
     if(t==write_time){
       write_time+=write_interval;
-      dump_data(t);
+      dump_data(t,H_n,E_n);
     }
   for(k=-1;k<=1;k++){
     for(j=-1;j<=1;j++){
@@ -241,6 +243,7 @@ for(k=z_min+1;k<z_max;k++){
     }
   }
  }
+ t+=dt;
   }
   return 0;
 }

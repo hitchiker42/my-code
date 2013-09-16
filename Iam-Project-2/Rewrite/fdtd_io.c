@@ -3,11 +3,12 @@
 #include "fdtd_consts.h"
 #include <sys/stat.h>
 #include <dirent.h>
+#define _GNU_SOURCE
 #define unless(bool_expr) if(!bool_expr)
 static int yes(const struct dirent *unused){return 1;}
 int cnt = 0;//incrementing counter to generate new filenames
 int init_dir(const char* dir_name){
-  if (mkdir(dir_name,0755)){
+  if (!mkdir(dir_name,0755)){
     return chdir(dir_name);
 //return
   } else {
@@ -25,6 +26,10 @@ int init_dir(const char* dir_name){
 //return
         } else if (S_ISDIR(is_dir.st_mode)){
           printf("%s is a directory, delete recursively?\ny/n:",dir_name);
+          char* command;
+          asprintf(&command,"rm -rf %s",dir_name);
+          system(command);
+          return chdir(dir_name);
           tol=3;
           while(1){
             if ('y' == getc(stdin)){break;}
@@ -63,10 +68,12 @@ int init_dir(const char* dir_name){
          *loop, if it bothers you, replace all calls of goto with tol=0
          *then break to outermost while loop*/
       NEW_DIR:
-        puts("Creating new directory ");
-        asprintf(&dir_name,"%s_%d",dir_name,++cnt);
-        init_dir(dir_name);
-        int retval = chdir(dir_name);
+        puts("Creating new directory");
+        char* new_dir_name;
+        asprintf(&new_dir_name,"%s_%d",dir_name,++cnt);
+        init_dir(new_dir_name);
+        int retval = chdir(new_dir_name);
+        free(new_dir_name);
         return retval;;
 //return
       } else{tol--;}

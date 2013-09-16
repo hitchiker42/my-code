@@ -10,6 +10,8 @@
 #include <math.h>
 #include <x86intrin.h>
 #include <mpi.h>
+#include <unistd.h>
+#include <features.h>
 #include "xmalloc.h"
 #include "fdtd_consts.h"
 #define dy dx
@@ -20,9 +22,12 @@ typedef __m128d m128d;
 typedef __m256d m256d;
 #endif
 #endif
+/* NOTE: I use restrict on the heavly used grid pointers,
+   however I'm not sure if I actually do any pointer aliasing or
+   not. but I don't think so, and it should make much faster code */
 //macro purely for convience in creating & allocating all the fields
 #define create_field(name)                  \
-  double* name = xcalloc(grid_size,sizeof(double))
+  double* restrict name = xcalloc(grid_size,sizeof(double))
 #define my_error(format,args...) fprintf(stderr,format,##args);abort();
 #define debug(string...) puts(string);\
   fprintf(stderr,"Here at file %s,line %d\n",__FILE__,__LINE__);
@@ -31,9 +36,9 @@ typedef struct field field;
 typedef struct cell cell;
 typedef struct point point;
 struct field {
-  double* x;
-  double* y;
-  double* z;
+  double* restrict x;
+  double* restrict y;
+  double* restrict z;
 };
 struct point{
   int x;
