@@ -1,15 +1,17 @@
+/* global header file,
+   contains generic includes, macros, global vars and a few small functions*/
 #ifndef _FDTD_H_
 #define _FDTD_H_
 /* Preprocessor includes/defines */
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
 #include <string.h>
 #include <math.h>
 #include <x86intrin.h>
 #include <mpi.h>
 #include "xmalloc.h"
+#include "fdtd_consts.h"
 #define dy dx
 #define dz dx
 #ifdef __SSE2__
@@ -21,8 +23,9 @@ typedef __m256d m256d;
 //macro purely for convience in creating & allocating all the fields
 #define create_field(name)                  \
   double* name = xcalloc(grid_size,sizeof(double))
-#define opttol() strtol(optarg,NULL,10)
-#define opttod() strtod(optarg,NULL)
+#define my_error(format,args...) fprintf(stderr,format,##args);abort();
+#define debug(string...) puts(string);\
+  fprintf(stderr,"Here at file %s,line %d\n",__FILE__,__LINE__);
 /* Types */
 typedef struct field field;
 typedef struct cell cell;
@@ -51,19 +54,20 @@ extern field H_n1;//H at time n and time n+1
 extern field E_n;
 extern field E_n1;//E at time n and time n+1
 //global constants
-extern const double sigma;
+/*extern const double sigma;
 extern const double episilon;
 extern const double mu;
 extern const double dt;
 extern const double dx;
 //min are assumed to be negitive
-extern const int x_min;
+/*extern const int x_min;
 extern const int x_max;
 extern const int y_min;
 extern const int y_max;
 extern const int z_min;
-extern const int z_max;
-extern const int grid_size;//max-min for x,y,z
+extern const int z_max;*/
+//const double episilon_0 = 8.854187e-12;
+//const double mu_0 = M_PI*4e-7;
 /* Functions */
 void updateHx(double* Hx, double* Hn, field E,point loc);
 void updateHy(double* Hy, double* Hn, field E,point loc);
@@ -71,7 +75,7 @@ void updateHz(double* Hz, double* Hn, field E,point loc);
 void updateEx(double* Ex, double* En, field H,point loc);
 void updateEy(double* Ey, double* En, field H,point loc);
 void updateEz(double* Ez, double* En, field H,point loc);
-double (source*)(double);
+double (*source)(double);
 /* Function Definitions */
 static inline double get_value(double* arr,point loc){
   //         x index, y index * x elem/y,z index * y elem/z  
@@ -102,7 +106,7 @@ static inline point incz(point loc){
   know H&E @ time n/n-0.5
   find H @ time n+0.5
   fine E @ time n+1
-  goto start
+  goto start*/
 //material constants, assume homogenious material
 /*
 syntax Field_{componant}^{time}
@@ -136,6 +140,8 @@ similar for E_z&E_y*/
     fields are at that point, for programming purposes
    where n+1 is on the next cell in the n direction*/
 /* loop structure*/
+
+#if 0
 int i,j,k;
 for(k=z_min+1;k<z_max;k++){
   for(j=y_min+1;j<y_max;j++){
@@ -159,3 +165,4 @@ for(k=z_min+1;k<z_max;k++){
     }
   }
  }
+#endif
