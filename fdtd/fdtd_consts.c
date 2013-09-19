@@ -33,7 +33,7 @@ int main(int argc,char* const argv[]){
   int c;
   int digit_optind = 0;  
   int grid_x=20,grid_y=20,grid_z=20,threads_temp=3,write_num=5;
-  double mu=mu_0,episilon_temp=episilon_0,sigma_temp=0,dx=1;
+  double mu=mu_0,episilon_temp=episilon_0,sigma_temp=1e7,dx=1;
   double t=0,t_max=30;
   int option_index = 0;
   static struct option long_options[] = {
@@ -102,7 +102,7 @@ int main(int argc,char* const argv[]){
   fprintf(consts,"static const int y_min = %d;\n",(int)(-grid_y/dx));
   fprintf(consts,"static const int z_max = %d;",(int)(grid_z/dx));
   fprintf(consts,"static const int z_min = %d;\n",(int)(-grid_z/dx));
-  fprintf(consts,"static const double dt = 1;\n");
+  fprintf(consts,"static const double dt = 0.001;\n");
     //sqrt(3*(1/pow(dx,2)));//or probably dt = 1
   fprintf(consts,"static const int grid_size = %d;\n",
           (2*grid_x)*(2*grid_y)*(2*grid_z));

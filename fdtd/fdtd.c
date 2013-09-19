@@ -2,44 +2,44 @@
 #include "fdtd.h"
 #include "fdtd_io.h"
 //constants
-inline void updateHx(double* Hx,double* Hn,field E,point loc){
+static inline void updateHx(double* Hx,double* Hn,field E,point loc){
 #ifndef __AVX__
   int i;
-    for(i=0;i<4;i++){
-      *(get_ptr_xyz(Hn,loc.x+i,loc.y,loc.z))=
-        get_value_xyz(Hx,loc.x+i,loc.y,loc.z) +
-        dt*mu*((get_value_xyz(E.y,loc.x+i,loc.y,loc.z+1)-
-                get_value_xyz(E.y,loc.x+i,loc.y,loc.z)) +
-               (get_value_xyz(E.z,loc.x+i,loc.y,loc.z)-
-                get_value_xyz(E.z,loc.x+i,loc.y+1,loc.z)));
-    }
+  for(i=0;i<4;i++){
+    *(get_ptr_xyz(Hn,loc.x+i,loc.y,loc.z))=
+      get_value_xyz(Hx,loc.x+i,loc.y,loc.z) +
+      dt*mu*((get_value_xyz(E.y,loc.x+i,loc.y,loc.z+1)-
+              get_value_xyz(E.y,loc.x+i,loc.y,loc.z)) +
+             (get_value_xyz(E.z,loc.x+i,loc.y,loc.z)-
+              get_value_xyz(E.z,loc.x+i,loc.y+1,loc.z)));
+  }
 #endif
 #ifdef __AVX__
   register m256d E_y=_mm256_load_pd(get_ptr_xyz(E.y,loc.x,loc.y,loc.z));
   /*                              get_value_xyz(E.y,loc.x+0,loc.y,loc.z),
-                                get_value_xyz(E.y,loc.x+1,loc.y,loc.z),
-                                get_value_xyz(E.y,loc.x+2,loc.y,loc.z),
-                                get_value_xyz(E.y,loc.x+3,loc.y,loc.z));*/
+                                  get_value_xyz(E.y,loc.x+1,loc.y,loc.z),
+                                  get_value_xyz(E.y,loc.x+2,loc.y,loc.z),
+                                  get_value_xyz(E.y,loc.x+3,loc.y,loc.z));*/
   register m256d E_y1=_mm256_load_pd(get_ptr_xyz(E.y,loc.x,loc.y,loc.z+1));
-                           /* get_value_xyz(E.y,loc.x+0,loc.y,loc.z+1),
-                              get_value_xyz(E.y,loc.x+1,loc.y,loc.z+1),
-                              get_value_xyz(E.y,loc.x+2,loc.y,loc.z+1),
-                              get_value_xyz(E.y,loc.x+3,loc.y,loc.z+1));*/
+  /* get_value_xyz(E.y,loc.x+0,loc.y,loc.z+1),
+     get_value_xyz(E.y,loc.x+1,loc.y,loc.z+1),
+     get_value_xyz(E.y,loc.x+2,loc.y,loc.z+1),
+     get_value_xyz(E.y,loc.x+3,loc.y,loc.z+1));*/
   register m256d E_z=_mm256_load_pd(get_ptr_xyz(E.z,loc.x,loc.y,loc.z));
-                              /*get_value_xyz(E.y,loc.x+0,loc.y,loc.z),
-                                get_value_xyz(E.y,loc.x+1,loc.y,loc.z),
-                                get_value_xyz(E.y,loc.x+2,loc.y,loc.z),
-                                get_value_xyz(E.y,loc.x+3,loc.y,loc.z));*/
+  /*get_value_xyz(E.y,loc.x+0,loc.y,loc.z),
+    get_value_xyz(E.y,loc.x+1,loc.y,loc.z),
+    get_value_xyz(E.y,loc.x+2,loc.y,loc.z),
+    get_value_xyz(E.y,loc.x+3,loc.y,loc.z));*/
   register m256d E_z1=_mm256_load_pd(get_ptr_xyz(E.z,loc.x,loc.y,loc.z+1));
-                               /*get_value_xyz(E.y,loc.x+0,loc.y+1,loc.z),
-                                get_value_xyz(E.y,loc.x+1,loc.y+1,loc.z),
-                                get_value_xyz(E.y,loc.x+2,loc.y+1,loc.z),
-                                get_value_xyz(E.y,loc.x+3,loc.y+1,loc.z));*/
+  /*get_value_xyz(E.y,loc.x+0,loc.y+1,loc.z),
+    get_value_xyz(E.y,loc.x+1,loc.y+1,loc.z),
+    get_value_xyz(E.y,loc.x+2,loc.y+1,loc.z),
+    get_value_xyz(E.y,loc.x+3,loc.y+1,loc.z));*/
   register m256d H_x=_mm256_load_pd(get_ptr_xyz(Hx,loc.x,loc.y,loc.z));
-                          /*get_value_xyz(Hx,loc.x+0,loc.y,loc.z),
-                            get_value_xyz(Hx,loc.x+1,loc.y,loc.z),
-                            get_value_xyz(Hx,loc.x+2,loc.y,loc.z),
-                            get_value_xyz(Hx,loc.x+3,loc.y,loc.z));*/
+  /*get_value_xyz(Hx,loc.x+0,loc.y,loc.z),
+    get_value_xyz(Hx,loc.x+1,loc.y,loc.z),
+    get_value_xyz(Hx,loc.x+2,loc.y,loc.z),
+    get_value_xyz(Hx,loc.x+3,loc.y,loc.z));*/
   E_y=_mm256_sub_pd(E_y1,E_y);
   E_z=_mm256_sub_pd(E_z,E_z1);
   E_z=_mm256_add_pd(E_y,E_z);
@@ -49,7 +49,7 @@ inline void updateHx(double* Hx,double* Hn,field E,point loc){
 #endif
   return;
 }
-inline void updateHy(double *Hy,double* Hn,field E,point loc){
+static inline void updateHy(double *Hy,double* Hn,field E,point loc){
 #ifndef __AVX__
   int i;
   for(i=0;i<4;i++){
@@ -63,7 +63,7 @@ inline void updateHy(double *Hy,double* Hn,field E,point loc){
 #endif
 #ifdef __AVX__
   register m256d E_z=_mm256_load_pd(get_ptr_xyz(E.z,loc.x,loc.y,loc.z));
-  register m256d E_z1=_mm256_load_pd(get_ptr_xyz(E.z,loc.x+1,loc.y,loc.z));
+  register m256d E_z1=_mm256_loadu_pd(get_ptr_xyz(E.z,loc.x+1,loc.y,loc.z));
   register m256d E_x=_mm256_load_pd(get_ptr_xyz(E.x,loc.x,loc.y,loc.z));
   register m256d E_x1=_mm256_load_pd(get_ptr_xyz(E.x,loc.x,loc.y,loc.z+1));
   register m256d H_y=_mm256_load_pd(get_ptr_xyz(Hy,loc.x,loc.y,loc.z));
@@ -76,7 +76,7 @@ inline void updateHy(double *Hy,double* Hn,field E,point loc){
 #endif
   return;
 }
-inline void updateHz(double* Hz,double* Hn,field E,point loc){
+static inline void updateHz(double* Hz,double* Hn,field E,point loc){
 #ifndef __AVX__
   int i;
   for(i=0;i<4;i++){
@@ -92,7 +92,7 @@ inline void updateHz(double* Hz,double* Hn,field E,point loc){
   register m256d E_x=_mm256_load_pd(get_ptr_xyz(E.x,loc.x,loc.y,loc.z));
   register m256d E_x1=_mm256_load_pd(get_ptr_xyz(E.x,loc.x,loc.y+1,loc.z));
   register m256d E_y=_mm256_load_pd(get_ptr_xyz(E.y,loc.x,loc.y,loc.z));
-  register m256d E_y1=_mm256_load_pd(get_ptr_xyz(E.y,loc.x+1,loc.y,loc.z));
+  register m256d E_y1=_mm256_loadu_pd(get_ptr_xyz(E.y,loc.x+1,loc.y,loc.z));
   register m256d H_z=_mm256_load_pd(get_ptr_xyz(Hz,loc.x,loc.y,loc.z));
   E_x=_mm256_sub_pd(E_x1,E_x);
   E_y=_mm256_sub_pd(E_y,E_y1);
@@ -103,16 +103,16 @@ inline void updateHz(double* Hz,double* Hn,field E,point loc){
 #endif
   return;
 }
-inline void updateEx(double* Ex,double* En,field H,point loc){
+static inline void updateEx(double* Ex,double* En,field H,point loc){
 #ifndef __AVX__
   int i;
   for(i=0;i<4;i++){
     *(get_ptr_xyz(En,loc.x+i,loc.y,loc.z))=
       (1-(sigma*dt/episilon))*get_value_xyz(Ex,loc.x+i,loc.y,loc.z)+
-        dt*episilon*((get_value_xyz(H.z,loc.x+i,loc.y,loc.z)-
-                     get_value_xyz(H.z,loc.x+i,loc.y-1,loc.z))+
-                    (get_value_xyz(H.y,loc.x+i,loc.y,loc.z-1)-
-                     get_value_xyz(H.y,loc.x+i,loc.y,loc.z)));
+      dt*episilon*((get_value_xyz(H.z,loc.x+i,loc.y,loc.z)-
+                    get_value_xyz(H.z,loc.x+i,loc.y-1,loc.z))+
+                   (get_value_xyz(H.y,loc.x+i,loc.y,loc.z-1)-
+                    get_value_xyz(H.y,loc.x+i,loc.y,loc.z)));
   }
 #endif
 #ifdef __AVX__
@@ -130,23 +130,23 @@ inline void updateEx(double* Ex,double* En,field H,point loc){
 #endif
   return;
 }
- inline void updateEy(double* Ey,double* En,field H,point loc){
+static inline void updateEy(double* Ey,double* En,field H,point loc){
 #ifndef __AVX__
-   int i;
+  int i;
   for(i=0;i<4;i++){
     *(get_ptr_xyz(En,loc.x+i,loc.y,loc.z))=
       (1-(sigma*dt/episilon))*get_value_xyz(Ey,loc.x+i,loc.y,loc.z)+
       dt*episilon*((get_value_xyz(H.x,loc.x+i,loc.y,loc.z)-
-                   get_value_xyz(H.x,loc.x+i,loc.y,loc.z-1))+
-                  (get_value_xyz(H.z,loc.x+i-1,loc.y,loc.z)-
-                   get_value_xyz(H.z,loc.x+i,loc.y,loc.z)));
+                    get_value_xyz(H.x,loc.x+i,loc.y,loc.z-1))+
+                   (get_value_xyz(H.z,loc.x+i-1,loc.y,loc.z)-
+                    get_value_xyz(H.z,loc.x+i,loc.y,loc.z)));
   }
 #endif
 #ifdef __AVX__
   register m256d H_x=_mm256_load_pd(get_ptr_xyz(H.x,loc.x,loc.y,loc.z));
   register m256d H_x1=_mm256_load_pd(get_ptr_xyz(H.x,loc.x,loc.y,loc.z-1));
   register m256d H_z=_mm256_load_pd(get_ptr_xyz(H.z,loc.x,loc.y,loc.z));
-  register m256d H_z1=_mm256_load_pd(get_ptr_xyz(H.z,loc.x-1,loc.y,loc.z));
+  register m256d H_z1=_mm256_loadu_pd(get_ptr_xyz(H.z,loc.x-1,loc.y,loc.z));
   register m256d E_y=_mm256_load_pd(get_ptr_xyz(Ey,loc.x,loc.y,loc.z));
   H_x=_mm256_sub_pd(H_x,H_x1);
   H_z=_mm256_sub_pd(H_z1,H_z);
@@ -157,21 +157,21 @@ inline void updateEx(double* Ex,double* En,field H,point loc){
 #endif
   return;
 }
-inline void updateEz(double* Ez, double* En, field H, point loc){
+static inline void updateEz(double* Ez, double* En, field H, point loc){
 #ifndef __AVX__
   int i;
   for(i=0;i<4;i++){
     *(get_ptr_xyz(En,loc.x+i,loc.y,loc.z))=
       (1-(sigma*dt/episilon))*get_value_xyz(Ez,loc.x+i,loc.y,loc.z)+
-        dt*episilon*((get_value_xyz(H.y,loc.x+i,loc.y,loc.z)-
-                     get_value_xyz(H.y,loc.x+i-1,loc.y,loc.z))+
-                    (get_value_xyz(H.x,loc.x+i,loc.y-1,loc.z)-
-                     get_value_xyz(H.x,loc.x+i,loc.y,loc.z)));
+      dt*episilon*((get_value_xyz(H.y,loc.x+i,loc.y,loc.z)-
+                    get_value_xyz(H.y,loc.x+i-1,loc.y,loc.z))+
+                   (get_value_xyz(H.x,loc.x+i,loc.y-1,loc.z)-
+                    get_value_xyz(H.x,loc.x+i,loc.y,loc.z)));
   }
 #endif
 #ifdef __AVX__
   register m256d H_y=_mm256_load_pd(get_ptr_xyz(H.x,loc.x,loc.y,loc.z));
-  register m256d H_y1=_mm256_load_pd(get_ptr_xyz(H.x-1,loc.x,loc.y,loc.z));
+  register m256d H_y1=_mm256_loadu_pd(get_ptr_xyz(H.x-1,loc.x,loc.y,loc.z));
   register m256d H_x=_mm256_load_pd(get_ptr_xyz(H.z,loc.x,loc.y,loc.z));
   register m256d H_x1=_mm256_load_pd(get_ptr_xyz(H.z,loc.x,loc.y-1,loc.z));
   register m256d E_z=_mm256_load_pd(get_ptr_xyz(Ez,loc.x,loc.y,loc.z));
@@ -185,7 +185,7 @@ inline void updateEz(double* Ez, double* En, field H, point loc){
   return;
 }
 int main(int argc,char** argv){
-  int i,j,k;
+  int i,j,k,l,m,n;
   double t=0,t_max=30;
   int write_interval= t_max /num_writes;
   int write_time=write_interval;
@@ -210,40 +210,68 @@ int main(int argc,char** argv){
   //is E_z = 1000*sin(M_PI*pow(t,2))
   init_dir("fdtd_data");
   while(t<t_max){
+    //        fprintf(stderr,"time=%f\n",t);
     if(t==write_time){
+      fprintf(stderr,"printing \n");
       write_time+=write_interval;
-      dump_data(t,H_n,E_n);
+      print_as_slices(t,H_n,E_n);
     }
-  for(k=-1;k<=1;k++){
-    for(j=-1;j<=1;j++){
-      for(i=-1;i<=1;i++){
-        if(k==0 && j==0 && i==0){
-          continue;
-        } else {
-          *(get_ptr_xyz(E_n.z,i,j,k))=1000*sin(M_PI*pow(t,2));
+    for(k=-1;k<=1;k++){
+      for(j=-1;j<=1;j++){
+        for(i=-1;i<=1;i++){
+          if(k==0 && j==0 && i==0){
+            continue;
+          } else {
+            *(get_ptr_xyz(H_n.x,i,j,k))+=10000*sin(M_PI*pow(t,2));
+            *(get_ptr_xyz(H_n.y,i,j,k))+=10000*sin(M_PI*pow(t,2));
+            *(get_ptr_xyz(H_n.z,i,j,k))+=10000*sin(M_PI*pow(t,2));
+            *(get_ptr_xyz(E_n.x,i,j,k))+=10000*cos(M_PI*pow(t,2));
+            *(get_ptr_xyz(E_n.y,i,j,k))+=10000*cos(M_PI*pow(t,2));
+            *(get_ptr_xyz(E_n.z,i,j,k))+=10000*cos(M_PI*pow(t,2));
+          }
+        }
+      }
+    }
+    for(k=z_min;k<z_max;k++){
+      for(j=y_min;j<y_max;j++){
+        //setting i to x_min, rather than x_min+1 for alignment reasons
+        //hopefully this won't fail horribly
+        for(i=x_min;i<x_max;i+=4){
+          updateHx(H_n.x,H_n1.x,E_n,(point){i,j,k});
+          updateHy(H_n.y,H_n1.y,E_n,(point){i,j,k});
+          updateHz(H_n.z,H_n1.z,E_n,(point){i,j,k});
+          /*          updateHx(H_n.x,H_n1.x,E_n,(point){l,m,n});
+          updateHy(H_n.y,H_n1.y,E_n,(point){l,m,n});
+          updateHz(H_n.z,H_n1.z,E_n,(point){l,m,n});*/
+        }
+      }
+    }
+    H_n=H_n1;//update H
+    for(k=z_min+1;k<z_max;k++){
+      for(j=y_min+1;j<y_max;j++){
+        for(i=x_min;i<x_max;i+=4){
+          updateEx(E_n.x,E_n1.x,H_n,(point){i,j,k});
+          updateEy(E_n.y,E_n1.y,H_n,(point){i,j,k});
+          updateEz(E_n.z,E_n1.z,H_n,(point){i,j,k});
+        }
+      }
+    }
+    E_n=E_n1;//update E
+    t+=dt;
+    //attempt to set boundries to 0
+    for(k=z_min;k<=z_max;k+=(2*z_max)){
+      for(j=y_min;j<=y_max;j+=(2*y_max)){
+        for(i=x_min;i<=x_max;i+=(1*x_max)){
+          set_boundires(H,x);set_boundires(H,y);set_boundires(H,z);
+          set_boundires(E,x);set_boundires(E,y);set_boundires(E,z);
         }
       }
     }
   }
-for(k=z_min+1;k<z_max;k++){
-  for(j=y_min+1;j<y_max;j++){
-    for(k=x_min+1;k<x_max;k+=4){
-      updateHx(H_n.x,H_n1.x,E_n,(point){i,j,k});
-      updateHy(H_n.y,H_n1.y,E_n,(point){i,j,k});
-      updateHz(H_n.z,H_n1.z,E_n,(point){i,j,k});
-    }
-  }
- }
- for(k=z_min+1;k<z_max;k++){
-  for(j=y_min+1;j<y_max;j++){
-    for(k=x_min+1;k<x_max;k+=4){
-      updateEx(E_n.x,E_n1.x,H_n,(point){i,j,k});
-      updateEy(E_n.y,E_n1.y,H_n,(point){i,j,k});
-      updateEz(E_n.z,E_n1.z,H_n,(point){i,j,k});
-    }
-  }
- }
- t+=dt;
+  fprintf(stderr,"data calculations finished, writing data\n");
+  if(t >= t_max){
+    print_as_slices(t,H_n,E_n);
+    //dump_data(t,H_n,E_n);
   }
   return 0;
 }

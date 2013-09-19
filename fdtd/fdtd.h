@@ -3,19 +3,23 @@
 #ifndef _FDTD_H_
 #define _FDTD_H_
 /* Preprocessor includes/defines */
+#include <features.h>
+#include <bits/types.h>
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <x86intrin.h>
 #include <mpi.h>
 #include <unistd.h>
-#include <features.h>
 #include "xmalloc.h"
 #include "fdtd_consts.h"
+#ifdef __x86_64__
+#include <x86intrin.h>
+#endif
 #define dy dx
 #define dz dx
+#define __USE_GNU_
 #ifdef __SSE2__
 typedef __m128d m128d;
 #ifdef __AVX__
@@ -26,8 +30,9 @@ typedef __m256d m256d;
    however I'm not sure if I actually do any pointer aliasing or
    not. but I don't think so, and it should make much faster code */
 //macro purely for convience in creating & allocating all the fields
+#define set_boundires(HE,xyz) *(get_ptr_xyz(HE##_n.xyz,i,j,k))=0
 #define create_field(name)                  \
-  double* restrict name = xcalloc(grid_size,sizeof(double))
+  double* restrict name=xvalloc(sizeof(double)*grid_size)
 #define my_error(format,args...) fprintf(stderr,format,##args);abort();
 #define debug(string...) puts(string);\
   fprintf(stderr,"Here at file %s,line %d\n",__FILE__,__LINE__);
@@ -58,28 +63,28 @@ extern field H_n;
 extern field H_n1;//H at time n and time n+1
 extern field E_n;
 extern field E_n1;//E at time n and time n+1
-//global constants
-/*extern const double sigma;
+/*global constants
+extern const double sigma;
 extern const double episilon;
 extern const double mu;
 extern const double dt;
 extern const double dx;
 //min are assumed to be negitive
-/*extern const int x_min;
+extern const int x_min;
 extern const int x_max;
 extern const int y_min;
 extern const int y_max;
 extern const int z_min;
-extern const int z_max;*/
+extern const int z_max;
 //const double episilon_0 = 8.854187e-12;
-//const double mu_0 = M_PI*4e-7;
+//const double mu_0 = M_PI*4e-7;*/
 /* Functions */
-void updateHx(double* Hx, double* Hn, field E,point loc);
+/*void updateHx(double* Hx, double* Hn, field E,point loc);
 void updateHy(double* Hy, double* Hn, field E,point loc);
 void updateHz(double* Hz, double* Hn, field E,point loc);
 void updateEx(double* Ex, double* En, field H,point loc);
 void updateEy(double* Ey, double* En, field H,point loc);
-void updateEz(double* Ez, double* En, field H,point loc);
+void updateEz(double* Ez, double* En, field H,point loc);*/
 double (*source)(double);
 /* Function Definitions */
 static inline double get_value(double* arr,point loc){
@@ -144,30 +149,3 @@ similar for E_z&E_y*/
     but really for a point i,j,k
     fields are at that point, for programming purposes
    where n+1 is on the next cell in the n direction*/
-/* loop structure*/
-
-#if 0
-int i,j,k;
-for(k=z_min+1;k<z_max;k++){
-  for(j=y_min+1;j<y_max;j++){
-    /*#ifndef __AVX__
-      for(k=x_min+1;k<x_max;k++){
-      #endif #ifdef __AVX__*/
-    for(k=x_min+1;k<x_max;k+=4){
-      updateHx(H_n.x,E_n,(point){i,j,k});
-    }
-  }
- }
-//etc...
-//for E fields
-for(k=z_min+1;k<z_max;k++){
-  for(j=y_min+1;j<y_max;j++){
-    /*#ifndef __AVX__
-      for(k=x_min+1;k<x_max;k++){
-      #endif #ifdef __AVX__*/
-    for(k=x_min+1;k<x_max;k+=4){
-      updateEx(H_n.x,E_n,(point){i,j,k});
-    }
-  }
- }
-#endif
