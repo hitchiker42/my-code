@@ -14,18 +14,35 @@ typedef union data data;
 typedef struct datatype datatype;
 typedef struct Cons Cons;
 typedef datatype(*func_t)(datatype);
+typedef enum{
+  _lparen='(',
+  _rparen=')',
+  _quote='\'',
+  _num='n',
+  _defun='f',
+  _id='s',
+  _if='i',
+  _def='d',
+  _do='l',//l is for loop
+  _err='?',
+  _eof='e'
+} token;
 enum type{
   _nil = -1,
   _double = 0,
   _fun = 1,
   _sym = 2,
-  _cons = 3
+  _cons = 3,
+  _str = 4,
+  _special = 5
 };
 union data {
   double real;
   symref* sym;
   func_t fun;
   Cons* ls;
+  char* string;
+  char special;
 };
 struct datatype{
   type tag;
@@ -41,7 +58,7 @@ struct Cons{
   Cons* cdr;
 };
 extern symref* symbolTable;
-extern datatype yylval;
+extern datatype *yylval;
 static const datatype nil={_nil,0};
 static const Cons NIL={{_nil,0},NULL};
 static const Cons* NIL_REF = &NIL;
@@ -53,6 +70,15 @@ static inline void getSym(const char* name,symref* Var){
 }
 static inline void* xmalloc(size_t size){
   register void* temp = GC_MALLOC(size);
+  if(!temp && size){
+    fprintf(stderr,"virtual memory exhausted\n");
+    raise(SIGSEGV);
+  } else{
+    return temp;
+  }
+}
+static inline void* xrealloc(void* mem,size_t size){
+  register void* temp = GC_REALLOC(mem,size);
   if(!temp && size){
     fprintf(stderr,"virtual memory exhausted\n");
     raise(SIGSEGV);
