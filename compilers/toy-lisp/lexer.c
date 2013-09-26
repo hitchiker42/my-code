@@ -1,23 +1,19 @@
 #include "common.h"
 #include <regex.h>
 #include <readline/readline.h>
-//idea for scaning for parens(just to see if we need more input)
-char lex(char* input){
-  rl_set_signals (void)
-    int i=0;
-  char cur_char;
-  char* input;//get line
-  int paren;
-  //a way to insure parantheses match, not the best
-  while(1){
-    while((cur_char=input[i++])!='\n'){
-      if(cur_char == '('){parens+=1;}
-      if(cur_char == ')'){parens-=1;}
-    }
-    if(parens != 0)
-      {input == getline;}
-    else{break;}
-  }
+char yylex(char* input){
+int i=0;
+char cur_char;
+char* input;//get line
+int paren;
+/*while(1){
+while((cur_char=input[i++])!='\n'){
+  if(cur_char == '('){parens+=1;}
+  if(cur_char == ')'){parens-=1;}
+ }
+if(parens != 0)
+  {input == getline;}
+  else{break;}}*/
 #define str_case(lc,uc) if(strcmp(#lc,/*some var*/)){return TOK_##uc;} else
 regex_t* ID = xmalloc_atomic(sizeof(regex_t));
 regex_t* LIST = xmalloc_atomic(sizeof(regex_t));

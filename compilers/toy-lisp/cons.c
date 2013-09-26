@@ -1,11 +1,10 @@
 #include "lists.h"
-/*I guess I could do something like this
-struct dbl_list{
-  Cons* hd;
-  Cons* tl;
-  int len;
-  }*/
+/*Think of things like this, a Cons is a dotted pair
+ *and a Cons* is a list.*/
 //convience function to return car of list
+datatype Car(Cons* ls){
+  return ls->car;
+}
 datatype car(Cons ls){
   return ls.car;
 }
@@ -20,7 +19,7 @@ Cons first(Cons* ls){
 }
 //iterate through list, return last element
 Cons last(Cons* ls){
-  if (ls->chr == NULL){
+  if (ls->cdr == NULL){
     return *ls;
   } else {    
     return last(ls->cdr);
@@ -99,27 +98,32 @@ Cons* mapcar(datatype(*map_fn)(datatype),Cons* ls){
   return retval;
 }
 //destructively concatenate arguments, last argument is unmodified
-Cons nconc(Cons ls,...){
+Cons* nconc(Cons* ls,...){
   va_list ap;
-  Cons cur_loc=ls;
+  Cons* cur_loc=ls;
   va_start(ap,ls);
   //not sure if this works
   while (ap != NULL) {
-    *last(&cur_loc).cdr=va_arg(ap,Cons);
-    cur_loc=*cur_loc.cdr;
+    last(cur_loc).cdr=va_arg(ap,Cons*);
+    cur_loc=cur_loc->cdr;
   }
   return ls;
 }
-Cons push(Cons ls,Cons l){
-  l.cdr=&ls;
-  return l;
+Cons* push(Cons* ls,datatype l){
+  Cons* retval = xmalloc(sizeof(Cons));
+  retval->car=l;
+  retval->cdr=ls;
+  return retval;
+}
+datatype pop(Cons* ls){
+  if(!ls){return NIL;}//deal with empty list
+  datatype retval=Car(ls);
+  ls=cdr(ls);
+  return retval;
 }
 Cons pop_fxn(Cons** ls){
   if (ls == NULL){
     return NIL;
-    /*  } if ((*ls)->next == NULL){
-    Cons retval=first(*ls);
-    *ls=NULL;*/
   } else {
     Cons retval=first(*ls);
     *ls=cdr(*ls);
@@ -136,7 +140,18 @@ Cons* nrev(Cons* ls){
   }
   return last_loc;
 }
-
+Cons* reverse(Cons* ls){
+  Cons* cur_loc,*prev_loc=0,*loc_ptr=ls;
+  while(loc_ptr !=NULL){
+    cur_loc=xmalloc(sizeof(Cons));//allocate new cons cell
+    cur_loc->car=loc_ptr->car;//set car of new cons cell
+    cur_loc->cdr=prev_loc;//set cdr of new cell to previous cell
+    prev_loc=cur_loc;//shift current cell to previous cell
+    loc_ptr=loc_ptr->cdr;//step to next element of ls
+  }
+  cur_loc->cdr=prev_loc;
+  return cur_loc;
+}
 List mkList(datatype head,...){
   HERE();
   va_list ap;

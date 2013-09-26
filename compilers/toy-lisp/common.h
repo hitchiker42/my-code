@@ -35,9 +35,10 @@ struct symref{
   char* name;
   datatype val;
   UT_hash_handle hh;
-};struct Cons{
-  datatype val;
-  Cons* next;
+};
+struct Cons{
+  datatype car;
+  Cons* cdr;
 };
 extern symref* symbolTable;
 extern datatype yylval;
