@@ -40,6 +40,7 @@ struct symref{
   Cons* next;
 };
 extern symref* symbolTable;
+extern datatype yylval;
 static const datatype nil={_nil,0};
 static const Cons NIL={{_nil,0},NULL};
 static const Cons* NIL_REF = &NIL;

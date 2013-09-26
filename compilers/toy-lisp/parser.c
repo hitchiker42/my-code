@@ -1,2 +1,4 @@
 #include "common.h"
-Cons* parse(char* input){}
+datatype yylval;
+Cons* parse(char* input){
+}
