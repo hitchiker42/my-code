@@ -117,6 +117,7 @@ char* num_str="[0-9]+\.?[0-9]*"
 regcomp(ID,id_str,REG_NEWLINE&REG_EXTENDED);
 regcomp(LIST,list_str,REG_NEWLINE&REG_EXTENDED);
 regcomp(NUMBER,num_str,REG_NEWLINE&REG_EXTENDED);
+<<<<<<< HEAD
 str_case(if,IF)
 str_case(do,DO)
 str_case(def,DEF)
@@ -132,3 +133,14 @@ while((cur_char=input[i++])!='\n'){
 if(parens != 0)
   {input == getline;}
   else{break;}}*/
+=======
+str_case(if,IF)//match if expr
+str_case(do,DO)//match do expr
+str_case(def,DEF)//match generic define
+str_case(define,DEF)//match generic define
+str_case(defun,DEFUN)//match function define, only way to define functions
+                     //untill I add lambdas
+str_case(quote,QUOTE)//match a quote
+str_case(\0x27,QUOTE)//also match a quote \0x27 is '
+           
+>>>>>>> ae853769629b47badf605d22215166ff05ec817c

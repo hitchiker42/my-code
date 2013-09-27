@@ -1,4 +1,5 @@
 #include "common.h"
+<<<<<<< HEAD
 datatype *yylval;
 int paren_cnt=0;
 Cons* parse(FILE* input){
@@ -25,3 +26,8 @@ Cons* parse(FILE* input){
       then->cdr=otherwise;
     }
 }
+=======
+datatype yylval;
+Cons* parse(FILE* input){}
+
+>>>>>>> ae853769629b47badf605d22215166ff05ec817c
