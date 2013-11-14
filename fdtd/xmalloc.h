@@ -26,17 +26,17 @@ static inline void* xcalloc (size_t nmemb,size_t size){
   }
   return value;
 }
-static inline int xmemalign(void** value,size_t alignment,size_t size){
+/*static inline int xmemalign(void** value,size_t alignment,size_t size){
   register int retval;
   retval=posix_memalign(value,alignment,size);
   if (!retval){
     fatal("virtual memory exhausted");
   }
   return retval;
-}
-static inline void* xvalloc(size_t size){
-  register void* value;
-  value=valloc(size);
+  }*/
+static inline void* xmemalign(size_t size,size_t align){
+  void* value;
+  posix_memalign(&value,align,size);
   if (!value){
     fatal("virtual memory exhausted");
   }

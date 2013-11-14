@@ -7,11 +7,12 @@ static const int threads = 3;
 static const double mu = 0.0000012566370614;
 static const double episilon = 0.0000000000088542;
 static const double sigma = 10000000.000000;
-static const int x_max = 20;static const int x_min = -20;
-static const int y_max = 20;static const int y_min = -20;
-static const int z_max = 20;static const int z_min = -20;
-static const double dt = 0.001;
-static const int grid_size = 64000;
+static const int x_max = 50;static const int x_min = -50;
+static const int y_max = 50;static const int y_min = -50;
+static const int z_max = 50;static const int z_min = -50;
+static const double dt = 0.000001;
+static const int grid_size = 1000000;
+static const int grid_size3 = 3000000;
 static const double mu_dt = 0.0000012566370614;
 #include <x86intrin.h>
 #ifdef __AVX__

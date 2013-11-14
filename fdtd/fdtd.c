@@ -1,6 +1,26 @@
 #include "fdtd_consts.h"
 #include "fdtd.h"
 #include "fdtd_io.h"
+pthread_barrier_t field_barrier;
+pthread_cond_t field_cond=PTHREAD_COND_INITIALIZER;
+pthread_mutex_t field_mutex=PTHREAD_MUTEX_INITIALIZER;//I suppose I don't use this
+pthread_cond_t main_cond=PTHREAD_COND_INITIALIZER;
+pthread_mutex_t main_mutex=PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t write_mutex=PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t write_cond=PTHREAD_COND_INITIALIZER;
+int continue_threads=1;
+double t;
+double t_max;
+int x_update_flag[1];
+int y_update_flag[1];
+int z_update_flag[1];
+int continue_writing=1;
+field H_n;
+field H_n1;
+field E_n;
+field E_n1;
+void* thread_main(void *field_info);
+struct timespec wait_time={.tv_sec=0,.tv_nsec=1000};
 //constants
 static inline void updateHx(double* Hx,double* Hn,field E,point loc){
 #ifndef __AVX__
@@ -184,20 +204,77 @@ static inline void updateEz(double* Ez, double* En, field H, point loc){
 #endif
   return;
 }
+struct thread_data {
+  void (*update_H)(double*,double*,field,point);
+  void (*update_E)(double*,double*,field,point);
+  double* my_Hn;
+  double* my_Hn_1;
+  double* my_En;
+  double* my_En_1;
+  int* done_updating;
+};
+void* write_main(void* x __attribute__((unused))){
+  while(1){
+    pthread_mutex_lock(&write_mutex);
+    pthread_cond_wait(&write_cond,&write_mutex);
+    if(continue_writing){
+      print_as_slices
+        (t,(field){.x=H_write,.y=H_write+grid_size,.z=H_write+(2*grid_size)},
+         (field){.x=E_write,.y=E_write+grid_size,.z=E_write+(2*grid_size)});
+      fprintf(stderr,"finished writing\n"); 
+      pthread_mutex_unlock(&write_mutex);
+      continue;
+    } else {
+      return 0;
+    }
+  }
+}
 int main(int argc,char** argv){
-  int i,j,k,l,m,n;
-  double t=0,t_max=30;
-  int write_interval= t_max /num_writes;
-  int write_time=write_interval;
-  //create field is a macro to define and initalize a double array
-  create_field(H_nx);create_field(H_ny);create_field(H_nz);
-  create_field(H_n1x);create_field(H_n1y);create_field(H_n1z);
-  create_field(E_nx);create_field(E_ny);create_field(E_nz);
-  create_field(E_n1x);create_field(E_n1y);create_field(E_n1z);
-  field H_n={H_nx,H_ny,H_nz};
-  field H_n1={H_n1x,H_n1y,H_n1z};//H at time n and time n+1
-  field E_n={E_nx,E_ny,E_nz};
-  field E_n1={E_n1x,E_n1y,E_n1z};//E at time n and time n+1
+  //I tried to allocate all this stuff statically but gcc wouldn't let me
+  x_update_flag[0]=0;
+  y_update_flag[0]=0;
+  z_update_flag[0]=0;
+  H_n_mem=xmalloc(grid_size3*sizeof(double));
+  H_n1_mem=xmalloc(grid_size3*sizeof(double));
+  H_write=xmalloc(grid_size3*sizeof(double));
+  E_n_mem=xmalloc(grid_size3*sizeof(double));
+  E_n1_mem=xmalloc(grid_size3*sizeof(double));
+  E_write=xmalloc(grid_size3*sizeof(double));
+  H_nx=H_n_mem;
+  H_n1x=H_n1_mem;
+  E_nx=E_n_mem;
+  E_n1x=E_n1_mem;
+  H_ny=H_n_mem+grid_size;
+  H_n1y=H_n1_mem+grid_size;
+  E_ny=E_n_mem+grid_size;
+  E_n1y=E_n1_mem+grid_size;
+  H_nz=H_n_mem+(grid_size*2);
+  H_n1z=H_n1_mem+(grid_size*2);
+  E_nz=E_n_mem+(grid_size*2);
+  E_n1z=E_n1_mem+(grid_size*2);
+struct thread_data x_field_data={.update_H=updateHx,.update_E=updateEx,
+                                 .my_Hn=H_nx,.my_Hn_1=H_n1x,
+                                 .my_En=E_nx,.my_En_1=E_n1x,
+                                 .done_updating=x_update_flag};
+struct thread_data y_field_data={.update_H=updateHy,.update_E=updateEy,
+                                 .my_Hn=H_ny,.my_Hn_1=H_n1y,
+                                 .my_En=E_ny,.my_En_1=E_n1y,
+                                 .done_updating=y_update_flag};
+struct thread_data z_field_data={.update_H=updateHz,.update_E=updateEz,
+                                 .my_Hn=H_nz,.my_Hn_1=H_n1z,
+                                 .my_En=E_nz,.my_En_1=E_n1z,
+                                 .done_updating=z_update_flag};
+  pthread_barrier_init(&field_barrier,NULL,3);
+  pthread_t field_threads[3];
+  pthread_t write_thread[1];
+  t=0;
+  t_max=1;
+  double write_interval=t_max/num_writes;
+  double write_time=write_interval;
+  H_n=(field){H_nx,H_ny,H_nz};
+  H_n1=(field){H_n1x,H_n1y,H_n1z};//H at time n and time n+1
+  E_n=(field){E_nx,E_ny,E_nz};
+  E_n1=(field){E_n1x,E_n1y,E_n1z};//E at time n and time n+1
   /*lets assume a central radiating source at(0,0,0) so points
    *(0/1/-1,0/1/-1,0/1/-1) are effected.
    *flow will be, update from source, i.e. unit cube around origin is updated 
@@ -208,6 +285,135 @@ int main(int argc,char** argv){
    *be pretty easy, in fact we could probably just use threads*/
   //lets say our initial conditon is E_z(i,j,k) for all -1=<i,j,k<=1
   //is E_z = 1000*sin(M_PI*pow(t,2))
+  init_dir("fdtd_data");
+  pthread_create(field_threads,NULL,thread_main,&x_field_data);
+  pthread_create(field_threads+1,NULL,thread_main,&y_field_data);
+  pthread_create(field_threads+2,NULL,thread_main,&z_field_data);
+  pthread_create(write_thread,NULL,write_main,NULL);
+  while(1){
+    //        fprintf(stderr,"time=%f\n",t);
+    pthread_mutex_lock(&main_mutex);
+    while(!x_update_flag[0]||!y_update_flag[0]||!z_update_flag[0]){
+      //wait for field threads to do their thing
+      pthread_cond_wait(&main_cond,&main_mutex);
+    }
+    //inc time and see if we're done    
+    t+=dt;
+    if(t>=t_max){
+      continue_threads=0;
+      continue_writing=0;
+      pthread_cond_broadcast(&field_cond);
+      pthread_cond_broadcast(&write_cond);
+      pthread_mutex_unlock(&main_mutex);
+      goto END;
+    } else {
+      //see if we need to write data
+      if(t>=write_time){
+        //do write stuff
+        fprintf(stderr,"time = %lf\n",t);
+        fprintf(stderr,"printing \n");
+        write_time+=write_interval;
+        pthread_mutex_lock(&write_mutex);
+        memcpy((void*)H_write,(void*)H_n_mem,grid_size*3*sizeof(double));
+        memcpy((void*)E_write,(void*)E_n_mem,grid_size*3*sizeof(double));
+        pthread_cond_broadcast(&write_cond);
+        pthread_mutex_unlock(&write_mutex);        
+      }
+      //wakeup the field threads
+      pthread_cond_broadcast(&field_cond);
+      pthread_mutex_unlock(&main_mutex);
+    }
+  }
+ END:
+  fprintf(stderr,"waiting to join threads\n");
+  pthread_join(field_threads[0],NULL);
+  pthread_join(field_threads[1],NULL);
+  pthread_join(field_threads[2],NULL);  
+  fprintf(stderr,"data calculations finished, writing data\n");
+  if(t >= t_max){
+    print_as_slices(t,H_n,E_n);
+  }
+  fprintf(stderr,"waiting to join threads\n");
+  pthread_join(write_thread[0],NULL);
+  return 0;
+}
+
+
+void* thread_main(void *field_info){
+  int i,j,k,l,m,n;  
+  struct thread_data *data=(struct thread_data*)field_info;
+  double* my_Hn=data->my_Hn;
+  double* my_Hn_1=data->my_Hn_1;
+  double* my_En=data->my_En;
+  double* my_En_1=data->my_En_1;
+  int* done_updating=data->done_updating;
+  fprintf(stderr,"starting field thread number %lu\n",pthread_self());
+  //update fields effected by the source function
+  while(1){
+    for(k=-1;k<=1;k++){
+      for(j=-1;j<=1;j++){
+        for(i=-1;i<=1;i++){
+          if(k==0 && j==0 && i==0){
+            continue;
+          } else {
+            *(get_ptr_xyz(my_Hn,i,j,k))+=10000*sin(M_PI*pow(t,2));          
+            *(get_ptr_xyz(my_En,i,j,k))+=10000*cos(M_PI*pow(t,2));
+          }
+        }
+      }
+    }
+    int I_should_update_H = pthread_barrier_wait(&field_barrier);
+    for(k=z_min;k<z_max;k++){
+      for(j=y_min;j<y_max;j++){
+        //setting i to x_min, rather than x_min+1 for alignment reasons
+        //hopefully this won't fail horribly
+        for(i=x_min;i<x_max;i+=4){
+          data->update_H(my_Hn,my_Hn_1,E_n,(point){i,j,k});
+        }
+      }
+    }
+    if(I_should_update_H){
+      H_n=H_n1;//update H
+    }
+    int I_should_update_E=pthread_barrier_wait(&field_barrier);
+    for(k=z_min+1;k<z_max;k++){
+      for(j=y_min+1;j<y_max;j++){
+        for(i=x_min;i<x_max;i+=4){
+          data->update_E(my_En,my_En_1,H_n,(point){i,j,k});
+        }
+      }
+    }
+    if(I_should_update_E){
+      E_n=E_n1;//update E
+    }
+    //attempt to set boundries to 0
+    for(k=z_min;k<=z_max;k+=(2*z_max)){
+      for(j=y_min;j<=y_max;j+=(2*y_max)){
+        for(i=x_min;i<=x_max;i+=(1*x_max)){
+          set_boundires_coord(my_Hn);
+          set_boundires_coord(my_En);
+        }
+      }
+    }
+    pthread_mutex_lock(&main_mutex);
+    done_updating[0]=1;
+    pthread_cond_broadcast(&main_cond);
+    pthread_cond_wait(&field_cond,&main_mutex);
+    if(continue_threads){
+      done_updating[0]=0;
+      pthread_mutex_unlock(&main_mutex);
+    } else {
+      pthread_mutex_unlock(&main_mutex);
+      HERE();
+      goto THREAD_END;
+    }    
+  }
+ THREAD_END:
+  HERE();
+  fprintf(stderr,"ending field thread number %lu\n",pthread_self());
+  return 0;
+}
+#if 0
   init_dir("fdtd_data");
   while(t<t_max){
     //        fprintf(stderr,"time=%f\n",t);
@@ -268,13 +474,4 @@ int main(int argc,char** argv){
       }
     }
   }
-  fprintf(stderr,"data calculations finished, writing data\n");
-  if(t >= t_max){
-    print_as_slices(t,H_n,E_n);
-    //dump_data(t,H_n,E_n);
-  }
-  return 0;
-}
-
-
-
+#endif 

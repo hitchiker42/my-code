@@ -28,6 +28,7 @@ int init_dir(const char* dir_name){
         } else if (S_ISDIR(is_dir.st_mode)){
           printf("%s is a directory, delete recursively?\ny/n:",dir_name);
           //kind of a hack, but doing things the right way takes forever
+          //(I just call rm -r via the system rather than doing it from C)
           tol=3;
           while(1){
             ans=getc(stdin);
@@ -41,7 +42,9 @@ int init_dir(const char* dir_name){
           system(command);
           mkdir(dir_name,0755);
           return chdir(dir_name);
-          tol=3;
+        }
+#if 0
+          /*          tol=3;
           while(1){
             if ('y' == getc(stdin)){break;}
             else if ('n' == getc(stdin)||!tol){goto NEW_DIR;}
@@ -73,11 +76,12 @@ int init_dir(const char* dir_name){
           printf("%s is not a regular file or directory, refusing to delete\n",
                  dir_name);
           goto NEW_DIR;
-        }
+          }*/
+#endif
       } else if ('n' == ans || tol <= 0){
-        /*label used to prevent excessive looping in containing while
-         *loop, if it bothers you, replace all calls of goto with tol=0
-         *then break to outermost while loop*/
+
+        //we go here if the user gives too many nonsense answers or
+        //doesn't want to overwrite a preexisting directory
       NEW_DIR:
         puts("Creating new directory");
         char* new_dir_name;
@@ -95,14 +99,14 @@ int init_dir(const char* dir_name){
 }
 //Bit of a workout for the preprocessor here
 #define print_header(file)                                              \
-fprintf(file,"%.16f %.16f  %.16f %.16f %.16f %d %d %d\n",                 \
+  fprintf(file,"%.16f %.16f  %.16f %.16f %.16f %d %d %d\n",             \
         dx, dt, mu,episilon, sigma, x_max, y_max, z_max)
 #define print_data(array,file)                  \
   fwrite(array,sizeof(double),grid_size,file)
 #define mkfile(field)                                                   \
   char* field##_name;                                                   \
   asprintf(&field##_name,"fdtd_raw_%s_t%d.dat",#field,time);            \
-  FILE* field##_data=fopen(field##_name,"w");                            \
+  FILE* field##_data=fopen(field##_name,"w");                           \
   free(field##_name)
 #define print_stuff(he,HE,xyz)                    \
   print_header(he##xyz##_data);                   \
@@ -114,9 +118,10 @@ void dump_data(int time,field H_n,field E_n){
   print_stuff(e,E,x); print_stuff(e,E,y); print_stuff(e,E,z);
   return;
 }
-#define print_header_slices(file)                                              \
-fprintf(file,"dx = %.16f dt = %.16f  mu = %.16f episilon = %.16f sigma = %.16f x_max = %d y_max = %d z_max = %d\n",                 \
-        dx, dt, mu,episilon, sigma, x_max, y_max, z_max)
+#define print_header_slices(file)                                       \
+  fprintf(file,"dx = %.16f dt = %.16f  mu = %.16f episilon = %.16f"\
+    "sigma = %.16f x_max = %d y_max = %d z_max = %d\n", \
+          dx, dt, mu,episilon, sigma, x_max, y_max, z_max)
   /* z=0 (y=0 x1..xn,...y=n x1..xn), z=n(y=0 x1..xn,y=n x1..xn)
      gnuplot wants
      #cols y0 ... yn
@@ -124,9 +129,9 @@ fprintf(file,"dx = %.16f dt = %.16f  mu = %.16f episilon = %.16f sigma = %.16f x
      ..
      xn    zn,0 .. zn,n */
   //meh, do this. print z = number, print grid of x,z points, blank line
-#define do_field(field,HE,xyz,t)                                         \
+#define do_field(field,HE,xyz,t)                                        \
   char* field##_name;                                                   \
-  asprintf(&field##_name,"fdtd_slices_%s_t%d.dat",#field,t);         \
+  asprintf(&field##_name,"fdtd_slices_%s_t%f.dat",#field,t);            \
   FILE* field##_data=fopen(field##_name,"w");                           \
   free(field##_name);                                                   \
   print_header_slices(field##_data);                                    \
@@ -141,7 +146,7 @@ fprintf(file,"dx = %.16f dt = %.16f  mu = %.16f episilon = %.16f sigma = %.16f x
     fprintf(field##_data,"\n\n");                                       \
   }                                                                     \
   fclose(field##_data)
-void print_as_slices(int time,field H_n,field E_n){
+void print_as_slices(double time,field H_n,field E_n){
   int i,j,k;
   do_field(hx,H,x,time);do_field(hy,H,y,time);do_field(hz,H,z,time);
   do_field(ex,E,x,time);do_field(ey,E,y,time);do_field(ez,E,z,time);

@@ -1,3 +1,4 @@
+
 /* global header file,
    contains generic includes, macros, global vars and a few small functions*/
 #ifndef _FDTD_H_
@@ -12,11 +13,14 @@
 #include <math.h>
 #include <mpi.h>
 #include <unistd.h>
+#include <stdint.h>
 #include "xmalloc.h"
 #include "fdtd_consts.h"
+#include <pthread.h>
 #ifdef __x86_64__
 #include <x86intrin.h>
 #endif
+//assume grid is uniform in all dimensions
 #define dy dx
 #define dz dx
 #define __USE_GNU_
@@ -29,13 +33,35 @@ typedef __m256d m256d;
 /* NOTE: I use restrict on the heavly used grid pointers,
    however I'm not sure if I actually do any pointer aliasing or
    not. but I don't think so, and it should make much faster code */
-//macro purely for convience in creating & allocating all the fields
+double* H_n_mem __attribute__((aligned(__BIGGEST_ALIGNMENT__)));
+double* H_n1_mem __attribute__((aligned(__BIGGEST_ALIGNMENT__)));
+double* H_write __attribute__((aligned(__BIGGEST_ALIGNMENT__)));
+double* E_n_mem __attribute__((aligned(__BIGGEST_ALIGNMENT__)));
+double* E_n1_mem __attribute__((aligned(__BIGGEST_ALIGNMENT__)));
+double* E_write __attribute__((aligned(__BIGGEST_ALIGNMENT__)));
+double* restrict H_nx;
+double* restrict H_n1x;
+double* restrict E_nx;
+double* restrict E_n1x;
+double* restrict H_ny;
+double* restrict H_n1y;
+double* restrict E_ny;
+double* restrict E_n1y;
+double* restrict H_nz;
+double* restrict H_n1z;
+double* restrict E_nz;
+double* restrict E_n1z;
 #define set_boundires(HE,xyz) *(get_ptr_xyz(HE##_n.xyz,i,j,k))=0
-#define create_field(name)                  \
-  double* restrict name=xvalloc(sizeof(double)*grid_size)
-#define my_error(format,args...) fprintf(stderr,format,##args);abort();
+#define set_boundires_coord(HE_n) *(get_ptr_xyz(HE_n,i,j,k))=0
+#define create_field(name)                                      \
+  double* restrict name=xmemalign(sizeof(double)*grid_size,sysconf(_SC_PAGESIZE))
+#define my_error(format,args...) fprintf(stderr,format,##args);exit(1);
 #define debug(string...) puts(string);\
   fprintf(stderr,"Here at file %s,line %d\n",__FILE__,__LINE__);
+#define HERE() fprintf(stderr,"here at %s,line %d\n",__FILE__,__LINE__)
+#define HERE_MSG(string) fprintf(stderr,"here at %s,line %d\n%s\n"\
+                                 ,__FILE__,__LINE__,string)
+#define HERE_FMT(string,fmt...) HERE();fprintf(stderr,string "\n",##fmt)
 /* Types */
 typedef struct field field;
 typedef struct cell cell;
