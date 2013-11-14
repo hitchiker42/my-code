@@ -1,0 +1,5 @@
+Finite Differance Time Domain program. Run make to create a program fdtd which
+runs with the default constants. If you wish to modify the constants use the
+gen_consts program which is generated as part of the build. If you wish to
+build a non multithreaded implementation add -DNOT_MULTI_THREAD to CFLAGS when
+running make.

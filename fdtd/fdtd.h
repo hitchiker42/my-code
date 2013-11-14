@@ -53,8 +53,6 @@ double* restrict E_nz;
 double* restrict E_n1z;
 #define set_boundires(HE,xyz) *(get_ptr_xyz(HE##_n.xyz,i,j,k))=0
 #define set_boundires_coord(HE_n) *(get_ptr_xyz(HE_n,i,j,k))=0
-#define create_field(name)                                      \
-  double* restrict name=xmemalign(sizeof(double)*grid_size,sysconf(_SC_PAGESIZE))
 #define my_error(format,args...) fprintf(stderr,format,##args);exit(1);
 #define debug(string...) puts(string);\
   fprintf(stderr,"Here at file %s,line %d\n",__FILE__,__LINE__);

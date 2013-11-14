@@ -204,9 +204,17 @@ static inline void updateEz(double* Ez, double* En, field H, point loc){
 #endif
   return;
 }
+double init_ex(double t){return default_init_e(t,_x);}
+double init_ey(double t){return default_init_e(t,_y);}
+double init_ez(double t){return default_init_e(t,_z);}
+double init_hx(double t){return default_init_h(t,_x);}
+double init_hy(double t){return default_init_h(t,_y);}
+double init_hz(double t){return default_init_h(t,_z);}
 struct thread_data {
   void (*update_H)(double*,double*,field,point);
   void (*update_E)(double*,double*,field,point);
+  double (*init_H)(double);
+  double (*init_E)(double);
   double* my_Hn;
   double* my_Hn_1;
   double* my_En;
@@ -229,6 +237,7 @@ void* write_main(void* x __attribute__((unused))){
     }
   }
 }
+#ifndef NOT_MULTI_THREADED
 int main(int argc,char** argv){
   //I tried to allocate all this stuff statically but gcc wouldn't let me
   x_update_flag[0]=0;
@@ -253,14 +262,17 @@ int main(int argc,char** argv){
   E_nz=E_n_mem+(grid_size*2);
   E_n1z=E_n1_mem+(grid_size*2);
 struct thread_data x_field_data={.update_H=updateHx,.update_E=updateEx,
+                                 .init_H=init_hx,.init_E=init_ex,
                                  .my_Hn=H_nx,.my_Hn_1=H_n1x,
                                  .my_En=E_nx,.my_En_1=E_n1x,
                                  .done_updating=x_update_flag};
 struct thread_data y_field_data={.update_H=updateHy,.update_E=updateEy,
+                                 .init_H=init_hy,.init_E=init_ey,
                                  .my_Hn=H_ny,.my_Hn_1=H_n1y,
                                  .my_En=E_ny,.my_En_1=E_n1y,
                                  .done_updating=y_update_flag};
 struct thread_data z_field_data={.update_H=updateHz,.update_E=updateEz,
+                                 .init_H=init_hz,.init_E=init_ez,
                                  .my_Hn=H_nz,.my_Hn_1=H_n1z,
                                  .my_En=E_nz,.my_En_1=E_n1z,
                                  .done_updating=z_update_flag};
@@ -338,7 +350,6 @@ struct thread_data z_field_data={.update_H=updateHz,.update_E=updateEz,
   return 0;
 }
 
-
 void* thread_main(void *field_info){
   int i,j,k,l,m,n;  
   struct thread_data *data=(struct thread_data*)field_info;
@@ -356,8 +367,8 @@ void* thread_main(void *field_info){
           if(k==0 && j==0 && i==0){
             continue;
           } else {
-            *(get_ptr_xyz(my_Hn,i,j,k))+=10000*sin(M_PI*pow(t,2));          
-            *(get_ptr_xyz(my_En,i,j,k))+=10000*cos(M_PI*pow(t,2));
+            *(get_ptr_xyz(my_Hn,i,j,k))+=data->init_H(t);
+            *(get_ptr_xyz(my_En,i,j,k))+=data->init_E(t);
           }
         }
       }
@@ -413,7 +424,36 @@ void* thread_main(void *field_info){
   fprintf(stderr,"ending field thread number %lu\n",pthread_self());
   return 0;
 }
-#if 0
+#endif
+#ifdef NOT_MULTI_THREADED
+int main(int argc,char *argv[]){
+  t=0;
+  t_max=30;
+  int write_interval=t_max/num_writes;
+  int write_time=write_interval;
+  int i,j,k,l,m,n;
+  H_n_mem=xmalloc(grid_size3*sizeof(double));
+  H_n1_mem=xmalloc(grid_size3*sizeof(double));
+  H_write=xmalloc(grid_size3*sizeof(double));
+  E_n_mem=xmalloc(grid_size3*sizeof(double));
+  E_n1_mem=xmalloc(grid_size3*sizeof(double));
+  E_write=xmalloc(grid_size3*sizeof(double));
+  H_nx=H_n_mem;
+  H_n1x=H_n1_mem;
+  E_nx=E_n_mem;
+  E_n1x=E_n1_mem;
+  H_ny=H_n_mem+grid_size;
+  H_n1y=H_n1_mem+grid_size;
+  E_ny=E_n_mem+grid_size;
+  E_n1y=E_n1_mem+grid_size;
+  H_nz=H_n_mem+(grid_size*2);
+  H_n1z=H_n1_mem+(grid_size*2);
+  E_nz=E_n_mem+(grid_size*2);
+  E_n1z=E_n1_mem+(grid_size*2);
+  H_n=(field){H_nx,H_ny,H_nz};
+  H_n1=(field){H_n1x,H_n1y,H_n1z};//H at time n and time n+1
+  E_n=(field){E_nx,E_ny,E_nz};
+  E_n1=(field){E_n1x,E_n1y,E_n1z};//E at time n and time n+1
   init_dir("fdtd_data");
   while(t<t_max){
     //        fprintf(stderr,"time=%f\n",t);
@@ -474,4 +514,11 @@ void* thread_main(void *field_info){
       }
     }
   }
+  fprintf(stderr,"data calculations finished, writing data\n");
+  if(t >= t_max){
+    print_as_slices(t,H_n,E_n);
+    //dump_data(t,H_n,E_n);
+  }
+  return 0;
+}
 #endif 
