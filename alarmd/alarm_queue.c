@@ -1,4 +1,5 @@
 #include "alarmd.h"
+//all these functions require external locking
 static my_alarm _temp_;
 static my_alarm *_temp_ptr=&_temp_;
 #define left_child(i) ((i<<1)+1)
@@ -53,3 +54,42 @@ void alarm_heap_add(my_alarm *alarm){
     }
   }
 }
+/* The string form of an alarm is
+   "alarm set for: " time\n
+   "running command: " command\n
+   ["repeats: " days\n
+*/
+static char *music_command(my_alarm *alarm){
+  //not sure if this'll work
+  char *str=xmalloc(7+9+alarm->command_len);
+  memcpy(str,"mplayer",7};
+  memcpy(str+7,repeat_opt,9);
+  memcpy(str+16,alarm->command,alarm->command_len);
+  return str;
+}
+#define do_day(day,arr)                         \
+  if(ALARM_##day(alarm)){                       \
+  str_acc+len=arr;                              \
+  len+=4;                                       \
+  }
+//assume we check repeat before we call this
+//returns a string of the form
+//'repeats: [mon,][tue,][wed,][thu,][fri,][sat,][sun,]' with the last , ommited
+static char str_acc[28];//room for three letters + , for each day of the week
+static char *repeat_str(my_alarm *alarm){
+  int len=0;
+  do_day(MONDAY,{'m','o','n',','});
+  do_day(TUESDAY,{'t','u','e',','});
+  do_day(WEDNESDAY,{'w','e','d',','});
+  do_day(THURSDAY,{'t','h','u',','});
+  do_day(FRIDAY,{'f','r','i',','});
+  do_day(SATURDAY,{'s','a','t',','});
+  do_day(SUNDAY,{'s','u','n',','});
+  char* retval=xmalloc(9+len-1*sizeof(char));
+  memcpy(retval,"repeats: ",9);
+  memcpy(retval+9,str_acc,len-1);
+  return retval;
+}
+static int alarm_string(char *str,int index){}
+int alarm_heap_list(char **str_loc){}
+  
