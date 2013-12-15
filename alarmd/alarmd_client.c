@@ -124,8 +124,12 @@ static struct option list_opts;
 static struct option delete_opts;
 static struct option modify_opts;
 static struct option snooze_opts;*/
- global_opts={{"help",no_argument,0,'h'},
-              {0,0,0,0}};
+global_opts={{"help",no_argument,0,'h'},
+             {0,0,0,0}};
+add_opts={{"song",required_argument,0,'s'},
+          {"command",required_argument,0,'c'},
+          {"repeat",required_argument,0,'r'},
+          {0,0,0,0}};
 static uint8_t parse_day_abbr(char *day_str){
   uint8_t retval=0x80;//assuming this only gets called on repeating alarms
   while(day_str){
