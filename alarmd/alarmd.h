@@ -1,6 +1,7 @@
 /* global header file for alarmd implementation*/
 #ifndef _ALARM_D
 #define _ALARM_D
+#include <alloca.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stddef.h>
@@ -34,7 +35,7 @@ pthread_t main_thread;
 time_t next_alarm;
 uint32_t queue_length;
 uint32_t queue_size;
-static const char *dir_name="/var/run/alarmd";
+static const char *alarmd_dir_name="/var/run/alarmd";
 static const char *mplayer="/usr/bin/mplayer";
 static struct timespec wait_time = {.tv_sec=2,.tv_nsec=0};
 //100 milisecond wait, presumably enough for a reasonable process 
@@ -49,16 +50,23 @@ extern int alarm_heap_list(char **str_loc);
 static const char *sock_name="alarmd_socket";
 char repeat_opt[10]={'-','l','o','o','p',' ','0','0','1','\0'};
 //I could use bitfields but eh, size isn't all that important
+/* TODO: change command from the command itself to
+   a filename in a temporary directory(i.e, /var/run/alarmd)
+   and make it an array containing the filename.
+   //of course if music is true command can still just be
+   //a pathname to a music file, so make sure it's a modestly
+   //large array
+*/
 struct my_alarm {
   time_t alarm_time;
-  char *command;
-  uint32_t command_len;
   uint8_t today;
   uint8_t repeat;
   uint8_t music;
   uint8_t music_loop;//make sure to set this to 1 by default
   //because 0 is infinite loop, and thats something kinda useful
   uint32_t alarm_id;
+  uint32_t command_len;
+  char command[256];
 };
 //this really doesn't need to be super efficent so malloc=calloc
 static inline void* xmalloc(size_t size){

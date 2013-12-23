@@ -1,5 +1,6 @@
 /*code for the alarmd daemon and a simple priority queue*/
 #include "alarmd.h"
+#include <syslog.h>
 //callers are expected to hold a lock before calling functions
 //which act on the alarm queue
 static int stat_loc;
@@ -38,26 +39,27 @@ void* run_alarm_command(void *data){
   sigaction(SIGTERM,&command_sigterm_act,NULL);
   //make a local copy so we can free the heap
   //allocated one and not worry about having to clean it up
-  my_alarm cur_alarm=*(my_alarm*)data;
+  my_alarm *cur_alarm=(my_alarm*)data;
   xfree(data);
   //something...maybe
   command_process=fork();
   if(command_process==0){
     //we're the new process
-    if(cur_alarm.music){
+    if(cur_alarm->music){
       //assume cur_alarm->command is a song title, run it w/mplayer
       //I'll leave setting the path of the file to the frontend;
-      if(cur_alarm.repeat != 1){
-        if(cur_alarm.repeat < 10){
-          repeat_opt[9]=cur_alarm.repeat+0x30;
-        } else if(cur_alarm.repeat < 100){
+      if(cur_alarm->repeat != 1){
+        if(cur_alarm->repeat < 10){
+          repeat_opt[9]=cur_alarm->repeat+0x30;
+        } else if(cur_alarm->repeat < 100){
           //this is kinda tricky, I'll need to look it up
         } else {
         }
       }
-      execl(mplayer,mplayer,cur_alarm.command,repeat_opt,driver,NULL);
+      execl(mplayer,mplayer,cur_alarm->command,repeat_opt,driver,NULL);
       //error handling goes here
     } else {//execute some other command, to ba added
+      execl(DIR_NAME "/" cur_alarm->command,NULL);
     }
   } else {
     //parent process, wait for child to complete, or for a signal
@@ -97,25 +99,33 @@ void alarmd_cleanup(){
   close(alarm_socket);
   unlink(SOCK_NAME DIR_NAME);  
   rmdir(DIR_NAME);
+  syslog(LOG_NOTICE,"alarmd exiting");
 }
 void main_loop(){
   int sock=make_alarm_socket(SOCK_NAME,_bind);
   pthread_t alarm_thread;
   pthread_create(&alarm_thread,NULL,alarm_loop,NULL);
   if(listen(sock,2)){
-    perror("listen failure");
+    syslog(LOG_ERR,"Error calling listen, %m. Alarmd exiting");
     exit(EXIT_FAILURE);
   }
   struct sockaddr_un addr;
   socklen_t len;
   int accept_sock;
   alarmd_action action;
+  pid_t client_pid=0;
   ssize_t size;
   while(1){
     if((accept_soc=accept(sock,(struct sockaddr)&addr,&len))<0){
-      perror("accept error");
+      syslog(LOG_ERR,"Error calling accept, %m. Alarmd exiting");
       //not sure what to do here, for now just exit
       //but preferably the program should continue
+      exit(EXIT_FAILURE);
+    }
+    //get client pid first so we can let the user know of errors
+    //via signals in the rest of the program
+    if(read(accept_sock,&client_pid,sizeof(pid_t))<=0){
+      syslog(LOG_ERR,"Error reading client pid, %m. Alarmd exiting");
       exit(EXIT_FAILURE);
     }
     if((size=read(accept_sock,&action,sizeof(alarmd_action)))>0){
@@ -126,17 +136,17 @@ void main_loop(){
       switch(action){
         case _add:{
           my_alarm *new_alarm=xmalloc(sizeof(my_alarm));
-          if((size=read(accept_sock,&new_alarm,sizeof(my_alarm)))>0){
+          if((size=read(accept_sock,new_alarm,sizeof(my_alarm)))>0){
             if(size != sizeof(my_alarm)){
               //some kind of error recovery, but to be safe exit for now
               exit(EXIT_FAILURE);
             }
             pthread_mutex_lock(&alarm_lock);
-            char *list=alarm_heap_add(new_alarm);
+            alarm_heap_add(new_alarm);
             pthread_mutex_unlock(&alarm_lock);
-          } else {
-            goto READ_FAILURE;
+            break;
           }
+          goto READ_FAILURE;
         }
         case _delete:{
           uint32_t alarm_id;
@@ -211,6 +221,7 @@ int main(int argc,char *argv[]){
   if(alarmd_pid>0){
     exit(EXIT_SUCCESS);
   }
+  openlog(NULL,0,LOG_CRON);
   pthread_attr_setdetachstate(&detached_attr,PTHREAD_CREATE_DETACHED);
   //child process, aka daemon
   pid_t sid=setsid();

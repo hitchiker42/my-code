@@ -59,14 +59,6 @@ void alarm_heap_add(my_alarm *alarm){
    "running command: " command\n
    ["repeats: " days\n
 */
-static char *music_command(my_alarm *alarm){
-  //not sure if this'll work
-  char *str=xmalloc(7+9+alarm->command_len);
-  memcpy(str,"mplayer",7};
-  memcpy(str+7,repeat_opt,9);
-  memcpy(str+16,alarm->command,alarm->command_len);
-  return str;
-}
 #define do_day(day,arr)                         \
   if(ALARM_##day(alarm)){                       \
   str_acc+len=arr;                              \
