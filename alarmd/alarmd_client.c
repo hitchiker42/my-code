@@ -18,15 +18,21 @@
  * snooze: stop currently executing alarm and set it to run x minutes later
  * stop: stop currently executing alarm
  * clear: clear all current alarms
-*/
+ */
 static pid_t daemon_pid;
 static int sock;
-static struct option global_opts;
-static struct option add_opts;
-static struct option list_opts;
-static struct option delete_opts;
-static struct option modify_opts;
-static struct option snooze_opts;
+static struct option global_opts[]=
+  {{"help",no_argument,0,'h'},
+   {0,0,0,0}};
+static struct option add_opts[]=
+  {{"song",required_argument,0,'s'},
+   {"command",required_argument,0,'c'},
+   {"repeat",required_argument,0,'r'},
+   {0,0,0,0}};
+static struct option list_opts[];
+static struct option delete_opts[];
+static struct option modify_opts[];
+static struct option snooze_opts[];
 #define mk_case(name)                           \
   if(!strcmp(argv[1],#name)){                   \
     name##_alarm(argc-1,argv+1);                \
@@ -58,7 +64,8 @@ void __attribute__((noreturn)) add_alarm(int argc,char *argv[]){
     .today=alarm_today,.repeat=repeat,.music=music,
     .music_loop=music_loop,.alarm_id=alarm_d};
     //write _add to socket then write new_alarm
-  */
+    */
+  exit(EXIT_SUCCESS);
 }
 void __attribute__((noreturn)) list_alarm(int argc,char *argv[]){
   /*
@@ -68,6 +75,7 @@ void __attribute__((noreturn)) list_alarm(int argc,char *argv[]){
     -read len characters from socket
     -write to stdout
   */
+    exit(EXIT_SUCCESS);
 }
 void __attribute__((noreturn)) delete_alarm(int argc,char *argv[]){
   /*
@@ -75,7 +83,8 @@ void __attribute__((noreturn)) delete_alarm(int argc,char *argv[]){
     the user give it)
     -write _delete to socket, then write alarm id
     -wait on socket to figure out if we actually deleted anything
-   */
+  */
+    exit(EXIT_SUCCESS);
 }
 void __attribute__((noreturn)) modify_alarm(int argc,char *argv[]);
 void __attribute__((noreturn)) stop_alarm(int argc,char *argv[]){
@@ -124,24 +133,18 @@ static struct option list_opts;
 static struct option delete_opts;
 static struct option modify_opts;
 static struct option snooze_opts;*/
-global_opts={{"help",no_argument,0,'h'},
-             {0,0,0,0}};
-add_opts={{"song",required_argument,0,'s'},
-          {"command",required_argument,0,'c'},
-          {"repeat",required_argument,0,'r'},
-          {0,0,0,0}};
 static uint8_t parse_day_abbr(char *day_str){
   uint8_t retval=0x80;//assuming this only gets called on repeating alarms
   while(day_str){
     switch(day_str[1]){
-      case "m":
+      case 'm':
         if(!strncmp(day_str,"mon",3)){
           retval&=0x40;
           break;
         } else {
           goto PARSE_ERROR;
         }
-      case "t":
+      case 't':
         if(!strncmp(day_str,"tue",3)){
           retval&=0x20;
           break;
@@ -151,21 +154,21 @@ static uint8_t parse_day_abbr(char *day_str){
         } else {
           goto PARSE_ERROR;
         }
-      case "w":
+      case 'w':
         if(!strncmp(day_str,"wed",3)){
           retval&=0x10;
           break;
         } else {
           goto PARSE_ERROR;
         }
-      case "f":
+      case 'f':
         if(!strncmp(day_str,"fri",3)){
           retval&=0x04;
           break;
         } else {
           goto PARSE_ERROR;
         }
-      case "s":
+      case 's':
         if(!strncmp(day_str,"sat",3)){
           retval&=0x2;
           break;
@@ -199,11 +202,11 @@ static uint8_t parse_day_abbr(char *day_str){
 #define HOUR_TO_SEC(hours) (hours * 3600)
 //I probably could just use the normal localtime function...
 static struct tm *today(time_t cur_time){
-  struct tm *today=xmalloc(sizeof struct tm);
+  struct tm *today=xmalloc(sizeof(struct tm));
   struct tm *retval=localtime_r(&cur_time,today);
   if(!retval){
     free(today);
-    return NULL:
+    return NULL;
   } else {
     return retval;
   }
@@ -238,7 +241,7 @@ static time_t parse_time(char *time_str,time_t cur_time){
       cur_str=cur_str+4;
     } else if(time_str[4]==':'){
       hours=(time_str[2]+48)+((time_str[3]+48)*10);
-      cur_str+cur_str+5;
+      cur_str=cur_str+5;
     } else {
       return 0;
     }
@@ -256,7 +259,7 @@ static time_t parse_time(char *time_str,time_t cur_time){
   if(relative){
     return (cur_time+HOUR_TO_SEC(hours)+MIN_TO_SEC(minutes));
   } else {
-    if(hours>=24 || mintes>=60){
+    if(hours>=24 || minutes>=60){
       return 0;
     }
     time_t est_time=EST(cur_time);
@@ -276,11 +279,12 @@ static regex_t time_re;
 static struct re_registers time_regs;
 //length is 38
 static time_t parse_time_re(char *time_str,time_t cur_time){
+  
   if(re_compile_pattern(time_re_pattern,strlen(time_re_pattern),&time_re)){
     return 0;
   }
   int len=strlen(time_str);
-  if(re_match(&time_re_pattern,time_str,len,0,&time_regs) != len){
+  if(re_match(&time_re,time_str,len,0,&time_regs) != len){
     return 0;
   }
   long hours;
@@ -312,7 +316,7 @@ static time_t parse_time_re(char *time_str,time_t cur_time){
   if(relative){
     return (cur_time+HOUR_TO_SEC(hours)+MIN_TO_SEC(minutes));
   } else {
-    if(hours>=24 || mintes>=60){
+    if(hours>=24 || minutes>=60){
       return 0;
     }
     time_t est_time=EST(cur_time);

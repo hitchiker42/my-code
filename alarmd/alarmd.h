@@ -90,7 +90,7 @@ enum bind_or_connect {
   _bind,
   _connect,
 };
-enum alarmd_actions{
+enum alarmd_action{
   _add,
   _clear,
   _delete,

@@ -215,7 +215,7 @@ int main(int argc,char *argv[]){
   //child process, aka daemon
   pid_t sid=setsid();
   umask(0);
-  PRINT_FMT("daemonn pid = %d",getpid());
+  PRINT_FMT("daemon pid = %d",getpid());
   //write permission only for the user who ran the daemon, this should be
   //fine since the same process will be doing the deletion
   if(mkdir(DIR_NAME,S_IRWXU|S_IXGRP|S_IRGRP|S_IROTH|S_IXOTH|S_ISVTX)){
