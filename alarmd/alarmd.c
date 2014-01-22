@@ -100,12 +100,12 @@ void alarmd_cleanup(){
 }
 void main_loop(){
   int sock=make_alarm_socket(SOCK_NAME,_bind);
-  pthread_t alarm_thread;
-  pthread_create(&alarm_thread,NULL,alarm_loop,NULL);
   if(listen(sock,2)){
     perror("listen failure");
     exit(EXIT_FAILURE);
   }
+  pthread_t alarm_thread;  
+  pthread_create(&alarm_thread,NULL,alarm_loop,NULL);
   struct sockaddr_un addr;
   socklen_t len;
   int accept_sock;
@@ -226,6 +226,9 @@ int main(int argc,char *argv[]){
     perror("chdir failure");
     exit(EXIT_FAILURE);
   }
+  FILE* pid_file=fopen("alarmd.pid","w");
+  fprintf(pid_file,"%d\n",getpid());
+  fclose(pid_file);
   close(STDIN_FILENO);
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
