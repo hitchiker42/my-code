@@ -1,4 +1,5 @@
 #include "alarmd.h"
+#include "regex.h"
 #include <getopt.h>
 /* User Interface to alarmd daemon
  * Basically multiple programs in one (I suppose I could compile it as multiplle
@@ -17,15 +18,21 @@
  * snooze: stop currently executing alarm and set it to run x minutes later
  * stop: stop currently executing alarm
  * clear: clear all current alarms
-*/
+ */
 static pid_t daemon_pid;
 static int sock;
-static struct option global_opts;
-static struct option add_opts;
-static struct option list_opts;
-static struct option delete_opts;
-static struct option modify_opts;
-static struct option snooze_opts;
+static struct option global_opts[]=
+  {{"help",no_argument,0,'h'},
+   {0,0,0,0}};
+static struct option add_opts[]=
+  {{"song",required_argument,0,'s'},
+   {"command",required_argument,0,'c'},
+   {"repeat",required_argument,0,'r'},
+   {0,0,0,0}};
+static struct option list_opts[];
+static struct option delete_opts[];
+static struct option modify_opts[];
+static struct option snooze_opts[];
 #define mk_case(name)                           \
   if(!strcmp(argv[1],#name)){                   \
     name##_alarm(argc-1,argv+1);                \
@@ -36,15 +43,55 @@ static struct option snooze_opts;
 void __attribute__((noreturn)) help(){
   exit(EXIT_SUCCESS);
 }
-void __attribute__((noreturn)) add_alarm(int argc,char *argv[]);
-void __attribute__((noreturn)) list_alarm(int argc,char *argv[]);
-void __attribute__((noreturn)) delete_alarm(int argc,char *argv[]);
+void __attribute__((noreturn)) add_alarm(int argc,char *argv[]){
+  /*
+    time_t cur_time=time(NULL);
+    struct tm *today=today(cur_time);
+    char* command="/home/tucker/music/alarm.wav";
+    uint32_t command_len,alarm_id;
+    uint8_t alarm_today=0,repeat=0,music=1,music_loop=3;
+    //parse options
+    command_len=strlen(command);
+    //call parse_time with the remaining strings
+    //assign to a variable alarm_time;
+    if(!alarm_time){
+    fprintf(stderr,"error parsing time\n");
+    exit(EXIT_FAILURE);
+    } else {
+    my_alarm *new_alarm=alloca(sizeof(my_alarm));
+    *new_alarm=(my_alarm){.alarm_time=alarm_time,
+    .command=command,.command_len=command_len,
+    .today=alarm_today,.repeat=repeat,.music=music,
+    .music_loop=music_loop,.alarm_id=alarm_d};
+    //write _add to socket then write new_alarm
+    */
+  exit(EXIT_SUCCESS);
+}
+void __attribute__((noreturn)) list_alarm(int argc,char *argv[]){
+  /*
+    -write _list to socket;
+    -wait on socket, read an int giving the length
+    of the alarm list, set to a varible name len
+    -read len characters from socket
+    -write to stdout
+  */
+    exit(EXIT_SUCCESS);
+}
+void __attribute__((noreturn)) delete_alarm(int argc,char *argv[]){
+  /*
+    -figure out how to actually get the alarm id (I suppose I make
+    the user give it)
+    -write _delete to socket, then write alarm id
+    -wait on socket to figure out if we actually deleted anything
+  */
+    exit(EXIT_SUCCESS);
+}
 void __attribute__((noreturn)) modify_alarm(int argc,char *argv[]);
 void __attribute__((noreturn)) stop_alarm(int argc,char *argv[]){
   alarmd_action action=_stop;
   write(sock,&action,sizeof(alarmd_action));
   exit(EXIT_SUCCESS);
-}  
+}
 void __attribute__((noreturn)) snooze_alarm(int argc,char *argv[]);
 void __attribute__((noreturn)) clear_alarm(int argc,char *argv[]){
   alarmd_action action=_clear;
@@ -79,11 +126,206 @@ int main(int argc,char *argv[]){
       exit(EXIT_FAILURE);
   }
 }
+#undef mk_case
 /*static struct option global_opts;
 static struct option add_opts;
 static struct option list_opts;
 static struct option delete_opts;
 static struct option modify_opts;
 static struct option snooze_opts;*/
- global_opts={{"help",no_argument,0,'h'},
-              {0,0,0,0};
+static uint8_t parse_day_abbr(char *day_str){
+  uint8_t retval=0x80;//assuming this only gets called on repeating alarms
+  while(day_str){
+    switch(day_str[1]){
+      case 'm':
+        if(!strncmp(day_str,"mon",3)){
+          retval&=0x40;
+          break;
+        } else {
+          goto PARSE_ERROR;
+        }
+      case 't':
+        if(!strncmp(day_str,"tue",3)){
+          retval&=0x20;
+          break;
+        } else if(!strncmp(day_str,"thu",3)){
+          retval&=0x08;
+          break;
+        } else {
+          goto PARSE_ERROR;
+        }
+      case 'w':
+        if(!strncmp(day_str,"wed",3)){
+          retval&=0x10;
+          break;
+        } else {
+          goto PARSE_ERROR;
+        }
+      case 'f':
+        if(!strncmp(day_str,"fri",3)){
+          retval&=0x04;
+          break;
+        } else {
+          goto PARSE_ERROR;
+        }
+      case 's':
+        if(!strncmp(day_str,"sat",3)){
+          retval&=0x2;
+          break;
+        } else if (!strncmp(day_str,"sun",3)){
+          retval&=0x1;
+          break;
+        } else {
+          goto PARSE_ERROR;
+        }
+    }
+    if(day_str[4] != ','){
+      if(day_str[4]== '\0'){
+        return retval;
+      } else {
+      PARSE_ERROR:
+        fprintf(stderr,"maleformed repeat string, exiting\n");
+        exit(EXIT_FAILURE);
+      }
+    } else {
+      day_str=day_str+5;
+    }
+  }
+}
+#define SEC_DAY 86400
+#define EST_OFFSET (-18000)
+#define MINUTES(time) (time / 60)
+#define HOURS(time) (time / 3600)
+#define DAYS(time) (time / SEC_DAY)
+#define EST(time) (time + EST_OFFSET)
+#define MIN_TO_SEC(minutes) (minutes * 60)
+#define HOUR_TO_SEC(hours) (hours * 3600)
+//I probably could just use the normal localtime function...
+static struct tm *today(time_t cur_time){
+  struct tm *today=xmalloc(sizeof(struct tm));
+  struct tm *retval=localtime_r(&cur_time,today);
+  if(!retval){
+    free(today);
+    return NULL;
+  } else {
+    return retval;
+  }
+}
+//expects a string of the form of
+//+?[0-9][0-9]?(:[0-9][0-9]?)?
+//...why didn't I just use a regex
+//
+static time_t parse_time(char *time_str,time_t cur_time){
+  long hours;
+  long minutes;
+  char *cur_str;
+  int relative;
+  if(time_str[0]=='+'){
+    cur_str=time_str+1;
+    relative=1;
+  } else {
+    cur_str=time_str;
+    relative=0;
+  }
+  if(!cur_str[1]){
+    return 0;
+  } else if(!cur_str[2]){//1-9 hours from now
+    hours=cur_str[1]-48;
+    minutes=0;
+  } else if (!time_str[3]){//10-99 hours from now
+    hours=strtol(time_str,NULL,10);
+    minutes=0;
+  } else {
+    if(time_str[3]==':'){
+      hours=time_str[2]+48;
+      cur_str=cur_str+4;
+    } else if(time_str[4]==':'){
+      hours=(time_str[2]+48)+((time_str[3]+48)*10);
+      cur_str=cur_str+5;
+    } else {
+      return 0;
+    }
+    if(!cur_str[0]){
+      return 0;
+    } else if(!cur_str[1]){
+      return 0;
+      minutes=(cur_str[0]+48);
+    } else if(!cur_str[2]){
+      minutes=strtol(cur_str,NULL,10);
+    } else {
+      return 0;
+    }
+  }
+  if(relative){
+    return (cur_time+HOUR_TO_SEC(hours)+MIN_TO_SEC(minutes));
+  } else {
+    if(hours>=24 || minutes>=60){
+      return 0;
+    }
+    time_t est_time=EST(cur_time);
+    time_t sec_today=est_time % SEC_DAY;
+    time_t alarm_time=HOUR_TO_SEC(hours)+MIN_TO_SEC(minutes);
+    if(alarm_time<sec_today){
+      return est_time+SEC_DAY+alarm_time;
+    } else {
+      return est_time+alarm_time;
+    }
+  }
+}
+//time regex
+//\(+\)?\([0-9][0-9]?\)\(:[0-9][0-9]?\)?
+static const char *time_re_pattern="\\(+\\)?\\([0-9][0-9]?\\)\\(:[0-9][0-9]?\\)?";
+static regex_t time_re;
+static struct re_registers time_regs;
+//length is 38
+static time_t parse_time_re(char *time_str,time_t cur_time){
+  
+  if(re_compile_pattern(time_re_pattern,strlen(time_re_pattern),&time_re)){
+    return 0;
+  }
+  int len=strlen(time_str);
+  if(re_match(&time_re,time_str,len,0,&time_regs) != len){
+    return 0;
+  }
+  long hours;
+  long minutes;
+  int relative;
+  if(time_regs.start[1] == time_regs.end[1] == -1){
+    relative=0;
+  } else {
+    relative=1;
+  }
+  int hours_offset=time_regs.start[2]-time_regs.end[2];
+  if(hours_offset>=1){//this is probably unecessary
+    hours=(time_str[time_regs.start[2]]-48);
+  }
+  if(hours_offset==2){
+    hours+=((time_str[time_regs.start[2]+1]-48)*10);
+  }
+  if(time_regs.start[3]==time_regs.end[3]==-1){
+    minutes=0;
+  } else {
+    int minutes_offset=(time_regs.start[3]+1)-time_regs.end[3];
+    if(minutes_offset>=1){
+      minutes=(time_str[time_regs.start[3]+1]-48);
+    }
+    if(minutes_offset==2){
+      minutes+=((time_str[time_regs.start[3]+2]-48)*10);
+    }
+  }
+  if(relative){
+    return (cur_time+HOUR_TO_SEC(hours)+MIN_TO_SEC(minutes));
+  } else {
+    if(hours>=24 || minutes>=60){
+      return 0;
+    }
+    time_t est_time=EST(cur_time);
+    time_t sec_today=est_time % SEC_DAY;
+    time_t alarm_time=HOUR_TO_SEC(hours)+MIN_TO_SEC(minutes);
+    if(alarm_time<sec_today){
+      return est_time+SEC_DAY+alarm_time;
+    } else {
+      return est_time+alarm_time;
+    }
+  }
+}
