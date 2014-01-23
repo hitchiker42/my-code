@@ -31,7 +31,7 @@ void alarm_queue_heapify(int index){
 
 //pop's head of alarm queue, sets queue length and next_alarm to
 //appropiate values
-my_alarm* alarm_head_pop(){
+my_alarm* alarm_heap_pop(){
   my_alarm* retval=alarm_queue[0];
   alarm_queue[0]=alarm_queue[queue_length-1];
   queue_length--;
@@ -54,6 +54,23 @@ void alarm_heap_add(my_alarm *alarm){
     }
   }
 }
+void alarm_heap_delete(int index){
+  my_alarm *deleted_node=alarm_queue[index];
+  xfree(deleted_node);
+  alarm_queue[index]=alarm_queue[queue_length-1];
+  queue_length--;
+  alarm_queue_heapify(index);
+}
+int alarm_heap_try_delete(uint32_t alarm_id){
+  int i;
+  for(i=0;i<queue_length;i++){
+    if(alarm_id==alarm_queue[i]->alarm_id){
+      alarm_heap_delete(i);
+      return i;
+    }
+  }
+  return -1;
+}
 /* The string form of an alarm is
    "alarm set for: " time\n
    "running command: " command\n
@@ -62,29 +79,36 @@ void alarm_heap_add(my_alarm *alarm){
 static char *music_command(my_alarm *alarm){
   //not sure if this'll work
   char *str=xmalloc(7+9+alarm->command_len);
-  memcpy(str,"mplayer",7};
+  memcpy(str,"mplayer",7);
   memcpy(str+7,repeat_opt,9);
   memcpy(str+16,alarm->command,alarm->command_len);
   return str;
 }
 #define do_day(day,arr)                         \
   if(ALARM_##day(alarm)){                       \
-  str_acc+len=arr;                              \
-  len+=4;                                       \
+    memcpy(str_acc+len,arr,4);                  \
+    len+=4;                                     \
   }
 //assume we check repeat before we call this
 //returns a string of the form
 //'repeats: [mon,][tue,][wed,][thu,][fri,][sat,][sun,]' with the last , ommited
 static char str_acc[28];//room for three letters + , for each day of the week
+const char mon_abbr[4]={'m','o','n',','};
+const char tue_abbr[4]={'t','u','e',','};
+const char wed_abbr[4]={'w','e','d',','};
+const char thu_abbr[4]={'t','h','u',','};
+const char fri_abbr[4]={'f','r','i',','};
+const char sat_abbr[4]={'s','a','t',','};
+const char sun_abbr[4]={'s','u','u',','};
 static char *repeat_str(my_alarm *alarm){
   int len=0;
-  do_day(MONDAY,{'m','o','n',','});
-  do_day(TUESDAY,{'t','u','e',','});
-  do_day(WEDNESDAY,{'w','e','d',','});
-  do_day(THURSDAY,{'t','h','u',','});
-  do_day(FRIDAY,{'f','r','i',','});
-  do_day(SATURDAY,{'s','a','t',','});
-  do_day(SUNDAY,{'s','u','n',','});
+  do_day(MONDAY,mon_abbr);
+  do_day(TUESDAY,tue_abbr);
+  do_day(WEDNESDAY,wed_abbr);
+  do_day(THURSDAY,thu_abbr);
+  do_day(FRIDAY,fri_abbr);
+  do_day(SATURDAY,sat_abbr);
+  do_day(SUNDAY,sun_abbr);
   char* retval=xmalloc(9+len-1*sizeof(char));
   memcpy(retval,"repeats: ",9);
   memcpy(retval+9,str_acc,len-1);

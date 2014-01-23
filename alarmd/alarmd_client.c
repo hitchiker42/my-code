@@ -23,6 +23,7 @@ static pid_t daemon_pid;
 static int sock;
 static struct option global_opts[]=
   {{"help",no_argument,0,'h'},
+   {"daemon",no_argument,0,'d'},
    {0,0,0,0}};
 static struct option add_opts[]=
   {{"song",required_argument,0,'s'},
@@ -33,13 +34,6 @@ static struct option list_opts[];
 static struct option delete_opts[];
 static struct option modify_opts[];
 static struct option snooze_opts[];
-#define mk_case(name)                           \
-  if(!strcmp(argv[1],#name)){                   \
-    name##_alarm(argc-1,argv+1);                \
-  } else {                                      \
-    fprintf(stderr,"Invalid command %s did you mean %s\n",argv[1],#name);\
-    exit(EXIT_FAILURE);                                                 \
-  }
 void __attribute__((noreturn)) help(){
   exit(EXIT_SUCCESS);
 }
@@ -86,22 +80,38 @@ void __attribute__((noreturn)) delete_alarm(int argc,char *argv[]){
   */
     exit(EXIT_SUCCESS);
 }
-void __attribute__((noreturn)) modify_alarm(int argc,char *argv[]);
+void __attribute__((noreturn)) modify_alarm(int argc,char *argv[]){
+  alarmd_action action=modify_action;
+  write(sock,&action,sizeof(alarmd_action));
+  exit(EXIT_SUCCESS);
+}
 void __attribute__((noreturn)) stop_alarm(int argc,char *argv[]){
-  alarmd_action action=_stop;
+  alarmd_action action=stop_action;
   write(sock,&action,sizeof(alarmd_action));
   exit(EXIT_SUCCESS);
 }
-void __attribute__((noreturn)) snooze_alarm(int argc,char *argv[]);
+void __attribute__((noreturn)) snooze_alarm(int argc,char *argv[]){
+  alarmd_action action=snooze_action;
+  write(sock,&action,sizeof(alarmd_action));
+  exit(EXIT_SUCCESS);
+}
 void __attribute__((noreturn)) clear_alarm(int argc,char *argv[]){
-  alarmd_action action=_clear;
+  alarmd_action action=clear_action;
   write(sock,&action,sizeof(alarmd_action));
   exit(EXIT_SUCCESS);
 }
+#define mk_case(name)                           \
+  if(!strcmp(argv[1],#name)){                   \
+    name##_alarm(argc-1,argv+1);                \
+  } else {                                      \
+    fprintf(stderr,"Invalid command %s did you mean %s\n",argv[1],#name);\
+    exit(EXIT_FAILURE);                                                 \
+  }
 int main(int argc,char *argv[]){
+  int c;
   if(argv[1][0] == '-'){
   }
-  sock=make_alarm_socket(SOCK_FILENAME,_connect);
+  sock=make_alarm_socket(SOCK_FILENAME,1);
   switch(argv[1][0]){
     case 'a':
       mk_case(add);
@@ -272,6 +282,7 @@ static time_t parse_time(char *time_str,time_t cur_time){
     }
   }
 }
+#ifdef HAVE_REGEX
 //time regex
 //\(+\)?\([0-9][0-9]?\)\(:[0-9][0-9]?\)?
 static const char *time_re_pattern="\\(+\\)?\\([0-9][0-9]?\\)\\(:[0-9][0-9]?\\)?";
@@ -329,3 +340,4 @@ static time_t parse_time_re(char *time_str,time_t cur_time){
     }
   }
 }
+#endif

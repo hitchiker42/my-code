@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -14,6 +15,7 @@
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
+#include "sd-daemon.h"
 #if !(defined(NDEBUG))
 #define PRINT_MSG(msg) fprintf(stderr,msg "\n")
 #define PRINT_FMT(msg,fmt...) fprintf(stderr,msg"\n",##fmt)
@@ -21,8 +23,8 @@
 #define PRINT_MSG(msg)
 #define PRINT_FMT(msg,fmt...)
 #endif
+#define xfree free
 typedef struct my_alarm my_alarm;
-typedef enum bind_or_connect bind_or_connect;
 typedef enum alarmd_action alarmd_action;
 static pthread_mutex_t alarm_lock=PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t alarm_cond=PTHREAD_COND_INITIALIZER;
@@ -41,13 +43,15 @@ static struct timespec wait_time = {.tv_sec=2,.tv_nsec=0};
 //to run cleanup functions
 static struct timespec nano_wait_time = {.tv_sec=0,.tv_nsec=1e4};
 static struct timespec nano_wait_time2 = {.tv_sec=0,.tv_nsec=(1e9-1e4)};
-static int make_alarm_socket(const char* filename,bind_or_connect mode);
-extern my_alarm* alarm_heap_pop();
-extern void alarm_heap_delete(int index);
-extern void alarm_heap_add(my_alarm *alarm);
-extern int alarm_heap_list(char **str_loc);
+static int make_alarm_socket(const char* filename,int mode);
+my_alarm* alarm_heap_pop();
+void alarm_heap_delete(int index);
+void alarm_heap_add(my_alarm *alarm);
+int alarm_heap_list(char **str_loc);
+int alarm_heap_try_delete(uint32_t alarm_id);
+int init_daemon();
 static const char *sock_name="alarmd_socket";
-char repeat_opt[10]={'-','l','o','o','p',' ','0','0','1','\0'};
+static char repeat_opt[10]={'-','l','o','o','p',' ','0','0','1','\0'};
 //I could use bitfields but eh, size isn't all that important
 struct my_alarm {
   time_t alarm_time;
@@ -60,11 +64,12 @@ struct my_alarm {
   //because 0 is infinite loop, and thats something kinda useful
   uint32_t alarm_id;
 };
+#define oom_error_call() fprintf(stderr,"Error virtual memory exhausted\n")
 //this really doesn't need to be super efficent so malloc=calloc
 static inline void* xmalloc(size_t size){
   void *temp=calloc(size,sizeof(char));
   if(!temp && size){
-    fprintf(stderr,"Error virtual memory exhausted\n");
+    oom_error_call();
     exit(EXIT_FAILURE);
   } else {
     return temp;
@@ -73,7 +78,7 @@ static inline void* xmalloc(size_t size){
 static inline void* xrealloc(void *ptr,size_t size){
   ptr=realloc(ptr,size);
   if(!ptr && size){
-    fprintf(stderr,"Error virtual memory exhausted\n");
+    oom_error_call();
     exit(EXIT_FAILURE);
   } else {
     return ptr;
@@ -86,20 +91,16 @@ static inline void* xrecalloc(void *ptr,size_t old_size,size_t size){
   }
   return ptr;
 } 
-enum bind_or_connect {
-  _bind,
-  _connect,
-};
 enum alarmd_action{
-  _add,
-  _clear,
-  _delete,
-  _kill,
-  _list,
-  _modify,
-  _remove,
-  _snooze,
-  _stop,
+  add_action,
+  clear_action,
+  delete_action,
+  kill_action,
+  list_action,
+  modify_action,
+  remove_action,
+  snooze_action,
+  stop_action,
 };
 #define xfree free 
 #define ALARM_REPEATS(alarm) (alarm->repeat & 0x80)
@@ -127,8 +128,15 @@ enum alarmd_action{
 static const char *driver="-ao alsa,";
 //just took this from the libc manual
 static int make_alarm_socket
-(const char *filename,bind_or_connect mode){
-  int sock;
+(const char *filename,int mode){
+  int sock,n;
+  n=sd_listen_fds(0);//see if systemd will give us a socket
+  if(n > 1){
+    fprintf(stderr,"Too many file descriptors recieved by systemd");
+    exit(EXIT_FAILURE);
+  } else if(n==1){
+    return SD_LISTEN_FDS_START;
+  }//else {
   size_t size;
   struct sockaddr_un name;
   /* Create the socket. */
@@ -150,13 +158,13 @@ static int make_alarm_socket
   size = (offsetof (struct sockaddr_un, sun_path)
           + strlen (name.sun_path));
   switch(mode){
-    case _bind:
+    case 0:
       if (bind (sock, (struct sockaddr *) &name, size) < 0){
         perror ("bind");
         exit (EXIT_FAILURE);
       }  
       return sock;
-    case _connect:
+    case 1:
       if (connect (sock, (struct sockaddr *) &name, size) < 0){
         perror ("bind");
         exit (EXIT_FAILURE);
@@ -168,9 +176,4 @@ struct args {
   char **args;
   uint32_t num_args;
 };
-/*static struct args string_split(char *str,char *delim){
-  if(NULL==delim){
-    delim=" \t\n";
-  }
-  } */ 
 #endif
