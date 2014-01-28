@@ -1,0 +1,6 @@
+[Unit]
+Description=Alarm daemon, a software alarm clock
+
+[Service]
+ExecStart=$(PREFIX)/bin/alarmd
+

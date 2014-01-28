@@ -1,13 +1,30 @@
 /*code for the alarmd daemon and a simple priority queue*/
 #include "alarmd.h"
+#ifdef USE_SYSTEMD
+#define syslog(priority,format,args...)         \
+  fprintf(stderr,priority format,##args)
+#else
 #include <syslog.h>
+#endif
+#undef oom_error_call
+#define oom_error_call() syslog(LOG_ERR,"Error virtual memory exhausted")
+#define read_size_error(size,type)                              \
+  if(size>sizeof(type)){                                            \
+    syslog(LOG_ERR,"Read error, size of data read was greater than expected"); \
+  } else {                                                              \
+    syslog(LOG_ERR,"Read error, size of data read was less than expected"); \
+  }
 //callers are expected to hold a lock before calling functions
 //which act on the alarm queue
 static int stat_loc;
+void kill_command_thread(int signo);
+void kill_current_command();
+void alarmd_cleanup();
 struct sigaction sigusr_act ={.sa_handler=kill_current_command};
 struct sigaction command_sigterm_act ={.sa_handler=kill_current_command};
 struct sigaction alarm_loop_sigterm_act ={.sa_handler=kill_command_thread};
 struct sigaction term_cleanup={.sa_handler=alarmd_cleanup};
+static pthread_t command_thread;
 void kill_command_thread(int signo){
   pthread_kill(command_thread,SIGTERM);
   if(pthread_timedjoin_np(command_thread,NULL,&wait_time)){
@@ -21,10 +38,11 @@ void kill_current_command(){
     return;
   }
   kill(command_process,SIGTERM);
-  nanosleep(nano_wait_time);
+  nanosleep(&nano_wait_time,NULL);
   if(!waitpid(command_process,&stat_loc,WNOHANG)){
-    nanosleep(nano_wait_time2);
+    nanosleep(&nano_wait_time2,NULL);
     if(!waitpid(command_process,&stat_loc,WNOHANG)){
+      syslog(LOG_WARNING,"Child process %d not responding, sending SIGKILL",command_process);
       kill(command_process,SIGKILL);
     } else {
       return;
@@ -81,14 +99,15 @@ void* alarm_loop(void* data){
         //some how add the alarm back with a new date
       }
       pthread_mutex_unlock(&alarm_lock);
-      if(cur_alarm->async){
-        pthread_create(&command_thread,&detached_attr,run_alarm_command,NULL);
+      /*      if(cur_alarm->async){//to bo added
+        pthread_t detached_thread;
+        pthread_create(&detached_thread,&detached_attr,run_alarm_command,NULL);
         continue;
-      } else {
+        } else {*/
         pthread_create(&command_thread,NULL,run_alarm_command,(void*)cur_alarm);
         pthread_join(command_thread,NULL);
         continue;
-      }
+        //      }
     } else {
       pthread_mutex_unlock(&alarm_lock);
     }
@@ -97,18 +116,19 @@ void* alarm_loop(void* data){
 }
 void alarmd_cleanup(){
   close(alarm_socket);
-  unlink(SOCK_NAME DIR_NAME);  
+  unlink(SOCK_NAME DIR_NAME);
   rmdir(DIR_NAME);
   syslog(LOG_NOTICE,"alarmd exiting");
 }
 void main_loop(){
-  int sock=make_alarm_socket(SOCK_NAME,_bind);
-  pthread_t alarm_thread;
-  pthread_create(&alarm_thread,NULL,alarm_loop,NULL);
+  int sock=make_alarm_socket(SOCK_NAME,0);
   if(listen(sock,2)){
-    syslog(LOG_ERR,"Error calling listen, %m. Alarmd exiting");
+    char *err_str=strerror_r(errno,NULL,0);
+    syslog(LOG_WARNING,"Error in listen, error was %s",err_str);
     exit(EXIT_FAILURE);
   }
+  pthread_t alarm_thread;
+  pthread_create(&alarm_thread,NULL,alarm_loop,NULL);
   struct sockaddr_un addr;
   socklen_t len;
   int accept_sock;
@@ -116,8 +136,9 @@ void main_loop(){
   pid_t client_pid=0;
   ssize_t size;
   while(1){
-    if((accept_soc=accept(sock,(struct sockaddr)&addr,&len))<0){
-      syslog(LOG_ERR,"Error calling accept, %m. Alarmd exiting");
+    if((accept_sock=accept(sock,(struct sockaddr*)&addr,&len))<0){
+      char *err_str=strerror_r(errno,NULL,0);
+      syslog(LOG_WARNING,"Error in accept, error was %s",err_str);
       //not sure what to do here, for now just exit
       //but preferably the program should continue
       exit(EXIT_FAILURE);
@@ -131,14 +152,16 @@ void main_loop(){
     if((size=read(accept_sock,&action,sizeof(alarmd_action)))>0){
       if(size != sizeof(alarmd_action)){
         //not sure what to do here, not sure how I would get here anyway
+        read_size_error(size,alarmd_action);
         exit(EXIT_FAILURE);
       }
       switch(action){
-        case _add:{
+        case add_action:{
           my_alarm *new_alarm=xmalloc(sizeof(my_alarm));
           if((size=read(accept_sock,new_alarm,sizeof(my_alarm)))>0){
             if(size != sizeof(my_alarm)){
               //some kind of error recovery, but to be safe exit for now
+              read_size_error(size,my_alarm);
               exit(EXIT_FAILURE);
             }
             pthread_mutex_lock(&alarm_lock);
@@ -148,65 +171,58 @@ void main_loop(){
           }
           goto READ_FAILURE;
         }
-        case _delete:{
+        case delete_action:{
           uint32_t alarm_id;
           if((size=read(accept_sock,&alarm_id,sizeof(uint32_t)))>0){
             if(size != sizeof(uint32_t)){
               exit(EXIT_FAILURE);//add recovery code
             }
-            int i;
-            //abstract this into a function/macro
             pthread_mutex_lock(&alarm_lock);
-            for(i=0;i<queue_length;i++){
-              if(alarm_id==alarm_queue[i]->alarm_id){
-                alarm_heap_delete(i);
-                pthread_mutex_unlock(&alarm_lock);
-                goto LOOP_END;
-              }
-            }
+            int deleted=alarm_heap_try_delete(alarm_id);
             pthread_mutex_unlock(&alarm_lock);
-            //not sure what to do here,
-            //I should print some sort of error message, but I'm not sure how to best
-            //return to the front end(but I'll probably just use the socket)
+            if(deleted<0){
+              //I'm not sure how to best return to the front end(but I'll use an int for now)
+              syslog(LOG_WARNING,"Could not delete alarm %d, no such alarm\n",alarm_id);
+              write(accept_sock,&deleted,sizeof(int));
+            }
           } else {
             goto READ_FAILURE;
           }
         }
-        case _kill:
+        case kill_action:
           pthread_kill(alarm_thread,SIGTERM);
-          if(pthread_tryjoin_np(alarm_thread,NULL,wait_time)){
+          if(pthread_timedjoin_np(alarm_thread,NULL,&wait_time)){
             pthread_kill(alarm_thread,SIGKILL);
           }
           pthread_join(alarm_thread,NULL);
           exit(EXIT_SUCCESS);
-        case _clear:
+        case clear_action:
           pthread_mutex_lock(&alarm_lock);
           queue_length=0;
           //I suppose this is enough, there's no really reason to zero out
           //the memory for alarm_queue
-        case _stop:
+        case stop_action:
           pthread_kill(alarm_thread,SIGUSR1);
-        case _snooze:
-        case _modify:
-        case _list:{
+        case snooze_action:
+        case modify_action:
+        case list_action:{
           char *alarm_list_str;
           int len=alarm_heap_list(&alarm_list_str);
           if(len){
             write(sock,alarm_list_str,len);
           }
         }
-      } 
+      }
     } else if (size<=0){
     READ_FAILURE:
       perror("read failure");
       //again not sure how to recover from this so exit for now
       exit(EXIT_FAILURE);
     }
-  LOOP_END:
+  LOOP_END:;
   }
 }
-//this may not work statically
-int main(int argc,char *argv[]){
+int systemd_init_daemon(){
   if(atexit(alarmd_cleanup)){
     fprintf(stderr,"failed to setup cleanup function,exiting");
     exit(1);
@@ -214,19 +230,25 @@ int main(int argc,char *argv[]){
   if(sigaction(SIGTERM,&term_cleanup,NULL)){
     perror("sigaction failure");
   }
-  pid_t alarmd_pid=fork();
-  if(alarmd_pid<0){
-    exit(EXIT_FAILURE);
+  pthread_attr_setdetachstate(&detached_attr,PTHREAD_CREATE_DETACHED);
+}
+int sysv_init_daemon(){
+  if(atexit(alarmd_cleanup)){
+    fprintf(stderr,"failed to setup cleanup function,exiting");
+    exit(1);
   }
-  if(alarmd_pid>0){
-    exit(EXIT_SUCCESS);
+  if(sigaction(SIGTERM,&term_cleanup,NULL)){
+    perror("sigaction failure");
   }
-  openlog(NULL,0,LOG_CRON);
+  //  openlog(NULL,0,LOG_CRON);
+  //need to remove this for systemd
+  daemon(0,0);//library function to daemonize, fork exit parent,
+  //redirect stdin,out,err to /dev/null and chdir to /
   pthread_attr_setdetachstate(&detached_attr,PTHREAD_CREATE_DETACHED);
   //child process, aka daemon
   pid_t sid=setsid();
   umask(0);
-  PRINT_FMT("daemonn pid = %d",getpid());
+  PRINT_FMT("daemon pid = %d",getpid());
   //write permission only for the user who ran the daemon, this should be
   //fine since the same process will be doing the deletion
   if(mkdir(DIR_NAME,S_IRWXU|S_IXGRP|S_IRGRP|S_IROTH|S_IXOTH|S_ISVTX)){
@@ -237,8 +259,13 @@ int main(int argc,char *argv[]){
     perror("chdir failure");
     exit(EXIT_FAILURE);
   }
-  close(STDIN_FILENO);
-  close(STDOUT_FILENO);
-  close(STDERR_FILENO);
+  FILE* pid_file=fopen("alarmd.pid","w");
+  fprintf(pid_file,"%d\n",getpid());
+  fclose(pid_file);
+  openlog("alarmd",LOG_PID,LOG_CRON);
   main_loop();
+}
+#endif
+int main(int argc,char *argv[]){
+  init_daemon();
 }
