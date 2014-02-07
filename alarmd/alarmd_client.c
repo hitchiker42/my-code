@@ -21,6 +21,54 @@
  */
 static pid_t daemon_pid;
 static int sock;
+static sigset_t *set;
+static const int wait_time=20;
+static void sigusr_handler(int signum){
+  if(signum==SIGUSR1){
+    fprintf(stderr,"operation completed successfully, exiting\n");
+    exit(EXIT_SUCCESS);
+  } else if (signum==SIGUSR2){
+    fprintf(stderr,"operation failed, daemon will contitue to run, exiting\n");
+    exit(EXIT_FAILURE);
+  } else if (signum == SIGABRT){
+    fprintf(stderr,"operation failed, daemon exited, "
+           "view syslog for daemon error message\n");
+    exit(EXIT_FAILURE);
+  } else if (signum == SIGALRM){
+    fprintf(stderr,"Error, no responce from daemon in %d seconds, "
+            "exiting client, daemon should be inspected\n",wait_time);
+    exit(EXIT_FAILURE);
+  }
+}
+static struct sigaction sigusr_action={.sa_handler=sigusr_handler};
+static char *cat_args(int argc,char *argv[]){
+  int *arglens=alloca(argc);
+  int i,arglen=0;
+  for(i=0;i<argc;i++){
+    arglens[i]=strlen(argv[i]);
+    arglen+=arglens[i];
+  }
+  char *retval=xmalloc(sizeof(char)*arglen-(argc-1));
+  arglen=0;
+  for(i=0;i<argc;i++){
+    memcpy(retval+arglen,argv[i],arglens[i]);
+    arglen=arglens[i];
+  }
+  retval[arglen+1]='\0';
+  return retval;
+}
+//error checked wrapper around localtime_r;
+//returned value needs to be freed when done
+static struct tm *my_localtime(time_t cur_time);
+static time_t parse_time_re(char *time_str,time_t cur_time);
+static time_t parse_time(char *time_str,time_t cur_time);
+#define mk_case(name)                           \
+  if(!strcmp(argv[1],#name)){                   \
+    name##_alarm(argc-1,argv+1);                \
+  } else {                                      \
+    fprintf(stderr,"Invalid command %s did you mean %s\n",argv[1],#name);\
+    exit(EXIT_FAILURE);                                                 \
+  }
 static struct option global_opts[]=
   {{"help",no_argument,0,'h'},
    {"daemon",no_argument,0,'d'},
@@ -38,27 +86,35 @@ void __attribute__((noreturn)) help(){
   exit(EXIT_SUCCESS);
 }
 void __attribute__((noreturn)) add_alarm(int argc,char *argv[]){
-  /*
     time_t cur_time=time(NULL);
-    struct tm *today=today(cur_time);
+    struct tm *today=my_localtime(cur_time);
     char* command="/home/tucker/music/alarm.wav";
     uint32_t command_len,alarm_id;
     uint8_t alarm_today=0,repeat=0,music=1,music_loop=3;
-    //parse options
-    command_len=strlen(command);
-    //call parse_time with the remaining strings
-    //assign to a variable alarm_time;
-    if(!alarm_time){
-    fprintf(stderr,"error parsing time\n");
-    exit(EXIT_FAILURE);
-    } else {
     my_alarm *new_alarm=alloca(sizeof(my_alarm));
-    *new_alarm=(my_alarm){.alarm_time=alarm_time,
-    .command=command,.command_len=command_len,
-    .today=alarm_today,.repeat=repeat,.music=music,
-    .music_loop=music_loop,.alarm_id=alarm_d};
+    //default alarm parameteres
+    //not sure if the command parameter will work now that
+    //it's an array
+    *new_alarm=(my_alarm){.alarm_time=0;
+                          .command=command,.command_len=28,
+                          .today=alarm_today,.repeat=repeat,.music=music,
+                          .music_loop=music_loop,.alarm_id=alarm_d};
+    
+    //parse options
+    //assign to a variable alarm_time;
+    time_t alarm_time=parse_time(argv[optind],cur_time);
+    if(!alarm_time){
+      fprintf(stderr,"error parsing time\n");
+      exit(EXIT_FAILURE);
+    } else {
+      new_alarm->alarm_time=alarm_time;
     //write _add to socket then write new_alarm
-    */
+      alarmd_action action=_add;
+      write(sock,&action,sizeof(alarmd_action));
+      write(sock,new_alarm,sizeof(my_alarm));
+      alarm(wait_time);
+      pause();
+    }
   exit(EXIT_SUCCESS);
 }
 void __attribute__((noreturn)) list_alarm(int argc,char *argv[]){
@@ -108,6 +164,12 @@ void __attribute__((noreturn)) clear_alarm(int argc,char *argv[]){
     exit(EXIT_FAILURE);                                                 \
   }
 int main(int argc,char *argv[]){
+  set=xmalloc(sizeof(sigset_t));
+  sigemptyset(&set);
+  sigaction(SIGUSR1,&sigusr_action,NULL);
+  sigaction(SIGUSR2,&sigusr_action,NULL);
+  sigaction(SIGABRT,&sigusr_action,NULL);
+  sigaction(SIGALRM,&sigusr_action,NULL);
   int c;
   if(argv[1][0] == '-'){
   }
@@ -211,8 +273,8 @@ static uint8_t parse_day_abbr(char *day_str){
 #define MIN_TO_SEC(minutes) (minutes * 60)
 #define HOUR_TO_SEC(hours) (hours * 3600)
 //I probably could just use the normal localtime function...
-static struct tm *today(time_t cur_time){
-  struct tm *today=xmalloc(sizeof(struct tm));
+static struct tm *my_localtime(time_t cur_time){
+  struct tm *today=xmalloc(sizeof struct tm);
   struct tm *retval=localtime_r(&cur_time,today);
   if(!retval){
     free(today);
