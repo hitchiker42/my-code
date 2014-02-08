@@ -4,7 +4,32 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>q
 #define unsigned unsigned int
+//I'm used to using gc (I use it for my lisp compilier) which
+//guarantees memory allocated with GC_malloc is zeroed, so
+//make the default behavior be to clear memory
+#define xmalloc_atomic(sz)                      \
+  ({void *temp=malloc(sz);                      \
+    if(!temp && sz){                            \
+    raise(SIGUSR1);                             \
+    }                                           \
+    temp;})
+#define xmalloc(sz)                             \
+  ({void *temp=calloc(sz,1);                    \
+    if(!temp && sz){                            \
+    raise(SIGUSR1);                             \
+    }                                           \
+    temp;})
+#define MIN(a,b)                                \
+  ({ __typeof__ (a) _a = a;                     \
+  __typeof__(b) _b = b;                         \
+  (_a<_b)?_a:_b;})
+#define MAX(a,b)                                \
+  ({ __typeof__ (a) _a = a;                     \
+  __typeof__(b) _b = b;                         \
+  (_a>_b)?_a:_b;})
 typedef uint32_t vm_word;
 typedef float vm_float;
 typedef struct vm *vm_ptr;
@@ -14,21 +39,18 @@ static const vm_word vm_mem_limit=1048576;//1<<20
 static vm_word vm_mem[VM_MEM_LIMIT];//shared by all processors
 static vm_word vm_mem_max;//=vm_mem+vm_mem_limit;//needs to be set in main
 static vm_word num_processors;
+static vm_word cur_proc_id=0;
 //use the processor to do the atomic stuff
-void cmpxchg_atomic(vm_word reg1,vm_word reg2,uint64_t addr){
-  //%rdi == reg1
-  //%rsi == reg2
-  //%rdx == addr
-  asm volatile ("movl %edi,%eax\n"//cmpxchg uses rax implicitly
-                "lock cmpxchgl %rsi,%(rdx)");
-  return
-                /*                "setz %al"//set al to zero flag
-                "ret");//return, this may not work
-              //if %rax==%(rdx) ZF=1 && %(rdx)=%rsi
-              //othewize %rax=%(rdx) ZF=0*/
-};
-  
-//each processor is described by a struct vm but
+#define cmpxchg_atomic(reg1,reg2,addr)                          \
+  ({uint8_t zf;                                                 \
+  __asm__ volatile ("movl %[old],%%rax\n"                       \
+                    "lock cmpxchg %[new],%[current]\n"          \
+                    "setz %[zf]\n"                              \
+                    : [current] "=m" (*addr), [zf] "=g" (zf)    \
+                    : [old] "g" (reg1), [new] "g" (reg2)        \
+                    : "%rax");                                  \
+  zf;})
+//each processor is described by a struct vm but memory is global
 struct vm {
   vm_word r0;
   vm_word r1;

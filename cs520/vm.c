@@ -170,4 +170,11 @@ void vm_loop(vm_ptr vm){
   }
  HALT:
   return;
+  }
+}
+vm_ptr vm_init(){
+  vm_ptr processor=xmalloc(sizeof(struct vm));
+  //should probably be an atomic add
+  processor->processor_id=cur_proc_id++;
+  return processor;
 }
