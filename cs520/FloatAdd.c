@@ -5,7 +5,7 @@
 //also ieee754.h is glibc specific so actually including
 //the code solves portably problems
 //#include <ieee754.h>
-/* Copyright (C) 1992-2013 Free Software Foundation, Inc.
+/* Copyright (C) 1992-2014 Free Software Foundation, Inc.
    This file is part of the GNU C Library.
 
    The GNU C Library is free software; you can redistribute it and/or
@@ -21,8 +21,78 @@
    You should have received a copy of the GNU Lesser General Public
    License along with the GNU C Library; if not, see
    <http://www.gnu.org/licenses/>.  */
+
 #ifndef _IEEE754_H
+
 #define _IEEE754_H 1
+#include <features.h>
+#include <stdint.h>
+#include <endian.h>
+
+__BEGIN_DECLS
+
+union ieee754_float
+  {
+    float f;
+    uint32_t bits32;
+    /* This is the IEEE 754 single-precision format.  */
+    struct
+      {
+#if	__BYTE_ORDER == __BIG_ENDIAN
+	unsigned int negative:1;
+	unsigned int exponent:8;
+	unsigned int mantissa:23;
+#endif				/* Big endian.  */
+#if	__BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int mantissa:23;
+	unsigned int exponent:8;
+	unsigned int negative:1;
+#endif				/* Little endian.  */
+      } ieee;
+
+    /* This format makes it easier to see if a NaN is a signalling NaN.  */
+    struct
+      {
+#if	__BYTE_ORDER == __BIG_ENDIAN
+	unsigned int negative:1;
+	unsigned int exponent:8;
+	unsigned int quiet_nan:1;
+	unsigned int mantissa:22;
+#endif				/* Big endian.  */
+#if	__BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int mantissa:22;
+	unsigned int quiet_nan:1;
+	unsigned int exponent:8;
+	unsigned int negative:1;
+#endif				/* Little endian.  */
+      } ieee_nan;
+  };
+
+#define IEEE754_FLOAT_BIAS	0x7f /* Added to exponent.  */
+
+#endif
+typedef union ieee754_float ieee32_t;
+static const ieee32_t pos_inf={.ieee={.negative=0,.exponent=0xff,.mantissa=0x0}};
+static const ieee32_t neg_inf={.ieee={.negative=1,.exponent=0xff,.mantissa=0x0}};
+static const ieee32_t SNan={.ieee_nan={.negative=1,.exponent=0xff,.quiet_nan=0,.mantissa=0xffffff}};
+static const ieee32_t QNan={.bits32=0xffffffff};
+static const ieee32_t pos_zero={.bits32=0x0};
+static const ieee32_t neg_zero={.bits32=0x80000000};
+uint32_t returnNan(uint32_t a,uint32_t b){
+  if(a == SNan || b== SNaN){
+    return SNaN;
+  } else {
+    return QNaN;
+  }
+}
+uint32_t addFloat32Sigs_bitfield(uint32_t a_bits,uint32_t b_bits){
+  ieee32_t a={.bits32=a_bits};
+  ieee32_t b={.bits32=b_bits};
+  int16_t expDiff=a.ieee.exponent - b.ieee.exponent;
+  if(expDiff > 0){
+    if(a.ieee.exponent==0xFF){
+      if(aSig){
+}
 //borrowed from mpfr.h
 typedef enum {
   flt_RNDN=0,  /* round to nearest, with ties to even */
@@ -37,7 +107,6 @@ enum {
   float_tininess_after_rounding  = 0,
   float_tininess_before_rounding = 1
 };
-#endif /*_IEEE754_H*/
 //technically you shouldn't name your types <name>_t because those names
 //are reserved for future use, but at the same time, it makes things
 //much clearer
@@ -54,9 +123,10 @@ static const real32_t plus_zero=0x00;
 static const real32_t plus_inf=0x7f800000;
 static const real32_t minus_inf=0xff800000;
 #define is_zero(flt) ((flt & 0x7fffffff) == 0)
-#define is_inf(flt) ((flt & 
+#define is_inf(flt) ((flt & 0x07f))
 //NANs have a bunch of representations and this is  only repreesent one
 static const real32_t QNaN = 0xffffffff;
+static const real32_t SNaN = 0xffbfffff;
 /*static const real32_t SNaN = {.ieee_nan={.sign=1,.exponent=0xff,
   .quiet_nan=0,.mantissa=MAX_MANTISSA}};*/
 static inline void shift32RightJamming( uint32_t a, int16_t count, uint32_t *zPtr ){
@@ -85,6 +155,13 @@ static inline void shift32RightJamming( uint32_t a, int16_t count, uint32_t *zPt
   fprintf(stderr,"the mantissa of the float %#0x is %d",flt,extractFloat32Frac(flt))
 #define PRINT_FLOAT_EXPONENT(flt)                       \
   fprintf(stderr,"the exponent of the float %#0x is %d",flt,extractFloat32Exp(flt))
+#define PRINT_FLOAT_PARTS(flt)                  \
+  (PRINT_FLOAT_SIGN(flt),PRINT_FLT_MANTISSA(flt),PRINT_FLT_EXPONENT(flt));
+#else
+#define PRINT_FLOAT_SIGN(flt)
+#define PRINT_FLOAT_MANTISSA(flt)
+#define PRINT_FLOAT_EXPONENT(flt)
+#define PRINT_FLOAT_PARTS(flt)
 #endif
 static inline uint32_t extractFloat32Frac(uint32_t a){
   return a & 0x007FFFFF;
@@ -101,6 +178,13 @@ static inline uint32_t packFloat32(int zSign, int16_t zExp, uint32_t zSig){
 }
 uint32_t round_nearest_even(int zSign, int16_t zExp, uint32_t zSig );
 uint32_t normalize_and_round(int zSign, int16_t zExp, uint32_t zSig );
+uint32_t propagateFloat32NaN(uint32 a,uint32 b){
+  if(a == SNaN || b == SNaN){
+    return SNaN;
+  } else {
+    return QNaN;
+  }
+}
 static uint32_t  addFloat32Sigs( real32_t a, real32_t b, int zSign ) {
   int16_t aExp, bExp, zExp;
   uint32_t aSig, bSig, zSig;
@@ -113,9 +197,10 @@ static uint32_t  addFloat32Sigs( real32_t a, real32_t b, int zSign ) {
   expDiff = aExp - bExp;
   aSig <<= 6;
   bSig <<= 6;
-  if ( 0 < expDiff ) {//aExp>bExp
-    if ( aExp == 0xFF ) {//a is nan
-      //if (aSig) {return propagateFloat32NaN(a, b);}
+  if ( 0 < expDiff ) {//aExp>bExp 
+    //if expDiff <0 aExp is strictly greater that bExp
+    if ( aExp == 0xFF ) {//a is nan or inf
+      if(aSig) {return propagateFloat32NaN(a, b);}
       return a;
     }
     if ( bExp == 0 ) {//denormal
@@ -128,12 +213,10 @@ static uint32_t  addFloat32Sigs( real32_t a, real32_t b, int zSign ) {
     zExp = aExp;
   }
   else if ( expDiff < 0 ) {
-    if ( bExp == 0xFF ) {//b is inf
-      if(zSign){
-        return minus_inf;
-      } else {
-        return plus_inf;
-      }
+    //if expDiff <0 bExp is strictly greater that aExp
+    if ( bExp == 0xFF ) {//b is inf(or nan)
+      if(bSig){return propagateFloat32NaN(a, b);}
+      return b;
     }
     if ( aExp == 0 ) {
       ++expDiff;//magic?
@@ -146,7 +229,7 @@ static uint32_t  addFloat32Sigs( real32_t a, real32_t b, int zSign ) {
   }
   else {
     if ( aExp == 0xFF ) {
-      //if (aSig | bSig) {return propagateFloat32NaN( a, b );}
+      if (aSig | bSig) {return propagateFloat32NaN( a, b );}
       return a;
     }
     if (aExp == 0) {
@@ -276,13 +359,17 @@ int32_t FloatAdd (int32_t a, int32_t b){
   int aSign, bSign;
   aSign=extractFloat32Sign(a);
   bSign=extractFloat32Sign(b);
+  uint32_t result;
   if ( aSign == bSign ) {
-    return addFloat32Sigs( a, b, aSign );
+    result=addFloat32Sigs( a, b, aSign );
+    PRINT_FLOAT_PARTS(result);
+    return result;
   }
   else {
-    return subFloat32Sigs( a, b, aSign );
+    result=subFloat32Sigs( a, b, aSign );
+    PRINT_FLOAT_PARTS(result);
+    return result;
   }
-
 }
 #if 0
 //template code from the softfloat package, used a a guide on how
