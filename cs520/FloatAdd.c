@@ -1,98 +1,5 @@
-#include <stdint.h>
-#include <strings.h>//for ffs
+#include <stdint.h>//because I like having definite lengths to types
 #define NDEBUG
-//below is code straight out of ieee754.h, but modified
-//also ieee754.h is glibc specific so actually including
-//the code solves portably problems
-//#include <ieee754.h>
-/* Copyright (C) 1992-2014 Free Software Foundation, Inc.
-   This file is part of the GNU C Library.
-
-   The GNU C Library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
-   License as published by the Free Software Foundation; either
-   version 2.1 of the License, or (at your option) any later version.
-
-   The GNU C Library is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-   Lesser General Public License for more details.
-
-   You should have received a copy of the GNU Lesser General Public
-   License along with the GNU C Library; if not, see
-   <http://www.gnu.org/licenses/>.  */
-
-#ifndef _IEEE754_H
-
-#define _IEEE754_H 1
-#include <features.h>
-#include <stdint.h>
-#include <endian.h>
-
-__BEGIN_DECLS
-
-union ieee754_float
-  {
-    float f;
-    uint32_t bits32;
-    /* This is the IEEE 754 single-precision format.  */
-    struct
-      {
-#if	__BYTE_ORDER == __BIG_ENDIAN
-	unsigned int negative:1;
-	unsigned int exponent:8;
-	unsigned int mantissa:23;
-#endif				/* Big endian.  */
-#if	__BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int mantissa:23;
-	unsigned int exponent:8;
-	unsigned int negative:1;
-#endif				/* Little endian.  */
-      } ieee;
-
-    /* This format makes it easier to see if a NaN is a signalling NaN.  */
-    struct
-      {
-#if	__BYTE_ORDER == __BIG_ENDIAN
-	unsigned int negative:1;
-	unsigned int exponent:8;
-	unsigned int quiet_nan:1;
-	unsigned int mantissa:22;
-#endif				/* Big endian.  */
-#if	__BYTE_ORDER == __LITTLE_ENDIAN
-	unsigned int mantissa:22;
-	unsigned int quiet_nan:1;
-	unsigned int exponent:8;
-	unsigned int negative:1;
-#endif				/* Little endian.  */
-      } ieee_nan;
-  };
-
-#define IEEE754_FLOAT_BIAS	0x7f /* Added to exponent.  */
-
-#endif
-typedef union ieee754_float ieee32_t;
-static const ieee32_t pos_inf={.ieee={.negative=0,.exponent=0xff,.mantissa=0x0}};
-static const ieee32_t neg_inf={.ieee={.negative=1,.exponent=0xff,.mantissa=0x0}};
-static const ieee32_t SNan={.ieee_nan={.negative=1,.exponent=0xff,.quiet_nan=0,.mantissa=0xffffff}};
-static const ieee32_t QNan={.bits32=0xffffffff};
-static const ieee32_t pos_zero={.bits32=0x0};
-static const ieee32_t neg_zero={.bits32=0x80000000};
-uint32_t returnNan(uint32_t a,uint32_t b){
-  if(a == SNan || b== SNaN){
-    return SNaN;
-  } else {
-    return QNaN;
-  }
-}
-uint32_t addFloat32Sigs_bitfield(uint32_t a_bits,uint32_t b_bits){
-  ieee32_t a={.bits32=a_bits};
-  ieee32_t b={.bits32=b_bits};
-  int16_t expDiff=a.ieee.exponent - b.ieee.exponent;
-  if(expDiff > 0){
-    if(a.ieee.exponent==0xFF){
-      if(aSig){
-}
 //borrowed from mpfr.h
 typedef enum {
   flt_RNDN=0,  /* round to nearest, with ties to even */
@@ -116,36 +23,44 @@ flt_rnd_t float_rounding_mode = flt_RNDN;
 uint8_t float_exception_flags = 0;
 uint8_t float_detect_tininess = float_tininess_after_rounding;
 typedef uint32_t real32_t;
-//exponents are normally interpreted with an bias of -127 (i.e 0x01 == -126)
-//but 0x00 and 0xff are special and are used to represent NANs, 0s and infinities
-static const real32_t minus_zero=0x80000000;
-static const real32_t plus_zero=0x00;
-static const real32_t plus_inf=0x7f800000;
-static const real32_t minus_inf=0xff800000;
+static const real32_t minus_zero=0x80000000;//just sign bit set
+static const real32_t plus_zero=0x00;//nothing
+static const real32_t plus_inf=0x7f800000;//exp bits set
+static const real32_t minus_inf=0xff800000;//exp bits +sign bit set
 #define is_zero(flt) ((flt & 0x7fffffff) == 0)
-#define is_inf(flt) ((flt & 0x07f))
-//NANs have a bunch of representations and this is  only repreesent one
-static const real32_t QNaN = 0xffffffff;
-static const real32_t SNaN = 0xffbfffff;
+#define is_inf(flt) ((flt & 0x7f) && !(flt & 0x007fffff))
+#define is_nan(flt) ((flt & 0x7f) && (flt & 0x007fffff))
+//assumed that you already know flt is a nan
+#define is_snan(flt)(!(flt & 0x00400000)) 
+//NANs have a bunch of representations, so these are just used as literal
+//NANs, not for comparsions
+static const real32_t QNaN = 0xffffffff;//all bits set
+static const real32_t SNaN = 0xffbfffff;//all but first mantissa bit
 /*static const real32_t SNaN = {.ieee_nan={.sign=1,.exponent=0xff,
   .quiet_nan=0,.mantissa=MAX_MANTISSA}};*/
-static inline void shift32RightJamming( uint32_t a, int16_t count, uint32_t *zPtr ){
+
+//straight out of SoftFloat
+ /*----------------------------------------------------------------------------
+| Shifts `a' right by the number of bits given in `count'.  If any nonzero
+| bits are shifted off, they are ``jammed'' into the least significant bit of
+| the result by setting the least significant bit to 1.  The value of `count'
+| can be arbitrarily large; in particular, if `count' is greater than 32, the
+| result will be either 0 or 1, depending on whether `a' is zero or nonzero.
+| The result is stored in the location pointed to by `zPtr'.
+*----------------------------------------------------------------------------*/
+
+static inline void shift32RightJamming(uint32_t a, int16_t count,
+                                       uint32_t *zPtr ){
   uint32_t z;
   if ( count == 0 ) {
     z = a;
-  }
-  else if ( count < 32 ) {
+  } else if ( count < 32 ) {
     z = ( a>>count ) | ( ( a<<( ( - count ) & 31 ) ) != 0 );
-  }
-  else {
+  } else {
     z = ( a != 0 );
   }
   *zPtr = z;
 }
-/*static inline uint32_t packFloat32(int32_t sign,int32_t exp,uint32_t mantissa){
-  real32_t a={.ieee={.sign=sign,.exponent=exp,.mantissa=mantissa}};
-  return a.bits32;
-  }*/
 //debugging code??? (not really for debugging, but because you asked to but it in)
 
 #if (defined DEBUG) && !(defined NDEBUG)
@@ -173,13 +88,15 @@ static inline int extractFloat32Sign(uint32_t a){
   return a>>31;
 }
 
+//since Sig is just added Exp should be one less than desired
+//(because of the hidden bit in Sig, which should be 1)
 static inline uint32_t packFloat32(int zSign, int16_t zExp, uint32_t zSig){
     return ( ( (uint32_t) zSign )<<31 ) + ( ( (uint32_t) zExp )<<23 ) + zSig;
 }
 uint32_t round_nearest_even(int zSign, int16_t zExp, uint32_t zSig );
 uint32_t normalize_and_round(int zSign, int16_t zExp, uint32_t zSig );
-uint32_t propagateFloat32NaN(uint32 a,uint32 b){
-  if(a == SNaN || b == SNaN){
+uint32_t propagateFloat32NaN(uint32_t a,uint32_t b){
+  if(is_snan(a) || is_snan(b)){
     return SNaN;
   } else {
     return QNaN;
@@ -195,8 +112,11 @@ static uint32_t  addFloat32Sigs( real32_t a, real32_t b, int zSign ) {
   bSig = extractFloat32Frac(b);
   bExp = extractFloat32Exp(b);
   expDiff = aExp - bExp;
+
   aSig <<= 6;
   bSig <<= 6;
+  //align radix points, if aExp<bExp shift the mantissa
+  //of b right by the difference,  otherwise do the oppisite
   if ( 0 < expDiff ) {//aExp>bExp 
     //if expDiff <0 aExp is strictly greater that bExp
     if ( aExp == 0xFF ) {//a is nan or inf
@@ -204,30 +124,28 @@ static uint32_t  addFloat32Sigs( real32_t a, real32_t b, int zSign ) {
       return a;
     }
     if ( bExp == 0 ) {//denormal
-      --expDiff;//magic?
+      --expDiff;//hidden digit
+    } else {//normalize hidden bit?
+      bSig |= 0x20000000;//magic? (set the 3rd most significant digit)
     }
-    else {
-      bSig |= 0x20000000;//magic?
-    }
+    //shift bSig right by expDiff bits, if any nonzero bits are shifted
+    //out set the least significant bit of bSig
     shift32RightJamming( bSig, expDiff, &bSig );//magic?
     zExp = aExp;
-  }
-  else if ( expDiff < 0 ) {
-    //if expDiff <0 bExp is strictly greater that aExp
+  } else if ( expDiff < 0 ) {//same as last block but bExp>aExp
     if ( bExp == 0xFF ) {//b is inf(or nan)
       if(bSig){return propagateFloat32NaN(a, b);}
       return b;
     }
     if ( aExp == 0 ) {
-      ++expDiff;//magic?
-    }
-    else {
+      ++expDiff;//a is denormal, compensate for that
+    } else {
       aSig |= 0x20000000;//magic?
     }
     shift32RightJamming( aSig, - expDiff, &aSig );//magic?
     zExp = bExp;
   }
-  else {
+  else {//aExp==bExp
     if ( aExp == 0xFF ) {
       if (aSig | bSig) {return propagateFloat32NaN( a, b );}
       return a;
@@ -235,11 +153,12 @@ static uint32_t  addFloat32Sigs( real32_t a, real32_t b, int zSign ) {
     if (aExp == 0) {
       return packFloat32( zSign, 0, ( aSig + bSig )>>6 );
     }
+    
     zSig = 0x40000000 + aSig + bSig;//magic?
     zExp = aExp;
     goto roundAndPack;
   }
-  //more magic
+  //more magic (add and normalize significand)
   aSig |= 0x20000000;
   zSig = ( aSig + bSig )<<1;
   --zExp;
@@ -265,9 +184,9 @@ static uint32_t subFloat32Sigs( real32_t a, real32_t b, int zSign ){
   bSig <<= 7;
   if ( 0 < expDiff ) {goto aExpBigger;}
   if ( expDiff < 0 ) {goto bExpBigger;}
-  if ( aExp == 0xFF ) {//nan
+  if ( aExp == 0xFF ) {//nan/inf
     //signaling vs quiet nans
-    //    if ( aSig | bSig ) return propagateFloat32NaN( a, b );
+    if ( aSig | bSig ) return propagateFloat32NaN( a, b );
     //    float_raise( float_flag_invalid );
     return a;
   }
@@ -287,8 +206,7 @@ static uint32_t subFloat32Sigs( real32_t a, real32_t b, int zSign ){
   }
   if ( aExp == 0 ) {
     ++expDiff;
-  }
-  else {
+  } else {
     aSig |= 0x40000000;
   }
   shift32RightJamming( aSig, - expDiff, &aSig );
@@ -305,8 +223,7 @@ static uint32_t subFloat32Sigs( real32_t a, real32_t b, int zSign ){
   }
   if ( bExp == 0 ) {
     --expDiff;
-  }
-  else {
+  } else {
     bSig |= 0x40000000;
   }
   shift32RightJamming( bSig, expDiff, &bSig );
@@ -321,7 +238,7 @@ static uint32_t subFloat32Sigs( real32_t a, real32_t b, int zSign ){
 
 uint32_t normalize_and_round(int zSign, int16_t zExp, uint32_t zSig ){
   int8_t shiftCount;
-  shiftCount = ffs(zSig) - 1;//I assume countLeadingZeros32 is the same as ffs
+  shiftCount = __builtin_clz(zSig) - 1;//I assume countLeadingZeros32 is the same as ffs
 
   return round_nearest_even(zSign,zExp-shiftCount,zSig<<shiftCount);
 }
@@ -364,8 +281,7 @@ int32_t FloatAdd (int32_t a, int32_t b){
     result=addFloat32Sigs( a, b, aSign );
     PRINT_FLOAT_PARTS(result);
     return result;
-  }
-  else {
+  } else {
     result=subFloat32Sigs( a, b, aSign );
     PRINT_FLOAT_PARTS(result);
     return result;
@@ -639,4 +555,114 @@ static float32 roundAndPackFloat32( flag zSign, int16 zExp, bits32 zSig )
   if ( zSig == 0 ) zExp = 0;
   return packFloat32( zSign, zExp, zSig );
 }
+#endif
+#if 0
+//An attempt to write things using bitfields, before realizing
+//that that's kinda dumb since things need to be shifted out
+//of the mantissa and into the significant, and using
+//bitfields makes that impossible
+//below is code straight out of ieee754.h, but modified
+//also ieee754.h is glibc specific so actually including
+//the code solves portably problems
+//#include <ieee754.h>
+/* Copyright (C) 1992-2014 Free Software Foundation, Inc.
+   This file is part of the GNU C Library.
+
+   The GNU C Library is free software; you can redistribute it and/or
+   modify it under the terms of the GNU Lesser General Public
+   License as published by the Free Software Foundation; either
+   version 2.1 of the License, or (at your option) any later version.
+
+   The GNU C Library is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more details.
+
+   You should have received a copy of the GNU Lesser General Public
+   License along with the GNU C Library; if not, see
+   <http://www.gnu.org/licenses/>.  */
+
+#ifndef _IEEE754_H
+
+#define _IEEE754_H 1
+#include <features.h>
+#include <stdint.h>
+#include <endian.h>
+
+__BEGIN_DECLS
+
+union ieee754_float
+  {
+    float f;
+    uint32_t bits32;
+    /* This is the IEEE 754 single-precision format.  */
+    struct
+      {
+#if	__BYTE_ORDER == __BIG_ENDIAN
+	unsigned int negative:1;
+	unsigned int exponent:8;
+	unsigned int mantissa:23;
+#endif				/* Big endian.  */
+#if	__BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int mantissa:23;
+	unsigned int exponent:8;
+	unsigned int negative:1;
+#endif				/* Little endian.  */
+      } ieee;
+
+    /* This format makes it easier to see if a NaN is a signalling NaN.  */
+    struct
+      {
+#if	__BYTE_ORDER == __BIG_ENDIAN
+	unsigned int negative:1;
+	unsigned int exponent:8;
+	unsigned int quiet_nan:1;
+	unsigned int mantissa:22;
+#endif				/* Big endian.  */
+#if	__BYTE_ORDER == __LITTLE_ENDIAN
+	unsigned int mantissa:22;
+	unsigned int quiet_nan:1;
+	unsigned int exponent:8;
+	unsigned int negative:1;
+#endif				/* Little endian.  */
+      } ieee_nan;
+  };
+
+#define IEEE754_FLOAT_BIAS	0x7f /* Added to exponent.  */
+
+#endif
+typedef union ieee754_float ieee32_t;
+static const ieee32_t pos_inf={.ieee={.negative=0,.exponent=0xff,.mantissa=0x0}};
+static const ieee32_t neg_inf={.ieee={.negative=1,.exponent=0xff,.mantissa=0x0}};
+static const ieee32_t SNan={.ieee_nan={.negative=1,.exponent=0xff,.quiet_nan=0,.mantissa=0xffffff}};
+static const ieee32_t QNan={.bits32=0xffffffff};
+static const ieee32_t pos_zero={.bits32=0x0};
+static const ieee32_t neg_zero={.bits32=0x80000000};
+uint32_t returnNaN(ieee32_t a,ieee32_t b){
+  if(a.ieee_nan.quiet_nan && b.ieee_nan.quiet_nan){
+    return QNaN.bits32;
+  } else {
+    return SNaN.bits32;
+  }
+}
+/*
+void shift_mantissa(ieee32_t *a,int shift_cnt){
+  if(!shift_cnt){
+    return;
+  } else if 
+uint32_t addFloat32Sigs_bitfield(uint32_t a_bits,uint32_t b_bits){
+  ieee32_t a={.bits32=a_bits};
+  ieee32_t b={.bits32=b_bits};
+  int16_t expDiff=a.ieee.exponent - b.ieee.exponent;
+  if(expDiff > 0){
+    if(a.ieee.exponent==0xFF){
+      if(a.ieee.mantissa){return returnNaN(a,b);}//a is nan
+      return a;//a is inf
+    }
+    if(!b.ieee.exponent){
+      --expDIff;
+    } else {      
+    }
+  }
+         }*/
 #endif
