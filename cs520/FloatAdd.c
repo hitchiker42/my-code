@@ -62,7 +62,7 @@ static inline void shift32RightJamming(uint32_t a, int16_t count,
   *zPtr = z;
 }
 //debugging code??? (not really for debugging, but because you asked to but it in)
-
+/*
 #if (defined DEBUG) && !(defined NDEBUG)
 #define PRINT_FLOAT_SIGN(flt)                           \
   fprintf(stderr,"the sign bit of the float %#0x is %d",flt,extractFloat32Sign(flt))
@@ -78,6 +78,7 @@ static inline void shift32RightJamming(uint32_t a, int16_t count,
 #define PRINT_FLOAT_EXPONENT(flt)
 #define PRINT_FLOAT_PARTS(flt)
 #endif
+*/
 static inline uint32_t extractFloat32Frac(uint32_t a){
   return a & 0x007FFFFF;
 }
@@ -279,11 +280,9 @@ int32_t FloatAdd (int32_t a, int32_t b){
   uint32_t result;
   if ( aSign == bSign ) {
     result=addFloat32Sigs( a, b, aSign );
-    PRINT_FLOAT_PARTS(result);
     return result;
   } else {
     result=subFloat32Sigs( a, b, aSign );
-    PRINT_FLOAT_PARTS(result);
     return result;
   }
 }

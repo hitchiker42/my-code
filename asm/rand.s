@@ -1,99 +1,96 @@
 	.file	"rand.c"
-	.section	.rodata
+	.section	.rodata.str1.8,"aMS",@progbits,1
 	.align 8
 .LC0:
 	.string	"Guess a random number between one and 25"
+	.section	.rodata.str1.1,"aMS",@progbits,1
 .LC1:
 	.string	"%d"
+	.section	.rodata.str1.8
 	.align 8
 .LC2:
 	.string	"Congradulations you guessed right"
 	.align 8
 .LC3:
 	.string	"Sorry wrong answer, enter a non zero number to  guess again?"
+	.section	.rodata.str1.1
 .LC4:
 	.string	"Too many tries"
 	.text
 	.globl	main
 	.type	main, @function
 main:
-.LFB0:
+.LFB21:
 	.cfi_startproc
-	pushq	%rbp
+	pushq	%r12
 	.cfi_def_cfa_offset 16
-	.cfi_offset 6, -16
-	movq	%rsp, %rbp
-	.cfi_def_cfa_register 6
+	.cfi_offset 12, -16
+	pushq	%rbp
+	.cfi_def_cfa_offset 24
+	.cfi_offset 6, -24
+	pushq	%rbx
+	.cfi_def_cfa_offset 32
+	.cfi_offset 3, -32
 	subq	$16, %rsp
-	call	rand
-	movl	%eax, %ecx
+	.cfi_def_cfa_offset 48
+	call	rand@PLT
+	movl	%eax, %ebp
 	movl	$1374389535, %edx
-	movl	%ecx, %eax
 	imull	%edx
 	sarl	$3, %edx
-	movl	%ecx, %eax
+	movl	%ebp, %eax
 	sarl	$31, %eax
 	subl	%eax, %edx
-	movl	%edx, %eax
-	sall	$2, %eax
-	addl	%edx, %eax
-	leal	0(,%rax,4), %edx
-	addl	%edx, %eax
-	movl	%ecx, %edx
-	subl	%eax, %edx
-	leal	1(%rdx), %eax
-	movl	%eax, -8(%rbp)
-	movl	$0, -12(%rbp)
-	movl	$0, -4(%rbp)
-	movl	$.LC0, %edi
-	call	puts
-	leaq	-12(%rbp), %rax
-	movq	%rax, %rsi
-	movl	$.LC1, %edi
+	leal	(%rdx,%rdx,4), %eax
+	leal	(%rax,%rax,4), %eax
+	subl	%eax, %ebp
+	addl	$1, %ebp
+	movl	$0, 12(%rsp)
+	leaq	.LC0(%rip), %rdi
+	call	puts@PLT
+	leaq	12(%rsp), %rsi
+	leaq	.LC1(%rip), %rdi
 	movl	$0, %eax
-	call	__isoc99_scanf
-	jmp	.L7
-.L9:
-	nop
-.L7:
-	movl	-12(%rbp), %eax
-	cmpl	-8(%rbp), %eax
-	jne	.L2
-	movl	$.LC2, %edi
-	call	puts
-	movl	$0, %eax
-	jmp	.L8
-.L2:
-	movl	$.LC3, %edi
-	call	puts
-	addl	$1, -4(%rbp)
-	cmpl	$10, -4(%rbp)
-	jle	.L4
-	movl	$.LC4, %edi
-	movl	$0, %eax
-	call	printf
-	movl	$0, %eax
-	jmp	.L8
-.L4:
-	leaq	-12(%rbp), %rax
-	movq	%rax, %rsi
-	movl	$.LC1, %edi
-	movl	$0, %eax
-	call	__isoc99_scanf
-	movl	-12(%rbp), %eax
-	testl	%eax, %eax
-	jle	.L5
-	movl	-12(%rbp), %eax
-	cmpl	$25, %eax
-	jle	.L9
+	call	__isoc99_scanf@PLT
+	movl	$11, %ebx
+	leaq	12(%rsp), %r12
 .L5:
+	cmpl	%ebp, 12(%rsp)
+	jne	.L2
+	leaq	.LC2(%rip), %rdi
+	call	puts@PLT
+	jmp	.L3
+.L2:
+	leaq	.LC3(%rip), %rdi
+	call	puts@PLT
+	subl	$1, %ebx
+	jne	.L4
+	leaq	.LC4(%rip), %rdi
 	movl	$0, %eax
-.L8:
-	leave
-	.cfi_def_cfa 7, 8
+	call	printf@PLT
+	jmp	.L3
+.L4:
+	movq	%r12, %rsi
+	leaq	.LC1(%rip), %rdi
+	movl	$0, %eax
+	call	__isoc99_scanf@PLT
+	movl	12(%rsp), %eax
+	leal	-1(%rax), %edx
+	cmpl	$24, %edx
+	jbe	.L5
+.L3:
+	movl	$0, %eax
+	addq	$16, %rsp
+	.cfi_def_cfa_offset 32
+	popq	%rbx
+	.cfi_def_cfa_offset 24
+	popq	%rbp
+	.cfi_def_cfa_offset 16
+	popq	%r12
+	.cfi_def_cfa_offset 8
 	ret
 	.cfi_endproc
-.LFE0:
+.LFE21:
 	.size	main, .-main
-	.ident	"GCC: (GNU) 4.7.2 20120921 (Red Hat 4.7.2-2)"
+	.ident	"GCC: (GNU) 4.8.2 20140206 (prerelease)"
 	.section	.note.GNU-stack,"",@progbits
