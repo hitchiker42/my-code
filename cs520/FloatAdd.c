@@ -1,45 +1,31 @@
+/* Software implementation of 32 bit ieee-754 binary floating point addition
+ */
 #include <stdint.h>//because I like having definite lengths to types
-#define NDEBUG
-//borrowed from mpfr.h
-typedef enum {
-  flt_RNDN=0,  /* round to nearest, with ties to even */
-  flt_RNDZ,    /* round toward zero */
-  flt_RNDU,    /* round toward +Inf */
-  flt_RNDD,    /* round toward -Inf */
-  flt_RNDA,    /* round away from zero */
-  flt_RNDF,    /* faithful rounding (not implemented yet) */
-  flt_RNDNA=-1 /* round to nearest, with ties away from zero (mpfr_round) */
-} flt_rnd_t;
-enum {
-  float_tininess_after_rounding  = 0,
-  float_tininess_before_rounding = 1
-};
-//technically you shouldn't name your types <name>_t because those names
-//are reserved for future use, but at the same time, it makes things
-//much clearer
+#define NDEBUG //disable debugging
+/*technically you shouldn't name your types <name>_t because those names
+  are reserved for future use (look at the standard),
+  but at the same time, it makes things much clearer*/
 //globals (i.e the floating point flags register)
 //although I'm assuming we don't need to do this
-flt_rnd_t float_rounding_mode = flt_RNDN;
-uint8_t float_exception_flags = 0;
-uint8_t float_detect_tininess = float_tininess_after_rounding;
-typedef uint32_t real32_t;
+typedef uint32_t real32_t;//just a typedef for clarity
+//constant special values
 static const real32_t minus_zero=0x80000000;//just sign bit set
 static const real32_t plus_zero=0x00;//nothing
 static const real32_t plus_inf=0x7f800000;//exp bits set
 static const real32_t minus_inf=0xff800000;//exp bits +sign bit set
+//NANs have a bunch of representations, so these are just used as literal
+//NANs, not for comparsions
+static const real32_t QNaN = 0xffffffff;//all bits set
+static const real32_t SNaN = 0xffbfffff;//all but first mantissa bit
+//macros to determine floating point class
 #define is_zero(flt) ((flt & 0x7fffffff) == 0)
 #define is_inf(flt) ((flt & 0x7f) && !(flt & 0x007fffff))
 #define is_nan(flt) ((flt & 0x7f) && (flt & 0x007fffff))
 //assumed that you already know flt is a nan
 #define is_snan(flt)(!(flt & 0x00400000)) 
-//NANs have a bunch of representations, so these are just used as literal
-//NANs, not for comparsions
-static const real32_t QNaN = 0xffffffff;//all bits set
-static const real32_t SNaN = 0xffbfffff;//all but first mantissa bit
-/*static const real32_t SNaN = {.ieee_nan={.sign=1,.exponent=0xff,
-  .quiet_nan=0,.mantissa=MAX_MANTISSA}};*/
 
-//straight out of SoftFloat
+
+//straight out of SoftFloat (Hey I cite my sources)
  /*----------------------------------------------------------------------------
 | Shifts `a' right by the number of bits given in `count'.  If any nonzero
 | bits are shifted off, they are ``jammed'' into the least significant bit of
@@ -61,24 +47,7 @@ static inline void shift32RightJamming(uint32_t a, int16_t count,
   }
   *zPtr = z;
 }
-//debugging code??? (not really for debugging, but because you asked to but it in)
-/*
-#if (defined DEBUG) && !(defined NDEBUG)
-#define PRINT_FLOAT_SIGN(flt)                           \
-  fprintf(stderr,"the sign bit of the float %#0x is %d",flt,extractFloat32Sign(flt))
-#define PRINT_FLOAT_MANTISSA(flt)                       \
-  fprintf(stderr,"the mantissa of the float %#0x is %d",flt,extractFloat32Frac(flt))
-#define PRINT_FLOAT_EXPONENT(flt)                       \
-  fprintf(stderr,"the exponent of the float %#0x is %d",flt,extractFloat32Exp(flt))
-#define PRINT_FLOAT_PARTS(flt)                  \
-  (PRINT_FLOAT_SIGN(flt),PRINT_FLT_MANTISSA(flt),PRINT_FLT_EXPONENT(flt));
-#else
-#define PRINT_FLOAT_SIGN(flt)
-#define PRINT_FLOAT_MANTISSA(flt)
-#define PRINT_FLOAT_EXPONENT(flt)
-#define PRINT_FLOAT_PARTS(flt)
-#endif
-*/
+
 static inline uint32_t extractFloat32Frac(uint32_t a){
   return a & 0x007FFFFF;
 }
@@ -89,13 +58,19 @@ static inline int extractFloat32Sign(uint32_t a){
   return a>>31;
 }
 
-//since Sig is just added Exp should be one less than desired
-//(because of the hidden bit in Sig, which should be 1)
+/* Return the bitwise representation of the floating point number
+   with the given sign,exponent and mantissa
+//  since Sig is just added Exp should be one less than desired
+//  (because of the hidden bit in Sig, which should be 1)
+*/
 static inline uint32_t packFloat32(int zSign, int16_t zExp, uint32_t zSig){
     return ( ( (uint32_t) zSign )<<31 ) + ( ( (uint32_t) zExp )<<23 ) + zSig;
 }
 uint32_t round_nearest_even(int zSign, int16_t zExp, uint32_t zSig );
 uint32_t normalize_and_round(int zSign, int16_t zExp, uint32_t zSig );
+/* Return a signaling nan if a or b is a signaling nan, otherwise
+   return a quiet nan
+ */
 uint32_t propagateFloat32NaN(uint32_t a,uint32_t b){
   if(is_snan(a) || is_snan(b)){
     return SNaN;
@@ -103,6 +78,9 @@ uint32_t propagateFloat32NaN(uint32_t a,uint32_t b){
     return QNaN;
   }
 }
+/* Perform floating point addition on a and b, the signs of a and b
+   are ignored and the result is given the sign zSign
+ */
 static uint32_t  addFloat32Sigs( real32_t a, real32_t b, int zSign ) {
   int16_t aExp, bExp, zExp;
   uint32_t aSig, bSig, zSig;
@@ -118,58 +96,62 @@ static uint32_t  addFloat32Sigs( real32_t a, real32_t b, int zSign ) {
   bSig <<= 6;
   //align radix points, if aExp<bExp shift the mantissa
   //of b right by the difference,  otherwise do the oppisite
-  if ( 0 < expDiff ) {//aExp>bExp 
-    //if expDiff <0 aExp is strictly greater that bExp
+  if ( 0 < expDiff ) {//aExp>bExp, shift bExp
     if ( aExp == 0xFF ) {//a is nan or inf
       if(aSig) {return propagateFloat32NaN(a, b);}
       return a;
     }
-    if ( bExp == 0 ) {//denormal
-      --expDiff;//hidden digit
-    } else {//normalize hidden bit?
-      bSig |= 0x20000000;//magic? (set the 3rd most significant digit)
+    if ( bExp == 0 ) {//b is denormal normalize it
+      --expDiff;
+    } else {//normalize hidden bit
+      bSig |= 0x20000000;
     }
     //shift bSig right by expDiff bits, if any nonzero bits are shifted
     //out set the least significant bit of bSig
     shift32RightJamming( bSig, expDiff, &bSig );//magic?
     zExp = aExp;
-  } else if ( expDiff < 0 ) {//same as last block but bExp>aExp
+  } else if ( expDiff < 0 ) {//same as last block but bExp>aExp so shift a
     if ( bExp == 0xFF ) {//b is inf(or nan)
       if(bSig){return propagateFloat32NaN(a, b);}
       return b;
     }
     if ( aExp == 0 ) {
       ++expDiff;//a is denormal, compensate for that
-    } else {
-      aSig |= 0x20000000;//magic?
+    } else {//normalize hidden bit
+      aSig |= 0x20000000;
     }
     shift32RightJamming( aSig, - expDiff, &aSig );//magic?
     zExp = bExp;
-  }
-  else {//aExp==bExp
-    if ( aExp == 0xFF ) {
+  } else {//aExp==bExp, no need to shift exponent
+    if ( aExp == 0xFF ) {//a or b is inf or nan
       if (aSig | bSig) {return propagateFloat32NaN( a, b );}
       return a;
     }
-    if (aExp == 0) {
+    if (aExp == 0) {//denormal, just add the significands
       return packFloat32( zSign, 0, ( aSig + bSig )>>6 );
     }
     
-    zSig = 0x40000000 + aSig + bSig;//magic?
+    zSig = 0x40000000 + aSig + bSig;//not totally shure
     zExp = aExp;
     goto roundAndPack;
   }
-  //more magic (add and normalize significand)
-  aSig |= 0x20000000;
-  zSig = ( aSig + bSig )<<1;
+  //we only get here if aExp != bExp
+  //more magic (add and normalize significand?)
+  aSig |= 0x20000000;//set hidden bit
+  zSig = ( aSig + bSig )<<1;//shift for hidden bit?
   --zExp;
   if ( (int32_t) zSig < 0 ) {
     zSig = aSig + bSig;
     ++zExp;
   }
- roundAndPack:
+ roundAndPack://since we don't actually have rounding modes just round nearest
+  //even
   return round_nearest_even(zSign, zExp, zSig );
 }
+/* Perform ieee-754 floating point subtraction on a and b, ignoring
+   the signs of a and b, set the sign of the result to zSign,
+   Works fairly similar to addFloat32Sigs
+ */
 static uint32_t subFloat32Sigs( real32_t a, real32_t b, int zSign ){
   int16_t aExp, bExp, zExp;
   uint32_t aSig, bSig, zSig;
@@ -185,11 +167,15 @@ static uint32_t subFloat32Sigs( real32_t a, real32_t b, int zSign ){
   bSig <<= 7;
   if ( 0 < expDiff ) {goto aExpBigger;}
   if ( expDiff < 0 ) {goto bExpBigger;}
-  if ( aExp == 0xFF ) {//nan/inf
+  if ( aExp == 0xFF ) {//nan/inf (and aExp = bExp
     //signaling vs quiet nans
     if ( aSig | bSig ) return propagateFloat32NaN( a, b );
-    //    float_raise( float_flag_invalid );
-    return a;
+    //-inf + inf returns a nan and raises a floating point exception
+    //this is a bit of a hack, but since I only call this from FloatAdd
+    //when the signs are different I know that if we get here we're
+    //adding a positive and negitive inf
+    return SNaN;
+    //    return a;
   }
   if ( aExp == 0 ) {
     aExp = 1;
@@ -197,12 +183,11 @@ static uint32_t subFloat32Sigs( real32_t a, real32_t b, int zSign ){
   }
   if ( bSig < aSig ) {goto aBigger;}
   if ( aSig < bSig ) {goto bBigger;}
-  //  return packFloat32( float_rounding_mode == float_round_down, 0, 0 );
+  //aExp==bExp, aSig==bSig, return 0
   return plus_zero;
  bExpBigger:
-  if ( bExp == 0xFF ) {
-    //    if (bSig) return propagateFloat32NaN( a, b );
-    if(bSig){return b;}
+  if ( bExp == 0xFF ) {//nan or inf
+    if (bSig) return propagateFloat32NaN(a, b);
     return packFloat32( zSign ^ 1, 0xFF, 0 );
   }
   if ( aExp == 0 ) {
@@ -236,13 +221,21 @@ static uint32_t subFloat32Sigs( real32_t a, real32_t b, int zSign ){
   --zExp;
   return normalize_and_round( zSign, zExp, zSig );
 }
-
+/* Normalize,Round and Pack the floating point number
+   represented by the given sign,exponent and significand
+ */
 uint32_t normalize_and_round(int zSign, int16_t zExp, uint32_t zSig ){
   int8_t shiftCount;
-  shiftCount = __builtin_clz(zSig) - 1;//I assume countLeadingZeros32 is the same as ffs
-
+  //use a gcc builtin function to count leading zeros, there are
+  //ways of doing this in software eaisly enough, but it's eaisest
+  //to just do this
+  shiftCount = __builtin_clz(zSig) - 1;
   return round_nearest_even(zSign,zExp-shiftCount,zSig<<shiftCount);
 }
+/* Round and Pack the floating point number represented by
+   the given sign exponent, and mantissa. Rounding is done
+   using round to nearest even
+ */
 uint32_t round_nearest_even(int zSign, int16_t zExp, uint32_t zSig){
   uint8_t roundBits,roundIncrement;
   roundBits = zSig & 0x7F;
@@ -252,7 +245,6 @@ uint32_t round_nearest_even(int zSign, int16_t zExp, uint32_t zSig){
             || (    ( zExp == 0xFD )
                     && ( (int32_t) ( zSig + roundIncrement ) < 0 ) )
             ) {
-      //float_raise( float_flag_overflow | float_flag_inexact );
       return packFloat32( zSign, 0xFF, 0 ) - ( roundIncrement == 0 );
     }
     if ( zExp < 0 ) {
@@ -273,6 +265,10 @@ uint32_t round_nearest_even(int zSign, int16_t zExp, uint32_t zSig){
   if ( zSig == 0 ) zExp = 0;
   return packFloat32( zSign, zExp, zSig );
 }
+/* The actual FloatAdd function, adds two floating point numbers a and b
+   using software emulation of ieee-754 32 bit binary floating point
+   addition.
+ */ 
 int32_t FloatAdd (int32_t a, int32_t b){
   int aSign, bSign;
   aSign=extractFloat32Sign(a);
@@ -288,7 +284,10 @@ int32_t FloatAdd (int32_t a, int32_t b){
 }
 #if 0
 //template code from the softfloat package, used a a guide on how
-//to implement things
+//to implement things, The Code below is directly from the
+//softfloat library, I attempted to add more comments describing what
+//was going on in each function, to show that I didn't just
+//copy the code and not understand what was actually going on
 /*============================================================================
 
   This C source file is part of the SoftFloat IEC/IEEE Floating-point Arithmetic
