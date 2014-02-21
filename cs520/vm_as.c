@@ -184,43 +184,8 @@ static const char * wordlist[] =
   }
 //for all the assemble_format<N> instr should point to the first character
 //following the opcode
-static inline vm_word assemble_format1(int key,const char *instr){
-  if(check_rest_of_line(instr)<0){
-    return -1;
-  }
-  vm_op retval=0;
-  if(key == 13){//ret
-    retval.op.op=0x10;
-  } else if (key==64){//halt
-    retval.op.op==0x00;
-  }
-  return retval.bits;
-}
-static inline vm_word assemble_format2(int key,const char *instr){
-  char *endptr;
-  uint32_t addr;
-  int64_t lit_addr=strtol(instr,&endptr,0);
-  if(is_space(*endptr)){
-    check_rest_of_line(endptr);
-    if(lit_addr>>20 || lit_addr<0){
-      fprintf(stderr,"Invaild constant address %#0lx",lit_addr);
-      return -1;
-    }
-  } else {
-    //lookup symbol;
-  }
-  vm_op retval=0;
-  if(key == 23){//jmp
-    retval.op_addr.op=0x14;
-  } else if(key == 54){//call
-    retval.op_addr.op=0x0f;
-  }
-  retval.op_addr.addr=addr;
-  return retval
-}
-static inline vm_word assemble_format3(int key,char *instr){
-  while(is_space(*instr)){instr++;}
-  int reg;
+static inline uint8_t parse_reg(const char **instr_ptr){
+  const char *instr=*instr_ptr;
   if(*instr != 'r'){
     if(*instr++ == 'f' && *instr++ == 'p'){
       reg=13;
@@ -241,10 +206,81 @@ static inline vm_word assemble_format3(int key,char *instr){
     if(reg>12){
       goto INVALID_REG;
     }
-  }  
+  }
+  return reg;
+ INVALID_REG:
+  return -1;
 }
-//if there were more than 32 instructions I might do this differently
-//but since there are so few I can afford to do this slowly
+static inline vm_word parse_addr(const char **instr_ptr){
+  const char *instr=*instr_ptr;
+  char *endptr;
+  uint32_t addr;
+  int64_t lit_addr=strtol(instr,&endptr,0);
+  if(is_space(*endptr)){
+    while(is_space(*++endptr));
+    *instr_ptr=endptr;
+    if(lit_addr>>20 || lit_addr<0){
+      fprintf(stderr,"Invaild constant address %#0lx",lit_addr);
+      return -1;
+    }
+    
+  } else {
+    //lookup symbol;
+  }
+  
+}
+static inline vm_word parse_imm(const char **instr_ptr){
+  const char *instr=*instr_ptr;
+  char *endptr;
+  uint64_t imm=(uint64_t)strtol(instr,&endptr,0);
+  if(imm>>20){
+    fprintf(stderr,
+            "Warning Immediate too large, truncating to maximum value\n");
+  }
+  imm&=(1<<20);
+  return imm;
+}
+static inline vm_word assemble_format1(uint8_t opcode,const char *instr){
+  if(check_rest_of_line(instr)<0){
+    return -1;
+  }
+  vm_op retval=0;
+  retval.op.op=opcode;
+  return retval.bits;
+}
+static inline vm_word assemble_format2(uint8_t opcode,const char *instr){
+  vm_word addr=parse_addr(&instr);
+  if(addr == (vm_word)-1){
+    return -1;
+  }
+  vm_op retval=0;
+  retval.op_addr.op=opcode;
+  retval.op_addr.addr=addr;
+  return retval.bits
+}
+static inline vm_word assemble_format3(uint8_t opcode,char *instr){
+  while(is_space(*instr)){instr++;}
+  uint8_t reg=parse_reg(&instr);
+  if(reg == (uint8_t)-1){
+    return -1;
+  }
+  vm_op retval;
+  retval.op_reg.reg=reg;
+  retval.op_reg.op=opcode;
+  return retval.bits;
+}
+static inline vm_word assemble_format4(uint8_t opcode,char *instr){
+  while(is_space(*instr)){instr++;}
+  uint8_t reg=parse_reg(&instr);
+  //scan to comma
+  vm_word imm=parse_imm(&instr);
+  vm_op retval={.op_reg_imm={.op=opcode,.imm=imm,.reg=reg}}
+}
+static inline vm_word assemble_format5(uint8_t opcode,char *instr){}
+static inline vm_word assemble_format6(uint8_t opcode,char *instr){}
+static inline vm_word assemble_format7(uint8_t opcode,char *instr){}
+static inline vm_word assemble_format8(uint8_t opcode,char *instr){}
+
 vm_word assemble_instruction(const char *instr,int len){
   char *first_space=memchr(instr,' ',len);
   uint32_t opcode_len;
@@ -260,5 +296,6 @@ vm_word assemble_instruction(const char *instr,int len){
       goto INVALID_INSTRUCTION;
     }
   }
-  switch(
+  switch(key){//translate key to opcode and assemble according to opcode
+  }
  INVALID_INSTRUCTION:
