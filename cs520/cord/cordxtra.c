@@ -16,10 +16,6 @@
  * implementation.  They serve also serve as example client code for
  * cord_basics.
  */
-
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
 #ifndef CORD_BUILD
 # define CORD_BUILD
 #endif
@@ -451,6 +447,7 @@ CORD CORD_chars(char c, size_t i)
     return(CORD_from_fn(CORD_nul_func, (void *)(unsigned long)c, i));
 }
 
+#if 0
 CORD CORD_from_file_eager(FILE * f)
 {
     register int c;
@@ -633,3 +630,4 @@ CORD CORD_from_file(FILE * f)
         return(CORD_from_file_lazy_inner(f, (size_t)len));
     }
 }
+#endif 

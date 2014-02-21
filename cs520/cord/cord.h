@@ -58,29 +58,6 @@
 #include <stddef.h>
 #include <stdio.h>
 
-#ifdef GC_DLL
-  /* Same as for GC_API in gc_config_macros.h.  */
-# ifdef CORD_BUILD
-#   if defined(__MINGW32__) || defined(__CEGCC__)
-#     define CORD_API __declspec(dllexport)
-#   elif defined(_MSC_VER) || defined(__DMC__) || defined(__BORLANDC__) \
-         || defined(__CYGWIN__) || defined(__WATCOMC__)
-#     define CORD_API extern __declspec(dllexport)
-#   elif defined(__GNUC__) && (__GNUC__ >= 4 \
-                               || defined(GC_VISIBILITY_HIDDEN_SET))
-    /* Only matters if used in conjunction with -fvisibility=hidden option. */
-#     define CORD_API extern __attribute__((__visibility__("default")))
-#   endif
-# else
-#   if defined(__MINGW32__) || defined(__CEGCC__) || defined(_MSC_VER) \
-       || defined(__DMC__) || defined(__BORLANDC__) || defined(__CYGWIN__)
-#     define CORD_API __declspec(dllimport)
-#   elif defined(__WATCOMC__)
-#     define CORD_API extern __declspec(dllimport)
-#   endif
-# endif /* !CORD_BUILD */
-#endif /* GC_DLL */
-
 #ifndef CORD_API
 # define CORD_API extern
 #endif
@@ -254,7 +231,7 @@ CORD_API size_t CORD_str(CORD x, size_t start, CORD s);
 /* The resulting representation takes constant space, independent of i. */
 CORD_API CORD CORD_chars(char c, size_t i);
 #define CORD_nul(i) CORD_chars('\0', (i))
-
+#if 0
 /* Turn a file into cord.  The file must be seekable.  Its contents     */
 /* must remain constant.  The file may be accessed as an immediate      */
 /* result of this call and/or as a result of subsequent accesses to     */
@@ -281,7 +258,7 @@ CORD_API CORD CORD_from_file_eager(FILE * f);
 /* Equivalent to the above, except that the file will be read on demand.*/
 /* The binary mode restriction applies.                                 */
 CORD_API CORD CORD_from_file_lazy(FILE * f);
-
+#endif
 /* Turn a cord into a C string. The result shares no structure with     */
 /* x, and is thus modifiable.                                           */
 CORD_API char * CORD_to_char_star(CORD x);

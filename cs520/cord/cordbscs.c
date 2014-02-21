@@ -10,10 +10,6 @@
  * provided the above notices are retained, and a notice that the code was
  * modified is included with the above copyright notice.
  */
-
-#ifdef HAVE_CONFIG_H
-# include "config.h"
-#endif
 #ifndef CORD_BUILD
 # define CORD_BUILD
 #endif

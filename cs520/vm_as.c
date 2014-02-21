@@ -1,7 +1,6 @@
 #include "vm.h"
 //I can't concatenate stuff
-#include "cord.h"//I'll redirect calls to gc_malloc to normal malloc, basically using 
-//arena allocation 
+#include "cord.h"
 //quick little hash function, to hash lables and such
 #define offset_basis_32 2166136261
 #define offset_basis_64 14695981039346656037UL
