@@ -1,4 +1,4 @@
-/* three steps, 
+/* three steps,
    1. preprocess input file: strip comments / whitespace,process directives,
                              and built up lists of imported/exported symbols
    2. validate symbols: insure all exported symbols exist, make sure no symbols
@@ -68,7 +68,7 @@ void *vm_preprocess(FILE *input){
         } else {break;}
 
       case 'w':
-        if(!memcmp(char_ptr,"word",4)){          
+        if(!memcmp(char_ptr,"word",4)){
           //read a constant and stick it int the objcode
           int64_t num=strtol(char_ptr+4,NULL,0);
           if(num != (int32_t)num){
@@ -87,48 +87,178 @@ void *vm_preprocess(FILE *input){
     }
   }
 }
+/* C code produced by gperf version 3.0.4 */
+/* Command-line: gperf -G instructions  */
+/* Computed positions: -k'1-2,$' */
+#define TOTAL_KEYWORDS 26
+#define MIN_WORD_LENGTH 3
+#define MAX_WORD_LENGTH 7
+#define MIN_HASH_VALUE 3
+#define MAX_HASH_VALUE 64
+/* maximum key range = 62, duplicates = 0 */
+static inline unsigned int hash (register const char *str,
+                                 register unsigned int len){
+  static unsigned char asso_values[] =
+    {
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 30,  0, 20,
+       5, 10,  5,  5, 30,  0, 20, 65,  0,  0,
+      10,  3,  0,  5,  0, 10,  0, 15, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65, 65, 65, 65, 65,
+      65, 65, 65, 65, 65, 65
+    };
+  return len + asso_values[(unsigned char)str[1]] +
+    asso_values[(unsigned char)str[0]] + asso_values[(unsigned char)str[len - 1]];
+}
+
+static const char * wordlist[] =
+  {
+    "", "", "",
+    "blt",//3
+    "", "",
+    "pop",//6
+    "",
+    "bgt",//8
+    "divi",//9
+    "ldimm",//10
+    "ldaddr",//11
+    "load",//12
+    "ret",//13
+    "divf",//14
+    "ldind",//15
+    "", "",
+    "beq",//18
+    "muli",//19
+    "stind",//20
+    "", "",
+    "jmp",//23
+    "mulf",//24
+    "store",//25
+    "getpid",//26
+    "", "",
+    "subi",//29
+    "getpn",//30
+    "",
+    "cmpxchg",//32
+    "",
+    "subf",//34
+    "", "", "", "",
+    "addi",//39
+    "", "", "", "",
+    "addf",//44
+    "", "", "", "",
+    "push",//49
+    "", "", "", "",
+    "call",//54
+    "", "", "", "", "", "", "", "", "",
+    "halt"//64
+  };
+//be careful with this as it returns from whatever function it's used in
+//if there's anything but whitespace in str
+//this should probably print an error message
+#define check_rest_of_line(str)                 \
+  while(*str){                                  \
+    if(!__builtin_isspace(*instr++)){           \
+      return -1;                                \
+    }                                           \
+  }
+//for all the assemble_format<N> instr should point to the first character
+//following the opcode
+static inline vm_word assemble_format1(int key,const char *instr){
+  if(check_rest_of_line(instr)<0){
+    return -1;
+  }
+  vm_op retval=0;
+  if(key == 13){//ret
+    retval.op.op=0x10;
+  } else if (key==64){//halt
+    retval.op.op==0x00;
+  }
+  return retval.bits;
+}
+static inline vm_word assemble_format2(int key,const char *instr){
+  char *endptr;
+  uint32_t addr;
+  int64_t lit_addr=strtol(instr,&endptr,0);
+  if(is_space(*endptr)){
+    check_rest_of_line(endptr);
+    if(lit_addr>>20 || lit_addr<0){
+      fprintf(stderr,"Invaild constant address %#0lx",lit_addr);
+      return -1;
+    }
+  } else {
+    //lookup symbol;
+  }
+  vm_op retval=0;
+  if(key == 23){//jmp
+    retval.op_addr.op=0x14;
+  } else if(key == 54){//call
+    retval.op_addr.op=0x0f;
+  }
+  retval.op_addr.addr=addr;
+  return retval
+}
+static inline vm_word assemble_format3(int key,char *instr){
+  while(is_space(*instr)){instr++;}
+  int reg;
+  if(*instr != 'r'){
+    if(*instr++ == 'f' && *instr++ == 'p'){
+      reg=13;
+    } else if (*instr++ == 's' && *instr++ == 'p'){
+      ret=14;
+    } else if (*instr++ == 'p' && *instr++ == 'c'){
+      reg=15;
+    } else {
+      goto INVALID_REG;
+    }    
+  } else {
+    if(*instr == '1'){
+      //i'm a little bit dissapointed ++instr++ doesn't work
+      reg=10+((*(++instr)++)-0x30);
+    } else {
+      reg=*instr++-0x30;
+    }
+    if(reg>12){
+      goto INVALID_REG;
+    }
+  }  
+}
 //if there were more than 32 instructions I might do this differently
 //but since there are so few I can afford to do this slowly
 vm_word assemble_instruction(const char *instr,int len){
-  switch(*instr){//basically make a trie out of switches
-    case 'a'://addf/addi
-      if(!strcmp(instr,"add",3)){
-      } else {
-        goto INVALID_INSTR;
-      }
-    case 'b'://blt/beq/bgt
-    case 'c'://call/cmpxchg
-    case 'd'://divi/divf
-      if(!strcmp(instr,"div",3)){
-      } else {
-        goto INVALID_INSTR;
-      }
-    case 'g'://getpid/getpn
-    case 'h'://halt
-    case 'j'://jmp
-    case 'l'://load/ldimm/ldaddr/ldind
-    case 'm'://muli/mulf
-      if(!strcmp(instr,"mul",3)){
-      } else {
-        goto INVALID_INSTR;
-      }
-    case 'p'://pop/push
-    case 's'://store/stind/subi/subf
-      if(*(instr+1) == 't'){
-        //might as well just do the strcmps
-        if(!strcmp(instr,"store",5)){
-        } else if (!strcmp(instr,"stind",5)){
-        } else {
-          goto INVALID_INSTR;
-        }
-      } else if(!strcmp(instr,"sub",3)){
-      } else {
-        goto INVALID_INSTR;
-      }
-    default:{
-    INVALID_INSTR:
-      fprintf(stderr,"Invalid instruction %s",instr);
-      return -1;
+  char *first_space=memchr(instr,' ',len);
+  uint32_t opcode_len;
+  if(!first_space){
+    opcode_len=len;//possibly valid for halt or ret
+  } else {
+    opcode_len=first_space-instr;
+  }
+  uint32_t key=hash(instr,opcode_len);
+  if (key <= MAX_HASH_VALUE && key >= 0){
+    register const char *s = wordlist[key];
+    if (!(*str == *s && !strcmp (str + 1, s + 1))){
+      goto INVALID_INSTRUCTION;
     }
   }
-}
+  switch(
+ INVALID_INSTRUCTION:
