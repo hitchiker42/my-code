@@ -1,8 +1,9 @@
 #include "vm.h"
-//unhygneic macro, assumes label HALT
+//unhygneic macro, assumes label HALT, and vm_ptr vm
 //check if addr is valid relative to vm_mem
 #define mem_check_relative(addr)                         \
-  (if(addr < 0 || addr > vm_mem_limit){                  \
+  (if(addr < 0 || addr > vm_mem_limit){                  \  
+    vm->r0=                                            \
     goto HALT;                                           \
   })
 //check if addr is within the bounds of vm_mem & vm_mem_max
@@ -28,7 +29,8 @@
 #define vm_cmp(instr,op)                        \
   (*(vm+instr.op_reg_reg_addr.reg1) op          \
    *(vm+instr.op_reg_reg_addr.reg2))
-void vm_loop(vm_ptr vm){
+void* vm_loop(void *vm_pointer){
+  vm_ptr vm=(vm_ptr)vm_pointer;
   vm_op instr;
   while(1){
     instr.bits=vm->mem[vm->pc++];//fetch instruction from memory
@@ -169,12 +171,28 @@ void vm_loop(vm_ptr vm){
     }
   }
  HALT:
-  return;
+    return vm->r0;
   }
 }
-vm_ptr vm_init(){
+vm_ptr processor_create(uint32_t stack_pointer){
   vm_ptr processor=xmalloc(sizeof(struct vm));
   //should probably be an atomic add
   processor->processor_id=cur_proc_id++;
+  processor->sp=stack_pointer;
   return processor;
 }
+vm_ptr vm_init(){
+  vm_ptr vm=xmalloc(sizeof(struct vm));
+  //should probably be an atomic add
+  vm->processor_id=cur_proc_id++;
+  vm->sp=stack_pointer;  
+  pthread_create(vm->thread,NULL,vm_loop,vm);
+  return vm;
+}
+int vm_init(uint32_t num_processors,uint32_t *stack_pointers,
+            int *return_values){
+  vm_ptr *procs=xmalloc(num_processors*sizeof(vm_ptr));
+  int i;
+  for(i=0;i<num_processors;i++){
+    procs[i]=processor_create(stack_pointers[i]);
+  }
