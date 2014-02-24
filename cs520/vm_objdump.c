@@ -58,7 +58,7 @@ static inline void print_instr(vm_word instr){
   vm_op op;
   op.bits=instr;
   uint8_t opcode=op.op.op;//that's pretty great right there
-  if(opcode>0x19){
+  if(opcode>VM_LAST){
     printf("%x unknown\n",opcode);
   } else {
     printf("%02x %s\n",opcode,instr_names[opcode]);

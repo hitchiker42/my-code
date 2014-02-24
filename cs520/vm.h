@@ -123,6 +123,7 @@ typedef enum vm_instruction {
   VM_GETPN=0x17,//getpn reg;store number of processors in reg
   VM_PUSH=0x18,//push reg;*(--sp)=reg
   VM_POP=0x19,//pop reg;reg=*(sp++)
+  VM_LAST=VM_POP,
 } vm_instruction;
 const char* instr_names[0x20]=
   {"halt","load","store","ldimm","ldaddr","ldind","stind","addf",
