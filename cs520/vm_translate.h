@@ -11,6 +11,14 @@
 #include <limits.h>
 #include <strings.h>
 #include "vm.h"
+typedef union doubleword {
+  uint32_t uint32;
+  uint8_t uint8[4];
+} doubleword;
+typedef union quadword {
+  uint64_t uint64;
+  uint8_t uint8[8];
+} doubleword;
 void *allocate_executable_buffer(uint64_t *length);
 /* Intel Instruction format:
    Prefixes 0-4 bytes
@@ -110,6 +118,14 @@ static inline uint8_t make_modrm(uint8_t mod,uint8_t reg,uint8_t r_m){
   modrm.fields.r_m=r_m;
   return modrm.byte;
 }
+#define byte_0(int) (int&0xff000000)
+#define byte_1(int) (int&0x00ff0000)
+#define byte_2(int) (int&0x0000ff00)
+#define byte_3(int) (int&0x000000ff)
+static const uint8_t  mov_rdx_rsi[3]={0x48,0x89,0xd6};
+static const uint8_t mov_rsi_rdx[3]={0x48,0x89,0xf2};
+static const uint8_t xor_rdx[3]={0x48,0x31,0xd2};//xorq %rdx,%rdx
+static const uint8_t mov_imm_rcx[3]={0x48,0xc7,0xc1};
 typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instruction
   INTEL_RET=0xc3,
   INTEL_ADD=0x03,
@@ -127,7 +143,7 @@ typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instructio
   INTEL_JMP_LT=0x0F8C,//ditto
   INTEL_JMP=0xE9,//followed by a 32 bit relative adress
   INTEL_LEA=0x8D,
-} intel_opcodes;  
+} intel_opcodes;
 #define intel_binop(rex,op,modrm)               \
   (rex|(op<<8)|(modrm<<16))
 #define intel_imm_op(rex,op,modrm,imm)            \
@@ -137,3 +153,7 @@ typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instructio
 #define intel_jmp(dest)                         \
   (INTEL_JMP|(uint64_t)dest<<8)
 #endif
+/*Initial jmp is number of datawords*8 + 3
+  datawords are 64 bits (sign extended from 32 bit vm520 datawords)
+  encode first jmp w/3 bytes of padding to keep data
+  32 bit aligned*/
