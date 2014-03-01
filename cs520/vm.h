@@ -1,5 +1,6 @@
 #ifndef CS520_VM
 #define CS520_VM
+#include <alloca.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <pthread.h>

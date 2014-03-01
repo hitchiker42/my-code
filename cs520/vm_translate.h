@@ -11,6 +11,14 @@
 #include <limits.h>
 #include <strings.h>
 #include "vm.h"
+/* 
+   I'd like to think this a pretty clever hack, you can't return
+   arrays from functions, but you can return structs/unions, even if they   
+   happen to have arrays in them, so using these unions I can
+   use small arrays without having to use malloc (to avoid returning
+   the adress of a local variable).
+   
+*/
 typedef union doubleword {
   uint32_t uint32;
   uint8_t uint8[4];
@@ -52,9 +60,19 @@ void *allocate_executable_buffer(uint64_t *length);
   
   Register-Memory using SIB byte 
   0100WRXB Opcode ModRM[MMRrrr100] SIB[ssXxxxBbbb]
-  MM (mod) can't be 11
+  MM (mod) can't be 11, if 01 add 8bit displacement,
+                        if 10 add 32bit displacement
   encodes
   Opcode register Rrrr, (register Bbbb,register Xxxx, immediate ss)
+
+  to encode register , (register);ie no scale/index use
+  0100WR0B Opcode ModRM[MMRrrrBbbb]
+  MM (mod) can't be 11, if 01 add 8bit displacement,
+                        if 10 add 32bit displacement
+  encodes
+  Opcode register Rrrr,(register Bbbb)
+  //Question if the r/m field is 100 (the rsp register)
+  //How could you tell not to use the SIB byte?
 
   
  */
@@ -126,6 +144,7 @@ static const uint8_t  mov_rdx_rsi[3]={0x48,0x89,0xd6};
 static const uint8_t mov_rsi_rdx[3]={0x48,0x89,0xf2};
 static const uint8_t xor_rdx[3]={0x48,0x31,0xd2};//xorq %rdx,%rdx
 static const uint8_t mov_imm_rcx[3]={0x48,0xc7,0xc1};
+static const uint64_t sign_mask=0xffffffff00000000;
 typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instruction
   INTEL_RET=0xc3,
   INTEL_ADD=0x03,
