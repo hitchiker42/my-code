@@ -79,8 +79,8 @@
   cell)
 (defn pop! [cell]
   (let [temp (car cell)]
-    (set-car! y (car (cdr y)))
-    (set-cdr! y (cdr (cdr y)))
+    (set-car! cell (car (cdr cell)))
+    (set-cdr! cell (cdr (cdr cell)))
     temp))
 (defn rev [cell]
   (let [acc (fn [ls sl]
