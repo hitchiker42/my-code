@@ -1,4 +1,4 @@
-#include "vm.h"
+#include "vm_translate.h"
 #define pow2_roundup(num,multiple) ((uint64_t)(num+multiple-1)&(uint64_t)(~(multiple-1)))
 #define round_to_next_page(num) (pow2_roundup(num,sys_pagesize))
 void *allocate_executable_buffer(uint64_t *length){
