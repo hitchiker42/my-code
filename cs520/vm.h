@@ -126,7 +126,7 @@ typedef enum vm_instruction {
   VM_POP=0x19,//pop reg;reg=*(sp++)
   VM_LAST=VM_POP,
 } vm_instruction;
-const char* instr_names[0x20]=
+static const char* instr_names[0x20]=
   {"halt","load","store","ldimm","ldaddr","ldind","stind","addf",
    "subf","divf","mulf","addi","subi","divi","muli","call","ret",
    "blt","bgt","beq","jmp","cmpxchg","getpid","getpn","push","pop"};
