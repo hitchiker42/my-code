@@ -26,7 +26,7 @@ typedef union doubleword {
 typedef union quadword {
   uint64_t uint64;
   uint8_t uint8[8];
-} doubleword;
+} quadword;
 void *allocate_executable_buffer(uint64_t *length);
 /* Intel Instruction format:
    Prefixes 0-4 bytes
@@ -76,12 +76,10 @@ void *allocate_executable_buffer(uint64_t *length);
 
   
  */
-
 #define REX_W 0x08
 #define REX_R 0x04
 #define REX_X 0x02
 #define REX_B 0x01
-#define
 enum intel_registers {
   //B bit from REX prefix and reg field of ModRM
   //REX_B = 0
@@ -154,6 +152,7 @@ typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instructio
   INTEL_DIV=0xf7,//reg field of modrm == 6
   INTEL_MUL=0xf7,//reg field of modrm == 4
   INTEL_MOV=0x89,//movq only
+  INTEL_MOV_MEM=0x8B,//movq only
   INTEL_MOV_IMM=0xC7,//reg field of modrm == 0, 32 bit immediate
   INTEL_CMP=0x3B,
   INTEL_CMP_IMM=0x83,//reg field of modrm==7, 32 bit immediate

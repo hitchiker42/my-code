@@ -28,7 +28,8 @@
    start of code -> RDI
    RAX used in mul/div
    RSI used to hold RDX in mul/div instructions
- */
+*/
+#include "vm_translate.h"
 static inline uint8_t translate_register(uint8_t vm_reg){
   switch(vm_reg){
     case 0x00:
@@ -36,7 +37,7 @@ static inline uint8_t translate_register(uint8_t vm_reg){
     case 0x01:
       return R9;
     case 0x02:
-      return R10:
+      return R10;
     case 0x03:
       return R11;
     case 0x04:
@@ -73,13 +74,13 @@ static inline quadword encode_imm_binop(uint8_t op,uint8_t reg,
     rex_b = 1;
     reg&=(~0x8);
   }
-  uint8_t rex_byte=make_reg(1,0,0,rex_b);
+  uint8_t rex_byte=make_rex(1,0,0,rex_b);
   uint8_t modrm_byte=make_modrm(0x3,modrm_reg,reg);
   quadword retval;
   retval.uint8[0]=rex_byte;
   retval.uint8[1]=op;
   retval.uint8[2]=modrm_byte;
-  memcpy(retval.int8+3,imm.uint8,4);  
+  memcpy(retval.uint8+3,imm.uint8,4);  
   return retval;
 }
 static inline doubleword encode_add(uint8_t reg1,uint8_t reg2){
@@ -148,7 +149,7 @@ static inline quadword encode_add_imm(uint8_t reg1,uint32_t imm){
   imm32.uint32=imm;
   return encode_imm_binop(INTEL_ADD_IMM,reg1,0,imm32);
 }
-static inline void* encode_sub_imm(uint8_t reg1,uint32_t imm){
+static inline quadword encode_sub_imm(uint8_t reg1,uint32_t imm){
   doubleword imm32;
   imm32.uint32=imm;
   return encode_imm_binop(INTEL_SUB_IMM,reg1,5,imm32);
@@ -157,21 +158,21 @@ static inline void* encode_mul_imm(uint8_t reg1,uint32_t imm){
   //there really isn't any need to worry about saving registers
   static uint8_t objcode[22];
   memcpy(objcode,mov_imm_rcx,3);
-  memcpy(objcode+3,imm,4);
+  memcpy(objcode+3,&imm,4);
   memcpy(objcode+7,encode_mul(RCX,reg1),15);
   return objcode;
 }
 static inline void* encode_div_imm(uint8_t reg1,uint32_t imm){
   static uint8_t objcode[25];
   memcpy(objcode,mov_imm_rcx,3);
-  memcpy(objcode+3,imm,4);
+  memcpy(objcode+3,&imm,4);
   memcpy(objcode+7,encode_div(RCX,reg1),18);
   return objcode;
 }
 static inline quadword encode_known_jmp(uint32_t addr){
   quadword retval;
   retval.uint8[0]=INTEL_JMP;
-  memcpy(retval.uint8+1,addr,4);
+  memcpy(retval.uint8+1,&addr,4);
   return retval;
 }
 //one of reg1/reg2 might to an adress
@@ -189,7 +190,7 @@ static inline quadword encode_ldimm(uint8_t reg,uint32_t imm){
   retval.uint8[0]=rex_byte;
   retval.uint8[1]=INTEL_MOV_IMM;
   retval.uint8[2]=modrm_byte;
-  memcpy(retval.uint8+3,imm,4);
+  memcpy(retval.uint8+3,&imm,4);
   return retval;
   
 }
@@ -199,18 +200,14 @@ static inline void* encode_ldaddr(uint8_t reg,uint32_t addr){
   
 }
 static inline void* encode_ldind(uint8_t reg1,uint8_t reg2,uint32_t offset){
-  uint8_t rex_r=0,rex_x=0,rex_b=0;
-  if(reg2>0x8){
-    rex_x=1;
-    reg2;
 }
 static inline void* encode_stind(){}
-static inline quadword  encode_store(uint8_t reg1,uint32_t offset){
+static inline quadword  encode_store(uint8_t reg,uint32_t offset){
   //movq reg1,offset(%rdi)
   uint8_t rex_r;
-  if(reg1>=0x8){
+  if(reg>=0x8){
     rex_r = 1;
-    reg1&=(~0x8);
+    reg&=(~0x8);
   }
   uint8_t rex_byte=make_rex(1,rex_r,0,0);
   uint8_t modrm_byte=make_modrm(0x2,reg,RDI);
@@ -218,23 +215,39 @@ static inline quadword  encode_store(uint8_t reg1,uint32_t offset){
   retval.uint8[0]=rex_byte;
   retval.uint8[1]=INTEL_MOV;
   retval.uint8[2]=modrm_byte;
-  memcpy(retval.uint8+3,offset,4);
+  memcpy(retval.uint8+3,&offset,4);
+  return retval;
+}
+static inline quadword  encode_load(uint8_t reg,uint32_t offset){
+  //movq reg1,offset(%rdi)
+  uint8_t rex_b;
+  if(reg>=0x8){
+    rex_b = 1;
+    reg&=(~0x8);
+  }
+  uint8_t rex_byte=make_rex(1,0,0,rex_b);
+  uint8_t modrm_byte=make_modrm(0x2,RDI,reg);
+  quadword retval;
+  retval.uint8[0]=rex_byte;
+  retval.uint8[1]=INTEL_MOV_MEM;
+  retval.uint8[2]=modrm_byte;
+  memcpy(retval.uint8+3,&offset,4);
   return retval;
 }
 static inline uint8_t* encode_branch(uint8_t reg1,uint8_t reg2,
                                      uint16_t op){
   static uint8_t retval[9];
   doubleword cmp=encode_cmp(reg1,reg2);
-  memcpy(retval.uint8,encode_cmp(reg1,reg2),3);
-  memcpy(retval.uint8+3,op,2);
+  memcpy(retval,cmp.uint8,3);
+  memcpy(retval+3,&op,2);
   return retval;
 }
-static inline uint8_t *encode_blt(uint8_t reg1,uint8_t reg2,uint32_t addr){
+static inline uint8_t *encode_blt(uint8_t reg1,uint8_t reg2){
   return encode_branch(reg1,reg2,INTEL_JMP_LT);
 }
-static inline uint8_t *encode_bgt(){
+static inline uint8_t *encode_bgt(uint8_t reg1,uint8_t reg2){
   return encode_branch(reg1,reg2,INTEL_JMP_GT);
 }
-static inline uint8_t *encode_beq(){
+static inline uint8_t *encode_beq(uint8_t reg1,uint8_t reg2){
   return encode_branch(reg1,reg2,INTEL_JMP_EQ);
 }
