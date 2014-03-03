@@ -27,6 +27,8 @@ int main(int argc,char *argv[]){
   } else {
     FILE* outfile=fopen("a.out","w");
   }
-  fwrite(buf,1,length,outfile);
+  if(fwrite(buf,1,length,outfile)==(size_t)-1){
+    return -2;
+  }
   return 0;
 }
