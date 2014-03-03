@@ -14,13 +14,17 @@ void *allocate_executable_buffer(uint64_t *length){
   return buf;
 }
 int main(int argc,char *argv[]){
-  uint8_t *buf=allocate_executable_buffer(4096*5);
+  uint64_t length=4096*5;
+  uint8_t *buf=allocate_executable_buffer(length);
+  if(length==(void*)-1){
+    return -1;
+  }
   translateBinary(argv[1],buf,4096*5);
   FILE* outfile;
   if(argv[2]){
     FILE* outfile=fopen(argv[2],"w");
   } else {
-    FILE* outfile=fopen(a.out,"w");
+    FILE* outfile=fopen("a.out","w");
   }
   fwrite(buf,1,4096*5,outfile);
   return 0;
