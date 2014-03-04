@@ -1,18 +1,23 @@
 #ifndef CS520_VM
 #define CS520_VM
+//bits/mman.h doesn't define all the flags we need
 #include <alloca.h>
+#include <asm/mman.h>
+#include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <pthread.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <unistd.h>
-#include <sys/types.h>
+#include <strings.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
-#include <fcntl.h>
-#include <errno.h>
-#include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
 #define unsigned unsigned int
 //I'm used to using gc (I use it for my lisp compilier) which
 //guarantees memory allocated with GC_malloc is zeroed, so
@@ -161,7 +166,7 @@ union vm_op {
   struct {//format2 jmp & call
     unsigned op :8;
     unsigned padding :4;
-    unsigned addr :20;
+    int addr :20;
   } op_addr;
   struct {//format 3 getpid,getpn,push & pop
     unsigned op :8;
@@ -171,12 +176,12 @@ union vm_op {
   struct {
     unsigned op :8;
     unsigned reg :4;
-    unsigned imm:20;
+    int imm:20;
   } op_reg_imm;
   struct {
     unsigned op :8;
     unsigned reg :4;
-    unsigned addr :20;
+    int addr :20;
   } op_reg_addr;
   struct {
     unsigned op :8;
@@ -188,13 +193,13 @@ union vm_op {
     unsigned op :8;
     unsigned reg1 :4;
     unsigned reg2 :4;
-    unsigned offset :16;
+    int offset :16;
   } op_reg_reg_offset;
   struct {
     unsigned op :8;
     unsigned reg1 :4;
     unsigned reg2 :4;
-    unsigned  addr :16;
+    int addr :16;
   } op_reg_reg_addr;
   vm_word bits;
 };
@@ -202,3 +207,4 @@ static inline uint8_t get_opcode(vm_op instr){
   return instr.op.op;
 }
 #endif
+

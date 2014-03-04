@@ -1,16 +1,6 @@
 #ifndef _VM_TRANSLATE_H
 #define _VM_TRANSLATE_H
-#include <stdint.h>
-#include <sys/mman.h>
-//bits/mman.h doesn't define all the flags we need
-#include <asm/mman.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <limits.h>
-#include <strings.h>
-#include "vm.h"
+//#include "vm.h"
 /* 
    I'd like to think this a pretty clever hack, you can't return
    arrays from functions, but you can return structs/unions, even if they   
@@ -76,10 +66,6 @@ void *allocate_executable_buffer(uint64_t *length);
 
   
  */
-#define REX_W 0x08
-#define REX_R 0x04
-#define REX_X 0x02
-#define REX_B 0x01
 enum intel_registers {
   //B bit from REX prefix and reg field of ModRM
   //REX_B = 0
@@ -103,6 +89,7 @@ enum intel_registers {
 };
 typedef union ModRM ModRM;
 typedef union SIB SIB;
+typedef union REX REX;
 typedef struct int64 int64_struct;
 struct int24 {
   unsigned zeros :8;
@@ -110,9 +97,9 @@ struct int24 {
 };
 union ModRM {
   struct {
-    unsigned mod :2;
-    unsigned reg :3;
     unsigned r_m :3;
+    unsigned reg :3;
+    unsigned mod :2;
   } fields;
   uint8_t byte;
 };
@@ -124,8 +111,21 @@ union SIB {
   } fields;
   uint8_t byte;
 };
+union REX {
+  struct {
+    unsigned B :1;
+    unsigned X :1;
+    unsigned R :1;
+    unsigned W :1;
+    unsigned pad :2;
+    unsigned one :1;
+    unsigned zero :1;
+  } rex_byte;
+  uint8_t byte;
+};
 static inline uint8_t make_rex(uint8_t W,uint8_t R,uint8_t X,uint8_t B){
-  return (0x40|(W && REX_W)|(R && REX_R)|(X && REX_X)|(B && REX_B));
+  REX rex={.rex_byte={.one=1,.W=W,.B=B,.X=X,.R=R}};
+  return rex.byte;
 }
 static inline uint8_t make_modrm(uint8_t mod,uint8_t reg,uint8_t r_m){
   ModRM modrm;
@@ -175,3 +175,4 @@ typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instructio
   datawords are 64 bits (sign extended from 32 bit vm520 datawords)
   encode first jmp w/3 bytes of padding to keep data
   32 bit aligned*/
+

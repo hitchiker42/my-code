@@ -29,7 +29,7 @@
    RAX used in mul/div
    RSI used to hold RDX in mul/div instructions
 */
-#include "vm_translate.h"
+//#include "vm_translate.h"
 static inline uint8_t translate_register(uint8_t vm_reg){
   switch(vm_reg){
     case 0x00:
@@ -54,11 +54,11 @@ static inline uint8_t encode_ret(){//hlt -> retq
 //any register in the following is an intel register, not a vm registerv
 static inline doubleword encode_binop(uint8_t op,uint8_t reg1,uint8_t reg2){
   uint8_t rex_r=0,rex_b=0;
-  if(reg1>=0x8){
+  if(reg2>=0x8){
     rex_r = 1;
     reg1&=(~0x8);
   }
-  if(reg2>=0x8){
+  if(reg1>=0x8){
     rex_b = 1;
     reg2&=(~0x8);
   }
@@ -101,12 +101,12 @@ static inline uint8_t* encode_mul(uint8_t reg1,uint8_t reg2){
   //movq %reg1,%rax //3*8
   memcpy(objcode+3,encode_binop(reg1,RAX,INTEL_MOV).uint8,3);
   //mulq %reg2 //3*8
-  uint8_t rex_b;
+  uint8_t rex_r;
   if(reg1>=0x8){
-    rex_b = 1;
+    rex_r = 1;
     reg2&=(~0x8);
   }
-  uint8_t rex_byte_mul=make_rex(1,0,0,rex_b);
+  uint8_t rex_byte_mul=make_rex(1,rex_r,0,0);
   uint8_t modrm_byte_mul=make_modrm(0x3,0x7,reg1);
   objcode[6]=rex_byte_mul;
   objcode[7]=INTEL_MUL;
@@ -128,12 +128,12 @@ static inline uint8_t* encode_div(uint8_t reg1,uint8_t reg2){
   //xorq %rdx,%rdx
   memcpy(objcode+6,xor_rdx,3);
   //mulq %reg2 //3*8
-  uint8_t rex_b;
+  uint8_t rex_r;
   if(reg1>=0x8){
-    rex_b = 1;
+    rex_r = 1;
     reg2&=(~0x8);
   }
-  uint8_t rex_byte_mul=make_rex(1,0,0,rex_b);
+  uint8_t rex_byte_mul=make_rex(1,rex_r,0,0);
   uint8_t modrm_byte_mul=make_modrm(0x3,0x7,reg1);
   objcode[9]=rex_byte_mul;
   objcode[10]=INTEL_MUL;
@@ -203,7 +203,6 @@ static inline void* encode_ldind(uint8_t reg1,uint8_t reg2,uint32_t offset){
 }
 static inline void* encode_stind(){}
 static inline quadword  encode_store(uint8_t reg,uint32_t offset){
-  //movq reg1,offset(%rdi)
   uint8_t rex_r;
   if(reg>=0x8){
     rex_r = 1;
@@ -251,3 +250,4 @@ static inline uint8_t *encode_bgt(uint8_t reg1,uint8_t reg2){
 static inline uint8_t *encode_beq(uint8_t reg1,uint8_t reg2){
   return encode_branch(reg1,reg2,INTEL_JMP_EQ);
 }
+
