@@ -160,9 +160,9 @@ typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instructio
   INTEL_MOV_IMM=0xC7,//reg field of modrm == 0, 32 bit immediate
   INTEL_CMP=0x3B,
   INTEL_CMP_IMM=0x83,//reg field of modrm==7, 32 bit immediate
-  INTEL_JMP_EQ=0x0F84,//followed by a 32 bit relative address
-  INTEL_JMP_GT=0x0F8F,//ditto
-  INTEL_JMP_LT=0x0F8C,//ditto
+  INTEL_JMP_EQ=0x840F,//followed by a 32 bit relative address
+  INTEL_JMP_GT=0x8F0F,//ditto
+  INTEL_JMP_LT=0x8C0F,//ditto
   INTEL_JMP=0xE9,//followed by a 32 bit relative adress
   INTEL_LEA=0x8D,
 } intel_opcodes;

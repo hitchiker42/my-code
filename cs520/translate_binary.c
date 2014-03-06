@@ -20,6 +20,7 @@ static void print_header(vm_word in,vm_word out,vm_word obj);
 //simple linked list to keep track of branches to resolve
 struct branch_list {
   uint32_t branch_ind;//vm_adress/index in adress translation array
+  uint32_t branch_dest;
   uint8_t *addr_dest;//fill this place in at the end
   struct branch_list *next;
 };
@@ -74,7 +75,8 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
     uint8_t reg1,reg2;
     intel_addresses[vm_i]=buf_i;
     op.bits=vm_obj->objcode[vm_i++];//fetch and increment ip/pc
-    MSG("vm_op = %#0x\nop=%d\n",op.bits,op.op.op);
+    MSG("op=%d\n",op.bits,op.op.op);
+    MSG("intel_adress = %#0x\n",buf_i);
     //I'd use dispatch tables if this were performance critical code
     //or I knew I'd need to use it later, but being as this is
     //just a one off assignment switches should be fine
@@ -87,7 +89,6 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
       case VM_LOAD:{//->mov offset(%rdi),reg
         if(buf_i+7>len){goto LENGTH_ERROR;}
         check_reg(reg1);
-        MSG("address = %d\n",(int)op.op_reg_addr.addr);
         int32_t dest=(int)vm_i+(int)op.op_reg_addr.addr;
         if(dest>(data_words+1) || dest<0){goto INVALID_MEMORY_ACCESS;}
         dest<<=3;
@@ -98,7 +99,6 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
       }
       case VM_STORE:{//->mov reg,offset(%rdi)
         if(buf_i+7>len){goto LENGTH_ERROR;}
-        MSG("address = %d\n",op.op_reg_addr.addr);
         check_reg(reg1);
         int32_t dest=(int)vm_i+(int)op.op_reg_addr.addr;
         if(dest>(data_words+1) || dest<0){goto INVALID_MEMORY_ACCESS;}
@@ -113,7 +113,6 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
         check_reg(reg1);
         int32_t dest=(int)vm_i+(int)op.op_reg_addr.addr;
         if(dest>(data_words+1) || dest<0){goto INVALID_MEMORY_ACCESS;}
-        dest<<=3;
         quadword code=encode_ldimm(reg1,dest);
         memcpy(buf+buf_i,code.uint8,7);
         buf_i+=7;
@@ -123,7 +122,6 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
       case VM_LDIMM:{//->mov imm32,reg
         if(buf_i+7>len){goto LENGTH_ERROR;}
         check_reg(reg1);
-        MSG("op.op_reg_imm.reg=%d\nreg=%d\n",op.op_reg_imm.reg,reg1);
         quadword code=encode_ldimm(reg1,op.op_reg_imm.imm);
         memcpy(buf+buf_i,code.uint8,7);
         buf_i+=7;
@@ -190,7 +188,8 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
                           INTEL_JMP_EQ));
         check_regs(reg1,reg2);
         uint8_t *code=encode_branch(reg1,reg2,opcode);
-        branches->branch_ind=vm_i;
+        branches->branch_ind=vm_i;        
+        branches->branch_dest=dest;
         branches->addr_dest=buf+buf_i+5;
         branches->next=alloca(sizeof(struct branch_list));
         branches=branches->next;
@@ -206,6 +205,7 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
         //the end of the program it's an error
         if(dest>vm_len || dest<(data_words+1)){goto ILLEGAL_BRANCH;}
         branches->branch_ind=vm_i;
+        branches->branch_dest=dest;
         branches->addr_dest=buf+buf_i+1;
         branches->next=alloca(sizeof(struct branch_list));
         branches=branches->next;
@@ -217,11 +217,20 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
         goto ILLEGAL_INSTRUCTION;
     }
   }
-  if(branches != branch_list){
-    //resolve branches
-    branches->next=0;
+  //insert a ret if we need one
+  if(op.op.op != VM_HALT){
+    if(buf_i+1>len){goto LENGTH_ERROR;}
+    buf[buf_i]=INTEL_RET;
+    buf_i++;
+  }
+  //resolve branches
+  branches->next=0;
+  if(branch_list != branches){
     while(branch_list->next){
-      uint32_t addr=intel_addresses[branch_list->branch_ind];
+      uint32_t addr=intel_addresses[branch_list->branch_dest]-
+        intel_addresses[branch_list->branch_ind];
+      MSG("translating vm address %#0x to intel adress %#0x\n",
+          branch_list->branch_ind,addr);
       memcpy(branch_list->addr_dest,&addr,4);
       branch_list=branch_list->next;
     }
