@@ -35,6 +35,14 @@
 ;;a constructor type (just a function type with a leading new)
 ;;or an object type (all other literals are just shorthand for object literals)
 ;;an object type is really complicated, so I'll explain it elsewhere
+(defn ash [integer count]
+  (if (>= 0 count)
+    (bit-shift-left integer count)
+    (bit-shift-right integer count)))
+(defn strtol [str]
+  (try
+    (java.lang.Long/parseLong  str)
+    (catch Exception x nil)))
 (declare Type element-type parameter-list string-literal numeric-literal)
 ;;Most of these variable names are taken from the TypeScript grammer
 ;;With the exception of whitespace names being shortened
@@ -138,3 +146,18 @@
   (make-re-union object-type array-type function-type constructor-type))
 (def Type
   (make-re-union predefined-type type-reference type-query type-literal))
+(defn parse-escape [esc & rest]
+  (case esc
+    (\' [\' rest])
+    (\" [\" rest])
+    (\\ [\\ rest])
+    (\b [\u0008 rest]);backspace
+    (\t [\u0009 rest]);tab
+    (\n [\u000a rest]);line-feed
+    (\v [\u000b rest]);vtab
+    (\f [\u000c rest]);form feed
+    (\r [\u000d rest]);carriage return
+    (\0 [\u0000 rest])
+    (\x (let [[a b & c] rest]
+          (if (strtol (str "0x" a b))
+            
