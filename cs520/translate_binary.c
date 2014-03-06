@@ -19,7 +19,7 @@ static void print_header(vm_word in,vm_word out,vm_word obj);
   if(_reg<0){goto INVALID_REGISTER;}
 //simple linked list to keep track of branches to resolve
 struct branch_list {
-  uint32_t branch_ind;
+  uint32_t branch_ind;//vm_adress/index in adress translation array
   uint8_t *addr_dest;//fill this place in at the end
   struct branch_list *next;
 };
@@ -108,8 +108,20 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
         buf_i+=7;
         continue;
       }
+      case VM_LDADDR:{//->mov offset,reg,add %rdi,reg
+        if(buf_i+7>len){goto LENGTH_ERROR;}
+        check_reg(reg1);
+        int32_t dest=(int)vm_i+(int)op.op_reg_addr.addr;
+        if(dest>(data_words+1) || dest<0){goto INVALID_MEMORY_ACCESS;}
+        dest<<=3;
+        quadword code=encode_ldimm(reg1,dest);
+        memcpy(buf+buf_i,code.uint8,7);
+        buf_i+=7;
+        continue;
+      }
+        //        if(buf_i+___>len){goto LENGTH_ERROR;}
       case VM_LDIMM:{//->mov imm32,reg
-        if(buf_i+7>len){goto LENGTH_ERROR;}       
+        if(buf_i+7>len){goto LENGTH_ERROR;}
         check_reg(reg1);
         MSG("op.op_reg_imm.reg=%d\nreg=%d\n",op.op_reg_imm.reg,reg1);
         quadword code=encode_ldimm(reg1,op.op_reg_imm.imm);
@@ -117,13 +129,23 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
         buf_i+=7;
         continue;
       }
-      case VM_LDADDR://->mov offset,reg,add %rdi,reg
-        //        if(buf_i+___>len){goto LENGTH_ERROR;}
+
       case VM_LDIND:{//->mov offset(%rdi,reg2),reg1
-        //        check_regs(reg1,reg2);
-        //        int32_t offset=(int)vm_i+(int)op.op_reg_reg_offset.offset;
+        if(buf_i+19>len){goto LENGTH_ERROR;}
+        check_regs(reg1,reg2);
+        uint8_t *code=encode_ldind(reg1,reg2,op.op_reg_reg_offset.offset);
+        memcpy(buf+buf_i,code,19);
+        buf_i+=19;
+        continue;
       }
-      case VM_STIND://->mov reg1,offset(%rdi,reg2)
+      case VM_STIND:{//->mov reg1,offset(%rdi,reg2)
+        if(buf_i+19>len){goto LENGTH_ERROR;}
+        check_regs(reg1,reg2);
+        uint8_t *code=encode_stind(reg1,reg2,op.op_reg_reg_offset.offset);
+        memcpy(buf+buf_i,code,19);
+        buf_i+=19;
+        continue;
+      }
     //add/sub use the same code, except the opcode, obviously
     //-> add/sub reg1,reg2, or add/sub imm32,reg
       case VM_ADDI:
@@ -176,7 +198,21 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
         buf_i+=9;
         continue;
       }
-      case VM_JMP:
+      case VM_JMP:{
+        if(buf_i+5>len){goto LENGTH_ERROR;}
+        //destination in vm code
+        int32_t dest=(int)vm_i+(int)op.op_addr.addr;
+        //if the jmp jumps into the data section or past
+        //the end of the program it's an error
+        if(dest>vm_len || dest<(data_words+1)){goto ILLEGAL_BRANCH;}
+        branches->branch_ind=vm_i;
+        branches->addr_dest=buf+buf_i+1;
+        branches->next=alloca(sizeof(struct branch_list));
+        branches=branches->next;
+        *(buf+buf_i)=INTEL_JMP;
+        buf_i+=5;
+        continue;
+      }
       default:
         goto ILLEGAL_INSTRUCTION;
     }

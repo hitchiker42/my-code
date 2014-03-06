@@ -142,6 +142,10 @@ static const uint8_t  mov_rdx_rsi[3]={0x48,0x89,0xd6};
 static const uint8_t mov_rsi_rdx[3]={0x48,0x89,0xf2};
 static const uint8_t xor_rdx[3]={0x48,0x31,0xd2};//xorq %rdx,%rdx
 static const uint8_t mov_imm_rcx[3]={0x48,0xc7,0xc1};
+static const uint8_t add_imm_rax[2]={0x48,0x05};//special opcode for adding
+//an immediate to rax
+static const uint8_t add_rdi_rax[3]={0x48,0x01,0xf8};
+static const uint8_t sal_3_rax[4]={0x48,0xc1,0xe0,0x03};//uses 8 bit imm
 static const uint64_t sign_mask=0xffffffff00000000;
 typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instruction
   INTEL_RET=0xc3,
