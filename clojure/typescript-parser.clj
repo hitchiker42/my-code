@@ -26,6 +26,15 @@
 (defn make-re-list [re]
   (make-seperated-re re (strcat ws-opt "," ws-opt)))
 
+;;So a type is one of, a built-in type, a type query (i.e typeof value),
+;;a type-reference, which is a type-name (a qualified identifier), if 
+;;the type is a generic type it must be followed by a list of types
+;;qualifing it, or a literal type which is one of 
+;;an array type (element-type []), 
+;;a function type (<types...> (params...) => return-type
+;;a constructor type (just a function type with a leading new)
+;;or an object type (all other literals are just shorthand for object literals)
+;;an object type is really complicated, so I'll explain it elsewhere
 (declare Type element-type parameter-list string-literal numeric-literal)
 ;;Most of these variable names are taken from the TypeScript grammer
 ;;With the exception of whitespace names being shortened
