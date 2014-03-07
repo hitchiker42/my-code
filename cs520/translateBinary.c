@@ -4,6 +4,7 @@
 //#include "vm.h"
 #ifndef CS520_VM
 #define CS520_VM
+#pragma GCC diagnostic ignored "-Wunused-variable"
 //bits/mman.h doesn't define all the flags we need
 #include <alloca.h>
 #include <asm/mman.h>
@@ -357,6 +358,10 @@ static const uint8_t  mov_rdx_rsi[3]={0x48,0x89,0xd6};
 static const uint8_t mov_rsi_rdx[3]={0x48,0x89,0xf2};
 static const uint8_t xor_rdx[3]={0x48,0x31,0xd2};//xorq %rdx,%rdx
 static const uint8_t mov_imm_rcx[3]={0x48,0xc7,0xc1};
+static const uint8_t add_imm_rax[2]={0x48,0x05};//special opcode for adding
+//an immediate to rax
+static const uint8_t add_rdi_rax[3]={0x48,0x01,0xf8};
+static const uint8_t sal_3_rax[4]={0x48,0xc1,0xe0,0x03};//uses 8 bit imm
 static const uint64_t sign_mask=0xffffffff00000000;
 typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instruction
   INTEL_RET=0xc3,
@@ -371,9 +376,9 @@ typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instructio
   INTEL_MOV_IMM=0xC7,//reg field of modrm == 0, 32 bit immediate
   INTEL_CMP=0x3B,
   INTEL_CMP_IMM=0x83,//reg field of modrm==7, 32 bit immediate
-  INTEL_JMP_EQ=0x0F84,//followed by a 32 bit relative address
-  INTEL_JMP_GT=0x0F8F,//ditto
-  INTEL_JMP_LT=0x0F8C,//ditto
+  INTEL_JMP_EQ=0x840F,//followed by a 32 bit relative address
+  INTEL_JMP_GT=0x8F0F,//ditto
+  INTEL_JMP_LT=0x8C0F,//ditto
   INTEL_JMP=0xE9,//followed by a 32 bit relative adress
   INTEL_LEA=0x8D,
 } intel_opcodes;
@@ -412,7 +417,7 @@ typedef enum intel_opcodes {//just opcodes, theres a bunch more to an instructio
   cmpl %edi,%esi
   jl/jg/je %edx
   ret
-  
+
   cmpxchg -> lock cmpxchgl
 
 */
@@ -448,17 +453,17 @@ static inline uint8_t encode_ret(){//hlt -> retq
 //any register in the following is an intel register, not a vm registerv
 static inline doubleword encode_binop(uint8_t op,uint8_t reg1,uint8_t reg2){
   uint8_t rex_r=0,rex_b=0;
-  if(reg2>=0x8){
+  if(reg1>=0x8){
     rex_r = 1;
     reg1&=(~0x8);
   }
-  if(reg1>=0x8){
+  if(reg2>=0x8){
     rex_b = 1;
     reg2&=(~0x8);
   }
   uint8_t modrm_byte=make_modrm(0x3,reg1,reg2);
   uint8_t rex_byte=make_rex(1,rex_r,0,rex_b);
-  doubleword retval={.uint8={modrm_byte,rex_byte,op}};
+  doubleword retval={.uint8={rex_byte,op,modrm_byte}};
   return retval;
 }
 static inline quadword encode_imm_binop(uint8_t op,uint8_t reg,
@@ -474,7 +479,7 @@ static inline quadword encode_imm_binop(uint8_t op,uint8_t reg,
   retval.uint8[0]=rex_byte;
   retval.uint8[1]=op;
   retval.uint8[2]=modrm_byte;
-  memcpy(retval.uint8+3,imm.uint8,4);  
+  memcpy(retval.uint8+3,imm.uint8,4);
   return retval;
 }
 static inline doubleword encode_add(uint8_t reg1,uint8_t reg2){
@@ -489,53 +494,54 @@ static inline doubleword encode_cmp(uint8_t reg1,uint8_t reg2){
 //15 bytes of object code
 static inline uint8_t* encode_mul(uint8_t reg1,uint8_t reg2){
   static uint8_t objcode[15];//static so that I can return it's adress
-  //I assume we return just the low 32 bits  
+  //I assume we return just the low 32 bits
   //movq %rdx,%rsi // 3*8
   memcpy(objcode,mov_rdx_rsi,3);
   //movq %reg1,%rax //3*8
-  memcpy(objcode+3,encode_binop(reg1,RAX,INTEL_MOV).uint8,3);
+  memcpy(objcode+3,encode_binop(INTEL_MOV,reg2,RAX).uint8,3);
   //mulq %reg2 //3*8
-  uint8_t rex_r;
+  uint8_t rex_b;
   if(reg1>=0x8){
-    rex_r = 1;
+    rex_b = 1;
     reg2&=(~0x8);
   }
-  uint8_t rex_byte_mul=make_rex(1,rex_r,0,0);
-  uint8_t modrm_byte_mul=make_modrm(0x3,0x7,reg1);
+  uint8_t rex_byte_mul=make_rex(1,0,0,rex_b);
+  uint8_t modrm_byte_mul=make_modrm(0x3,0x5,reg1);
   objcode[6]=rex_byte_mul;
   objcode[7]=INTEL_MUL;
   objcode[8]=modrm_byte_mul;
-  //movq %rax, %reg2 //3*8
-  memcpy(objcode+9,encode_binop(RAX,reg2,INTEL_MOV).uint8,3);
   //movq %rsi,%rdx
-  memcpy(objcode+12,mov_rsi_rdx,3);
+  memcpy(objcode+9,mov_rsi_rdx,3);
+  //movq %rax, %reg2 //3*8
+  memcpy(objcode+12,encode_binop(INTEL_MOV,RAX,reg2).uint8,3);
+
   return objcode;
 }
 //18 bytes of object code
 static inline uint8_t* encode_div(uint8_t reg1,uint8_t reg2){
   static uint8_t objcode[18];
-  //I assume we return just the low 32 bits  
+  //I assume we return just the low 32 bits
   //movq %rdx,%rsi // 3*8
   memcpy(objcode,mov_rdx_rsi,3);
   //movq %reg1,%rax //3*8
-  memcpy(objcode+3,encode_binop(reg1,RAX,INTEL_MOV).uint8,3);
+  memcpy(objcode+3,encode_binop(INTEL_MOV,reg2,RAX).uint8,3);
   //xorq %rdx,%rdx
   memcpy(objcode+6,xor_rdx,3);
   //mulq %reg2 //3*8
-  uint8_t rex_r;
+  uint8_t rex_b;
   if(reg1>=0x8){
-    rex_r = 1;
-    reg2&=(~0x8);
+    rex_b = 1;
+    reg1&=(~0x8);
   }
-  uint8_t rex_byte_mul=make_rex(1,rex_r,0,0);
+  uint8_t rex_byte_mul=make_rex(1,0,0,rex_b);
   uint8_t modrm_byte_mul=make_modrm(0x3,0x7,reg1);
   objcode[9]=rex_byte_mul;
-  objcode[10]=INTEL_MUL;
+  objcode[10]=INTEL_DIV;
   objcode[11]=modrm_byte_mul;
-  //movq %rax, %reg2 //3*8
-  memcpy(objcode+12,encode_binop(RAX,reg2,INTEL_MOV).uint8,3);
   //movq %rsi,%rdx
-  memcpy(objcode+15,mov_rsi_rdx,3);
+  memcpy(objcode+12,mov_rsi_rdx,3);
+  //movq %rax, %reg2 //3*8
+  memcpy(objcode+15,encode_binop(INTEL_MOV,RAX,reg2).uint8,3);
   return objcode;
 }
 static inline quadword encode_add_imm(uint8_t reg1,uint32_t imm){
@@ -569,9 +575,6 @@ static inline quadword encode_known_jmp(uint32_t addr){
   memcpy(retval.uint8+1,&addr,4);
   return retval;
 }
-//one of reg1/reg2 might to an adress
-static inline void* encode_mov(uint8_t reg1,uint8_t reg2){
-}
 static inline quadword encode_ldimm(uint8_t reg,uint32_t imm){
   uint8_t rex_b;
   if(reg>=0x8){
@@ -586,16 +589,60 @@ static inline quadword encode_ldimm(uint8_t reg,uint32_t imm){
   retval.uint8[2]=modrm_byte;
   memcpy(retval.uint8+3,&imm,4);
   return retval;
-  
+
 }
-//addr will always be in data section,
-//assume that the address passed here is ready to be used
-static inline void* encode_ldaddr(uint8_t reg,uint32_t addr){
-  
+static inline void* encode_stind(uint8_t reg1,uint8_t reg2,uint32_t offset){
+  /* movq reg2,%rax //3
+     addq offset,%rax //6
+     salq $3,%rax // 4
+     addq %rdi,%rax //3
+     movq reg1,(%rax) //3  
+*/
+  static uint8_t code[19];
+  doubleword mov_reg2_rax=encode_binop(INTEL_MOV,reg2,RAX);
+  memcpy(code,mov_reg2_rax.uint8,3);
+  memcpy(code+3,add_imm_rax,2);
+  memcpy(code+5,&offset,4);
+  memcpy(code+9,sal_3_rax,4);
+  memcpy(code+13,add_rdi_rax,3);
+  uint8_t rex_r;
+  if(reg1>=0x8){
+    rex_r = 1;
+    reg1&=(~0x8);
+  }
+  uint8_t rex_byte=make_rex(1,rex_r,0,0);
+  uint8_t modrm_byte=make_modrm(0x0,reg1,RAX);
+  uint8_t mov_op[3]={rex_byte,INTEL_MOV,modrm_byte};
+  memcpy(code+16,mov_op,3);
+  return code;
+
 }
 static inline void* encode_ldind(uint8_t reg1,uint8_t reg2,uint32_t offset){
+    /* movq reg2,%rax //3
+     addq offset,%rax //6
+     salq $3,%rax // 4
+     addq %rdi,%rax //3
+     movq (%rax),reg1 //3
+  */
+  static uint8_t code[19];
+  doubleword mov_reg2_rax=encode_binop(INTEL_MOV,reg2,RAX);
+  memcpy(code,mov_reg2_rax.uint8,3);
+  memcpy(code+3,add_imm_rax,2);
+  memcpy(code+5,&offset,4);
+  memcpy(code+9,sal_3_rax,4);
+  memcpy(code+13,add_rdi_rax,3);
+  uint8_t rex_b;
+  if(reg1>=0x8){
+    rex_b = 1;
+    reg1&=(~0x8);
+  }
+  uint8_t rex_byte=make_rex(1,0,0,rex_b);
+  uint8_t modrm_byte=make_modrm(0x0,reg1,RAX);
+  uint8_t mov_op[3]={rex_byte,INTEL_MOV_MEM,modrm_byte};
+  memcpy(code+16,mov_op,3);
+  return code;
+
 }
-static inline void* encode_stind(){}
 static inline quadword  encode_store(uint8_t reg,uint32_t offset){
   uint8_t rex_r;
   if(reg>=0x8){
@@ -613,13 +660,13 @@ static inline quadword  encode_store(uint8_t reg,uint32_t offset){
 }
 static inline quadword  encode_load(uint8_t reg,uint32_t offset){
   //movq reg1,offset(%rdi)
-  uint8_t rex_b;
+  uint8_t rex_r;
   if(reg>=0x8){
-    rex_b = 1;
+    rex_r = 1;
     reg&=(~0x8);
   }
-  uint8_t rex_byte=make_rex(1,0,0,rex_b);
-  uint8_t modrm_byte=make_modrm(0x2,RDI,reg);
+  uint8_t rex_byte=make_rex(1,rex_r,0,0);
+  uint8_t modrm_byte=make_modrm(0x2,reg,RDI);
   quadword retval;
   retval.uint8[0]=rex_byte;
   retval.uint8[1]=INTEL_MOV_MEM;
@@ -644,7 +691,6 @@ static inline uint8_t *encode_bgt(uint8_t reg1,uint8_t reg2){
 static inline uint8_t *encode_beq(uint8_t reg1,uint8_t reg2){
   return encode_branch(reg1,reg2,INTEL_JMP_EQ);
 }
-
 //#include "translate_binary.h"
 //not hygenic, but I do this enough that it's worth putting into a macro
 #ifdef DEBUG
@@ -667,7 +713,8 @@ static void print_header(vm_word in,vm_word out,vm_word obj);
   if(_reg<0){goto INVALID_REGISTER;}
 //simple linked list to keep track of branches to resolve
 struct branch_list {
-  uint32_t branch_ind;
+  uint32_t branch_ind;//vm_adress/index in adress translation array
+  uint32_t branch_dest;
   uint8_t *addr_dest;//fill this place in at the end
   struct branch_list *next;
 };
@@ -722,7 +769,8 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
     uint8_t reg1,reg2;
     intel_addresses[vm_i]=buf_i;
     op.bits=vm_obj->objcode[vm_i++];//fetch and increment ip/pc
-    MSG("vm_op = %#0x\nop=%d\n",op.bits,op.op.op);
+    MSG("op=%d\n",op.bits,op.op.op);
+    MSG("intel_adress = %#0x\n",buf_i);
     //I'd use dispatch tables if this were performance critical code
     //or I knew I'd need to use it later, but being as this is
     //just a one off assignment switches should be fine
@@ -735,7 +783,6 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
       case VM_LOAD:{//->mov offset(%rdi),reg
         if(buf_i+7>len){goto LENGTH_ERROR;}
         check_reg(reg1);
-        MSG("address = %d\n",(int)op.op_reg_addr.addr);
         int32_t dest=(int)vm_i+(int)op.op_reg_addr.addr;
         if(dest>(data_words+1) || dest<0){goto INVALID_MEMORY_ACCESS;}
         dest<<=3;
@@ -746,7 +793,6 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
       }
       case VM_STORE:{//->mov reg,offset(%rdi)
         if(buf_i+7>len){goto LENGTH_ERROR;}
-        MSG("address = %d\n",op.op_reg_addr.addr);
         check_reg(reg1);
         int32_t dest=(int)vm_i+(int)op.op_reg_addr.addr;
         if(dest>(data_words+1) || dest<0){goto INVALID_MEMORY_ACCESS;}
@@ -756,22 +802,42 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
         buf_i+=7;
         continue;
       }
-      case VM_LDIMM:{//->mov imm32,reg
-        if(buf_i+7>len){goto LENGTH_ERROR;}       
+      case VM_LDADDR:{//->mov offset,reg,add %rdi,reg
+        if(buf_i+7>len){goto LENGTH_ERROR;}
         check_reg(reg1);
-        MSG("op.op_reg_imm.reg=%d\nreg=%d\n",op.op_reg_imm.reg,reg1);
+        int32_t dest=(int)vm_i+(int)op.op_reg_addr.addr;
+        if(dest>(data_words+1) || dest<0){goto INVALID_MEMORY_ACCESS;}
+        quadword code=encode_ldimm(reg1,dest);
+        memcpy(buf+buf_i,code.uint8,7);
+        buf_i+=7;
+        continue;
+      }
+        //        if(buf_i+___>len){goto LENGTH_ERROR;}
+      case VM_LDIMM:{//->mov imm32,reg
+        if(buf_i+7>len){goto LENGTH_ERROR;}
+        check_reg(reg1);
         quadword code=encode_ldimm(reg1,op.op_reg_imm.imm);
         memcpy(buf+buf_i,code.uint8,7);
         buf_i+=7;
         continue;
       }
-      case VM_LDADDR://->mov offset,reg,add %rdi,reg
-        //        if(buf_i+___>len){goto LENGTH_ERROR;}
+
       case VM_LDIND:{//->mov offset(%rdi,reg2),reg1
-        //        check_regs(reg1,reg2);
-        //        int32_t offset=(int)vm_i+(int)op.op_reg_reg_offset.offset;
+        if(buf_i+19>len){goto LENGTH_ERROR;}
+        check_regs(reg1,reg2);
+        uint8_t *code=encode_ldind(reg1,reg2,op.op_reg_reg_offset.offset);
+        memcpy(buf+buf_i,code,19);
+        buf_i+=19;
+        continue;
       }
-      case VM_STIND://->mov reg1,offset(%rdi,reg2)
+      case VM_STIND:{//->mov reg1,offset(%rdi,reg2)
+        if(buf_i+19>len){goto LENGTH_ERROR;}
+        check_regs(reg1,reg2);
+        uint8_t *code=encode_stind(reg1,reg2,op.op_reg_reg_offset.offset);
+        memcpy(buf+buf_i,code,19);
+        buf_i+=19;
+        continue;
+      }
     //add/sub use the same code, except the opcode, obviously
     //-> add/sub reg1,reg2, or add/sub imm32,reg
       case VM_ADDI:
@@ -816,7 +882,8 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
                           INTEL_JMP_EQ));
         check_regs(reg1,reg2);
         uint8_t *code=encode_branch(reg1,reg2,opcode);
-        branches->branch_ind=vm_i;
+        branches->branch_ind=vm_i;        
+        branches->branch_dest=dest;
         branches->addr_dest=buf+buf_i+5;
         branches->next=alloca(sizeof(struct branch_list));
         branches=branches->next;
@@ -824,16 +891,40 @@ void translateBinary(char *vm_objfile_name,void *buf_ptr,int64_t len){
         buf_i+=9;
         continue;
       }
-      case VM_JMP:
+      case VM_JMP:{
+        if(buf_i+5>len){goto LENGTH_ERROR;}
+        //destination in vm code
+        int32_t dest=(int)vm_i+(int)op.op_addr.addr;
+        //if the jmp jumps into the data section or past
+        //the end of the program it's an error
+        if(dest>vm_len || dest<(data_words+1)){goto ILLEGAL_BRANCH;}
+        branches->branch_ind=vm_i;
+        branches->branch_dest=dest;
+        branches->addr_dest=buf+buf_i+1;
+        branches->next=alloca(sizeof(struct branch_list));
+        branches=branches->next;
+        *(buf+buf_i)=INTEL_JMP;
+        buf_i+=5;
+        continue;
+      }
       default:
         goto ILLEGAL_INSTRUCTION;
     }
   }
-  if(branches != branch_list){
-    //resolve branches
-    branches->next=0;
+  //insert a ret if we need one
+  if(op.op.op != VM_HALT){
+    if(buf_i+1>len){goto LENGTH_ERROR;}
+    buf[buf_i]=INTEL_RET;
+    buf_i++;
+  }
+  //resolve branches
+  branches->next=0;
+  if(branch_list != branches){
     while(branch_list->next){
-      uint32_t addr=intel_addresses[branch_list->branch_ind];
+      uint32_t addr=intel_addresses[branch_list->branch_dest]-
+        intel_addresses[branch_list->branch_ind];
+      MSG("translating vm address %#0x to intel adress %#0x\n",
+          branch_list->branch_ind,addr);
       memcpy(branch_list->addr_dest,&addr,4);
       branch_list=branch_list->next;
     }

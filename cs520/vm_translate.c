@@ -18,7 +18,7 @@
   cmpl %edi,%esi
   jl/jg/je %edx
   ret
-  
+
   cmpxchg -> lock cmpxchgl
 
 */
@@ -54,17 +54,17 @@ static inline uint8_t encode_ret(){//hlt -> retq
 //any register in the following is an intel register, not a vm registerv
 static inline doubleword encode_binop(uint8_t op,uint8_t reg1,uint8_t reg2){
   uint8_t rex_r=0,rex_b=0;
-  if(reg2>=0x8){
+  if(reg1>=0x8){
     rex_r = 1;
     reg1&=(~0x8);
   }
-  if(reg1>=0x8){
+  if(reg2>=0x8){
     rex_b = 1;
     reg2&=(~0x8);
   }
   uint8_t modrm_byte=make_modrm(0x3,reg1,reg2);
   uint8_t rex_byte=make_rex(1,rex_r,0,rex_b);
-  doubleword retval={.uint8={modrm_byte,rex_byte,op}};
+  doubleword retval={.uint8={rex_byte,op,modrm_byte}};
   return retval;
 }
 static inline quadword encode_imm_binop(uint8_t op,uint8_t reg,
@@ -80,7 +80,7 @@ static inline quadword encode_imm_binop(uint8_t op,uint8_t reg,
   retval.uint8[0]=rex_byte;
   retval.uint8[1]=op;
   retval.uint8[2]=modrm_byte;
-  memcpy(retval.uint8+3,imm.uint8,4);  
+  memcpy(retval.uint8+3,imm.uint8,4);
   return retval;
 }
 static inline doubleword encode_add(uint8_t reg1,uint8_t reg2){
@@ -95,53 +95,54 @@ static inline doubleword encode_cmp(uint8_t reg1,uint8_t reg2){
 //15 bytes of object code
 static inline uint8_t* encode_mul(uint8_t reg1,uint8_t reg2){
   static uint8_t objcode[15];//static so that I can return it's adress
-  //I assume we return just the low 32 bits  
+  //I assume we return just the low 32 bits
   //movq %rdx,%rsi // 3*8
   memcpy(objcode,mov_rdx_rsi,3);
   //movq %reg1,%rax //3*8
-  memcpy(objcode+3,encode_binop(reg1,RAX,INTEL_MOV).uint8,3);
+  memcpy(objcode+3,encode_binop(INTEL_MOV,reg2,RAX).uint8,3);
   //mulq %reg2 //3*8
-  uint8_t rex_r;
+  uint8_t rex_b;
   if(reg1>=0x8){
-    rex_r = 1;
+    rex_b = 1;
     reg2&=(~0x8);
   }
-  uint8_t rex_byte_mul=make_rex(1,rex_r,0,0);
-  uint8_t modrm_byte_mul=make_modrm(0x3,0x7,reg1);
+  uint8_t rex_byte_mul=make_rex(1,0,0,rex_b);
+  uint8_t modrm_byte_mul=make_modrm(0x3,0x5,reg1);
   objcode[6]=rex_byte_mul;
   objcode[7]=INTEL_MUL;
   objcode[8]=modrm_byte_mul;
-  //movq %rax, %reg2 //3*8
-  memcpy(objcode+9,encode_binop(RAX,reg2,INTEL_MOV).uint8,3);
   //movq %rsi,%rdx
-  memcpy(objcode+12,mov_rsi_rdx,3);
+  memcpy(objcode+9,mov_rsi_rdx,3);
+  //movq %rax, %reg2 //3*8
+  memcpy(objcode+12,encode_binop(INTEL_MOV,RAX,reg2).uint8,3);
+
   return objcode;
 }
 //18 bytes of object code
 static inline uint8_t* encode_div(uint8_t reg1,uint8_t reg2){
   static uint8_t objcode[18];
-  //I assume we return just the low 32 bits  
+  //I assume we return just the low 32 bits
   //movq %rdx,%rsi // 3*8
   memcpy(objcode,mov_rdx_rsi,3);
   //movq %reg1,%rax //3*8
-  memcpy(objcode+3,encode_binop(reg1,RAX,INTEL_MOV).uint8,3);
+  memcpy(objcode+3,encode_binop(INTEL_MOV,reg2,RAX).uint8,3);
   //xorq %rdx,%rdx
   memcpy(objcode+6,xor_rdx,3);
   //mulq %reg2 //3*8
-  uint8_t rex_r;
+  uint8_t rex_b;
   if(reg1>=0x8){
-    rex_r = 1;
-    reg2&=(~0x8);
+    rex_b = 1;
+    reg1&=(~0x8);
   }
-  uint8_t rex_byte_mul=make_rex(1,rex_r,0,0);
+  uint8_t rex_byte_mul=make_rex(1,0,0,rex_b);
   uint8_t modrm_byte_mul=make_modrm(0x3,0x7,reg1);
   objcode[9]=rex_byte_mul;
-  objcode[10]=INTEL_MUL;
+  objcode[10]=INTEL_DIV;
   objcode[11]=modrm_byte_mul;
-  //movq %rax, %reg2 //3*8
-  memcpy(objcode+12,encode_binop(RAX,reg2,INTEL_MOV).uint8,3);
   //movq %rsi,%rdx
-  memcpy(objcode+15,mov_rsi_rdx,3);
+  memcpy(objcode+12,mov_rsi_rdx,3);
+  //movq %rax, %reg2 //3*8
+  memcpy(objcode+15,encode_binop(INTEL_MOV,RAX,reg2).uint8,3);
   return objcode;
 }
 static inline quadword encode_add_imm(uint8_t reg1,uint32_t imm){
@@ -175,9 +176,6 @@ static inline quadword encode_known_jmp(uint32_t addr){
   memcpy(retval.uint8+1,&addr,4);
   return retval;
 }
-//one of reg1/reg2 might to an adress
-static inline void* encode_mov(uint8_t reg1,uint8_t reg2){
-}
 static inline quadword encode_ldimm(uint8_t reg,uint32_t imm){
   uint8_t rex_b;
   if(reg>=0x8){
@@ -192,16 +190,60 @@ static inline quadword encode_ldimm(uint8_t reg,uint32_t imm){
   retval.uint8[2]=modrm_byte;
   memcpy(retval.uint8+3,&imm,4);
   return retval;
-  
+
 }
-//addr will always be in data section,
-//assume that the address passed here is ready to be used
-static inline void* encode_ldaddr(uint8_t reg,uint32_t addr){
-  
+static inline void* encode_stind(uint8_t reg1,uint8_t reg2,uint32_t offset){
+  /* movq reg2,%rax //3
+     addq offset,%rax //6
+     salq $3,%rax // 4
+     addq %rdi,%rax //3
+     movq reg1,(%rax) //3  
+*/
+  static uint8_t code[19];
+  doubleword mov_reg2_rax=encode_binop(INTEL_MOV,reg2,RAX);
+  memcpy(code,mov_reg2_rax.uint8,3);
+  memcpy(code+3,add_imm_rax,2);
+  memcpy(code+5,&offset,4);
+  memcpy(code+9,sal_3_rax,4);
+  memcpy(code+13,add_rdi_rax,3);
+  uint8_t rex_r;
+  if(reg1>=0x8){
+    rex_r = 1;
+    reg1&=(~0x8);
+  }
+  uint8_t rex_byte=make_rex(1,rex_r,0,0);
+  uint8_t modrm_byte=make_modrm(0x0,reg1,RAX);
+  uint8_t mov_op[3]={rex_byte,INTEL_MOV,modrm_byte};
+  memcpy(code+16,mov_op,3);
+  return code;
+
 }
 static inline void* encode_ldind(uint8_t reg1,uint8_t reg2,uint32_t offset){
+    /* movq reg2,%rax //3
+     addq offset,%rax //6
+     salq $3,%rax // 4
+     addq %rdi,%rax //3
+     movq (%rax),reg1 //3
+  */
+  static uint8_t code[19];
+  doubleword mov_reg2_rax=encode_binop(INTEL_MOV,reg2,RAX);
+  memcpy(code,mov_reg2_rax.uint8,3);
+  memcpy(code+3,add_imm_rax,2);
+  memcpy(code+5,&offset,4);
+  memcpy(code+9,sal_3_rax,4);
+  memcpy(code+13,add_rdi_rax,3);
+  uint8_t rex_b;
+  if(reg1>=0x8){
+    rex_b = 1;
+    reg1&=(~0x8);
+  }
+  uint8_t rex_byte=make_rex(1,0,0,rex_b);
+  uint8_t modrm_byte=make_modrm(0x0,reg1,RAX);
+  uint8_t mov_op[3]={rex_byte,INTEL_MOV_MEM,modrm_byte};
+  memcpy(code+16,mov_op,3);
+  return code;
+
 }
-static inline void* encode_stind(){}
 static inline quadword  encode_store(uint8_t reg,uint32_t offset){
   uint8_t rex_r;
   if(reg>=0x8){
@@ -219,13 +261,13 @@ static inline quadword  encode_store(uint8_t reg,uint32_t offset){
 }
 static inline quadword  encode_load(uint8_t reg,uint32_t offset){
   //movq reg1,offset(%rdi)
-  uint8_t rex_b;
+  uint8_t rex_r;
   if(reg>=0x8){
-    rex_b = 1;
+    rex_r = 1;
     reg&=(~0x8);
   }
-  uint8_t rex_byte=make_rex(1,0,0,rex_b);
-  uint8_t modrm_byte=make_modrm(0x2,RDI,reg);
+  uint8_t rex_byte=make_rex(1,rex_r,0,0);
+  uint8_t modrm_byte=make_modrm(0x2,reg,RDI);
   quadword retval;
   retval.uint8[0]=rex_byte;
   retval.uint8[1]=INTEL_MOV_MEM;
@@ -250,4 +292,3 @@ static inline uint8_t *encode_bgt(uint8_t reg1,uint8_t reg2){
 static inline uint8_t *encode_beq(uint8_t reg1,uint8_t reg2){
   return encode_branch(reg1,reg2,INTEL_JMP_EQ);
 }
-

@@ -26,10 +26,20 @@
   (make-re-pattern "(" re ")" "(" seperator re ")*"))
 (defn make-re-list [re]
   (make-seperated-re re (strcat ws-opt "," ws-opt)))
+
+;;So a type is one of, a built-in type, a type query (i.e typeof value),
+;;a type-reference, which is a type-name (a qualified identifier), if 
+;;the type is a generic type it must be followed by a list of types
+;;qualifing it, or a literal type which is one of 
+;;an array type (element-type []), 
+;;a function type (<types...> (params...) => return-type
+;;a constructor type (just a function type with a leading new)
+;;or an object type (all other literals are just shorthand for object literals)
+;;an object type is really complicated, so I'll explain it elsewhere
 (defn ash [integer count]
-  (if (>= 0 count)
+  (if (>= count 0)
     (bit-shift-left integer count)
-    (bit-shift-right integer count)))
+    (bit-shift-right integer (- count))))
 (defn strtol [str]
   (try
     (java.lang.Long/parseLong  str)
@@ -137,8 +147,24 @@
   (make-re-union object-type array-type function-type constructor-type))
 (def Type
   (make-re-union predefined-type type-reference type-query type-literal))
-(defn parse-escape [esc & rest]
-  (case esc
+(defn parse-escape [str];assume str starts one character after a \
+  (let [[esc & rest] str]
+  (letfn [(isdigit [x] (and (> x 0x2F) (< x 0x3A)))
+          (strtol-hex 
+            ([a b] 
+               (if (and (isdigit a) (isdigit b))
+                 (+ (bit-shift-left (- a 0x3) 4)
+                    (- b 0x30)))
+               nil)
+            ([a b c d] 
+               (if (and (isdigit a) (isdigit b)
+                        (isdigit c) (isdigit d))
+                 (+ (bit-shift-left (- a 0x3) 12)
+                    (bit-shift-left (- b 0x30) 8)
+                    (bit-shift-left (- c 0x30) 4)
+                    (- d 0x30))
+                 nil)))]
+    (case esc
     (\' [\' rest])
     (\" [\" rest])
     (\\ [\\ rest])
@@ -149,6 +175,10 @@
     (\f [\u000c rest]);form feed
     (\r [\u000d rest]);carriage return
     (\0 [\u0000 rest])
-    (\x (let [[a b & c] rest]
-          (if (strtol (str "0x" a b))
-            
+    (\x (let [[a b & c] rest
+              num (strtol-hex a b)]
+          (if num [(char num) c]  nil)));maybe raise exception
+    (\u (let [[a b c d & e] rest
+              num (strtol-hex a b c d)]
+          (if num [(char num) e]  nil)));maybe raise exception
+    [esc rest]))))

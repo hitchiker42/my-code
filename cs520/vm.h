@@ -1,5 +1,6 @@
 #ifndef CS520_VM
 #define CS520_VM
+#pragma GCC diagnostic ignored "-Wunused-variable"
 //bits/mman.h doesn't define all the flags we need
 #include <alloca.h>
 #include <asm/mman.h>
