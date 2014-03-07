@@ -9,6 +9,7 @@
 ;;We need an option type, what's the best way to do that?
 (ns typescript
   (:use [clojure.string :as string :only (join)])
+  (:require [instaparse.core :as yy])
   (:import java.util.regex.Pattern))
 
 ;;Various convience functions for constructing regular expressions
