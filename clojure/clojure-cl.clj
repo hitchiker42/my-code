@@ -379,6 +379,11 @@
   `(try
      ~bodyform
      ~(mapcat (fn [cell] `(catch ~(first cell) ~var ~(rest cell))) handlers)))
+(defmacro dolist-cons [[var list] & body]
+  `(loop [~var (car list)]
+     ~@body
+     (if (
+  
 ;(defmacro cons-destructuring-bind [args expr &rest body]
 ;  `(let ~(vec (mapcat (
 ;(defmacro do [vars test & body]
