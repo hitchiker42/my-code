@@ -8,6 +8,8 @@
 /* Almost completely self contained with one exception,
    We call the c exit function rather than making the exit syscall
    because the assignment says to use the c exit function.
+   if jumps to exit were replaced my jumps to my_exit it would
+   be completely self contained
 
 
    I do all output using the write syscall, and I wrote a simple
@@ -201,7 +203,7 @@ LOCAL_ENTRY base_handler
         write
 
         movq %rbx,%rdi
-        jmp my_exit
+        jmp exit
 END base_handler
 /*Handle error caused by calling throwException with a 0 argument*/
 LOCAL_ENTRY zero_handler
@@ -212,7 +214,7 @@ LOCAL_ENTRY zero_handler
         cmpq $-4095, %rax
         /*if we get a syscall error return that as the program exit value*/
         cmovae %rax,%rdi
-        jmp my_exit
+        jmp exit
 END zero_handler
 
 /*Allocate memory*/
@@ -340,7 +342,7 @@ itoa_mem:
         .size	exception_stack, 3200
 exception_stack:
         .zero	3200*/
-/*defines digits as an array of characters '0'-'9'*/
+//get back to data section
 	.data
 deflocal digits
 digits:

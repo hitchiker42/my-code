@@ -47,7 +47,7 @@ int main(int argc, char*argv[])
   }
   fprintf(stderr, "main exiting\n");
   cancelCatchException();
-  throwException(1);
+  throwException(1888);
   return 0;
 }
 
