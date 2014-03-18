@@ -5,7 +5,16 @@
         void throwException(int exception_number);
         //jumps to current exception handler
 */
-
+/* A decent ammount of code was taken from setjmp.S for x86_64 
+   in glibc. meaning that this code is technically licensed under the 
+   gnu gpl v3*/
+/* Quick note to self 
+   for some value x
+   x:      
+        .quad <number>
+   movq x,%rax moves the value of x (i.e the location of x) into rax
+   movq x(%rip),%rax moves the value of <number> into rax
+*/
 /*Macros*/
 .macro ENTRY name
         .globl \name;
@@ -64,7 +73,7 @@ str:
         .quad str
 .endm
 /*Symbolic constansts for offsets, because that's what you'd
-  do in a higher lever language*/        
+  do in a higher level language*/        
 .LJB_RBX=0
 .LJB_RBP=1
 .LJB_R12=2
@@ -78,9 +87,9 @@ str:
 .text
 /*Cancel exception handler*/
 ENTRY cancelCatchException
-        movq current_exception(%rip),%rax
-        movq 56(%rax),%rcx
-        movq %rcx,current_exception(%rip)
+        movq current_exception,%rax
+        movq (.LJB_NXT*8)(%rax),%rcx
+        movq %rcx,current_exception
         retq
 END cancelCatchException
 /*establish exception handler*/
@@ -101,9 +110,9 @@ ENTRY catchException
         movq (%rsp), %rax	/* Save adress we are returning to now.  */
         movq %rax, (.LJB_RIP*8)(%rdi)
         /*make new exception head of exception list*/
-        movq current_exception(%rip),%rcx
+        movq current_exception,%rcx
         movq %rcx,(.LJB_NXT*8)(%rdi)
-        movq %rdi,current_exception(%rip)
+        movq %rdi,current_exception
         xorl %eax, %eax
         retq
 END catchException
@@ -114,14 +123,16 @@ END catchException
    in essence calls longjmp(global_jmp_buf,exception_number)*/
 ENTRY throwException
         /*restore last exception*/
-        movq current_exception(%rip),%rsi /*load current offset address*/
-        movq 56(%rax),%rcx /*copy adress of previous exception handler*/
-        movq %rcx,current_exception(%rip) /*restore previous handler*/
+        testq %rdi,%rdi
+        jz zero_handler
+        movq current_exception,%rsi /*load current offset address*/
+        movq (.LJB_NXT*8)(%rsi),%rcx /*copy adress of previous exception handler*/
+        movq %rcx,current_exception /*restore previous handler*/
         /* Restore registers.  */
         movq (.LJB_RSP*8)(%rsi),%r8
         movq (.LJB_RBP*8)(%rsi),%r9
         movq (.LJB_RIP*8)(%rsi),%rdx
-        /* We add unwind information for the target here.  */
+        /* We add unwind information here.*/
         .cfi_def_cfa %rsi,0
         .cfi_register %rsp,%r8
         .cfi_register %rbp,%r9
@@ -144,10 +155,13 @@ ENTRY throwException
 END throwException
 
 LOCAL_ENTRY base_handler
+        movq %rsp,%rbp
         pushq %rdi
         movq %rdi,%rdx
         movq no_exception(%rip), %rsi
         movq stderr(%rip), %rdi
+        xorl %eax,%eax /*%al is the number of xmm args passed 
+                         to a vaarg function, so we need to clear it */
         callq fprintf
         popq %rdi
         callq exit
@@ -156,6 +170,7 @@ END base_handler
 LOCAL_ENTRY zero_handler
         movq zero_exception(%rip),%rsi
         movq stderr(%rip),%rdi
+        xorl %eax,%eax
         callq fprintf
         movq $-1,%rdi
         callq exit
@@ -182,17 +197,29 @@ defstring zero_exception "Error 0 passed as argument to throwException\n"
 defglobal current_exception
 current_exception:      
         .quad base_exception
-defglobal base_exception 64
 
+defglobal base_exception 72
 base_exception: 
+	.quad	0 /*rbx*/
+        .quad   temp_stack+4096*3 /*rbp*/
+	.quad	0 /*r12-15*/
 	.quad	0
 	.quad	0
 	.quad	0
-	.quad	0
-	.quad	0
-	.quad	0
-	.quad	base_handler
-	.quad	base_exception
+        .quad   temp_stack+4096*3 /*rsp*/
+	.quad	base_handler /*rip*/
+	.quad	base_exception /*pointer to next exception*/
+/*Only a tiny bit of a massive hack here, since we can't know the stack
+  top at assemble time and I set rsp before I jump to my exception handler
+  I setup a temporary stack ala sigaltstack to deal with stuff
+*/
+defglobal temp_stack\
+        .bss
+        .align 32
+	.type	temp_stack, @object
+	.size	temp_stack, 4096*6
+temp_stack:     
+        .zero 4096*6
 /* I suppose we should probably use a stack...
 	.globl	exception_stack
 	.bss
