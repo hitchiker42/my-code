@@ -91,6 +91,22 @@ str:
         .quad str
 .endm
 
+/*Allocate an array of quadwords*/
+.macro defarray_sized name size init:vararg
+        .data
+        .align 8
+        .type \name, @object
+\name\():
+        .irp elem \init
+        \size \elem
+        .endr
+        .size \name, .-\name
+.endm
+
+.macro defarray name init:vararg
+defarray_sized \name .quad \init
+.endm
+
 /*write string in %rdi to stderr*/
 .macro write
         movq %rdi,%rsi /*move string to second arg*/
@@ -105,8 +121,18 @@ str:
         movq $1,%rax /*syscall number for write*/
         syscall /*calls write(ind fd, const void* but,size_t count)*/
 .endm
-/*Symbolic constansts for offsets of saved registers,
-  because that's what you'd do in a higher level language*/
+
+.macro L name
+        \name\():
+.endm
+
+.macro gen_label
+        .LG\@:
+        .set .LLabel,.LG\@
+.endm
+
+/*Symbolic constansts for offsets of saved because,
+  registers that's what you'd do in a higher level language*/
 .LJB_RBX = 0
 .LJB_RBP = 1
 .LJB_R12 = 2
@@ -243,14 +269,14 @@ LOCAL_ENTRY itoa_10
         xorq %rcx,%rcx
         movl %edi, %eax
         movl $10, %esi
-.L0:
+gen_label
         cltd /*sign extend %eax into %edx:%eax*/
         idivl %esi
         movzbl digits(%edx), %edx /* load character into edx */
         movb %dl,itoa_mem_end(%rcx)
         decq %rcx
         testl %eax,%eax
-        jnz .L0
+        jnz .LLabel
         leaq itoa_mem_end(%rcx) ,%rax
         incq %rax
         xorq %rdx,%rdx
@@ -286,17 +312,9 @@ deflocal current_exception
 current_exception:
         .quad base_exception
 
-deflocal base_exception 72
-base_exception:
-        .quad	0 /*rbx*/
-        .quad   temp_stack+4096*3 /*rbp*/
-        .quad	0 /*r12-15*/
-        .quad	0
-        .quad	0
-        .quad	0
-        .quad   temp_stack+4096*3 /*rsp*/
-        .quad	base_handler /*rip*/
-        .quad	base_exception /*pointer to next exception*/
+.local base_exception
+defarray base_exception 0, temp_stack+4096*3, 0, 0, 0, 0, temp_stack+4096*3, base_handler, base_exception
+
 deflocal mempointer
 mempointer:
         .quad temp_stack
