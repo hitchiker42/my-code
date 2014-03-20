@@ -351,16 +351,8 @@ itoa_mem_end:
         .size iota_mem, 128
 itoa_mem:
         .zero 128
-
-/* I suppose we should probably use a stack...
-        .globl	exception_stack
-        .bss
-        .align 32
-        .type	exception_stack, @object
-        .size	exception_stack, 3200
-exception_stack:
-        .zero	3200*/
 //get back to data section
+//slashes are comments
 	.data
 deflocal digits
 digits:

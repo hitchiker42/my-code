@@ -1,3 +1,12 @@
+/*Constants*/
+.LNR_WRITE = $1
+.LNR_EXIT = $60
+.LNR_FUTEX = $202
+.LFUTEX_WAIT = $0
+.LFUTEX_WAKE = $1
+.LFUTEX_FD = $2
+.LFUTEX_REQUEUE = $3
+.LFUTEX_CMP_REQUEUE = $4
 /*Macros*/
 /*begin global function*/
 
@@ -46,7 +55,7 @@ defvar \name .local \size \align \type
 \visiblity \name
 LOCAL str
 /*read only data section, "aMS" means allocatable,mergable,
-  and contains strings, @progbits indicates it contines data 
+  and contains strings, @progbits indicates it contines data
   and 1 indicates that each data element is one byte*/
         .section	.rodata.str,"aMS",@progbits,1
 str:
@@ -73,14 +82,16 @@ str:
         movq $-2,%rdx
         .endif
         subq %rcx,%rdx
-        movq $\fd,%rdi 
-        movq $1,%rax /*syscall number for write*/
+        movq $\fd,%rdi
+        movq .LNR_WRITE,%rax /*syscall number for write*/
         syscall /*calls write(ind fd, const void* but,size_t count)*/
 .endm
 
 /*simple wrapper for the exit syscall*/
+/*if error checking is needed compare rax with -4095, */
+/*if above or equal there's an error*/
 .macro my_exit
-        movq $60,%rax
+        movq .LNR_EXIT,%rax
         syscall
 .endm
 /*just so syscall looks a bit more like a normal instruction*/
@@ -95,7 +106,7 @@ str:
 .endm
 
 
-/*generate a unique label of the name .L_G<N> where N is the number of macros 
+/*generate a unique label of the name .L_G<N> where N is the number of macros
   executed so far during assembly, the most recently defined label is stored
   in the symbol .LLabel, if a label is needed past the next call to gen label
   the value of .LLabel should be stored in another symbol*/
@@ -104,13 +115,11 @@ str:
         .set .LLabel,.L_G\@
 .endm
 
-
 /*perform a conditional jump over one instruction using a temporary label*/
 .macro jump_over jmp_op:req instr:req
         \jmp_op .L_G\@
         \instr
-        .L_G\@:
-.endm
+        .L_G\@:.endm
 /*perform a conditional jump if not equal over one instruction using a temporary label*/
 .macro jne_over instr:req
         jump_over jne \instr
@@ -146,7 +155,7 @@ str:
         .size \name,\size
 \name\():
         .zero \size
-.endm 
+.endm
 
 .macro defarray_typed name elemsize init:vararg
         .data
@@ -157,7 +166,7 @@ str:
         \size \elem
         .endr
         .size \name, .-\name
-.endm 
+.endm
 
 .macro defarray name init:vararg
 defarray_typed \name .quad \init
@@ -169,3 +178,62 @@ defarray_typed \name .quad \init
 .macro zerol reg:req
         xorl \reg,\reg
 .endm
+
+/*int futex(int *uaddr, int op, int val, const struct timespec *timeout,
+        int *uaddr2, int val3);*/
+
+/*Effectively this unlocks a futex*/
+ENTRY futex_up
+        lock addq $1,(%rdi)
+        testq $1,(%rdi)
+        /*assume most common case is the uncontested case*/
+        jne_over retq
+        /*if we get here it's contested*/
+        movq $1,(%rdi)
+        movq .LFUTEX_WAKE,%rsi
+        movq $1,%rdx
+        my_syscall .LNR_FUTEX
+        retq
+END futex_up
+
+/*Effectively this locks a futex*/
+ENTRY futex_down
+        lock subq $1,(%rdi)
+        cmpq $0,%rdi
+        /*if non contendend rdi is 0*/
+        jne_over retq
+        /*again if we get here it's contended*/
+        movq $-1,(%rdi)
+        movq $-1,%rdx
+        movq .LFUTEX_WAIT,%rsi
+        /*fourth argument is a timer, for now just wait forever*/
+        xorq %rcx,%rcx
+        my_syscall .LNR_FUTEX
+        renq
+END futex_down
+
+ENTRY run_with_futex /*uint64_t* futex,(void*)(*f)(void*),void* arg*/
+        pushq %rbx /*used to store futex addr*/
+        /*will get clobbered by call to futex_down*/
+        /*I would move them to r8,r9, but I don't know if the syscall*/
+        /*clobbers them*/
+        pushq %rdx 
+        pushq %rsi
+        movq %rdi,%rbx /*save futex location in a callee saved register*/
+        callq futex_down /*lock futex*/
+        popq %rcx /*function to call*/
+        popq %rdi /*argument*/
+        callq *%rcx /*call function*/
+        movq %rbx,%rdi /*restore futex addr*/
+        callq futex_up /*unlock futex*/
+        popq %rbx /*restore rbx*/
+        retq
+END run_with_futex
+
+/*try to lock futex, don't wait if we fail to lock it */
+ENTRY futex_trylock
+        xorq %rsi,%rsi
+        movq $1,%rax
+        lock cmpxchgq %rsi,(%rdi)
+        retq /*if succssful rax will be 1*/
+END futex_trylock
