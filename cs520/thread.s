@@ -1,12 +1,49 @@
 /*Constants*/
 .LNR_WRITE = $1
+.LNR_BRK = $12
+.LNR_SIGACTION = $13
+.LNR_CLONE = $56
 .LNR_EXIT = $60
+.LNR_WAIT = $61 /*really wait4, wait pid doesn't exist*/
+.LNR_GETTID = $186
+.LNR_TKILL = $200
 .LNR_FUTEX = $202
 .LFUTEX_WAIT = $0
 .LFUTEX_WAKE = $1
 .LFUTEX_FD = $2
 .LFUTEX_REQUEUE = $3
 .LFUTEX_CMP_REQUEUE = $4
+
+.LCSIGNAL =       0x000000ff /* Signal mask to be sent at exit.  */
+.LCLONE_VM =      0x00000100 /* Set if VM shared between processes.  */
+.LCLONE_FS =      0x00000200 /* Set if fs info shared between processes.  */
+.LCLONE_FILES =   0x00000400 /* Set if open files shared between processes.  */
+.LCLONE_SIGHAND = 0x00000800 /* Set if signal handlers shared.  */
+.LCLONE_PTRACE =  0x00002000 /* Set if tracing continues on the child.  */
+.LCLONE_VFORK =   0x00004000 /* Set if the parent wants the child to
+				     wake it up on mm_release.  */
+.LCLONE_PARENT =  0x00008000 /* Set if we want to have the same
+				     parent as the cloner.  */
+.LCLONE_THREAD =  0x00010000 /* Set to add to same thread group.  */
+.LCLONE_NEWNS =   0x00020000 /* Set to create new namespace.  */
+.LCLONE_SYSVSEM = 0x00040000 /* Set to shared SVID SEM_UNDO semantics.  */
+.LCLONE_SETTLS =  0x00080000 /* Set TLS info.  */
+.LCLONE_PARENT_SETTID = 0x00100000 /* Store TID in userlevel buffer
+					   before MM copy.  */
+.LCLONE_CHILD_CLEARTID = 0x00200000 /* Register exit futex and memory
+					    location to clear.  */
+.LCLONE_DETACHED = 0x00400000 /* Create clone detached.  */
+.LCLONE_UNTRACED = 0x00800000 /* Set if the tracing process can't
+				      force CLONE_PTRACE on this clone.  */
+.LCLONE_CHILD_SETTID = 0x01000000 /* Store TID in userlevel buffer in
+					  the child.  */
+.Lpthread_clone_flags = (.LCLONE_VM | .LCLONE_FS | .LCLONE_FILES | .LCLONE_SIGHAND
+		     | .LCLONE_SETTLS | .LCLONE_PARENT_SETTID
+		     | .LCLONE_CHILD_CLEARTID | .LCLONE_SYSVSEM
+		     | 0)
+.LCLONE_FLAGNS = (.LCLONE_VM | .LCLONE_FS | .LCLONE_FILES | .LCLONE_SIGHAND
+                  | .LCLONE_PARENT_SETTID)
+#endif
 /*Macros*/
 /*begin global function*/
 
