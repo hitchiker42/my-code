@@ -148,12 +148,16 @@ defarray_sized \name .quad \init
 ENTRY cancelCatchException
         movq current_exception,%rax
         movq (.LJB_NXT*8)(%rax),%rcx
+        testq %rax,%rcx
+        je 1f
+        subq $64,mempointer /*free memory*/
+1:      
         movq %rcx,current_exception
         retq
 END cancelCatchException
 /*establish exception handler*/
 ENTRY catchException
-        movq $64,%rdi
+        movq $72,%rdi
         callq malloc /*NOTE: this isn't the libc malloc, see below*/
         movq %rax,%rdi
 
@@ -164,6 +168,7 @@ ENTRY catchException
         movq %r13, (.LJB_R13*8)(%rdi)
         movq %r14, (.LJB_R14*8)(%rdi)
         movq %r15, (.LJB_R15*8)(%rdi)
+        /*puts (%rsp)+8 into rdx*/
         lea 8(%rsp), %rdx	/* Save SP as it will be after we return.  */
         movq %rdx, (.LJB_RSP*8)(%rdi)
         movq (%rsp), %rax	/* Save adress we are returning to now.  */
@@ -185,6 +190,7 @@ ENTRY throwException
         movq current_exception,%rsi /*load current offset address*/
         movq (.LJB_NXT*8)(%rsi),%rcx /*copy adress of previous exception handler*/
         movq %rcx,current_exception /*restore previous handler*/
+        subq $72,mempointer /*free memory*/
         /* Restore registers.  */
         movq (.LJB_RSP*8)(%rsi),%r8
         movq (.LJB_RBP*8)(%rsi),%r9
@@ -204,7 +210,7 @@ ENTRY throwException
         movq (.LJB_R13*8)(%rsi),%r13
         movq (.LJB_R14*8)(%rsi),%r14
         movq (.LJB_R15*8)(%rsi),%r15
-        /* Set return value for setjmp.  */
+        /* Set return value for catchException.  */
         mov %edi, %eax
         mov %r8,%rsp
         movq %r9,%rbp
@@ -249,6 +255,7 @@ LOCAL_ENTRY malloc
         addq %rdi,mempointer
         retq
 END malloc
+        
 
 /*really naive strlen, a better version (i.e the glibc version)
   would use simd instructions*/

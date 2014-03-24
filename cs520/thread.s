@@ -274,3 +274,73 @@ ENTRY futex_trylock
         lock cmpxchgq %rsi,(%rdi)
         retq /*if succssful rax will be 1*/
 END futex_trylock
+
+ENTRY write /*fd,string,len*/
+        movq .LNR_WRITE,%rax /*syscall number for write*/
+        syscall /*calls write(int fd, const void* but,size_t count)*/
+END write
+
+ENTRY brk
+        movq .LNR_BRK,%rax
+        syscall
+END brk
+
+ENTRY syscall_1
+        movq %rdi,%rax
+        movq %rsi,%rdi
+        syscall
+        retq
+END syscall_1
+
+ENTRY syscall_2
+        movq %rdi,%rax
+        movq %rsi,%rdi
+        movq %rdi,%rsi
+        syscall
+        retq
+END syscall_2
+
+ENTRY syscall_3
+        movq %rdi,%rax
+        movq %rsi,%rdi
+        movq %rdx,%rsi
+        movq %rcx,%rdx
+        syscall
+        retq
+END syscall_3
+
+ENTRY syscall_4
+        movq %rdi,%rax
+        movq %rsi,%rdi
+        movq %rdx,%rsi
+        movq %rcx,%rdx
+/*umm this is what glibc does...*/
+        movq %r8,%r10
+        syscall
+        retq
+END syscall_4
+
+ENTRY syscall_5
+        movq %rdi,%rax
+        movq %rsi,%rdi
+        movq %rdx,%rsi
+        movq %rcx,%rdx
+/*umm this is what glibc does...*/
+        movq %r8,%r10
+        movq %r9,%r8
+        syscall
+        retq
+END syscall_5
+
+ENTRY syscall_6
+        movq %rdi,%rax
+        movq %rsi,%rdi
+        movq %rdx,%rsi
+        movq %rcx,%rdx
+/*umm this is what glibc does...*/
+        movq %r8,%r10
+        movq %r9,%r8
+        movq 8(%rsp),%r9
+        syscall
+        retq
+END syscall_6
