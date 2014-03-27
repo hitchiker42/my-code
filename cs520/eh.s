@@ -18,9 +18,9 @@
    I use a really simple memory allocator, I allocate 6 pages of memory
    int the bss section and maintain a pointer to that memory. To allocate
    memory I simply increment that pointer by the desired size and return
-   the old value. Memory never gets freed and if more than 6 pages
-   get used it'll overwrite dynamically allocated memory, but that shouldn't
-   happen
+   the old value. To free memory I just decrement the pointer.
+   I've called by memory functions malloc and free (they're local symbols)
+   so it should be really easy to switch in the libc malloc and free
 */
 /* A decent ammount of code was taken from setjmp.S for x86_64
    in glibc. meaning that this code is technically licensed under the
@@ -148,12 +148,16 @@ defarray_sized \name .quad \init
 ENTRY cancelCatchException
         movq current_exception,%rax
         movq (.LJB_NXT*8)(%rax),%rcx
+        testq %rax,%rcx
+        je 1f
+        callq free /*not the libc free*/
+1:      
         movq %rcx,current_exception
         retq
 END cancelCatchException
 /*establish exception handler*/
 ENTRY catchException
-        movq $64,%rdi
+        movq $72,%rdi
         callq malloc /*NOTE: this isn't the libc malloc, see below*/
         movq %rax,%rdi
 
@@ -164,6 +168,7 @@ ENTRY catchException
         movq %r13, (.LJB_R13*8)(%rdi)
         movq %r14, (.LJB_R14*8)(%rdi)
         movq %r15, (.LJB_R15*8)(%rdi)
+        /*puts (%rsp)+8 into rdx*/
         lea 8(%rsp), %rdx	/* Save SP as it will be after we return.  */
         movq %rdx, (.LJB_RSP*8)(%rdi)
         movq (%rsp), %rax	/* Save adress we are returning to now.  */
@@ -185,6 +190,8 @@ ENTRY throwException
         movq current_exception,%rsi /*load current offset address*/
         movq (.LJB_NXT*8)(%rsi),%rcx /*copy adress of previous exception handler*/
         movq %rcx,current_exception /*restore previous handler*/
+        callq free
+
         /* Restore registers.  */
         movq (.LJB_RSP*8)(%rsi),%r8
         movq (.LJB_RBP*8)(%rsi),%r9
@@ -204,7 +211,7 @@ ENTRY throwException
         movq (.LJB_R13*8)(%rsi),%r13
         movq (.LJB_R14*8)(%rsi),%r14
         movq (.LJB_R15*8)(%rsi),%r15
-        /* Set return value for setjmp.  */
+        /* Set return value for catchException.  */
         mov %edi, %eax
         mov %r8,%rsp
         movq %r9,%rbp
@@ -249,6 +256,11 @@ LOCAL_ENTRY malloc
         addq %rdi,mempointer
         retq
 END malloc
+        
+LOCAL_ENTRY free
+        subq $72,mempointer
+        retq
+END free
 
 /*really naive strlen, a better version (i.e the glibc version)
   would use simd instructions*/
@@ -326,9 +338,9 @@ deflocal temp_stack
         .bss /*put large (uninitialized) objects in the bss section*/
         .align 32
         .type	temp_stack, @object
-        .size	temp_stack, 4096*6
+        .size	temp_stack, 4096*8
 temp_stack:
-        .zero 4096*6
+        .zero 4096*8
 /*hold the string for itoa, it makes things eaiser because
   we can start at the end and fill in the string in decending order
   which means the result will be in the correct order
@@ -357,3 +369,53 @@ itoa_mem:
 deflocal digits
 digits:
         .ascii "0123456789"
+deflocal program_break
+deflocal program_stack
+
+/*
+This might work for dynamic allocation but it would mess with the 
+system malloc because it changes the program break
+LOCAL_ENTRY malloc2
+        pushq %rbx
+        
+        movq %rdi,%rbx
+        movq program_break(%rip),%rdi
+        testq %rdi,%rdi
+        jeq 1f
+        movq $12,%rax /*brk syscall number/
+        syscall
+        movq %rax,mempointer /*initial break/
+        pushq %rbp
+        movq %rax,%rbp
+        /*now allocate some memory/
+        movq %rax,%rdi
+        addq $4096,%rdi
+        movq $12,%rax
+        syscall
+        /*update break (also set stack values in default handler)/
+        movq %rax,program_break(%rip)
+        movq %rsp,.LJB_RSP(base_exception)
+        movq %rsp,.LJB_RBP(base_exception)
+        
+        /*increase mempointer by ammount of memory to allocate/
+        addq %rbp,%rbx
+        popq %rbp
+        jmp 2f
+1:      
+        /*test if allocating memory goes beyond the program break/
+        movq mempointer,%rax
+        addq %rax,%rbx
+        cmpq %rbx,program_break(%rip)
+        jae 3f
+2:      
+        movq %rbx,%rdi
+        popq %rbx
+        retq
+3:      
+        movq $12,%rax
+        movq program_break(%rip),%rdi
+        addq $4096,%rdi
+        syscall
+        movq %rax,program_break(%rip)
+END malloc
+*/

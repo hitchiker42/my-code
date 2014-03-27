@@ -5,6 +5,8 @@
 void throwException(int);
 void cancelCatchException(void);
 int catchException(void);
+int caughtException;
+int temp=340;
 
 void f3()
 {
@@ -16,6 +18,14 @@ void f3()
 void f2()
 {
   fprintf(stderr, "f2 entered\n");
+  if ((caughtException = catchException()))
+  {
+    temp=temp-1;
+    fprintf(stderr, "f2 catch clause entered\n");
+    fprintf(stderr, "temp %d\n", temp);
+    fprintf(stderr, "f2 catch clause exiting\n");
+    throwException(caughtException>>1);
+  }
   f3();
   fprintf(stderr, "f2 exiting\n");
 }
@@ -23,31 +33,42 @@ void f2()
 void f1()
 {
   fprintf(stderr, "f1 entered\n");
+  if ((caughtException = catchException()))
+  {
+    temp=temp-1;
+    fprintf(stderr, "f1 catch clause entered\n");
+    fprintf(stderr, "temp = %d\n", temp);
+    fprintf(stderr, "f1 catch clause exiting\n");
+    throwException(caughtException>>1);
+  }
   f2();
   fprintf(stderr, "f1 exiting\n");
 }
 
 int main(int argc, char*argv[])
 {
-  int caughtException;
-
   fprintf(stderr, "main entered\n");
+ TOP:
   if ((caughtException = catchException()))
   {
     fprintf(stderr, "catch clause entered\n");
-    fprintf(stderr, "caught exception %d\n", caughtException);
+    fprintf(stderr, "temp = %d\n", temp);
+    if(temp<=1){
+      return 0;
+    }
+    goto TOP;
     fprintf(stderr, "catch clause exiting\n");
   }
-  else
-  {
-    fprintf(stderr, "try block entered\n");
-    f1();
-    cancelCatchException();
-    fprintf(stderr, "try block exiting\n");
-  }
+  f1();
+  cancelCatchException();
   fprintf(stderr, "main exiting\n");
   cancelCatchException();
-  throwException(1888);
+  cancelCatchException();
+  cancelCatchException();
+  cancelCatchException();
+  cancelCatchException();
+  cancelCatchException();
+  throwException(caughtException>>1);
   return 0;
 }
 

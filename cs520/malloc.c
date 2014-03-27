@@ -1,13 +1,44 @@
 #include <stdint.h>
-static uint8_t *mem_pointer;
-static uint8_t *program_break;
+#define PAGESIZE 4096
+typedef uint8_t *ptr_t;
+typedef size_t uint64_t;
+struct internal_state {
+  ptr_t initial_break;
+  ptr_t program_break;
+
+  //we keep a page of small blocks for quick alocation
+  //and use a bitmap to keep track of which blocks are free
+  uint64_t small_blocks;//maybe this should be 128 bits
+  uint32_t small_block_size;//size of small blocks, max 64 bytes
+  //if using a 64 bit bitmap, 128 if using 128 bit bitmap
+  uint32_t mmap_threshold;
+  uint32_t min_alignment;
+};
 static uint8_t *small_block_pointer;
-static uint64_t small_blocks=0;
-struct mem_block {
-  uint8_t *addr;
+static uint8_t zero_blocks=0;//if set to 1 any call to malloc will first
+//zero the memory
+struct mem_block{
+  //each of these is really a union {unsigned size :63;unsigned in_use :1};
+  uint64_t prev_size;
+  uint64_t size;
+  union {
+    void *mem;//actual memory
+    //used for free list
+    struct {
+      struct mem_block *next;
+      struct mem_block *prev;
+    }
+  }
+};
+struct mmapped_block {
+  uint64_t addr;
   uint64_t size;
 };
 extern uint64_t brk(uint64_t);
+extern int64_t syscall_1(uint64_t syscall_no,uint64_t arg1);
+extern int64_t syscall_2(uint64_t syscall_no,uint64_t arg1,uint64_t arg2);
+//etc
+extern void write(int fd,const void* buf,size_t sz);
 /*decalares uint64_t/void* brk(uint64_t/void*)*/
 __asm__(".globl brk\n"
         ".p2align 4\n"
@@ -21,7 +52,9 @@ static void *mmap_anon(void *addr,size_t length,int prot){
   return mmap(addr,length,prot,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
 }
 static void init_malloc(){
-  uint64_t current_break=brk(0);
+  initial_break=(void*)brk(0);
+  small_block_pointer=intital_break;
+  brk(initial_break
 static inline uint64_t ffz(register uint64_t val){//find first 0
   val=~val;//flip bits
   if(val){
