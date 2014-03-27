@@ -274,3 +274,11 @@ ENTRY futex_trylock
         lock cmpxchgq %rsi,(%rdi)
         retq /*if succssful rax will be 1*/
 END futex_trylock
+
+
+/*Just a quick syscall wrapper*/
+ENTRY clone
+        my_syscall .LNR_CLONE
+        retq
+END clone
+
