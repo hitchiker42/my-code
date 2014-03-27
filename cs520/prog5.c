@@ -2,6 +2,44 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <sys/mman.h>
+#include <errno.h>
+#include <regex.h>
+/* open files given filename on command line,
+   count words in each file, determine words common to each file
+   find the 20 most common words that occur in each file
+
+   a word is given by [a-zA-Z]{6,50}
+
+   2GB max file length (so uint32_t can hold any length)
+   100 files max, 1 file min
+   
+   ideas for storing info:
+   simplest: use seperate hash tables
+     -wastes memory
+     -a lot of work to resolve the different files at the end
+   One hash table
+     -need to have a 100 bit bit field (or 64 bit if < 64 files) to store
+       info about access from each file
+     -requires quite a bit of locking, so I need to figure out how to do things
+       atomically if I want speed
+     -Extra bitwise or for each update (not a big deal)
+     -No complicated resoltuion 
+   Trie
+     -faster than a binary tree (which is why thats not an option)
+     -Significantly more compilcated to implement
+   
+   Hash tree/trie
+     -complicated, not sure if it would be any faster either
+
+   for the one hash table case a hash entry would be
+   struct {
+     char *str;
+     uint32_t len;
+     uint32_t count;
+     uint64_t/uint128_t file_counter;
+   } 
+*/
 #ifndef NUM_PROCS
 #ifdef AGATE
 #define NUM_PROCS 16
@@ -170,6 +208,17 @@ static hash_table* hashtable_rehash(hash_table *ht){
   return ht;
 }
 //maybe I should use mmap
+//yes, use mmap, I can't fail if malloc fails, so I need to be able
+//to swap pages
+void *mmap_file(char *filename){
+  int fd=open(filename,O_RDONLY);
+  if(fd == -1){
+    perror("Error opening file");
+    exit(1);
+  }
+  off_t len=file_size(fd);
+  uint8_t *buf=mmap(NULL,PAGE_ROUND_UP(len),);
+
 char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
   char *filename;
   int i=0,j=0;
@@ -177,13 +226,8 @@ char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
   char **retval=xmalloc(num_files*2*sizeof(filebuf));
   while(i<num_files){
     filename=filenames[i];
-    int fd=open(filename,O_RDONLY);
-  if(fd == -1){
-    perror("Error opening file");
-    exit(1);
-  }
-  off_t len=file_size(fd);
-  uint8_t *buf=xmalloc(PAGE_ROUND_UP(len));
+  
+
   ssize_t nbytes=read(fd,buf,len);
   if(nbytes == (ssize_t)-1 /*|| nbytes != len*/){
     perror("Error reading from file");
