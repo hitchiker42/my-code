@@ -130,7 +130,9 @@ char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
     while(offset<len){
       *retval[j++]=buf+offset;
       offset++;
-      if(j
+      //      if(j
+    }
+  }
   }
 }
 english_word next_word(filebuf){
@@ -145,13 +147,56 @@ english_word next_word(filebuf){
   filebuf->index+=len;
   return retval;
 }  
-
-void parse_buf(const char *buf,uint64_t len){
-  uint64_t index_1=0,index_2=0;
-  while(1){
-    while(!eng_accept[buf[index_1++]]);//skip non word characters
-    index_2=index_1;
-    while(eng_accept[buf[index_2++]]);
+extern void process_string(const char *buf,uint64_t len);
+void parse_buf(const char *buf){
+  uint64_t index=1;
+ START:
+  if(eng_accept[*(buf)]){goto ACCEPT_0;}
+  if(eng_accept[*(buf+1)]){goto ACCEPT_1;}
+  if(eng_accept[*(buf+2)]){goto ACCEPT_2;}
+  if(eng_accept[*(buf+3)]){goto ACCEPT_3;}
+  buf+=4;
+  goto START;
+ ACCEPT_3:
+  buf++;
+ ACCEPT_2:
+  buf++;
+ ACCEPT_1:
+  buf++;
+ ACCEPT_0:
+  if(!eng_accept[*(buf+index)]){goto REJECT_0;}
+  if(!eng_accept[*(buf+index+1)]){goto REJECT_1;}
+  if(!eng_accept[*(buf+index+2)]){goto REJECT_2;}
+  if(!eng_accept[*(buf+index+3)]){goto REJECT_3;}
+  index+=4;
+  goto ACCEPT_0;
+ REJECT_3:
+  index++;
+ REJECT_2:
+  index++;
+ REJECT_1:
+  index++;
+ REJECT_0:
+  process_string(buf,index);
+  if(*(buf[index+1])!=0xff){
+    index=1;
+    goto START;
+  }
+}
+char *setup_block(char *block,uint32_t block_size){
+  //start is start of last eng word, it will ultimately
+  //refer to the end of the block we're returning
+  uint32_t start=block_size,end=block_size;
+  if(eng_accept[block[block_size]]){
+    while(eng_accept[block[--start]]);//find start of word
+    while(eng_accept[block[++end]]);//find end of word
+    process_string(block-(start+1),end-start);//process word 
+  }
+  //mark end of block with EOF
+  while(!eng_accept[block[--start]]);
+  block[start+1]=0xff;
+  return (struct {char *buf;uint32_t len;}){.buf=block,.len=start};
+}
 /*int futex(int *uaddr, int op, int val, const struct timespec *timeout,
         int *uaddr2, int val3);*/
 /*Futexes, declares two functions
@@ -163,6 +208,7 @@ void parse_buf(const char *buf,uint64_t len){
   futex_down(lock);
 */
 
+//futexs 1=free, 0=locked, no waiters -1=locked, waiters
 __asm__(".macro ENTRY name:req\n"
         ".globl \\name;\n"
         ".type \\name,@function;\n"
@@ -174,36 +220,78 @@ __asm__(".macro ENTRY name:req\n"
         ".cfi_endproc\n"
         ".size \\name, .-\\name\n"
         ".endm\n"
+
+        //essentially futex unlock
         "ENTRY futex_up\n"
         "lock addq $1,(%rdi)\n"
         "testq $1,(%rdi)\n"
-        "/*assume most common case is the uncontested case*/\n"
+        //assume non contested case is most common, only jmp
+        //if contested
         "jne 1f\n"
         "retq\n"
         "1:\n"
-        "/*if we get here it's contested*/\n"
+        //if we get here it's contested, so setup futex syscall
         "movq $1,(%rdi)\n"
         "movq $0,%rsi\n"
         "movq $1,%rdx\n"
-        "movq $202, %rax /*futex syscall no*/\n"
+        "movq $202, %rax\n" /*put futex syscall no in rax*/
         "syscall \n"
         "retq\n"
         "END futex_up\n"
-        "\n"
-        "/*Effectively this locks a futex*/\n"
+
+        //essentially futex lock
         "ENTRY futex_down\n"
         "lock subq $1,(%rdi)\n"
-        "cmpq $0,%rdi\n"
-        "/*if non contendend rdi is 0*/\n"
+        "cmpq $0,(%rdi)\n"
+        //same idea as with futex_up, assume non contested is most common
         "jne 1f\n"
-        "1:\n"
         "retq\n"
-        "/*again if we get here it's contended*/\n"
+        "1:\n"
+        //if we get here it's contested, so setup futex syscall
         "movq $-1,(%rdi)\n"
         "movq $-1,%rdx\n"
-        "movq $0,%rsi\n"
-        "/*fourth argument is a timer, for now just wait forever*/\n"
+        "movq $0,%rsi\n"//this is FUTEX_WAIT
         "xorq %rcx,%rcx\n"
         "my_syscall $202\n"
-        "renq\n"
-        "END futex_down\n")
+        "retq\n"
+        "END futex_down\n"
+        
+        //unlock spin lock
+        "ENTRY futex_spin_up\n"
+        //much eaiser, we do the same thing no matter what
+        "movq $1,%rax\n"
+        "lock xchg %rax,(%rdi)\n"
+        "END futex_spin_up\n"
+
+        //lock spin lock
+        "ENTRY futex_spin_down\n"
+        "movq $1,%rax\n"
+        "xorq %rcx,%rcx\n"
+        "1:\n"//start spining
+        "cmpq %rax,%rdi\n"//is the lock free?
+        "jeq 2f\n"//if yes try to get it
+        "pause\n"//if no pause
+        "jmp 1b\n"//spin again
+        "lock cmpxcghq %rcx,(%rdi)\n"//try to get lock
+        "jnz 1b\n"//if we failed spin again
+        "END futex_spin_down\n"
+
+
+)
+#define PTHREAD_CLONE_FLAGS = (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|\
+                               CLONE_SETTLS|CLONE_PARENT_SETTID|\
+                               CLONE_CHILD_CLEARTID|CLONE_SYSVMEM|0)
+#define SIMPLE_CLONE_FLAGS = (CLONE_VM|CLONE_FS|CLONE_SIGHAND|  \
+                              CLONE_PARENT_SETTID|0)
+//would be eaiser to just do a mov and a ret but 
+//then gcc will complain about returning without a value or something
+//clone returns 0 for new child and child tid for parent
+long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
+                   void *ctid,struct pt_regs *regs){
+  long retval;
+  __asm__("movq %1,%rax\n"
+          "syscall"
+          "movq %rax,%0"
+          : "=g" (retval) : "=g" (__NR_clone));
+  return;
+}

@@ -5,6 +5,7 @@
 #include <sys/mman.h>
 #include <errno.h>
 #include <regex.h>
+/*Agate has simd instructions up to sse4.2*/
 #ifndef NUM_PROCS
 #ifdef AGATE
 #define NUM_PROCS 16
@@ -12,6 +13,8 @@
 #define NUM_PROCS 8
 #endif
 #endif
+//allocate NUM_PROCS*2MB space for the thread stacks
+static uint8_t thread_stacks[NUM_PROCS*(2*1024*1024)];
 #define PAGE_ROUND_DOWN(x) (((uint64_t)(x)) & (~(PAGE_SIZE-1)))
 #define PAGE_ROUND_UP(x) ( (((uint64_t)(x)) + PAGE_SIZE-1)  & (~(PAGE_SIZE-1)) )
 #define file_size(fd)                           \
@@ -25,6 +28,8 @@
 /* open files given filename on command line,
    count words in each file, determine words common to each file
    find the 20 most common words that occur in each file
+
+   input will be straight ascii text1
 
    a word is given by [a-zA-Z]{6,50}
 
@@ -63,13 +68,15 @@ static const uint64_t PAGESIZE=4096;
 
 /*1 if char is in the set [A-Za-z] zero otherwise */
 static const char eng_accept[256]=
-  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-   1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-   1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0}
+  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+   0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+   1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
 typedef struct internal_buf internal_buf;
 struct filebuf {
   char *buf;
@@ -93,7 +100,8 @@ struct hash_table {
   float capacity;
   float capacity_inc;
 };
-
+//these should be rewritten so I don't terminate the program if
+//I use too much memory
 static inline void *xmalloc(size_t sz){
   void *temp=malloc(sz);
   if(!temp && sz){
@@ -105,6 +113,14 @@ static inline void *xmalloc(size_t sz){
 /*Same calling conviention as malloc, rather than calloc*/
 static inline void *xcalloc(size_t sz){
   void *temp=calloc(sizeof(char),sz);
+  if(!temp && sz){
+    fprintf(stderr,"Error virtual memory exhausted\n");
+    exit(EXIT_FAILURE);
+  }
+  return temp;
+}
+static inline void *xrealloc(void *ptr,size_t sz){
+  void *temp=realloc(ptr,sz);
   if(!temp && sz){
     fprintf(stderr,"Error virtual memory exhausted\n");
     exit(EXIT_FAILURE);
@@ -153,3 +169,5 @@ static hash_table_maybe_rehash(hash_table *ht);
 static hash_table_rehash(hash_table *ht);
 long futex_up(volatile long *futex_addr);
 long futex_down(volatile long *futex_addr);
+long futex_spin_up(volatile long *futex_addr);
+long futex_spin_down(volatile long *futex_addr);
