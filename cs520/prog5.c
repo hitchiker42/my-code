@@ -1,125 +1,3 @@
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <pthread.h>
-#include <sys/mman.h>
-#include <errno.h>
-#include <regex.h>
-/* open files given filename on command line,
-   count words in each file, determine words common to each file
-   find the 20 most common words that occur in each file
-
-   a word is given by [a-zA-Z]{6,50}
-
-   2GB max file length (so uint32_t can hold any length)
-   100 files max, 1 file min
-   
-   ideas for storing info:
-   simplest: use seperate hash tables
-     -wastes memory
-     -a lot of work to resolve the different files at the end
-   One hash table
-     -need to have a 100 bit bit field (or 64 bit if < 64 files) to store
-       info about access from each file
-     -requires quite a bit of locking, so I need to figure out how to do things
-       atomically if I want speed
-     -Extra bitwise or for each update (not a big deal)
-     -No complicated resoltuion 
-   Trie
-     -faster than a binary tree (which is why thats not an option)
-     -Significantly more compilcated to implement
-   
-   Hash tree/trie
-     -complicated, not sure if it would be any faster either
-
-   for the one hash table case a hash entry would be
-   struct {
-     char *str;
-     uint32_t len;
-     uint32_t count;
-     uint64_t/uint128_t file_counter;
-   } 
-*/
-#ifndef NUM_PROCS
-#ifdef AGATE
-#define NUM_PROCS 16
-#else
-#define NUM_PROCS 8
-#endif
-#endif
-static const uint64_t PAGESIZE=4096;
-#define PAGE_ROUND_DOWN(x) (((uint64_t)(x)) & (~(PAGE_SIZE-1)))
-#define PAGE_ROUND_UP(x) ( (((uint64_t)(x)) + PAGE_SIZE-1)  & (~(PAGE_SIZE-1)) )
-#define file_size(fd)                           \
-  ({off_t len=lseek(fd,0,SEEK_END);             \
-    lseek(fd,0,SEEK_SET);                       \
-    len;})
-static const char *eng_accept=
-  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-typedef struct internal_buf internal_buf;
-struct filebuf {
-  char *buf;
-  int file_id;
-  int buf_num;
-};
-static inline void *xmalloc(size_t sz){
-  void *temp=malloc(sz);
-  if(!temp && sz){
-    fprintf(stderr,"Error virtual memory exhausted\n");
-    exit(EXIT_FAILURE);
-  }
-  return temp;
-}
-/*Same calling conviention as malloc, rather than calloc*/
-static inline void *xcalloc(size_t sz){
-  void *temp=calloc(sizeof(char),sz);
-  if(!temp && sz){
-    fprintf(stderr,"Error virtual memory exhausted\n");
-    exit(EXIT_FAILURE);
-  }
-  return temp;
-}
-static inline size_t /*__attribute__((pure))*/ word_len(char *str){
-  return strspn(str,eng_accept);
-}
-#define offset_basis_32 2166136261
-#define offset_basis_64 14695981039346656037UL
-#define fnv_prime_32 16777619
-#define fnv_prime_64 1099511628211UL
-static uint64_t fnv_hash(const void *key,int keylen){
-  const uint8_t *raw_data=(const uint8_t *)key;
-  int i;
-  uint64_t hash=offset_basis_64;
-  for(i=0; i < keylen; i++){
-    hash = (hash ^ raw_data[i])*fnv_prime_64;
-  }
-  return hash;
-}
-typedef struct english_word english_word;
-typedef struct hash_table hash_table;
-struct english_word {
-  char *str;//NOT a c string
-  uint32_t len;
-  uint32_t count;
-};
-static int english_word_compare(english_word x,english_word y){
-  if(x.len != y.len){
-    return 0;
-  } else {
-    return !memcmp(x.str,y.str,x.len);
-  }
-}
-static const float ht_growth_threshold=0.8;
-static const float ht_growth_factor=2.0;
-struct hash_table {
-  english_word *buckets;
-  /*all these need to be updated atomically, which should happen by default*/
-  uint32_t size;
-  uint32_t used;//not sure that I need either this field or the next
-  uint32_t entries;
-  float capacity;
-  float capacity_inc;
-};
 static hash_table* make_hash_table(size_t size){
   //it might be faster to do this in one allocation
   hash_table *retval=xcalloc(sizeof(hash_table));
@@ -135,6 +13,15 @@ static hash_table* make_hash_table(size_t size){
     }*/
   return retval;
 }
+/* Use different means of collision resolution. instead of using
+   a linked list in each bucket just increment the bucket if there
+   is a collision, this will mean I need to make sure the capacity is
+   a lot smaller, 0.5-0.7 or so.
+
+   The best way to do this would be use atomic cmpxchg of pointers.
+   So have the actual hash table be an array of pointers, and to update
+   use atomic operations.
+*/
 static english_word hash_table_add(hash_table *ht,english_word word){
   uint64_t hashv=fnv_hash(word.str,word.len);
   uint32_t bucket_index=hashv%ht->size;
@@ -210,6 +97,7 @@ static hash_table* hashtable_rehash(hash_table *ht){
 //maybe I should use mmap
 //yes, use mmap, I can't fail if malloc fails, so I need to be able
 //to swap pages
+//I can't use mmap...damn
 void *mmap_file(char *filename){
   int fd=open(filename,O_RDONLY);
   if(fd == -1){
@@ -218,7 +106,7 @@ void *mmap_file(char *filename){
   }
   off_t len=file_size(fd);
   uint8_t *buf=mmap(NULL,PAGE_ROUND_UP(len),);
-
+}
 char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
   char *filename;
   int i=0,j=0;
@@ -257,4 +145,65 @@ english_word next_word(filebuf){
   filebuf->index+=len;
   return retval;
 }  
-    
+
+void parse_buf(const char *buf,uint64_t len){
+  uint64_t index_1=0,index_2=0;
+  while(1){
+    while(!eng_accept[buf[index_1++]]);//skip non word characters
+    index_2=index_1;
+    while(eng_accept[buf[index_2++]]);
+/*int futex(int *uaddr, int op, int val, const struct timespec *timeout,
+        int *uaddr2, int val3);*/
+/*Futexes, declares two functions
+  usage:
+  long lock_mem;
+  long *lock=&lock_mem;
+  futex_up(lock);
+  //scalar code goes here
+  futex_down(lock);
+*/
+
+__asm__(".macro ENTRY name:req\n"
+        ".globl \\name;\n"
+        ".type \\name,@function;\n"
+        ".p2align 4\n"
+        "\\name\\():\n"
+        ".cfi_startproc\n"
+        ".endm\n"
+        ".macro END name:req\n"
+        ".cfi_endproc\n"
+        ".size \\name, .-\\name\n"
+        ".endm\n"
+        "ENTRY futex_up\n"
+        "lock addq $1,(%rdi)\n"
+        "testq $1,(%rdi)\n"
+        "/*assume most common case is the uncontested case*/\n"
+        "jne 1f\n"
+        "retq\n"
+        "1:\n"
+        "/*if we get here it's contested*/\n"
+        "movq $1,(%rdi)\n"
+        "movq $0,%rsi\n"
+        "movq $1,%rdx\n"
+        "movq $202, %rax /*futex syscall no*/\n"
+        "syscall \n"
+        "retq\n"
+        "END futex_up\n"
+        "\n"
+        "/*Effectively this locks a futex*/\n"
+        "ENTRY futex_down\n"
+        "lock subq $1,(%rdi)\n"
+        "cmpq $0,%rdi\n"
+        "/*if non contendend rdi is 0*/\n"
+        "jne 1f\n"
+        "1:\n"
+        "retq\n"
+        "/*again if we get here it's contended*/\n"
+        "movq $-1,(%rdi)\n"
+        "movq $-1,%rdx\n"
+        "movq $0,%rsi\n"
+        "/*fourth argument is a timer, for now just wait forever*/\n"
+        "xorq %rcx,%rcx\n"
+        "my_syscall $202\n"
+        "renq\n"
+        "END futex_down\n")
