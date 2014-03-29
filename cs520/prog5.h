@@ -26,6 +26,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>//open
+#include <sched.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -132,7 +133,9 @@ long futex_spin_up(volatile long *futex_addr);
 long futex_spin_down(volatile long *futex_addr);
 long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
                    void *ctid,struct pt_regs *regs);
-char *my_strcpy(uint8_t *dest,const uint8_t *src,uint64_t len);
+//glibc clone wrapper
+int clone(int (*fn)(void*),void *child_stack,int flags,void *arg,...);
+/*...=pid_t *ptid, struct user_desc *tls, pid_t *ctid*/
 void parse_buf(const uint8_t *buf);//core function
 struct filebuf read_full_file(char *filename);
 struct fileinfo open_file_simple(char *filename);
@@ -154,6 +157,11 @@ static uint8_t thread_stacks[NUM_PROCS*(2<<20)];
 //it'd be nice to have this be an array of structs rather than an array of 
 //pointers but that woud quadruple the size and 32 MB for a hash table
 //seems a bit much. I'll profile it later and see if it's worth it 
+
+//change to 
+//static english_word global_hash_table[1<<17];
+//this uses the same ammount of memory, but doesn't use pointers it only
+// holds 1/4 as many entries but it means I almost never have to call malloc
 static english_word *global_hash_table[1<<20];
 static const uint64_t global_hash_table_size=1<<20;//size in 8 byte blocks
 static uint32_t hash_table_indices[1<<18];
@@ -319,7 +327,16 @@ static int string_compare(english_word *x,english_word *y){
 static void print_string(english_word *x){
   fwrite(x->str,x->len,1,stdout);
 }
-
+static void print_word_and_count(english_word *x){
+  printf("The word ");
+  fwrite(x->str,x->len,1,stdout);
+  printf(" occurred %d times\n",x->count);
+}
+static void print_count_word(english_word *x){
+  printf("%-8d ",x->count);
+  fwrite(x->str,x->len,1,stdout);
+  puts("");
+}
 /*   
    ideas for storing info:
    simplest: use seperate hash tables
@@ -346,3 +363,12 @@ static void print_string(english_word *x){
      uint32_t count;
      uint64_t/uint128_t file_counter;
      } */
+static inline char *my_strcpy(uint8_t *dest_,const uint8_t *src_,uint64_t len_){
+  uint8_t *retval=dest_;
+  register uint8_t *dest __asm__ ("%rdi")=dest_;
+  const register uint8_t *src __asm__ ("%rsi")=src_;
+  register uint64_t len __asm__ ("%rcx")=len_;
+  __asm__("rep movsb"
+          : : "r" (dest), "r" (src), "r" (len));
+  return (char*)dest_;
+}
