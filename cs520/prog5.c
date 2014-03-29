@@ -1,31 +1,4 @@
-/*this is all we need for the hash table, again we're trading space for time
-  by having a (really) large hash table we never need to rehash and by
-  using open adressing we don't need to use buckets (though open adressing
-  has its own flaws).
-*/
-
-//desired is a pointer
-#define atomic_compare_exchange(ptr,expected,desired)           \
-  __atomic_compare_exchange(ptr,expected,desired,0,             \
-                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
-//desired isn't a pointer
-#define atomic_compare_exchange_n(ptr,expected,desired)           \
-  __atomic_compare_exchange_n(ptr,expected,desired,0,             \
-                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
-#define atomic_bts(bit_index,mem_pointer)                       \
-  __asm__("lock bts %0,%1\n"                                    \
-          : : "r" (bit_index), "m" (mem_pointer))
-/* presumably atomic_add_fetch is just lock add val,(ptr)
-   where atomic_fetch_add is lock xadd val,(ptr)
-   and I imagine that add is faster that xadd
- */
-#define atomic_add(ptr,val)                     \
-  __atomic_add_fetch(ptr,val,__ATOMIC_SEQ_CST)
-//with this (and pretty much any binary operation but add) the difference
-//between fetch_or and or_fetch is a lot bigger, or_fetch is just a lock or
-//whereas fetch_or translates into a cmpxcgh loop
-#define atomic_or(ptr,val)                                      \
-  __atomic_or_fetch(ptr,val,__ATOMIC_SEQ_CST)
+#include "prog5.h"
 /* 
    Update the value of word in the global hash table, this means that if word
    isn't in the table then we should add it, and if it is we should increment the
@@ -39,19 +12,19 @@
 static english_word* locking_hash_table_update(english_word *word){
   uint64_t hashv=fnv_hash(word->str,word->len);
   uint64_t index=hashv%global_hash_table_size;
-  int low=(word->low?1:0);
-  futex_spin_lock(&futex_lock);
+  int low=(word->file_bits.low?1:0);
+  futex_spin_lock(&global_futex_lock);
   if(!global_hash_table[index]){//word isn't in the hash table, add it
     global_hash_table[index]=word;
   } else {
     do {
       //word is in the hash table, update it
-      if(string_compare(global_hash_table[index],*word)){
+      if(string_compare(global_hash_table[index],word)){
         global_hash_table[index]->count+=1;
         if(low){
-          global_hash_table[index]->low|=word->low;
+          global_hash_table[index]->file_bits.low|=word->file_bits.low;
         } else {
-          global_hash_table[index]->high|=word->high;
+          global_hash_table[index]->file_bits.high|=word->file_bits.high;
         }
         goto END;
         xfree(word);
@@ -61,7 +34,7 @@ static english_word* locking_hash_table_update(english_word *word){
     global_hash_table[index]=word;
   }
  END:
-  futex_spin_unlock(&futex_lock);
+  futex_spin_unlock(&global_futex_lock);
   return word;
 }
 
@@ -76,13 +49,19 @@ static english_word* locking_hash_table_update(english_word *word){
 static english_word* atomic_hash_table_update(english_word *word){
   uint64_t hashv=fnv_hash(word->str,word->len);
   uint64_t index=hashv%global_hash_table_size;
-  int low=(word->low?1:0);
+  int low=(word->file_bits.low?1:0);
   if(!global_hash_table[index]){//word isn't in the hash table, add it
     void *prev=global_hash_table[index];
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
     if(test){
       //we added the word
-      goto END;
+      //this needs to be atomic to prevent two threads writing different
+      //values to the same index of indices
+      uint64_t old_indices_index=atomic_fetch_add(&indices_index,1);
+      //this doesn't need to be atomic, since indices_index will never be
+      //decremented, so no one else will change this 
+      hash_table_indices[old_indices_index]=index;
+      goto end;
     }
     //else, someone else changed the value of global_hash_table[index] before us
   }
@@ -90,26 +69,30 @@ static english_word* atomic_hash_table_update(english_word *word){
     do {
       //see if the value in the table is the same as our value
       //if so update the value already in the table
-      if(string_compare(global_hash_table[index],*word)){
+      if(string_compare(global_hash_table[index],word)){
         //atomically increment word count
         atomic_add(&global_hash_table[index]->count,1);
         //atomiclly update the file index
         if(low){
-          atomic_or(&global_hash_table[index]->low,word->low);
+          atomic_or(&global_hash_table[index]->file_bits.low,word->file_bits.low);
         } else {
-          atomic_or(&global_hash_table[index]->high,word->high);
+          atomic_or(&global_hash_table[index]->file_bits.high,word->file_bits.high);
         }
         xfree(word);
-        goto END;
+        goto end;
       }
     } while(global_hash_table[++index]);
     //not in the table use next free index (if we can)
     void *prev=global_hash_table[index];
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
-    if(test){break;}
+    if(test){
+      uint64_t old_indices_index=atomic_fetch_add(&indices_index,1);
+      hash_table_indices[old_indices_index]=index;
+      goto end;
+    }
     //if !test the compare exchange failed and we need to keep looping
   }
- END:
+ end:
   return word;
 }
 //same as above but without a file index
@@ -122,16 +105,16 @@ static english_word* atomic_hash_table_update_one(english_word *word){
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
     if(test){
       //this happened global_hash_table[index]=word;
-      goto END;
+      goto end;
     }
   }
   while(1){
     do {
-      if(string_compare(global_hash_table[index],*word)){
+      if(string_compare(global_hash_table[index],word)){
         //atomically increment word count
         atomic_add(&global_hash_table[index]->count,1);
         xfree(word);
-        goto END;
+        goto end;
       }
     } while(global_hash_table[++index]);
     //not in the table use next free index
@@ -140,19 +123,61 @@ static english_word* atomic_hash_table_update_one(english_word *word){
     if(test){break;}
     //if !test the compare exchange failed and we need to keep looping
   }
- END:
+ end:
   return word;
 }
-//I can't use this ...
+//i can't use this ...
+/*
 void *mmap_file(char *filename){
   int fd=open(filename,O_RDONLY);
   if(fd == -1){
-    perror("Error opening file");
+    perror("error opening file");
     exit(1);
   }
   off_t len=file_size(fd);
   uint8_t *buf=mmap(NULL,PAGE_ROUND_UP(len),);
+}*/
+struct fileinfo open_file_simple(char *filename){
+  long fd=open(filename,O_RDONLY);
+  if(fd == -1){
+    perror("error opening file");
+    exit(1);
+  }
+  off_t len=lseek(fd,0,SEEK_END);
+  lseek(fd,0,SEEK_SET);
+  if(len == (off_t)-1){
+    perror("error seeking file");
+    exit(1);
+  }
+  return (struct fileinfo){.fd=fd,.len=len};
 }
+ 
+struct filebuf read_full_file(char *filename){
+  long fd=open(filename,O_RDONLY);
+  if(fd == -1){
+    perror("error opening file");
+    exit(1);
+  }
+  off_t len=lseek(fd,0,SEEK_END);
+  lseek(fd,0,SEEK_SET);
+  if(len == (off_t)-1){
+    perror("error seeking file");
+    exit(1);
+  }
+  uint8_t *buf=xmalloc(len);
+
+  ssize_t nbytes=read(fd,buf,len);
+  if(nbytes == (ssize_t)-1 /*|| nbytes != len*/){
+    perror("error reading from file");
+    exit(EXIT_FAILURE);
+  }
+  if(close(fd) == -1){
+    perror("error closing file");
+    exit(EXIT_FAILURE);
+  }  
+  return (struct filebuf){.buf=buf,.len=len};
+} 
+#if 0
 char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
   char *filename;
   int i=0,j=0;
@@ -163,12 +188,12 @@ char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
   }
   ssize_t nbytes=read(fd,buf,len);
   if(nbytes == (ssize_t)-1 /*|| nbytes != len*/){
-    perror("Error reading from file");
-    exit(EXIT_FAILURE);
+    perror("error reading from file");
+    exit(exit_failure);
   }
   if(close(fd) == -1){
-    perror("Error closing file");
-    exit(EXIT_FAILURE);
+    perror("error closing file");
+    exit(exit_failure);
   }
   if(len > PAGESIZE){
     uint32_t offset=0;
@@ -179,13 +204,15 @@ char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
     }
   }
 }
+#endif
 /* 
-   Main work function, searches buf for english words (matching [a-zA-Z]{6,50})
+   main work function, searches buf for english words (matching [a-za-z]{6,50})
    and puts/updates the word in the global hash table.
    frees the buffer it's given once it's done;
-   TODO: this need to take another parameter specifing the file index
+   todo: this need to take another parameter specifing the file index
  */
-void parse_buf(const char *buf){
+void parse_buf(register const uint8_t *buf){
+  const uint8_t *initial_buf=buf;
   uint64_t index=1;
  START:
   if(eng_accept[*(buf)]){goto ACCEPT_0;}
@@ -214,43 +241,48 @@ void parse_buf(const char *buf){
  REJECT_1:
   index++;
  REJECT_0:
-  if(!(index < 6 || index >50)){
+  if(index >= 6 && index <= 50){
+
     //allocate the memory for the struct and the string at the same time
     //this means we only need to call malloc/free once 
     void *mem=xmalloc(sizeof(english_word)+index);
-    //it seems wasteful to copy every word but if I used the string from the
-    //buffer I wouldn't be able to free the buffer, and only copying the
-    //string when I need in would add another layer of complexity to the already
+    //it seems wasteful to copy every word but if i used the string from the
+    //buffer i wouldn't be able to free the buffer, and only copying the
+    //string when i need in would add another layer of complexity to the already
     //complex process of atomically updating the hash table
-    //I might change this later if it proves a performance issue
+    //i might change this later if it proves a performance issue
     my_strcpy(mem+sizeof(english_word),buf,index);
     english_word *word=mem;
     //need to modify this function to pass the file index to put
     //into this 
     *word=(english_word){.str=mem+sizeof(english_word),.len=index,
-                         .low=0,.high=0,.count=0};
+                         .count=1,.file_bits={.low=0,.high=0}};
+/*    PRINT_MSG("Adding word ");
+    PRINT_STRING_ERR(word);
+    PRINT_MSG(" to hash table\n");*/
     atomic_hash_table_update(word);//frees word if it's not needed 
   }
-  if(*(buf[index+1])!=0xff){
+  if(buf[index]!=0xff){
+    buf+=index;
     index=1;
     goto START;
   }
   //no one else should need this buffer after us
-  xfree(buf);
+  xfree((void*)initial_buf);
 }
 /*
-  Setup a block of memory to be processed by parse_buf.
+  setup a block of memory to be processed by parse_buf.
   if block[block_size] isn't a word character scan backwards until a word 
-  character is found and mark the next character as EOF (i.e insure the block
-  ends immediately after a word character). If block[block_size] is a word 
+  character is found and mark the next character as eof (i.e insure the block
+  ends immediately after a word character). if block[block_size] is a word 
   character scan forward/backward to find the bounds of it, and if it's 
-  within size limits put/update it in the hash table. Following this do the same
-  as above to mark the end of the block with EOF.
+  within size limits put/update it in the hash table. following this do the same
+  as above to mark the end of the block with eof.
 
-  The core of this function is good, the actual interface to it needs to be
-  reworked once I decide how exactly I'm going to do everything.
+  the core of this function is good, the actual interface to it needs to be
+  reworked once i decide how exactly i'm going to do everything.
  */
-struct {char *buf;uint32_t len;} setup_block(char *block,uint32_t block_size){
+struct filebuf setup_block(uint8_t *block,uint32_t block_size){
   //start is start of last eng word, it will ultimately
   //refer to the end of the block we're returning
   uint32_t start=block_size,end=block_size;
@@ -265,97 +297,234 @@ struct {char *buf;uint32_t len;} setup_block(char *block,uint32_t block_size){
       //need to modify this function to pass the file index to put
       //into this 
       *word=(english_word){.str=mem+sizeof(english_word),.len=len,
-                           .low=0,.high=0,.count=0};
+                           .count=0,.file_bits={.low=0,.high=0}};
       atomic_hash_table_update(word);//frees word if it's not needed 
     }
   }
-  //mark end of block with EOF
+  //mark end of block with eof
   while(!eng_accept[block[--start]]);
   block[start+1]=0xff;
-  return (struct {char *buf;uint32_t len;}){.buf=block,.len=start};
+  return (struct filebuf){.buf=block,.len=start};
 }
 
+//auxiliary routines for sorting
+#define heap_left_child(i) (2*i+1)
+#define heap_right_child(i) (2*i+2)
+#define heap_parent(i) (i?(i-1)/2:0)
+struct heap {english_word **heap; uint32_t size;};
+static english_word** heap_sort(english_word **heap, uint32_t size);
+static void sift_down(english_word **heap, uint32_t start, uint32_t end);
+static void heapify(english_word **heap, uint32_t index, uint32_t heap_length);
+static english_word *heap_pop(english_word **heap,uint32_t heap_length);
+
+static inline void heap_insert(english_word **heap,english_word *new_element,
+                               uint32_t heap_index){
+  heap[heap_index]=new_element;
+#ifdef DEBUG
+  if(!heap_index){
+    assert(heap_index == heap_parent(heap_index));
+  }
+#endif
+  //will always terminate when heap_index = 0 because heap_parent returns 0
+  //when given 0
+  while(heap[heap_index]->count > heap[heap_parent(heap_index)]->count){
+    SWAP(heap[heap_index],heap[heap_parent(heap_index)]);
+    heap_index=heap_parent(heap_index);
+  }
+}
+static inline void heapify(english_word **heap,uint32_t index,
+                           uint32_t heap_length){
+  uint32_t left,right,cur_max;
+  while(index<heap_length){
+    left=heap_left_child(index);
+    right=heap_right_child(index);
+    cur_max=index;
+    if(heap[left]->count > heap[cur_max]->count){
+      cur_max=left;
+    }
+    if(heap[right]->count > heap[cur_max]->count){
+      cur_max=right;
+    }
+    if(cur_max == index){
+      break;
+    }
+    SWAP(heap[index],heap[cur_max]);
+    index=cur_max;
+  }
+}
+//this comes from the psudeocode on the wikipedia heapsort artical
+static inline void sift_down(english_word **heap,uint32_t start,uint32_t end){
+  uint32_t root=start,child,swap;
+  while((child=heap_left_child(root)) <= end){
+    swap=root;
+    //is left child bigger?
+    if(heap[child]->count > heap[swap]->count  ){
+      swap=child;
+    }
+    //is right child bigger?
+    if(child+1<=end && heap[child+1]->count > heap[swap]->count){
+      swap=child+1;
+    }
+    if(swap!=root){
+      SWAP(heap[root],heap[swap]);
+      root=swap;
+    } else {
+      return;
+    }
+  }
+}
+    
+static inline english_word *heap_pop(english_word **heap,uint32_t heap_length){
+  english_word *retval=*heap;
+  heap[0]=heap[heap_length-1];
+  heapify(heap,0,heap_length-2);
+  return retval;
+}
+
+//no args because all the data used is global
+struct heap sort_words(){
+  //maybe this should be thread local
+  static english_word *most_common[20];
+  uint32_t i=0,j=0,minimum=-1;
+  //first get twenty words used in every file, if there are less then twenty 
+  //then this is all we need to do
+  PRINT_MSG("start of sort_words\n");
+  while(i<20 && j<indices_index){
+//    PRINT_FMT("Loop %d\n",j);
+    english_word *cur_word=global_hash_table[hash_table_indices[j++]];
+//    if(cur_word->file_bits.uint128 == all_file_bits.uint128){
+      if(cur_word->count < minimum){
+        minimum=cur_word->count;
+      }
+      heap_insert(most_common,cur_word,i);
+      i++;
+//    }
+  }
+  if(i<20){
+    PRINT_MSG("Less than twenty words found\n");
+    return (struct heap){.heap=heap_sort(most_common,i),.size=i};
+  }
+  PRINT_MSG("added initial 20 words\n");
+  i=19;
+  while(j<indices_index){
+    english_word *cur_word=global_hash_table[hash_table_indices[j++]];
+    if(cur_word->file_bits.uint128 == all_file_bits.uint128){
+      if(cur_word->count > minimum){        
+        heap_insert(most_common,cur_word,i);
+      }
+    }
+  }
+  PRINT_MSG("added all words\n");
+  i=20;
+  return (struct heap){.heap=heap_sort(most_common,i),.size=i};
+}
+//works by modifying memory, but returns a value for convience
+static inline english_word** heap_sort(english_word **heap,uint32_t size){
+  PRINT_MSG("Running heapsort\n");
+  uint32_t end=size-1;
+  while(end>0){
+    SWAP(heap[end],heap[0]);
+    end--;
+    sift_down(heap,0,end);
+  }
+  return heap;
+}
+static int is_sorted(english_word **arr,uint32_t size){
+  uint32_t i;
+  uint32_t count=-1;
+  for(i=size-1;i>0;i--){
+    if(arr[i]->count > count){
+      return 0;
+    } else {
+      count=arr[i]->count;
+    }
+  }
+  return 1;
+}
+  
 /* Assembly for futex routines and my_strcpy.
    the futex stuff will probably be removed since I'm using atomic
    operations rather that locks
 */
 //futexs 1=free, 0=locked, no waiters -1=locked, waiters
-__asm__(".macro ENTRY name:req\n"
-        ".globl \\name;\n"
-        ".type \\name,@function;\n"
-        ".p2align 4\n"
-        "\\name\\():\n"
+__asm__("\n.macro ENTRY name:req\n\t"
+        ".globl \\name;\n\t"
+        ".type \\name,@function;\n\t"
+        ".p2align 4\n\t"
+        "\\name\\():\n\t"
         ".cfi_startproc\n"
         ".endm\n"
-        ".macro END name:req\n"
-        ".cfi_endproc\n"
+        ".macro END name:req\n\t"
+        ".cfi_endproc\n\t"
         ".size \\name, .-\\name\n"
-        ".endm\n"
+        ".endm\n\n"
 
         //essentially futex unlock
-        "ENTRY futex_up\n"
-        "lock addq $1,(%rdi)\n"
-        "testq $1,(%rdi)\n"
+        "ENTRY futex_up\n\t"
+        "lock addq $1,(%rdi)\n\t"
+        "testq $1,(%rdi)\n\t"
         //assume non contested case is most common, only jmp
         //if contested
-        "jne 1f\n"
+        "jne 1f\n\t"
         "retq\n"
-        "1:\n"
+        "1:\n\t"
         //if we get here it's contested, so setup futex syscall
-        "movq $1,(%rdi)\n"
-        "movq $0,%rsi\n"
-        "movq $1,%rdx\n"
-        "movq $202, %rax\n" /*put futex syscall no in rax*/
-        "syscall \n"
+        "movq $1,(%rdi)\n\t"
+        "movq $0,%rsi\n\t"
+        "movq $1,%rdx\n\t"
+        "movq $202, %rax\n\t" /*put futex syscall no in rax*/
+        "syscall\n\t"
         "retq\n"
-        "END futex_up\n"
+        "END futex_up\n\n"
 
         //essentially futex lock
-        "ENTRY futex_down\n"
-        "lock subq $1,(%rdi)\n"
-        "cmpq $0,(%rdi)\n"
+        "ENTRY futex_down\n\t"
+        "lock subq $1,(%rdi)\n\t"
+        "cmpq $0,(%rdi)\n\t"
         //same idea as with futex_up, assume non contested is most common
-        "jne 1f\n"
+        "jne 1f\n\t"
         "retq\n"
-        "1:\n"
+        "1:\n\t"
         //if we get here it's contested, so setup futex syscall
-        "movq $-1,(%rdi)\n"
-        "movq $-1,%rdx\n"
-        "movq $0,%rsi\n"//this is FUTEX_WAIT
-        "xorq %rcx,%rcx\n"
-        "my_syscall $202\n"
+        "movq $-1,(%rdi)\n\t"
+        "movq $-1,%rdx\n\t"
+        "movq $0,%rsi\n\t"//this is FUTEX_WAIT
+        "xorq %rcx,%rcx\n\t"
+        "movq $202,%rax\n\t"
+        "syscall\n\t"
         "retq\n"
-        "END futex_down\n"
+        "END futex_down\n\n"
 
         //unlock spin lock
-        "ENTRY futex_spin_up\n"
+        "ENTRY futex_spin_up\n\t"
         //much eaiser, we do the same thing no matter what
-        "movq $1,%rax\n"
+        "movq $1,%rax\n\t"
         "lock xchg %rax,(%rdi)\n"
-        "END futex_spin_up\n"
+        "END futex_spin_up\n\n"
 
         //lock spin lock
-        "ENTRY futex_spin_down\n"
-        "movq $1,%rax\n"
+        "ENTRY futex_spin_down\n\t"
+        "movq $1,%rax\n\t"
         "xorq %rcx,%rcx\n"
-        "1:\n"//start spining
-        "cmpq %rax,%rdi\n"//is the lock free?
-        "jeq 2f\n"//if yes try to get it
-        "pause\n"//if no pause
+        "1:\n\t"//start spining
+        "cmpq %rax,%rdi\n\t"//is the lock free?
+        "je 2f\n\t"//if yes try to get it
+        "pause\n\t"//if no pause
         "jmp 1b\n"//spin again
-        "lock cmpxcghq %rcx,(%rdi)\n"//try to get lock
+        "2:\n\t"
+        "lock cmpxchgq %rcx,(%rdi)\n\t"//try to get lock
         "jnz 1b\n"//if we failed spin again
-        "END futex_spin_down\n"
+        "END futex_spin_down\n\n"
         /*This assumes that the cost of aligning memory before copying
           outweighs the benifit for 6-50 byte strings (also that 
           rep movsb is fast)
         */
-        "ENTRY my_strcpy\n"
-        "movq %rdx,%rcx\n"//move length to rcx
-        "movq %rsi,%rax\n"//save return value
-        "rep movsb\n"//actually copy
+        "ENTRY my_strcpy\n\t"
+        "movq %rdx,%rcx\n\t"//move length to rcx
+        "movq %rsi,%rax\n\t"//save return value
+        "rep movsb\n\t"//actually copy
         "retq\n"
-        "END my_strcpy\n")
+        "END my_strcpy\n");
 #define PTHREAD_CLONE_FLAGS = (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|\
                                CLONE_SETTLS|CLONE_PARENT_SETTID|\
                                CLONE_CHILD_CLEARTID|CLONE_SYSVMEM|0)
@@ -367,13 +536,58 @@ __asm__(".macro ENTRY name:req\n"
 long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
                    void *ctid,struct pt_regs *regs){
   long retval;
-  __asm__("movq %1,%rax\n"
-          "syscall"
-          "movq %rax,%0"
-          : "=g" (retval) : "=g" (__NR_clone));
-  return;
+  __asm__("movq %1,%%rax\n"
+          "syscall\n"
+          "movq %%rax,%0"
+          : "=g" (retval) : "i" (__NR_clone));
+  return retval;
 }
-
-long main(long argc,char *argv[]){
-  
+static inline char* __attribute__((const)) ordinal_sufffix(uint32_t num){
+  if(num == 1){
+    return "st";
+  }
+  if(num == 2){
+    return "nd";
+  }
+  if(num == 3){
+    return "rd";
+  }
+  return "th";
+}
+int main(int argc,char *argv[]){
+  //remove the program name from the arguments (its just eaiser)
+  num_files=(--argc);
+  argv++;
+  if(argc <=0){
+    fprintf(stderr,"Error no filenames given\n");
+  }
+  //temporally assume one file
+  PRINT_MSG("program start\n");
+  struct filebuf file_buf=read_full_file(argv[0]);
+  PRINT_MSG("read file\n");
+  uint32_t end=file_buf.len-1;
+  while(!eng_accept[file_buf.buf[--end]]){
+    fprintf(stderr,"current char = %c\n",file_buf.buf[end]);
+  }
+  file_buf.buf[end+1]=0xff;
+  PRINT_MSG("set EOF in file buffer\n");
+  parse_buf(file_buf.buf);
+  PRINT_MSG("parsed file\n");
+  struct heap common_words=sort_words();
+  PRINT_MSG("sorted words\n");
+  if(!is_sorted(common_words.heap,common_words.size)){
+    printf("Failed to sort the heap\n");
+  } else {
+    printf("Sorted the heap\n");
+  }
+  int i;
+  uint32_t size=common_words.size;
+  for(i=size-1;i>=0;i--){
+    //We can't use the %s format specifier of printf to print the actual word
+    //because its not null terminated
+    printf("The %d%s most common word was ",size-i,ordinal_sufffix(size-i));
+    fwrite(common_words.heap[i]->str,common_words.heap[i]->len,1,stdout);
+    printf(", with %d occurances\n",common_words.heap[i]->count);
+  }
+  return 0;
 }

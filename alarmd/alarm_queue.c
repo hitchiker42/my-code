@@ -2,9 +2,9 @@
 //all these functions require external locking
 static my_alarm _temp_;
 static my_alarm *_temp_ptr=&_temp_;
-#define left_child(i) ((i<<1)+1)
-#define right_child(i) ((i<<1)+2)
-#define parent(i) ((i-1)>>1)
+#define left_child(i) ((i*2)+1)
+#define right_child(i) ((i*2)+2)
+#define parent(i) ((i-1)/2)
 #define queue_compare(i,j) (alarm_queue[i]->alarm_time>alarm_queue[j]->alarm_time)
 #define queue_swap(i,j) _temp_ptr=alarm_queue[i];\
   alarm_queue[i]=alarm_queue[j];              \
