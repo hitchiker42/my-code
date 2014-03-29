@@ -1,103 +1,149 @@
-static hash_table* make_hash_table(size_t size){
-  //it might be faster to do this in one allocation
-  hash_table *retval=xcalloc(sizeof(hash_table));
-  retval->size=size;
-  retval->capacity_inc=1/(size*5);//lower capacity that I would normally use
-  //kinda risky, if we put more than 10 items in one bucket before
-  //reaching capacity this will access out of bounds memory
-  //but I trust my hash functon to make sure that doesn't happen
-  retval->buckets=xcalloc(sizeof(english_word)*size*10);
-  retval->lock=xmalloc(sizeof(pthread_spinlock_t));
-  /*  if(!pthread_spin_init(retval->lock,PTHREAD_PROCESS_PRIVATE)){
-    exit(EXIT_FAILURE);
-    }*/
-  return retval;
-}
-/* Use different means of collision resolution. instead of using
-   a linked list in each bucket just increment the bucket if there
-   is a collision, this will mean I need to make sure the capacity is
-   a lot smaller, 0.5-0.7 or so.
-
-   The best way to do this would be use atomic cmpxchg of pointers.
-   So have the actual hash table be an array of pointers, and to update
-   use atomic operations.
+/*this is all we need for the hash table, again we're trading space for time
+  by having a (really) large hash table we never need to rehash and by
+  using open adressing we don't need to use buckets (though open adressing
+  has its own flaws).
 */
-static english_word hash_table_add(hash_table *ht,english_word word){
-  uint64_t hashv=fnv_hash(word.str,word.len);
-  uint32_t bucket_index=hashv%ht->size;
-  //  pthread_spin_lock(ht->lock);
-  english_word *bucket=ht->buckets+(10*bucket_index);
-  if(!bucket){
-    ht->used++;
-    goto ADD_ENTRY;
-  }
-  while(*(uint64_t*)bucket){
-    if(english_word_compare(word,*bucket)){
-      bucket->count++;
-      english_word retval=*bucket;
-      //  pthread_spin_unlock(ht->lock);
-      return retval;
-    }
-    bucket++;
-  }
-  ADD_ENTRY:
-  *bucket=word;
-  ht->capacity+=ht->capacity_inc;
-  ht->entries++;
-  maybe_rehash_hash_table(ht);
-  return word;//count defaults to 1 on word;
-}
-static hash_table* hashtable_rehash(hash_table *ht){
-  uint64_t old_len=ht->size;
-  //update hash parameters
-  ht->size*=ht_growth_factor;
-  ht->capacity/=ht_growth_factor;
-  ht->capacity_inc/=ht_growth_factor;
-  ht->buckets=xrealloc(ht->buckets,(sizeof(english_word)*ht->size*10));
-  //suprisingly important, new memory needs to be zeroed
-  memset((void*)(ht->buckets+(old_len*10)),'\0',old_len*10);
-  int i,j;
-  english_word *bucket,*temp,*old_bucket;
-  for(i=0;i<old_len;i++){
-    bucket=ht->buckets+(i*10);
-    while(*bucket)
-      if(bucket->hashv%ht->size==i){
-        bucket=bucket->next;
-      } else {
-        old_bucket=bucket;
-        if(bucket->prev){
-          bucket->prev->next=bucket->next;
-        }
-        if(bucket->next){
-          bucket->next->prev=bucket->prev;
-        }
-        if(!ht->buckets[i+old_len%ht->size]){
-          //this is an unused bucket
-          ht->buckets[i+old_len]=bucket;
-          bucket=bucket->next;
-          old_bucket->prev=old_bucket->next=NULL;
-          ht->used++;
+
+//desired is a pointer
+#define atomic_compare_exchange(ptr,expected,desired)           \
+  __atomic_compare_exchange(ptr,expected,desired,0,             \
+                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
+//desired isn't a pointer
+#define atomic_compare_exchange_n(ptr,expected,desired)           \
+  __atomic_compare_exchange_n(ptr,expected,desired,0,             \
+                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
+#define atomic_bts(bit_index,mem_pointer)                       \
+  __asm__("lock bts %0,%1\n"                                    \
+          : : "r" (bit_index), "m" (mem_pointer))
+/* presumably atomic_add_fetch is just lock add val,(ptr)
+   where atomic_fetch_add is lock xadd val,(ptr)
+   and I imagine that add is faster that xadd
+ */
+#define atomic_add(ptr,val)                     \
+  __atomic_add_fetch(ptr,val,__ATOMIC_SEQ_CST)
+//with this (and pretty much any binary operation but add) the difference
+//between fetch_or and or_fetch is a lot bigger, or_fetch is just a lock or
+//whereas fetch_or translates into a cmpxcgh loop
+#define atomic_or(ptr,val)                                      \
+  __atomic_or_fetch(ptr,val,__ATOMIC_SEQ_CST)
+/* 
+   Update the value of word in the global hash table, this means that if word
+   isn't in the table then we should add it, and if it is we should increment the
+   count on the value in the table and update the file index based on the 
+   set bit in the file index of word
+*/
+//this version uses locking to guarantee atomic access to the hash table
+//currently the locking is done using a very small spin lock, though
+//it might be best to use locks with waiting, I'll need to profile to be sure
+//but it doesn't really matter since I'm probably not going to use this version
+static english_word* locking_hash_table_update(english_word *word){
+  uint64_t hashv=fnv_hash(word->str,word->len);
+  uint64_t index=hashv%global_hash_table_size;
+  int low=(word->low?1:0);
+  futex_spin_lock(&futex_lock);
+  if(!global_hash_table[index]){//word isn't in the hash table, add it
+    global_hash_table[index]=word;
+  } else {
+    do {
+      //word is in the hash table, update it
+      if(string_compare(global_hash_table[index],*word)){
+        global_hash_table[index]->count+=1;
+        if(low){
+          global_hash_table[index]->low|=word->low;
         } else {
-          //put old bucket list into a temp variable
-          temp=ht->buckets[i+old_len%ht->size];
-          ht->buckets[i+old_len%ht->size]=bucket;//set bucket to new value;
-          temp->prev=bucket;//relink old bucket list
-          //get next value in the bucket we're iterating through
-          bucket=bucket->next;
-          //now link the current value into the bucket list
-          old_bucket->next=temp;
-          old_bucket->prev=NULL;
+          global_hash_table[index]->high|=word->high;
         }
+        goto END;
+        xfree(word);
       }
-    }
-    if(!ht->buckets[i]){ht->used--;}
+    } while(global_hash_table[++index]);
+    //not in the table use next free index
+    global_hash_table[index]=word;
   }
-  return ht;
+ END:
+  futex_spin_unlock(&futex_lock);
+  return word;
 }
-//maybe I should use mmap
-//yes, use mmap, I can't fail if malloc fails, so I need to be able
-//to swap pages
-//I can't use mmap...damn
+
+/*
+  same as above but uses atomic operations instead of locking, which 
+  makes everything much faster, since we can have concurrent access to
+  the hash table unlike with locking. (i.e in this version multiple
+  threads can access different parts of the hash table all at once
+  whereas with locking one thread blocks all others even those accessing
+  a completely different part of the table
+*/
+static english_word* atomic_hash_table_update(english_word *word){
+  uint64_t hashv=fnv_hash(word->str,word->len);
+  uint64_t index=hashv%global_hash_table_size;
+  int low=(word->low?1:0);
+  if(!global_hash_table[index]){//word isn't in the hash table, add it
+    void *prev=global_hash_table[index];
+    int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
+    if(test){
+      //we added the word
+      goto END;
+    }
+    //else, someone else changed the value of global_hash_table[index] before us
+  }
+  while(1){
+    do {
+      //see if the value in the table is the same as our value
+      //if so update the value already in the table
+      if(string_compare(global_hash_table[index],*word)){
+        //atomically increment word count
+        atomic_add(&global_hash_table[index]->count,1);
+        //atomiclly update the file index
+        if(low){
+          atomic_or(&global_hash_table[index]->low,word->low);
+        } else {
+          atomic_or(&global_hash_table[index]->high,word->high);
+        }
+        xfree(word);
+        goto END;
+      }
+    } while(global_hash_table[++index]);
+    //not in the table use next free index (if we can)
+    void *prev=global_hash_table[index];
+    int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
+    if(test){break;}
+    //if !test the compare exchange failed and we need to keep looping
+  }
+ END:
+  return word;
+}
+//same as above but without a file index
+static english_word* atomic_hash_table_update_one(english_word *word){
+  uint64_t hashv=fnv_hash(word->str,word->len);
+  uint64_t index=hashv%global_hash_table_size;
+  if(!global_hash_table[index]){
+    //use compare and swap eventually
+    void *prev=global_hash_table[index];
+    int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
+    if(test){
+      //this happened global_hash_table[index]=word;
+      goto END;
+    }
+  }
+  while(1){
+    do {
+      if(string_compare(global_hash_table[index],*word)){
+        //atomically increment word count
+        atomic_add(&global_hash_table[index]->count,1);
+        xfree(word);
+        goto END;
+      }
+    } while(global_hash_table[++index]);
+    //not in the table use next free index
+    void *prev=global_hash_table[index];
+    int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
+    if(test){break;}
+    //if !test the compare exchange failed and we need to keep looping
+  }
+ END:
+  return word;
+}
+//I can't use this ...
 void *mmap_file(char *filename){
   int fd=open(filename,O_RDONLY);
   if(fd == -1){
@@ -114,8 +160,7 @@ char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
   char **retval=xmalloc(num_files*2*sizeof(filebuf));
   while(i<num_files){
     filename=filenames[i];
-  
-
+  }
   ssize_t nbytes=read(fd,buf,len);
   if(nbytes == (ssize_t)-1 /*|| nbytes != len*/){
     perror("Error reading from file");
@@ -133,21 +178,13 @@ char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
       //      if(j
     }
   }
-  }
 }
-english_word next_word(filebuf){
-  uint32_t len=word_len(filebuf->buf+filebuf->index),skip;
-  while(len<6){
-    filebuf->index+=len;
-    skip=strcspn(filebuf->buf+filebuf->index,eng_accept);
-    filebuf->index+=skip;
-    len=word_len(filebuf->buf+filebuf->index);
-  }
-  english_word retval={.str=(filebuf->buf+filebuf->index),.len=len,.count=1};
-  filebuf->index+=len;
-  return retval;
-}  
-extern void process_string(const char *buf,uint64_t len);
+/* 
+   Main work function, searches buf for english words (matching [a-zA-Z]{6,50})
+   and puts/updates the word in the global hash table.
+   frees the buffer it's given once it's done;
+   TODO: this need to take another parameter specifing the file index
+ */
 void parse_buf(const char *buf){
   uint64_t index=1;
  START:
@@ -177,37 +214,71 @@ void parse_buf(const char *buf){
  REJECT_1:
   index++;
  REJECT_0:
-  process_string(buf,index);
+  if(!(index < 6 || index >50)){
+    //allocate the memory for the struct and the string at the same time
+    //this means we only need to call malloc/free once 
+    void *mem=xmalloc(sizeof(english_word)+index);
+    //it seems wasteful to copy every word but if I used the string from the
+    //buffer I wouldn't be able to free the buffer, and only copying the
+    //string when I need in would add another layer of complexity to the already
+    //complex process of atomically updating the hash table
+    //I might change this later if it proves a performance issue
+    my_strcpy(mem+sizeof(english_word),buf,index);
+    english_word *word=mem;
+    //need to modify this function to pass the file index to put
+    //into this 
+    *word=(english_word){.str=mem+sizeof(english_word),.len=index,
+                         .low=0,.high=0,.count=0};
+    atomic_hash_table_update(word);//frees word if it's not needed 
+  }
   if(*(buf[index+1])!=0xff){
     index=1;
     goto START;
   }
+  //no one else should need this buffer after us
+  xfree(buf);
 }
-char *setup_block(char *block,uint32_t block_size){
+/*
+  Setup a block of memory to be processed by parse_buf.
+  if block[block_size] isn't a word character scan backwards until a word 
+  character is found and mark the next character as EOF (i.e insure the block
+  ends immediately after a word character). If block[block_size] is a word 
+  character scan forward/backward to find the bounds of it, and if it's 
+  within size limits put/update it in the hash table. Following this do the same
+  as above to mark the end of the block with EOF.
+
+  The core of this function is good, the actual interface to it needs to be
+  reworked once I decide how exactly I'm going to do everything.
+ */
+struct {char *buf;uint32_t len;} setup_block(char *block,uint32_t block_size){
   //start is start of last eng word, it will ultimately
   //refer to the end of the block we're returning
   uint32_t start=block_size,end=block_size;
   if(eng_accept[block[block_size]]){
     while(eng_accept[block[--start]]);//find start of word
     while(eng_accept[block[++end]]);//find end of word
-    process_string(block-(start+1),end-start);//process word 
+    uint32_t len=end-start;
+    if(len>=6 && len<=50){
+      void *mem=xmalloc(sizeof(english_word)+len);
+      my_strcpy(mem+sizeof(english_word),block-(start+1),len);
+      english_word *word=mem;
+      //need to modify this function to pass the file index to put
+      //into this 
+      *word=(english_word){.str=mem+sizeof(english_word),.len=len,
+                           .low=0,.high=0,.count=0};
+      atomic_hash_table_update(word);//frees word if it's not needed 
+    }
   }
   //mark end of block with EOF
   while(!eng_accept[block[--start]]);
   block[start+1]=0xff;
   return (struct {char *buf;uint32_t len;}){.buf=block,.len=start};
 }
-/*int futex(int *uaddr, int op, int val, const struct timespec *timeout,
-        int *uaddr2, int val3);*/
-/*Futexes, declares two functions
-  usage:
-  long lock_mem;
-  long *lock=&lock_mem;
-  futex_up(lock);
-  //scalar code goes here
-  futex_down(lock);
-*/
 
+/* Assembly for futex routines and my_strcpy.
+   the futex stuff will probably be removed since I'm using atomic
+   operations rather that locks
+*/
 //futexs 1=free, 0=locked, no waiters -1=locked, waiters
 __asm__(".macro ENTRY name:req\n"
         ".globl \\name;\n"
@@ -255,7 +326,7 @@ __asm__(".macro ENTRY name:req\n"
         "my_syscall $202\n"
         "retq\n"
         "END futex_down\n"
-        
+
         //unlock spin lock
         "ENTRY futex_spin_up\n"
         //much eaiser, we do the same thing no matter what
@@ -275,15 +346,22 @@ __asm__(".macro ENTRY name:req\n"
         "lock cmpxcghq %rcx,(%rdi)\n"//try to get lock
         "jnz 1b\n"//if we failed spin again
         "END futex_spin_down\n"
-
-
-)
+        /*This assumes that the cost of aligning memory before copying
+          outweighs the benifit for 6-50 byte strings (also that 
+          rep movsb is fast)
+        */
+        "ENTRY my_strcpy\n"
+        "movq %rdx,%rcx\n"//move length to rcx
+        "movq %rsi,%rax\n"//save return value
+        "rep movsb\n"//actually copy
+        "retq\n"
+        "END my_strcpy\n")
 #define PTHREAD_CLONE_FLAGS = (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|\
                                CLONE_SETTLS|CLONE_PARENT_SETTID|\
                                CLONE_CHILD_CLEARTID|CLONE_SYSVMEM|0)
 #define SIMPLE_CLONE_FLAGS = (CLONE_VM|CLONE_FS|CLONE_SIGHAND|  \
                               CLONE_PARENT_SETTID|0)
-//would be eaiser to just do a mov and a ret but 
+//would be eaiser to just do a mov and a ret but
 //then gcc will complain about returning without a value or something
 //clone returns 0 for new child and child tid for parent
 long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
@@ -294,4 +372,8 @@ long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
           "movq %rax,%0"
           : "=g" (retval) : "=g" (__NR_clone));
   return;
+}
+
+long main(long argc,char *argv[]){
+  
 }

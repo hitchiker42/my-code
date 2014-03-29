@@ -14,7 +14,21 @@
 #endif
 #endif
 //allocate NUM_PROCS*2MB space for the thread stacks
-static uint8_t thread_stacks[NUM_PROCS*(2*1024*1024)];
+static uint8_t thread_stacks[NUM_PROCS*(2<<20)];
+/*Assuming there that are ~1000000 english words, and probably half of those
+  are 6-50 letters long, 8 MB should be large enough for a hash table that 
+  won't exceed 50% capacity regardless of input. and 8 MB isn't so large as
+  to be ridiculous, it's the same size as the default stack
+  also no need to monitor the capacity because of how big the hash table is.
+*/
+
+typedef struct english_word english_word;
+//it'd be nice to have this be an array of structs rather than an array of 
+//pointers but that woud quadruple the size and 32 MB for a hash table
+//seems a bit much. I'll profile it later and see if it's worth it 
+static english_word *global_hash_table[1<<20];
+static const uint64_t global_hash_table_size=1<<20;//size in 8 byte blocks
+static struct {uint64_t low; uint64_t high;} all_files;
 #define PAGE_ROUND_DOWN(x) (((uint64_t)(x)) & (~(PAGE_SIZE-1)))
 #define PAGE_ROUND_UP(x) ( (((uint64_t)(x)) + PAGE_SIZE-1)  & (~(PAGE_SIZE-1)) )
 #define file_size(fd)                           \
@@ -35,36 +49,18 @@ static uint8_t thread_stacks[NUM_PROCS*(2*1024*1024)];
 
    2GB max file length (so uint32_t can hold any length)
    100 files max, 1 file min
-   
-   ideas for storing info:
-   simplest: use seperate hash tables
-     -wastes memory
-     -a lot of work to resolve the different files at the end
-   One hash table
-     -need to have a 100 bit bit field (or 64 bit if < 64 files) to store
-       info about access from each file
-     -requires quite a bit of locking, so I need to figure out how to do things
-       atomically if I want speed
-     -Extra bitwise or for each update (not a big deal)
-     -No complicated resoltuion 
-   Trie
-     -faster than a binary tree (which is why thats not an option)
-     -Significantly more compilcated to implement
-   
-   Hash tree/trie
-     -complicated, not sure if it would be any faster either
 
-   for the one hash table case a hash entry would be
-   struct {
-     char *str;
-     uint32_t len;
-     uint32_t count;
-     uint64_t/uint128_t file_counter;
-   } 
+   information stored in one really big hash table (large enough to hold 
+   pretty much every english word). This hash table uses open adressing with
+   linear probing (meaning no linked lists, and collisions are resolved by
+   putting the colliding value into the next free bucket), the large size of
+   the hash table means the load factor will be small and this will be efficient.
 */
 static volatile int futex_lock __attribute__((aligned (16))) = 0;
 
 static const uint64_t PAGESIZE=4096;
+
+static const uint64_t buf_size=2<<12;//2*pagesize
 
 /*1 if char is in the set [A-Za-z] zero otherwise */
 static const char eng_accept[256]=
@@ -77,28 +73,57 @@ static const char eng_accept[256]=
    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+static const uint64_t file_bit_strings[64] =
+  {0x1,0x3,0x7,0xf,
+   0x1f,0x3f,0x7f,0xff,
+   0x1ff,0x3ff,0x7ff,0xfff,
+   0x1fff,0x3fff,0x7fff,0xffff,
+   0x1ffff,0x3ffff,0x7ffff,0xfffff
+   0x1fffff,0x3fffff,0x7fffff,0xffffff
+   0x1ffffff,0x3ffffff,0x7ffffff,0xfffffff
+   0x1fffffff,0x3fffffff,0x7fffffff,0xffffffff
+   0x1ffffffff,0x3ffffffff,0x7ffffffff,0xfffffffff
+   0x1fffffffff,0x3fffffffff,0x7fffffffff,0xffffffffff
+   0x1ffffffffff,0x3ffffffffff,0x7ffffffffff,0xfffffffffff
+   0x1fffffffffff,0x3fffffffffff,0x7fffffffffff,0xffffffffffff
+   0x1ffffffffffff,0x3ffffffffffff,0x7ffffffffffff,0xfffffffffffff
+   0x1fffffffffffff,0x3fffffffffffff,0x7fffffffffffff,0xffffffffffffff
+   0x1ffffffffffffff,0x3ffffffffffffff,0x7ffffffffffffff,0xfffffffffffffff
+   0x1fffffffffffffff,0x3fffffffffffffff,0x7fffffffffffffff,0xffffffffffffffff}
 typedef struct internal_buf internal_buf;
-struct filebuf {
+struct internal_buf {
   char *buf;
   int file_id;
   int buf_num;
 };
-typedef struct english_word english_word;
-typedef struct hash_table hash_table;
-//avoid using c strings, use char arrays with explicit lengths 
+
+/*structure for storing data about each word
+  contains:
+  -the word iself as a char * (not necessarly null terminated)
+  -the word length in a 32 bit integer (we really only need 8 bits but 
+    using 32 is more efficent alignment wise...probably)
+  -A count of how many times the word has been seen, only uses in 
+    the hash table entries
+  -A means of uniquely identifying which file the word came from 
+    (the actual implementation of this is a bit complicated)
+*/
 struct english_word {
-  char *str;//NOT a c string
+  char *str;//NOT null terminated
   uint32_t len;
   uint32_t count;
-};
-struct hash_table {
-  english_word *buckets;
-  /*all these need to be updated atomically, which should happen by default*/
-  uint32_t size;
-  uint32_t used;//not sure that I need either this field or the next
-  uint32_t entries;
-  float capacity;
-  float capacity_inc;
+  /*only 100 of these next 128 bits are used
+    they keep track of which files each word has been seen it,
+    after program startup a value of N 1s followed by 128-N 0s
+    where N is the number of files is saved in the global variable all_files,
+    at the end the low/high values of each word in the hash table are
+    compared against this value to determine if a word appeared in all of the 
+    files.
+    
+    if there is only one file we don't use these, it's a small optimization
+    but it might do something.
+  */
+  uint64_t low;
+  uint64_t high;
 };
 //these should be rewritten so I don't terminate the program if
 //I use too much memory
@@ -128,12 +153,16 @@ static inline void *xrealloc(void *ptr,size_t sz){
   return temp;
 }
 #define xfree free
-static inline size_t /*__attribute__((pure))*/ word_len(char *str){
-  size_t count=-1;
-  while(eng_accept[str[++count]]);
-  return count;
-}
+/*simple but efficient hash function
+  MurmurHash and cityhash are better hash functions but my version of 
+  city hash is about 600 lines long (granted it does various lengths)
+  and I haven't actually used MurmurHash before. (I use cityhash in another
+  project of mine)
 
+  These technically inplement the FNV-1a hash rather that the FNV-1 hash
+  the only difference is the order of the XOR and multiply but the change
+  in order gives FNV-1a much better avalanche behavior.
+*/
 static uint64_t fnv_hash(const void *key,int keylen){
   const uint8_t *raw_data=(const uint8_t *)key;
   int i;
@@ -142,6 +171,19 @@ static uint64_t fnv_hash(const void *key,int keylen){
     hash = (hash ^ raw_data[i])*fnv_prime_64;
   }
   return hash;
+}
+//this might result in a more even distribution, but it might not 
+static uint32_t fnv_hash_32_folded(const void *key,int keylen){
+  const uint8_t *raw_data=(const uint8_t *)key;
+  int i;
+  union {
+    uint64_t uint64; 
+    struct {uint32_t low; uint32_t high} uint32;
+  } hash=offset_basis_64;
+  for(i=0; i < keylen; i++){
+    hash.uint64 = (hash.uint64 ^ raw_data[i])*fnv_prime_64;
+  }
+  return (hash.uint32.high ^ hash.uint32.low);
 }
 static uint32_t fnv_hash_32(const void *key,int keylen){
   const uint8_t *raw_data=(const uint8_t *)key;
@@ -153,21 +195,48 @@ static uint32_t fnv_hash_32(const void *key,int keylen){
   return hash;
 }
 
-static int string_compare(struct {char *str; uint32_t len;} x,
-                          struct {char *str; uint32_t len;} y){
-  if(x.len != y.len){
+static int string_compare(struct {char *str; uint32_t len;} *x,
+                          struct {char *str; uint32_t len;} *y){
+  if(x->len != y->len){
     return 0;
   } else {
-    return !memcmp(x.str,y.str,x.len);
+    return !memcmp(x->str,y->str,x->len);
   }
 }
-static const float ht_growth_threshold=0.8;
-static const float ht_growth_factor=2.0;
-static hash_table *make_hash_table(size_t size);
-static hash_table_add(hash_table *ht,english_word word);
-static hash_table_maybe_rehash(hash_table *ht);
-static hash_table_rehash(hash_table *ht);
+#define futex_lock futex_down
+#define futex_unlock futex_up
+#define futex_spin_lock futex_spin_down
+#define futex_spin_unlock futex_spin_up
 long futex_up(volatile long *futex_addr);
 long futex_down(volatile long *futex_addr);
 long futex_spin_up(volatile long *futex_addr);
 long futex_spin_down(volatile long *futex_addr);
+long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
+                   void *ctid,struct pt_regs *regs);
+char *my_strcpy(char *src,char *dest,uint64_t len);
+/*   
+   ideas for storing info:
+   simplest: use seperate hash tables
+     -wastes memory
+     -a lot of work to resolve the different files at the end
+   One hash table
+     -need to have a 100 bit bit field (or 64 bit if < 64 files) to store
+       info about access from each file
+     -requires quite a bit of locking, so I need to figure out how to do things
+       atomically if I want speed
+     -Extra bitwise or for each update (not a big deal)
+     -No complicated resoltuion 
+   Trie
+     -faster than a binary tree (which is why thats not an option)
+     -Significantly more compilcated to implement
+   
+   Hash tree/trie
+     -complicated, not sure if it would be any faster either
+
+   for the one hash table case a hash entry would be
+   struct {
+     char *str;
+     uint32_t len;
+     uint32_t count;
+     uint64_t/uint128_t file_counter;
+     } */
