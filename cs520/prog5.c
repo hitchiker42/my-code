@@ -146,7 +146,10 @@ struct filebuf read_full_file(char *filename){
     perror("error closing file");
     exit(EXIT_FAILURE);
   }
-  return (struct filebuf){.buf=buf,.len=len};
+  uint32_t end=len-1;
+  while(!eng_accept[buf[--end]]);
+  buf[end+1]=0xff;
+  return (struct filebuf){.buf=buf,.len=end};
 }
 #if 0
 char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
@@ -238,6 +241,104 @@ void parse_buf(register const uint8_t *buf){
   //no one else should need this buffer after us
   xfree((void*)initial_buf);
 }
+
+void thread_main(void *arg){
+  int signo;
+  thread_id=(uint64_t)(arg);//once
+  while(1){
+    parse_buf(thread_bufs[thread_id]);//do stuff
+
+    //tell main thread we're done
+    __atomic_store_n(thread_status+thread_id,0,__ATOMIC_SEQ_CST);
+    futex_spin_lock(&thread_queue_lock);
+    thread_queue[thread_queue_index++]=thread_id;
+    futex_wake(&main_thread_wait,1);
+    futex_spin_unlock(&thread_queue_lock);
+
+    //wait for main thread to give us more data
+    /* There is a highly unlikely race condition to prevent here
+       if the main thread signals us before we start waiting we'd
+       end up waiting forever. However the main thread has to refill
+       our buffer (entailing a syscall to read), and clean up the end of
+       the buffer if necessary before it signals us. So the odds of us
+       getting signaled before we start waiting are really low.
+       I'll put in code to prevent this, but if it makes a performance
+       difference (which it shouldn't) I'll take it out
+     */
+    sigwait(&sigwait_set,&signo);
+    __atomic_store_n(thread_status+thread_id,1,__ATOMIC_SEQ_CST);//this prevents the race contition
+    //the main thread runs a loop while(!thread_status[worker_thread_id]){
+    //tgkill(-1,thread_pids[worker_thread_id],<SIGNAL>);}
+    if(signo == SIGCHLD){
+      thread_exit(EXIT_SUCCESS);
+    }
+  }
+}
+
+void main_wait_loop(){
+  uint8_t worker_thread_id;
+  while(/*there is data left to process*/ 1){
+    //this might be a race conditon, I think so, but I think I know how to 
+    //fix it, the way it is now a thread might call futex wake before
+    //this thread starts waiting. I should be able to fixe htis by using the
+    //futex as a counter which gets atomically incremented/decremunted
+    int val = -1;
+    val=atomic_add(&val,main_thread_wait);
+    //wait untill a thread is done;
+    futex_wait(&main_thread_wait,val);
+    while(__atomic_load_n(&thread_queue_index,__ATOMIC_SEQ_CST) > 0){
+      futex_spin_lock(&thread_queue_lock);
+      worker_thread_id=thread_queue[thread_queue_index--];
+      futex_spin_unlock(&thread_queue_lock);
+      //I still need to figure these out
+      //      somehow_fill_block(thread_bufs[worker_thread_id]);
+      //MAGIC GOES HERE
+      setup_block(thread_bufs[worker_thread_id],buf_size);
+      while(!(__atomic_load_n(thread_status+worker_thread_id,__ATOMIC_SEQ_CST))){
+        tgkill(-1,thread_pids[worker_thread_id],SIGCONT);
+        __asm__ volatile("pause\n\tpause\n");//give the worker thread time to set
+        //its staus
+      }
+    }
+  }
+  int live_threads=NUM_PROCS-1;
+  while(live_threads){
+    while(thread_queue_index > 0){
+      futex_spin_lock(&thread_queue_lock);
+      worker_thread_id=thread_queue[thread_queue_index--];
+      futex_spin_unlock(&thread_queue_lock);
+      //I suppose here is where the race condition might actually matter
+      //if we actually needed to make sure the thread was waiting
+      //use SIGTERM, if the thread isn't already waiting it'll just terminate
+      //instead, I assume this will only terminate that thread, but if not
+      //I'll set up a signal hanler to allow indivual theads to terminate
+      tgkill(-1,thread_pids[worker_thread_id],SIGTERM);
+      live_threads--;
+    }
+    int val = -1;
+    val=atomic_add(&val,main_thread_wait);
+    //wait untill another thread is done;
+    futex_wait(&main_thread_wait,val);
+  }
+  struct heap common_words=sort_words();
+  //print stuff
+  //actually call the libc exit to insure everything gets cleaned up
+  //and all the threads actually die
+  exit(EXIT_SUCCESS);
+}
+//this should be merged into another function, it's only a function
+//now so I have a place to put this code
+void init_threads(){
+  //assumes all thread buffers are already setup
+  int live_threads=1;
+  int next_thread_id=1;
+  while(live_threads<NUM_PROCS){
+    my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(next_thread_id),
+             thread_pids+next_thread_id,thread_main,(void*)(long)next_thread_id);
+    live_threads++;
+    next_thread_id++;
+  }
+}
 /*
   setup a block of memory to be processed by parse_buf.
   if block[block_size] isn't a word character scan backwards until a word
@@ -279,7 +380,6 @@ struct filebuf setup_block(uint8_t *block,uint32_t block_size){
 #define heap_left_child(i) (2*i+1)
 #define heap_right_child(i) (2*i+2)
 #define heap_parent(i) (i?(i-1)/2:0)
-struct heap {english_word **heap; uint32_t size;};
 static english_word** heap_sort(english_word **heap, uint32_t size);
 static void sift_down(english_word **heap, uint32_t start, uint32_t end);
 static void heapify(english_word **heap, uint32_t index, uint32_t heap_length);
@@ -361,7 +461,7 @@ static inline int heap_swap_min(english_word **heap,english_word *new){
   }
   return min_count[0];
 }
-  
+
 //no args because all the data used is global
 struct heap sort_words(){
   //maybe this should be thread local
@@ -443,11 +543,49 @@ static int is_sorted(english_word **arr,uint32_t size){
   return 1;
 }
 
-/* Assembly for futex routines and my_strcpy.
-   the futex stuff will probably be removed since I'm using atomic
-   operations rather that locks
+/* Assembly for futex routines
+   the futex stuff will probably only be used for inter thread
+   communication (i.e passing arguments/indicating a thread
+   needs more data,etc) since my hash table is done using
+   atomic opperations
 */
+/*these next two functions will be useful for using futexs
+  for things other than basic locks
+*/
+
+//interfate to the raw syscall
+//check that *uadder==val then wait until a FUTEX_WAKE
+int futex_wait(int *uaddr,int val){//ignore timeout argument
+  register int retval __asm__ ("%rax");
+  __asm__("movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
+          "movq %2,%%rsi\n\t"
+          "movq %3,%%rax\n\t"
+          "xorq %%rcx,%%rcx\n\t"
+          "lock subq $1,(%%edi)\n\t"
+          //hopefully if another thread adds to the futex before
+          //the kernel makes us wait the syscall return
+          //immediately
+          "syscall\n"
+          : "=r" (retval)
+          : "r" (val), "i" (FUTEX_WAIT), "i" (__NR_futex));
+  return retval;
+}
+//interfate to the raw syscall
+//wake up upto val processes waiting on the futex at uaddr
+int futex_wake(int *uaddr,int val){//timeout ignored by syscall
+  register int retval __asm__ ("%rax");
+  __asm__("movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
+          "movq %2,%%rsi\n\t"
+          "movq %3,%%rax\n\t"
+          "lock addq $1,(%%rdi)\n\t"
+          "syscall\n"
+          : "=r" (retval)
+          : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex));
+  return retval;
+}
 //futexs 1=free, 0=locked, no waiters -1=locked, waiters
+//futex_up and futex_down implement the locking mechanism described
+//int the futex(7) man page
 __asm__("\n.macro ENTRY name:req\n\t"
         ".globl \\name;\n\t"
         ".type \\name,@function;\n\t"
@@ -525,22 +663,35 @@ __asm__("\n.macro ENTRY name:req\n\t"
         "rep movsb\n\t"//actually copy
         "retq\n"
         "END my_strcpy\n"*/);
-#define PTHREAD_CLONE_FLAGS = (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|\
-                               CLONE_SETTLS|CLONE_PARENT_SETTID|\
-                               CLONE_CHILD_CLEARTID|CLONE_SYSVMEM|0)
-#define SIMPLE_CLONE_FLAGS = (CLONE_VM|CLONE_FS|CLONE_SIGHAND|  \
-                              CLONE_PARENT_SETTID|0)
 //would be eaiser to just do a mov and a ret but
 //then gcc will complain about returning without a value or something
 //clone returns 0 for new child and child tid for parent
 long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
                    void *ctid,struct pt_regs *regs){
-  long retval;
-  __asm__("movq %1,%%rax\n"
+  register long retval __asm__ ("%rax");
+  __asm__("movq %1,%%rax\n\t"
           "syscall\n"
-          "movq %%rax,%0"
-          : "=g" (retval) : "i" (__NR_clone));
+          : "=r" (retval) : "i" (__NR_clone));
   return retval;
+}
+long my_clone(unsigned long flags,void *child_stack,void *ptid,
+              void (*fn)(void*),void *arg){
+  register long retval __asm__ ("%rax");
+  __asm__("movq %0,%%rax\n\t"
+          "xorq %%rcx,%%rcx\n\t"
+          "xorq %%r8,%%r8\n\t"
+          "syscall\n"
+          : : "i" (__NR_clone), "r" (retval) :"rcx","r8");
+  if(retval < 0){
+    perror("Clone failed");
+    exit(EXIT_FAILURE);
+  } else if(retval > 0) {
+    return retval;
+  } else {
+    //this is in the new thread
+    fn(arg);
+    __builtin_unreachable();//tell gcc that we can never get here
+  }
 }
 static inline char* __attribute__((const)) ordinal_sufffix(uint32_t num){
   if(num == 1){
@@ -561,14 +712,14 @@ int main(int argc,char *argv[]){
   if(argc <=0){
     fprintf(stderr,"Error no filenames given\n");
   }
+  //this is used when threads are waiting for more data
+  sigemptyset(&sigwait_set);
+  sigaddset(&sigwait_set,SIGCONT);
+  sigaddset(&sigwait_set,SIGTERM);
   //temporally assume one file
   PRINT_MSG("program start\n");
   struct filebuf file_buf=read_full_file(argv[0]);
   PRINT_MSG("read file\n");
-  uint32_t end=file_buf.len-1;
-  while(!eng_accept[file_buf.buf[--end]]);
-  file_buf.buf[end+1]=0xff;
-  PRINT_MSG("set EOF in file buffer\n");
   parse_buf(file_buf.buf);
   PRINT_MSG("parsed file\n");
   PRINT_FMT("Read %d words\n",indices_index);
