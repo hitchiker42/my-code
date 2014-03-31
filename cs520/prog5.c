@@ -1,50 +1,16 @@
 #include "prog5.h"
 /*
-   Update the value of word in the global hash table, this means that if word
-   isn't in the table then we should add it, and if it is we should increment the
-   count on the value in the table and update the file index based on the
-   set bit in the file index of word
-*/
-//this version uses locking to guarantee atomic access to the hash table
-//currently the locking is done using a very small spin lock, though
-//it might be best to use locks with waiting, I'll need to profile to be sure
-//but it doesn't really matter since I'm probably not going to use this version
-/*static english_word* locking_hash_table_update(english_word *word){
-  uint64_t hashv=fnv_hash(word->str,word->len);
-  uint64_t index=hashv%global_hash_table_size;
-  int low=(word->file_bits.low?1:0);
-  futex_spin_lock(&global_futex_lock);
-  if(!global_hash_table[index]){//word isn't in the hash table, add it
-    global_hash_table[index]=word;
-  } else {
-    do {
-      //word is in the hash table, update it
-      if(string_compare(global_hash_table[index],word)){
-        global_hash_table[index]->count+=1;
-        if(low){
-          global_hash_table[index]->file_bits.low|=word->file_bits.low;
-        } else {
-          global_hash_table[index]->file_bits.high|=word->file_bits.high;
-        }
-        goto END;
-        xfree(word);
-      }
-    } while(global_hash_table[++index]);
-    //not in the table use next free index
-    global_hash_table[index]=word;
-  }
- END:
-  futex_spin_unlock(&global_futex_lock);
-  return word;
-}*/
+  Update the value of word in the global hash table, this means that if word
+  isn't in the table then we should add it, and if it is we should increment the
 
-/*
-  same as above but uses atomic operations instead of locking, which
-  makes everything much faster, since we can have concurrent access to
-  the hash table unlike with locking. (i.e in this version multiple
-  threads can access different parts of the hash table all at once
-  whereas with locking one thread blocks all others even those accessing
-  a completely different part of the table
+  count on the value in the table and update the file index based on the
+  set bit in the file index of word
+
+  uses atomic operations not locking, which should make everything much faster,
+  since we can have concurrent access to the hash table unlike with
+  locking. (i.e in this version multiple threads can access different parts of
+  the hash table all at once whereas with locking one thread blocks all others
+  even those accessing a completely different part of the table
 */
 static english_word* atomic_hash_table_update(english_word *word){
   uint64_t hashv=fnv_hash(word->str,word->len);
@@ -58,6 +24,7 @@ static english_word* atomic_hash_table_update(english_word *word){
     void *prev=global_hash_table[index];
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
     if(test){
+      HERE();
       //we added the word
       //this needs to be atomic to prevent two threads writing different
       //values to the same index of indices
@@ -82,7 +49,7 @@ static english_word* atomic_hash_table_update(english_word *word){
         } else {
           atomic_or(&global_hash_table[index]->file_bits.high,word->file_bits.high);
         }
-        xfree(word);
+        free(word);
         goto end;
       }
     } while(global_hash_table[++index]);
@@ -99,56 +66,30 @@ static english_word* atomic_hash_table_update(english_word *word){
  end:
   return word;
 }
-//i can't use this ...
-/*
-void *mmap_file(char *filename){
-  int fd=open(filename,O_RDONLY);
-  if(fd == -1){
-    perror("error opening file");
-    exit(1);
-  }
-  off_t len=file_size(fd);
-  uint8_t *buf=mmap(NULL,PAGE_ROUND_UP(len),);
-}*/
-/*struct fileinfo open_file_simple(char *filename){
-  long fd=open(filename,O_RDONLY);
-  if(fd == -1){
-    perror("error opening file");
-    exit(1);
-  }
-  off_t len=lseek(fd,0,SEEK_END);
-  lseek(fd,0,SEEK_SET);
-  if(len == (off_t)-1){
-    perror("error seeking file");
-    exit(1);
-  }
-  return (struct fileinfo){.fd=fd,.len=len};
-  }*/
-
 struct filebuf read_full_file(char *filename){
+  static struct stat stat_buf;
   long fd=open(filename,O_RDONLY);
-  if(fd == -1){
+  if(builtin_unlikely(fd == -1)){
     perror("error opening file");
     exit(1);
   }
-  off_t len=lseek(fd,0,SEEK_END);
-  lseek(fd,0,SEEK_SET);
-  if(len == (off_t)-1){
-    perror("error seeking file");
+  int stat_retval=fstat(fd,&stat_buf);
+  if(builtin_unlikely(stat_retval == (off_t)-1)){
+    perror("error calling stat on file");
     exit(1);
   }
-  uint8_t *buf=xmalloc(len);
+  uint8_t *buf=xmalloc(stat_buf.st_size);
 
-  ssize_t nbytes=read(fd,buf,len);
-  if(nbytes == (ssize_t)-1 /*|| nbytes != len*/){
+  ssize_t nbytes=read(fd,buf,stat_buf.st_size);
+  if(builtin_unlikely(nbytes == (ssize_t)-1)){
     perror("error reading from file");
     exit(EXIT_FAILURE);
   }
-  if(close(fd) == -1){
+  if(builtin_unlikely(close(fd) == -1)){
     perror("error closing file");
     exit(EXIT_FAILURE);
   }
-  uint32_t end=len-1;
+  uint32_t end=stat_buf.st_size-1;
   while(!eng_accept[buf[--end]]);
   buf[end+1]=0xff;
   return (struct filebuf){.buf=buf,.len=end};
@@ -159,21 +100,22 @@ struct filebuf read_full_file(char *filename){
    frees the buffer it's given once it's done;
    todo: this need to take another parameter specifing the file index
 */
-/*A later possible optimization, looking at the output of 
-  cachegrind there are a lot of cache misses here that might 
-  be fixed by some prefetching
-*/
 
 void parse_buf(register const uint8_t *buf_,int file_id){
   register const uint8_t *buf __asm__ ("%rbx")=buf_;
   const uint8_t *initial_buf=buf;
   uint64_t index=1;
   union file_bitfield bitmask;
-  if(file_id>=64){file_id-=64;
-    bitmask.high=file_bitmasks[file_id];
+  if(file_id>=64){
+    file_id-=64;
+    bitmask.high=file_bit_masks[file_id];
   } else {
-    bitmask.low=file_bitmasks[file_id];
+    bitmask.low=file_bit_masks[file_id];
   }
+  PRINT_FMT("Start of parse buf in thread %ld\n",thread_id);
+//this doesn't seem to do much, positively or negitively
+//it might be worth trying different precetch instructions different
+//memory locations and different locations for the instruction
  PREFETCH:{
     __asm__ volatile ("prefetchnta 768(%rbx)");
   }
@@ -218,22 +160,33 @@ void parse_buf(register const uint8_t *buf_,int file_id){
     index=1;
     goto PREFETCH;
   }
+  PRINT_FMT("End of parse buf in thread %ld\n",thread_id);
   //no one else should need this buffer after us
   xfree((void*)initial_buf);
 }
 
 void thread_main(void *arg){
   int signo;
+  int futex_retval=-1;
   thread_id=(uint64_t)(arg);//once
+  PRINT_FMT("Worker thread %ld started\n",thread_id);
   while(1){
-    parse_buf(thread_bufs[thread_id]);//do stuff
-
+    parse_buf(thread_bufs[thread_id],thread_file_ids[thread_id]);//do stuff
+//    PRINT_FMT("Worker thread %ld parsed_buf\n",thread_id);
     //tell main thread we're done
     __atomic_store_n(thread_status+thread_id,0,__ATOMIC_SEQ_CST);
     futex_spin_lock(&thread_queue_lock);
+    PRINT_FMT("Worker thread %ld locked spin lock\n",thread_id);
     thread_queue[thread_queue_index++]=thread_id;
-    futex_wake(&main_thread_wait,1);
+    atomic_inc(main_thread_wait_ptr);
+    futex_retval=futex_wake(main_thread_wait_ptr,10);
     futex_spin_unlock(&thread_queue_lock);
+    PRINT_FMT("Worker thread %ld unlocked spin lock\n",thread_id);
+    if(futex_retval==-1){
+      perror("Futex failure\n");
+      exit(1);
+    }
+//    PRINT_FMT("Worker thread %ld unlocked spin lock\n",thread_id);
 
     //wait for main thread to give us more data
     /* There is a highly unlikely race condition to prevent here
@@ -245,80 +198,126 @@ void thread_main(void *arg){
        I'll put in code to prevent this, but if it makes a performance
        difference (which it shouldn't) I'll take it out
      */
+    PRINT_FMT("Worker thread %ld waiting for main\n",thread_id);
     sigwait(&sigwait_set,&signo);
     __atomic_store_n(thread_status+thread_id,1,__ATOMIC_SEQ_CST);//this prevents the race contition
+    PRINT_FMT("Worker thread %ld recieved signal %d\n",thread_id,signo);
     //the main thread runs a loop while(!thread_status[worker_thread_id]){
     //tgkill(-1,thread_pids[worker_thread_id],<SIGNAL>);}
-    if(signo == SIGCHLD){
+    if(signo == SIGTERM){
+      PRINT_FMT("Worker thread %ld finished\n",thread_id);
       thread_exit(EXIT_SUCCESS);
     }
   }
 }
-
+//setup the buffer and file_id for the thread with thread_id
+//then do the minimal ammount of work possible to insure
+//that there is at least one entry in the fileinfo queue
+int setup_thread_args(int thread_id_num){
+  //nothing should ever leave fileinfo_queue completely empty,
+  //fileinfo_queue[0] should always contain a vaild struct fileinfo
+  static struct fileinfo *info;
+  info=setup_block(fileinfo_queue[fileinfo_queue_index],thread_bufs[thread_id_num]);
+  thread_file_ids[thread_id_num]=info->file_id;
+  //these conditionals make sure that fileinfo_queue has a valid entry
+  //if it does not and there are no files left, we return 0 to indicate
+  //that we're out of data
+  if(info->remaining){
+    return 1;
+  }
+  if(fileinfo_queue_index>0){
+    fileinfo_queue_index--;
+    return 1;
+  }
+  if(fileinfo_queue_index==0){
+    if(current_file<num_files){
+      info=setup_fileinfo(filenames[current_file++]);
+      fileinfo_queue[fileinfo_queue_index]=info;
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+  __builtin_unreachable();
+}
+//fill the fileinfo queue as much as is possible. The idea is that
+//this should get called when there are no threads waiting for data
+//so that data can be given quickly when threads need it
+int refill_fileinfo_queue(){
+  static struct fileinfo *info;
+  while(fileinfo_queue_index<NUM_PROCS){
+    if(current_file<num_files){
+      info=setup_fileinfo(filenames[current_file++]);
+      fileinfo_queue[fileinfo_queue_index++]=info;
+    } else {
+      break;
+    }
+  }
+  return (fileinfo_queue_index?(fileinfo_queue_index-1):0);
+}
 void main_wait_loop(){
   uint8_t worker_thread_id;
-  while(/*there is data left to process*/ 1){
-    //this might be a race conditon, I think so, but I think I know how to 
-    //fix it, the way it is now a thread might call futex wake before
-    //this thread starts waiting. I should be able to fixe htis by using the
-    //futex as a counter which gets atomically incremented/decremunted
-    int val = -1;
-    val=atomic_add(&val,main_thread_wait);
+  int have_data=1;
+  int32_t val=-1;
+  int32_t futex_retval;
+  while(1){
     //wait untill a thread is done;
-    futex_wait(&main_thread_wait,val);
-    while(__atomic_load_n(&thread_queue_index,__ATOMIC_SEQ_CST) > 0){
+    PRINT_FMT("Main waiting with val %d\n",main_thread_wait);
+    futex_retval=futex_wait(main_thread_wait_ptr,val);
+    PRINT_FMT("Main woke up with val %d\n",main_thread_wait);
+    if(futex_retval==-1){
+      perror("Futex failure\n");
+      exit(1);
+    }
+    while(atomic_sub(&main_thread_wait,-1)>=0){
+      PRINT_MSG("Allocating thread_data\n");
       futex_spin_lock(&thread_queue_lock);
-      worker_thread_id=thread_queue[thread_queue_index--];
+      worker_thread_id=thread_queue[--thread_queue_index];
       futex_spin_unlock(&thread_queue_lock);
-      //I still need to figure these out
-      //      somehow_fill_block(thread_bufs[worker_thread_id]);
-      //MAGIC GOES HERE
-      setup_block(thread_bufs[worker_thread_id],buf_size);
-      while(!(__atomic_load_n(thread_status+worker_thread_id,__ATOMIC_SEQ_CST))){
-        tgkill(-1,thread_pids[worker_thread_id],SIGCONT);
+      if(!setup_thread_args(worker_thread_id)){
+        goto OUT_OF_DATA;
+      }
+      PRINT_MSG("Waking up thread\n");
+      do {
+        tgkill(tgid,thread_pids[worker_thread_id],SIGCONT);
         __asm__ volatile("pause\n\tpause\n");//give the worker thread time to set
         //its staus
+      } while(!(__atomic_load_n(thread_status+worker_thread_id,__ATOMIC_SEQ_CST)));
+      PRINT_MSG("thread woke up\n");
+    }
+    //I don't think it should be possible for this to return 0
+    //but I'm not 100% sure
+    if(!refill_fileinfo_queue()){
+      goto OUT_OF_DATA;
+    }
+  }
+ OUT_OF_DATA:{
+    PRINT_MSG("Out of data\n");
+    int live_threads=NUM_PROCS-1;
+    while(live_threads){
+      while(thread_queue_index > 0){
+        futex_spin_lock(&thread_queue_lock);
+        worker_thread_id=thread_queue[thread_queue_index--];
+        futex_spin_unlock(&thread_queue_lock);
+        //I suppose here is where the race condition might actually matter
+        //if we actually needed to make sure the thread was waiting
+        //use SIGTERM, if the thread isn't already waiting it'll just terminate
+        //instead, I assume this will only terminate that thread, but if not
+        //I'll set up a signal hanler to allow indivual theads to terminate
+        tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
+        live_threads--;
       }
+      int val = -1;
+      val=atomic_add(&val,main_thread_wait);
+      //wait untill another thread is done;
+      futex_wait(&main_thread_wait,val);
     }
-  }
-  int live_threads=NUM_PROCS-1;
-  while(live_threads){
-    while(thread_queue_index > 0){
-      futex_spin_lock(&thread_queue_lock);
-      worker_thread_id=thread_queue[thread_queue_index--];
-      futex_spin_unlock(&thread_queue_lock);
-      //I suppose here is where the race condition might actually matter
-      //if we actually needed to make sure the thread was waiting
-      //use SIGTERM, if the thread isn't already waiting it'll just terminate
-      //instead, I assume this will only terminate that thread, but if not
-      //I'll set up a signal hanler to allow indivual theads to terminate
-      tgkill(-1,thread_pids[worker_thread_id],SIGTERM);
-      live_threads--;
-    }
-    int val = -1;
-    val=atomic_add(&val,main_thread_wait);
-    //wait untill another thread is done;
-    futex_wait(&main_thread_wait,val);
-  }
-  struct heap common_words=sort_words();
-  //print stuff
-  //actually call the libc exit to insure everything gets cleaned up
-  //and all the threads actually die
-  exit(EXIT_SUCCESS);
-}
-//this should be merged into another function, it's only a function
-//now so I have a place to put this code
-void init_threads(){
-  //assumes all thread buffers are already setup
-  int live_threads=1;
-  int next_thread_id=1;
-  while(live_threads<NUM_PROCS){
-    my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(next_thread_id),
-             thread_pids+next_thread_id,thread_main,(void*)(long)next_thread_id);
-    live_threads++;
-    next_thread_id++;
+    PRINT_MSG("All worker threads finished\n")
+    struct heap common_words=sort_words();
+    print_results(common_words);
   }
 }
+
 /*
   Read the next block of memory by the file given in the info argument.
   This function deals with words that lie on the boundries of blocks
@@ -328,43 +327,42 @@ void init_threads(){
 
   the pattern of use is roughly:
   file_info *info=setup_file_info(filenames[i++]);//or something like this
-  while(files_left){  
+  while(files_left){
     info=setup_block(info,next_thread_buffer);
-    pass next_theread_buffer+info->start_offset as an argument 
+    pass next_theread_buffer+info->start_offset as an argument
     to a worker thread
     if(!info->remaning){
       info=setup_file_info(filenames[i++]);
     }
   }
  */
-struct fileinfo *setup_block(struct fileinfo *info,
-                                        uint8_t *buf){
-  /*slight Issue I just though of, if I read max_buf_size bytes
-    how do I fit in the end of file marker that I need
-    to indicate that the file should stop?
-  */
-  if(max_buf_size>=info->remaning){
+struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
+  if(max_buf_size>info->remaining){
     //just read the rest of the file
     ssize_t nbytes=read(info->fd,buf,max_buf_size);
-    if(__builtin_expect((nbytes == (ssize_t)-1),0)){
+    if(builtin_unlikely(nbytes == (ssize_t)-1)){
       perror("error reading from file");
       exit(EXIT_FAILURE);
     }
-    if(__builtin_expect((close(info->fd) == -1),0)){
+    if(builtin_unlikely(close(info->fd) == -1)){
       perror("error closing file");
       exit(EXIT_FAILURE);
     }
-    info->remaning=0;
+    info->remaining=0;
     uint32_t start=nbytes-1;
-    while(!eng_accept[buf[start--]]);
-    buf[start+1]=0xff;
+    if(eng_accept[buf[start]]){
+      buf[start+1]=0xff;
+    } else {
+      while(!eng_accept[buf[--start]]);
+      buf[start+1]=0xff;
+    }
   } else {
     ssize_t nbytes=read(info->fd,buf,buf_size);
-    if(__builtin_expect((nbytes == (ssize_t)-1),0)){
+    if(builtin_unlikely(nbytes == (ssize_t)-1)){
       perror("error reading from file");
       exit(EXIT_FAILURE);
     }
-    info->remaning-=buf_size;
+    info->remaining-=buf_size;
   }
   //this happens independent of weather we read the rest of the
   //file of still have some left, it depends on what was at
@@ -377,7 +375,7 @@ struct fileinfo *setup_block(struct fileinfo *info,
           buf[index++];
       } while (eng_accept[buf[index]] && info->word_len <50);
     }
-    if(__builtin_expect(info->word_len==50,0)){
+    if(builtin_unlikely(info->word_len==50)){
       while(eng_accept[buf[++index]]);
       info->word_len=0;
     }
@@ -393,341 +391,29 @@ struct fileinfo *setup_block(struct fileinfo *info,
   } else {
     info->start_offset=0;
   }
-  //this 
-  if(info->remaning){
+  //this filles the last_word buf with an incomplete word from the end of
+  //buf if there is one, and puts an eof at the end of the last word in buf
+  if(info->remaining){
     uint32_t start=buf_size-1;
-    if(eng_accept[buf[start]]){
-      while(eng_accept[buf[--start]]);
+    uint32_t cur=start;
+    if(eng_accept[buf[cur]]){
+      while(eng_accept[buf[--cur]]);      
       //should this be (buf_size-1)-start?
+      cur++
       if(buf_size-start<50){
-        my_strcpy(info->last_word,(buf_size-start));
+        my_strcpy((uint8_t*)info->last_word,buf+cur,(start-cur));
       }
-      info->word_len=buf_size-start;
+      info->word_len=start-cur;
     }
-    //mark eof at end of the buffer 
-    while(!eng_accept[buf[start--]]);
-    buf[start+1]=0xff;
+    //mark eof at end of the buffer
+    while(!eng_accept[buf[--cur]]);
+    buf[cur+1]=0xff;
   }
   return info;
 }
-//auxiliary routines for sorting
-#define heap_left_child(i) (2*i+1)
-#define heap_right_child(i) (2*i+2)
-#define heap_parent(i) (i?(i-1)/2:0)
-static english_word** heap_sort(english_word **heap, uint32_t size);
-static void sift_down(english_word **heap, uint32_t start, uint32_t end);
-static void heapify(english_word **heap, uint32_t index, uint32_t heap_length);
-static english_word *heap_pop(english_word **heap,uint32_t heap_length);
-
-static inline void heap_insert(english_word **heap,english_word *new_element,
-                               uint32_t heap_index){
-  heap[heap_index]=new_element;
-  //will always terminate when heap_index = 0 because heap_parent returns 0
-  //when given 0
-  while(heap[heap_index]->count > heap[heap_parent(heap_index)]->count){
-    SWAP(heap[heap_index],heap[heap_parent(heap_index)]);
-    heap_index=heap_parent(heap_index);
-  }
-}
-static inline void heapify(english_word **heap,uint32_t index,
-                           uint32_t heap_length){
-  uint32_t left,right,cur_max;
-  while(index<heap_length){
-    left=heap_left_child(index);
-    right=heap_right_child(index);
-    cur_max=index;
-    if(heap[left]->count > heap[cur_max]->count){
-      cur_max=left;
-    }
-    if(heap[right]->count > heap[cur_max]->count){
-      cur_max=right;
-    }
-    if(cur_max == index){
-      break;
-    }
-    SWAP(heap[index],heap[cur_max]);
-    index=cur_max;
-  }
-}
-//this comes from the psudeocode on the wikipedia heapsort artical
-static inline void sift_down(english_word **heap,uint32_t start,uint32_t end){
-  uint32_t root=start,child,swap;
-  while((child=heap_left_child(root)) <= end){
-    swap=root;
-    //is left child bigger?
-    if(heap[child]->count > heap[swap]->count  ){
-      swap=child;
-    }
-    //is right child bigger?
-    if(child+1<=end && heap[child+1]->count > heap[swap]->count){
-      swap=child+1;
-    }
-    if(swap!=root){
-      SWAP(heap[root],heap[swap]);
-      root=swap;
-    } else {
-      return;
-    }
-  }
-}
-
-static inline english_word *heap_pop(english_word **heap,uint32_t heap_length){
-  english_word *retval=*heap;
-  heap[0]=heap[heap_length-1];
-  heapify(heap,0,heap_length-2);
-  return retval;
-}
-//this is pretty inefficent, but it should work for now
-static inline int heap_swap_min(english_word **heap,english_word *new){
-  int i,heap_index=15,min_count[2]={heap[15]->count,heap[15]->count};
-  //find the current smallest value
-  for(i=16;i<=30;i++){
-    if(heap[i]->count < min_count[1]){
-      min_count[0]=min_count[1];
-      min_count[1]=heap[i]->count;
-      heap_index=i;
-    }
-  }
-  heap[heap_index]=new;
-  while(heap[heap_index]->count > heap[heap_parent(heap_index)]->count){
-    SWAP(heap[heap_index],heap[heap_parent(heap_index)]);
-    heap_index=heap_parent(heap_index);
-  }
-  return min_count[0];
-}
-
-//no args because all the data used is global
-struct heap sort_words(){
-  //maybe this should be thread local
-  //this is 32 instead of 20 so we have a full 5 level binary tree
-  //which needs 31 blocks and 32 is a much nicer value than 31
-  static english_word *most_common[32];
-  uint32_t i=0,j=0,minimum=-1;
-  //first get twenty words used in every file, if there are less then twenty
-  //then this is all we need to do
-  PRINT_MSG("start of sort_words\n");
-  while(i<31 && j<indices_index){
-//    PRINT_FMT("Loop %d\n",j);
-    english_word *cur_word=global_hash_table[hash_table_indices[j++]];
-//    if(cur_word->file_bits.uint128 == all_file_bits.uint128){
-      if(cur_word->count < minimum){
-        minimum=cur_word->count;
-      }
-      heap_insert(most_common,cur_word,i);
-      i++;
-//    }
-  }
-  if(i<20){
-    PRINT_MSG("Less than twenty words found\n");
-    return (struct heap){.heap=heap_sort(most_common,i),.size=i};
-  }
-  PRINT_MSG("added initial 20 words\n");
-  i=30;
-  while(j<indices_index){
-    english_word *cur_word=global_hash_table[hash_table_indices[j++]];
-    if(cur_word->file_bits.uint128 == all_file_bits.uint128){
-      if(cur_word->count > minimum){
-        minimum=heap_swap_min(most_common,cur_word);
-      }
-    }
-  }
-  PRINT_MSG("added all words\n");
-  i=31;
-  return (struct heap){.heap=heap_sort(most_common,i),.size=i};
-}
-struct heap sort_words_2(){
-  //maybe this should be thread local
-  //this is 32 instead of 20 so we have a full 5 level binary tree
-  //which needs 31 blocks and 32 is a much nicer value than 31
-  english_word **most_common=xmalloc(indices_index*sizeof(english_word*));
-  uint32_t i=0,j=0;
-  //first get twenty words used in every file, if there are less then twenty
-  //then this is all we need to do
-  PRINT_MSG("start of sort_words\n");
-  while(j<indices_index){
-    english_word *cur_word=global_hash_table[hash_table_indices[j++]];
-//    if(cur_word->file_bits.uint128 == all_file_bits.uint128){
-    heap_insert(most_common,cur_word,i);
-    i++;
-//    }
-  }
-  return (struct heap){.heap=heap_sort(most_common,i),.size=i};
-}
-//works by modifying memory, but returns a value for convience
-static inline english_word** heap_sort(english_word **heap,uint32_t size){
-  PRINT_MSG("Running heapsort\n");
-  uint32_t end=size-1;
-  while(end>0){
-    SWAP(heap[end],heap[0]);
-    end--;
-    sift_down(heap,0,end);
-  }
-  return heap;
-}
-static int is_sorted(english_word **arr,uint32_t size){
-  uint32_t i;
-  uint32_t count=-1;
-  for(i=size-1;i>0;i--){
-    if(arr[i]->count > count){
-      return 0;
-    } else {
-      count=arr[i]->count;
-    }
-  }
-  return 1;
-}
-
-/* Assembly for futex routines
-   the futex stuff will probably only be used for inter thread
-   communication (i.e passing arguments/indicating a thread
-   needs more data,etc) since my hash table is done using
-   atomic opperations
-*/
-/*these next two functions will be useful for using futexs
-  for things other than basic locks
-*/
-
-//interfate to the raw syscall
-//check that *uadder==val then wait until a FUTEX_WAKE
-int futex_wait(int *uaddr,int val){//ignore timeout argument
-  register int retval __asm__ ("%rax");
-  __asm__("movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
-          "movq %2,%%rsi\n\t"
-          "movq %3,%%rax\n\t"
-          "xorq %%rcx,%%rcx\n\t"
-          "lock subq $1,(%%edi)\n\t"
-          //hopefully if another thread adds to the futex before
-          //the kernel makes us wait the syscall return
-          //immediately
-          "syscall\n"
-          : "=r" (retval)
-          : "r" (val), "i" (FUTEX_WAIT), "i" (__NR_futex));
-  return retval;
-}
-//interfate to the raw syscall
-//wake up upto val processes waiting on the futex at uaddr
-int futex_wake(int *uaddr,int val){//timeout ignored by syscall
-  register int retval __asm__ ("%rax");
-  __asm__("movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
-          "movq %2,%%rsi\n\t"
-          "movq %3,%%rax\n\t"
-          "lock addq $1,(%%rdi)\n\t"
-          "syscall\n"
-          : "=r" (retval)
-          : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex));
-  return retval;
-}
-//futexs 1=free, 0=locked, no waiters -1=locked, waiters
-//futex_up and futex_down implement the locking mechanism described
-//int the futex(7) man page
-__asm__("\n.macro ENTRY name:req\n\t"
-        ".globl \\name;\n\t"
-        ".type \\name,@function;\n\t"
-        ".p2align 4\n\t"
-        "\\name\\():\n\t"
-        ".cfi_startproc\n"
-        ".endm\n"
-        ".macro END name:req\n\t"
-        ".cfi_endproc\n\t"
-        ".size \\name, .-\\name\n"
-        ".endm\n\n"
-
-        //essentially futex unlock
-        "ENTRY futex_up\n\t"
-        "lock addq $1,(%rdi)\n\t"
-        "testq $1,(%rdi)\n\t"
-        //assume non contested case is most common, only jmp
-        //if contested
-        "jne 1f\n\t"
-        "retq\n"
-        "1:\n\t"
-        //if we get here it's contested, so setup futex syscall
-        "movq $1,(%rdi)\n\t"
-        "movq $0,%rsi\n\t"
-        "movq $1,%rdx\n\t"
-        "movq $202, %rax\n\t" /*put futex syscall no in rax*/
-        "syscall\n\t"
-        "retq\n"
-        "END futex_up\n\n"
-
-        //essentially futex lock
-        "ENTRY futex_down\n\t"
-        "lock subq $1,(%rdi)\n\t"
-        "cmpq $0,(%rdi)\n\t"
-        //same idea as with futex_up, assume non contested is most common
-        "jne 1f\n\t"
-        "retq\n"
-        "1:\n\t"
-        //if we get here it's contested, so setup futex syscall
-        "movq $-1,(%rdi)\n\t"
-        "movq $-1,%rdx\n\t"
-        "movq $0,%rsi\n\t"//this is FUTEX_WAIT
-        "xorq %rcx,%rcx\n\t"
-        "movq $202,%rax\n\t"
-        "syscall\n\t"
-        "retq\n"
-        "END futex_down\n\n"
-
-        //unlock spin lock
-        "ENTRY futex_spin_up\n\t"
-        //much eaiser, we do the same thing no matter what
-        "movq $1,%rax\n\t"
-        "lock xchg %rax,(%rdi)\n"
-        "END futex_spin_up\n\n"
-
-        //lock spin lock
-        "ENTRY futex_spin_down\n\t"
-        "movq $1,%rax\n\t"
-        "xorq %rcx,%rcx\n"
-        "1:\n\t"//start spining
-        "cmpq %rax,%rdi\n\t"//is the lock free?
-        "je 2f\n\t"//if yes try to get it
-        "pause\n\t"//if no pause
-        "jmp 1b\n"//spin again
-        "2:\n\t"
-        "lock cmpxchgq %rcx,(%rdi)\n\t"//try to get lock
-        "jnz 1b\n"//if we failed spin again
-        "END futex_spin_down\n\n"
-        /*This assumes that the cost of aligning memory before copying
-          outweighs the benifit for 6-50 byte strings (also that
-          rep movsb is fast)
-        "ENTRY my_strcpy\n\t"
-        "movq %rdx,%rcx\n\t"//move length to rcx
-        "movq %rdi,%rax\n\t"//save return value
-        "rep movsb\n\t"//actually copy
-        "retq\n"
-        "END my_strcpy\n"*/);
-//would be eaiser to just do a mov and a ret but
-//then gcc will complain about returning without a value or something
-//clone returns 0 for new child and child tid for parent
-long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
-                   void *ctid,struct pt_regs *regs){
-  register long retval __asm__ ("%rax");
-  __asm__("movq %1,%%rax\n\t"
-          "syscall\n"
-          : "=r" (retval) : "i" (__NR_clone));
-  return retval;
-}
-long my_clone(unsigned long flags,void *child_stack,void *ptid,
-              void (*fn)(void*),void *arg){
-  register long retval __asm__ ("%rax");
-  __asm__("movq %0,%%rax\n\t"
-          "xorq %%rcx,%%rcx\n\t"
-          "xorq %%r8,%%r8\n\t"
-          "syscall\n"
-          : : "i" (__NR_clone), "r" (retval) :"rcx","r8");
-  if(retval < 0){
-    perror("Clone failed");
-    exit(EXIT_FAILURE);
-  } else if(retval > 0) {
-    return retval;
-  } else {
-    //this is in the new thread
-    fn(arg);
-    __builtin_unreachable();//tell gcc that we can never get here
-  }
-}
-static inline char* __attribute__((const)) ordinal_sufffix(uint32_t num){
+#include "prog5_heap.c"
+//simple little helper function to print ordinal suffixes
+static inline char* __attribute__((const)) ordinal_suffix(uint32_t num){
   if(num == 1){
     return "st";
   }
@@ -739,33 +425,90 @@ static inline char* __attribute__((const)) ordinal_sufffix(uint32_t num){
   }
   return "th";
 }
-/*What I need to do with the return value from this is 
-  if(info->len<max_buf_len){
-    read_whole_buf;
-  } else {
-    setup_block;
-  }
-  pass to thread;
-*/
+
 struct fileinfo *setup_fileinfo(char *filename){
+  static struct stat stat_buf;
   int fd=open(filename,O_RDONLY);
-  if(fd == -1){
+  if(builtin_unlikely(fd == -1)){
     perror("error opening file");
     exit(1);
   }
-  off_t len=lseek(fd,0,SEEK_END);
-  lseek(fd,0,SEEK_SET);
-  if(len == (off_t)-1){
-    perror("error seeking file");
+  int stat_retval=fstat(fd,&stat_buf);
+  if(builtin_unlikely(stat_retval == -1)){
+    perror("error calling stat on file");
     exit(1);
   }
   //this will probably change to using statically allocated memory
   struct fileinfo *info=xmalloc(sizeof(struct fileinfo));
-  *info=(struct fileinfo){.fd=fd,.len=len,
-                          .file_id=next_file_id++,.remaning=len};
+  *info=(struct fileinfo){.fd=fd,.len=stat_buf.st_size,
+                          .file_id=next_file_id++,.remaining=stat_buf.st_size};
   return info;
 }
-
+//only call with an unused fileinfo, behaves specially for
+//files that are less then max_buf_len bytes long
+struct fileinfo *init_thread_filestart(struct fileinfo *info,int thread_id_num){
+  if(info->remaining < max_buf_size){
+    ssize_t nbytes=read(info->fd,thread_bufs[thread_id_num],max_buf_size);
+    if(builtin_unlikely(nbytes == (ssize_t)-1)){
+      perror("error reading from file");
+      exit(EXIT_FAILURE);
+    }
+    if(builtin_unlikely(close(info->fd) == -1)){
+      perror("error closing file");
+      exit(EXIT_FAILURE);
+    }
+    uint8_t *buf=thread_bufs[thread_id_num];
+    uint32_t start=nbytes-1;
+    if(eng_accept[buf[start]]){
+      buf[start+1]=0xff;
+    } else {
+      while(!eng_accept[buf[--start]]);
+      buf[start+1]=0xff;
+    }
+    thread_file_ids[thread_id]=info->file_id;
+    long tid=my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(thread_id_num),
+                      thread_pids+thread_id_num,thread_main,(void*)(long)thread_id_num);
+    assert((tid == thread_pids[thread_id_num]) &&  tid != 0);
+    return NULL;
+  } else {
+    info=setup_block(info,thread_bufs[thread_id_num]);
+    thread_file_ids[thread_id]=info->file_id;
+    long tid=my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(thread_id_num),
+             thread_pids+thread_id_num,thread_main,(void*)(long)thread_id_num);
+    assert((tid == thread_pids[thread_id_num]) && tid!=0);
+    return info;
+  }
+}
+struct fileinfo *init_thread(struct fileinfo *info,int thread_id_num){
+  info=setup_block(info,thread_bufs[thread_id_num]);
+  thread_file_ids[thread_id]=info->file_id;
+  my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(thread_id_num),
+           thread_pids+thread_id_num,thread_main,(void*)(long)thread_id_num);
+  if(info->remaining){
+    return info;
+  } else {
+    return NULL;
+  }
+}
+void __attribute__((noreturn)) print_results(struct heap common_words){
+#if (defined DEBUG) && !(defined NDEBUG)
+  if(!is_sorted(common_words.heap,common_words.size)){
+    printf("Failed to sort the heap\n");
+  } else {
+    printf("Sorted the heap\n");
+  }
+#endif
+  int i;
+  uint32_t size=common_words.size;
+  for(i=size-1;i>=size-30;i--){
+    //We can't use the %s format specifier of printf to print the actual word
+    //because its not null terminated
+    printf("The %d%s most common word was ",size-i,ordinal_suffix(size-i));
+    print_string(common_words.heap[i]);
+    printf(", with %d occurances\n",common_words.heap[i]->count);
+  }
+  exit(EXIT_SUCCESS);
+}
 /* with threads heres what to do:
    if(argc>=NUM_PROCS-1){
    //more files than processors
@@ -774,7 +517,7 @@ struct fileinfo *setup_fileinfo(char *filename){
    } else {
    //more processors than files
    //start num_files threads first
-   //then if there is data left start more threads by calling setup_block 
+   //then if there is data left start more threads by calling setup_block
    //untill there is no data left or there are NUM_PROCS threads running
    }
    //once threads are started it should be the same pattern regardless
@@ -782,15 +525,51 @@ struct fileinfo *setup_fileinfo(char *filename){
  */
 int main(int argc,char *argv[]){
   //remove the program name from the arguments (its just eaiser)
-  num_files=(--argc);
-  argv++;
-  if(argc <=0){
+  num_files=argc-1;
+  filenames=argv+1;
+  if(num_files<=0){
     fprintf(stderr,"Error no filenames given\n");
   }
+  main_thread_wait=0;
+  tgid=gettgid();
   //this is used when threads are waiting for more data
   sigemptyset(&sigwait_set);
   sigaddset(&sigwait_set,SIGCONT);
   sigaddset(&sigwait_set,SIGTERM);
+  struct fileinfo *info;
+  int i;
+  if(num_files>NUM_PROCS-1){
+    for(i=1;i<NUM_PROCS;i++){
+      info=setup_fileinfo(filenames[current_file++]);
+      info=init_thread_filestart(info,i);
+      if(info){
+        fileinfo_queue[++fileinfo_queue_index]=info;
+      }
+    }
+  } else {
+    int i=1;
+    while(current_file<num_files){
+      info=setup_fileinfo(filenames[current_file++]);
+      info=init_thread_filestart(info,i);
+      if(info){
+        fileinfo_queue[++fileinfo_queue_index]=info;
+      }
+      i++;
+    }
+    if(fileinfo_queue_index>=0){
+      do {
+        info=fileinfo_queue[fileinfo_queue_index];
+        info=init_thread(info,i);
+        if(!info){
+          fileinfo_queue_index--;
+        }
+        i++;
+      } while(i<NUM_PROCS && fileinfo_queue_index>=0);
+    }
+  }
+  main_wait_loop();
+}
+#if 0
   //temporally assume one file
   PRINT_MSG("program start\n");
   struct filebuf file_buf=read_full_file(argv[0]);
@@ -824,3 +603,4 @@ int main(int argc,char *argv[]){
   }
   return 0;
 }
+#endif

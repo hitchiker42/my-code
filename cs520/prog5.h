@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <sys/stat.h>
 //#include <sys/mman.h>
 #include <sys/types.h>//off_t,pid_t,ssize_t,etc
 #include <unistd.h>//bunch of stuff, including close
@@ -49,10 +50,13 @@
 #endif
 #define PAGE_ROUND_DOWN(x) (((uint64_t)(x)) & (~(PAGESIZE-1)))
 #define PAGE_ROUND_UP(x) ( (((uint64_t)(x)) + PAGESIZE-1)  & (~(PAGESIZE-1)) )
+//this used to use lseek, but lseek is slower than fstat because
+//it involves two syscalls becasue the file position needs to be reset
+//after getting the file size.
 #define file_size(fd)                           \
-  ({off_t len=lseek(fd,0,SEEK_END);             \
-    lseek(fd,0,SEEK_SET);                       \
-    len;})
+  ({struct stat buf;                            \
+    fstat(fd,&buf);                             \
+    buf.st_size;})
 //desired is a pointer
 #define atomic_compare_exchange(ptr,expected,desired)           \
   __atomic_compare_exchange(ptr,expected,desired,0,             \
@@ -67,8 +71,12 @@
 /* atomic_add_fetch is lock add val,(ptr)
    while atomic_fetch_add is lock xadd val,(ptr)
  */
+#define atomic_inc(ptr)                         \
+  __asm__ volatile("lock incq (%0)" : :"r" (ptr));
 #define atomic_add(ptr,val)                     \
   __atomic_add_fetch(ptr,val,__ATOMIC_SEQ_CST)
+#define atomic_sub(ptr,val)                     \
+  __atomic_sub_fetch(ptr,val,__ATOMIC_SEQ_CST)
 #define atomic_fetch_add(ptr,val)                     \
   __atomic_fetch_add(ptr,val,__ATOMIC_SEQ_CST)
 //with this (and pretty much any binary operation but add) the difference
@@ -77,10 +85,16 @@
 #define atomic_or(ptr,val)                                      \
   __atomic_or_fetch(ptr,val,__ATOMIC_SEQ_CST)
 #define gettid()                                \
-  ({register uint64_t tid asm ("rax");          \
+  ({register uint64_t tid __asm__ ("rax");          \
   __asm__("movq %1,%%rax\n"                      \
           "syscall"                              \
           : "=r" (tid) : "i" (__NR_gettid));     \
+  tid;})
+#define gettgid()                                \
+  ({register uint64_t tid __asm__ ("rax");           \
+    __asm__("movq %1,%%rax\n"                    \
+            "syscall"                            \
+            : "=r" (tid) : "i" (__NR_getpid));   \
   tid;})
 #define array_swap_ptr(arr,_i,_j)                   \
   ({uint32_t i=_i,j=_j;                             \
@@ -99,12 +113,15 @@
     ;})
 #define PREFETCH_0(mem)                         \
   (__asm__ volatile ("prefetcht0 %0" : : "m" (mem));)
- #define PREFETCH_1(mem)                         \
+#define PREFETCH_1(mem)                                 \
    (__asm__ volatile ("prefetcht1 %0" : : "m" (mem));)
- #define PREFETCH_2(mem)                         \
+#define PREFETCH_2(mem)                                 \
    (__asm__ volatile ("prefetcht2 %0" : : "m" (mem));)
- #define PREFETCH_NT(mem)                         \
+#define PREFETCH_NT(mem)                                \
   (__asm__ volatile ("prefetchnta %0" : : "m" (mem));)
+#define builtin_expect(expr,c) __builtin_expect((expr),c)
+#define builtin_unlikely(expr) __builtin_expect((expr),0)
+#define builtin_likely(expr) __builtin_expect((expr),1)
 #define offset_basis_32 2166136261
 #define offset_basis_64 14695981039346656037UL
 #define fnv_prime_32 16777619
@@ -128,11 +145,11 @@
 #endif
 #define PTHREAD_CLONE_FLAGS   (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|\
                                CLONE_SETTLS|CLONE_PARENT_SETTID|\
-                               CLONE_CHILD_CLEARTID|CLONE_SYSVMEM|0)
+                               CLONE_CHILD_CLEARTID|CLONE_SYSVSEM|0)
 //flagss that entail the least ammount of copying, meaning that
 //the new thread shares pretty much everything with it's parent
-#define SIMPLE_CLONE_FLAGS  (CLONE_VM|CLONE_SIGHAND|CLONE_SYSVSEM| \
-                              CLONE_PARENT_SETTID|CLONE_THREAD|0)
+#define SIMPLE_CLONE_FLAGS  (CLONE_VM|CLONE_SIGHAND|CLONE_SYSVSEM|CLONE_PTRACE| \
+                             CLONE_PARENT_SETTID|CLONE_FS|CLONE_FILES|CLONE_THREAD|0)
 //typedefs
 typedef unsigned __int128 uint128_t;
 typedef __int128 int128_t;
@@ -144,8 +161,8 @@ struct pt_regs;
 //forward declarations
 long futex_up(int *futex_addr);
 long futex_down(int *futex_addr);
-long futex_spin_up(int *futex_addr);
-long futex_spin_down(int *futex_addr);
+void futex_spin_up(register int *futex_addr);
+void futex_spin_down(register int *futex_addr);
 int futex_wake(int *uaddr,int val);
 int futex_wait(int *uaddr,int val);
 long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
@@ -153,14 +170,17 @@ long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
 //glibc clone wrapper
 int clone(int (*fn)(void*),void *child_stack,int flags,void *arg,...);
 /*...=pid_t *ptid, struct user_desc *tls, pid_t *ctid*/
-void parse_buf(const uint8_t *buf);//core function
+void parse_buf(const uint8_t *buf,int file_id);//core function
 struct filebuf read_full_file(char *filename);
 struct fileinfo open_file_simple(char *filename);
 struct heap sort_words();
 struct fileinfo *setup_block(struct fileinfo *info,uint8_t *buf);
+struct fileinfo *setup_fileinfo(char *filename);
 long my_clone(unsigned long flags,void *child_stack,void *ptid,
               void (*fn)(void*),void *arg);
 static int tgkill(int tgid, int tid, int sig);
+void __attribute__((noreturn)) print_results(struct heap);
+static char* __attribute__((const)) ordinal_suffix(uint32_t num);
 
 //global scalars/uninitialized arrays
 //allocate NUM_PROCS*2MB space for the thread stacks
@@ -172,6 +192,7 @@ static uint8_t thread_status[NUM_PROCS];
 static __thread uint64_t thread_id;
 //static uint64_t next_thread_id=0;
 static pid_t thread_pids[NUM_PROCS];
+static pid_t tgid;
 //this queue is only accessed after locking the thread_queue_lock
 //Both the queue update and incremunting/decrementing the
 //queue index have to be done in one atomic step, meaning
@@ -180,10 +201,22 @@ static pid_t thread_pids[NUM_PROCS];
 //ok to lok for this
 static uint8_t thread_queue[NUM_PROCS];
 static uint8_t thread_queue_index;
-static /*volatile*/ int thread_queue_lock __attribute__((aligned (16))) = 0;
-static /*volatile*/ int main_thread_wait __attribute__((aligned (16))) = 0;
+//holds the information about the data to be given to threads
+static struct fileinfo *fileinfo_queue[NUM_PROCS];
+static uint64_t fileinfo_queue_index=-1;
+//the aligned 16 here is probably excessive
+static /*volatile*/ int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
+//this serves as a counter for threads waiting for data
+//when it is 0 the main thread waits for some worker theread to increment it
+//and call futex_wake. Whenever a worker thread finishes it increments this
+//and calls futex_wake, thus whenever this is > 0 the main thread will keep 
+//passing data to threads (as long as there is data left)
+/*volatile*/ int32_t main_thread_wait __attribute__((aligned (16)));
+/*volatile*/ int32_t *main_thread_wait_ptr = &main_thread_wait;
 static sigset_t sigwait_set;
 static uint64_t num_files;
+static uint64_t current_file=0;
+static char **filenames;//=argv+1
 static const uint64_t PAGESIZE=4096;
 static const uint64_t buf_size=128*(1<<10);//128kb
 static const uint64_t min_buf_size=8*(1<<10);//8Kb
@@ -193,6 +226,7 @@ static const uint64_t max_buf_size=136*(1<<10);//128+8Kb
 //are say 132Kb left in a file it will be read as one buffer
 //rather than divining it into a 128kb buffer and a 4kb buffer
 static uint8_t thread_bufs[NUM_PROCS][MAX_BUF_SIZE];
+static uint32_t thread_file_ids[NUM_PROCS];
 /*
 
   The basic idea with threading is to have NUM_PROC-1 worker threads
@@ -256,7 +290,7 @@ struct internal_buf {
 //if I allocate these statically I'll need 100 of them
 struct fileinfo {
   off_t len;
-  off_t remaning;
+  off_t remaining;
   int fd;
   int file_id;//some number between 0-100 indicating what file
   //this represents
@@ -276,6 +310,7 @@ union file_bitfield{
   };
 };
 struct heap {english_word **heap; uint32_t size;};
+//I NEVER SET THIS, FIX THAT
 static file_bitfield all_file_bits={.uint128=0};
 /*structure for storing data about each word
   contains:
@@ -372,7 +407,7 @@ static inline void *xrealloc(void *ptr,size_t sz){
   }
   return temp;
 }
-#define xfree free
+#define xfree(x)
 
 /*simple but efficient hash function
   MurmurHash and cityhash are better hash functions but my version of
@@ -447,15 +482,15 @@ static inline int my_string_compare_asm(english_word *x,english_word *y){
 //since my strings aren't null terminated I can't use
 //the %s printf specifier so these functions are a convience to
 //make printing eaiser
-static void print_string(english_word *x){
+static inline void print_string(english_word *x){
   fwrite(x->str,x->len,1,stdout);
 }
-static void print_word_and_count(english_word *x){
+static inline void print_word_and_count(english_word *x){
   printf("The word ");
   fwrite(x->str,x->len,1,stdout);
   printf(" occurred %d times\n",x->count);
 }
-static void print_count_word(english_word *x){
+static inline void print_count_word(english_word *x){
   printf("%-8d ",x->count);
   fwrite(x->str,x->len,1,stdout);
   puts("");
@@ -486,7 +521,7 @@ static inline char *my_strcpy(uint8_t *dest_,const uint8_t *src_,uint64_t len_){
 //over the _exit syscall
 static inline void __attribute__((noreturn)) thread_exit(int status_){
   register int status __asm__ ("%rdi")=status_;
-  __asm__("mov %0,%%rax\n\t"
+  __asm__ volatile ("mov %0,%%rax\n\t"
           "syscall\n"
           : : "i" (__NR_exit), "r" (status));
   __builtin_unreachable();
@@ -494,10 +529,175 @@ static inline void __attribute__((noreturn)) thread_exit(int status_){
 //just call this with -1 in the first arg, this will signal in the
 //current thread group.
 //Need to add register specific vars if I want to inline this
-static int tgkill(int tgid, int tid, int sig){
-  register int retval __asm__ ("%rax");
-  __asm__("movq %0,%%rax\n\t"
-          "syscall\n"
-          : : "i" (__NR_tgkill), "r" (retval));
+static int tgkill(int tgid_, int tid_, int sig_){
+  register int retval __asm__ ("%rax")=__NR_tgkill;
+  register int tgid  __asm__ ("%rdi")=tgid_;
+  register int tid __asm__ ("%rsi")=tid_;
+  register int sig __asm__ ("%rdx")=sig_;
+  __asm__ volatile ("syscall\n"
+                    : "+r" (retval): "r" (tgid),"r"(tid),"r"(sig));
   return retval;
+}
+/* Assembly for futex routines
+   the futex stuff will probably only be used for inter thread
+   communication (i.e passing arguments/indicating a thread
+   needs more data,etc) since my hash table is done using
+   atomic opperations
+*/
+/*these next two functions will be useful for using futexs
+  for things other than basic locks
+*/
+
+//interfate to the raw syscall
+//check that *uadder==val then wait until a FUTEX_WAKE
+int futex_wait(int *uaddr,int val){//ignore timeout argument
+  register int retval __asm__ ("%rax");
+  register int *futex_addr __asm__("%rdi")=uaddr;
+  __asm__ volatile ("movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
+                    "movq %2,%%rsi\n\t"
+                    "movq %3,%%rax\n\t"
+                    "xorq %%rcx,%%rcx\n\t"
+                    "xorq %%r8,%%r8\n\t"
+                    "lock subq $1,(%4)\n\t"
+                    //hopefully if another thread adds to the futex before
+                    //the kernel makes us wait the syscall return
+                    //immediately
+                    "syscall\n"
+                    : "=r" (retval)
+                    : "r" (val), "i" (FUTEX_WAIT), "i" (__NR_futex), "r" (futex_addr)
+                    : "%rsi","%rcx","%rdx","%r8");
+  return retval;
+}
+//interfate to the raw syscall
+//wake up upto val processes waiting on the futex at uaddr
+int futex_wake(int *uaddr,int val){//timeout ignored by syscall
+  PRINT_MSG("Calling futex wake\n")
+  register int retval __asm__ ("%rax");
+  register int *futex_addr __asm__("%rdi")=uaddr;
+  __asm__ volatile ("movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
+                    "movq %2,%%rsi\n\t"
+                    "movq %3,%%rax\n\t"
+                    "syscall\n"
+                    : "=r" (retval)
+                    : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex),"r" (futex_addr)
+                    :"%rsi","%rdx");
+  PRINT_MSG("Called futex wake\n")
+  return retval;
+}
+//futexs 1=free, 0=locked, no waiters -1=locked, waiters
+//futex_up and futex_down implement the locking mechanism described
+//int the futex(7) man page
+long __attribute__((noinline))futex_up(int *uaddr){
+  register int *futex_addr __asm__("%rdi") = uaddr;
+  register long retval __asm__("%rax");
+  __asm__ volatile("lock addq $1,(%1)\n\t"
+                   "testq $1,(%1)\n\t"
+                   //assume non contested case is most common, only jmp
+                   //if contested
+                   "jne 1f\n\t"
+                   "retq\n"
+                   "1:\n\t"
+                   //if we get here it's contested, so setup futex syscall
+                   "movq $1,(%1)\n\t"
+                   "movq $0,%%rsi\n\t"
+                   "movq $1,%%rdx\n\t"
+                   "movq $202, %%rax\n\t" /*put futex syscall no in rax*/
+                   "syscall\n\t"
+                   : "=r" (retval) : "r"(futex_addr) :"%rsi","%rdx");
+  return retval;
+}
+
+long __attribute ((noinline))futex_down(int *uaddr){
+  register int *futex_addr __asm__("%rdi") = uaddr;
+  register long retval __asm__("%rax");
+  __asm__ volatile("lock subq $1,(%1)\n\t"
+                   "cmpq $0,(%1)\n\t"
+                   //same idea as with futex_up, assume non contested is most common
+                   "jne 1f\n\t"
+                   "retq\n"
+                   "1:\n\t"
+                   //if we get here it's contested, so setup futex syscall
+                   "movq $-1,(%1)\n\t"
+                   "movq $-1,%%rdx\n\t"
+                   "movq $0,%%rsi\n\t"//this is FUTEX_WAIT
+                   "xorq %%rcx,%%rcx\n\t"
+                   "movq $202,%%rax\n\t"
+                   "syscall\n\t"
+                   : "=r" (retval) : "r"(futex_addr) :"%rsi","%rdx","%rcx");
+  return retval;
+}
+
+
+/*        //unlock spin lock
+        "ENTRY futex_spin_up\n\t"
+        //much eaiser, we do the same thing no matter what
+        "movq $1,%rax\n\t"
+        "lock xchg %rax,(%rdi)\n"
+        "END futex_spin_up\n\n"
+
+        //lock spin lock
+        "ENTRY futex_spin_down\n\t"
+        "movq $1,%rax\n\t"
+        "xorq %rcx,%rcx\n"
+        "1:\n\t"//start spining
+        "cmpq %rax,%rdi\n\t"//is the lock free?
+        "je 2f\n\t"//if yes try to get it
+        "pause\n\t"//if no pause
+        "jmp 1b\n"//spin again
+        "2:\n\t"
+        "lock cmpxchgq %rcx,(%rdi)\n\t"//try to get lock
+        "jnz 1b\n"//if we failed spin again
+        "END futex_spin_down\n\n"*/
+//clone returns 0 for new child and child tid for parent
+long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
+                   void *ctid,struct pt_regs *regs){
+  //this won't actually exist in the generated code, it's just a bookkeeping 
+  //mechanism so gcc knows how to return
+  register long retval __asm__ ("%rax");
+  __asm__("movq %1,%%rax\n\t"
+          "syscall\n"
+          : "=r" (retval) : "i" (__NR_clone));
+  return retval;
+}
+long my_clone(unsigned long flags_,void *child_stack_,void *ptid_,
+              void (*fn)(void*),void *arg){
+  register long retval __asm__ ("%rax");
+  register unsigned long flags __asm__("%rdi")=flags_;
+  register void *child_stack __asm__("%rsi")=child_stack_;
+  register void *ptid __asm__("%rdx")=ptid_;
+  __asm__("movq %0,%%rax\n\t"
+          "xorq %%rcx,%%rcx\n\t"
+          "xorq %%r8,%%r8\n\t"
+          "syscall\n"
+          : : "i" (__NR_clone), "r" (retval), "r" (flags),"r" (child_stack), "r" (ptid)
+          :"rcx","r8");
+  if(retval < 0){
+    perror("Clone failed");
+    exit(EXIT_FAILURE);
+  } else if(retval > 0) {
+    return retval;
+  } else {
+    //this is in the new thread
+    fn(arg);
+    __builtin_unreachable();//tell gcc that we can never get here
+  }
+}
+void futex_spin_up(register int *uaddr){        //unlock spin lock
+  register long one=1;
+  __asm__ volatile ("lock xchgq %0,(%1)\n"
+                    : : "r" (one), "r" (uaddr));
+}
+
+void futex_spin_down(register int *uaddr){
+  register int one __asm__ ("%rax")=1;
+  register int zero = 0;
+  __asm__ volatile("1:\n\t"//start spining
+                   "cmpl %0,(%1)\n\t"//is the lock free?
+                   "je 2f\n\t"//if yes try to get it
+                   "pause\n\t"//if no pause
+                   "jmp 1b\n"//spin again
+                   "2:\n\t"
+                   "lock cmpxchgl %2,(%1)\n\t"//try to get lock
+                   "jnz 1b\n"//if we failed spin again
+                   : : "r" (one), "r" (uaddr), "r" (zero));
 }

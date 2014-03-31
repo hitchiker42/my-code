@@ -9,3 +9,5 @@ prog5_branch:	prog5.c prog5.h
 	 -fbranch-probabilities
 prog5.s: prog5.c prog5.h
 	gcc -o prog5.s prog5.c -std=c99 -Wall -O1 -S -DNDEBUG
+prog5_debug.s: prog5.c prog5.h
+	gcc -o prog5_debug.s prog5.c -std=c99 -Wall -O1 -S -DDEBUG -g
