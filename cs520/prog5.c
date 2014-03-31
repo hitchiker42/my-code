@@ -50,6 +50,8 @@ static english_word* atomic_hash_table_update(english_word *word){
   uint64_t hashv=fnv_hash(word->str,word->len);
   uint64_t index=hashv%global_hash_table_size;
   int low=(word->file_bits.low?1:0);
+  //this next line results in a lot of cache misses
+  //for obvious reasons
   if(!global_hash_table[index]){//word isn't in the hash table, add it
     uint8_t *mem=xmalloc(word->len);
     word->str=(char*)my_strcpy(mem,(uint8_t*)word->str,word->len);
@@ -184,10 +186,22 @@ char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
    and puts/updates the word in the global hash table.
    frees the buffer it's given once it's done;
    todo: this need to take another parameter specifing the file index
- */
-void parse_buf(register const uint8_t *buf){
+*/
+/*A later possible optimization, looking at the output of 
+  cachegrind there are a lot of cache misses here that might 
+  be fixed by some prefetching
+*/
+
+void parse_buf(register const uint8_t *buf_){
+  register const uint8_t *buf __asm__ ("%rbx")=buf_;
   const uint8_t *initial_buf=buf;
   uint64_t index=1;
+ PREFETCH:{
+    __asm__ volatile ("prefetchnta 768(%rbx)");
+  }
+  //these cause tons of branch mispredictions
+  //but I'm not sure how I should fix this
+  //re-rolling the loop probably wouldn't help but I can try
  START:
   if(eng_accept[*(buf)]){goto ACCEPT_0;}
   if(eng_accept[*(buf+1)]){goto ACCEPT_1;}
@@ -236,7 +250,7 @@ void parse_buf(register const uint8_t *buf){
   if(buf[index]!=0xff){
     buf+=index;
     index=1;
-    goto START;
+    goto PREFETCH;
   }
   //no one else should need this buffer after us
   xfree((void*)initial_buf);
@@ -340,42 +354,96 @@ void init_threads(){
   }
 }
 /*
-  setup a block of memory to be processed by parse_buf.
-  if block[block_size] isn't a word character scan backwards until a word
-  character is found and mark the next character as eof (i.e insure the block
-  ends immediately after a word character). if block[block_size] is a word
-  character scan forward/backward to find the bounds of it, and if it's
-  within size limits put/update it in the hash table. following this do the same
-  as above to mark the end of the block with eof.
+  Read the next block of memory by the file given in the info argument.
+  This function deals with words that lie on the boundries of blocks
+  it stores the start of a word at the end of a block info an interal
+  buffer setup_block is called on info again it completes that word
+  based on the start of the next block.
 
-  the core of this function is good, the actual interface to it needs to be
-  reworked once i decide how exactly i'm going to do everything.
- */
-struct filebuf setup_block(uint8_t *block,uint32_t block_size){
-  //start is start of last eng word, it will ultimately
-  //refer to the end of the block we're returning
-  uint32_t start=block_size,end=block_size;
-  if(eng_accept[block[block_size]]){
-    while(eng_accept[block[--start]]);//find start of word
-    while(eng_accept[block[++end]]);//find end of word
-    uint32_t len=end-start;
-    if(len>=6 && len<=50){
-      void *mem=xmalloc(sizeof(english_word)+len);
-      my_strcpy(mem+sizeof(english_word),block-(start+1),len);
-      english_word *word=mem;
-      //need to modify this function to pass the file index to put
-      //into this
-      *word=(english_word){.str=mem+sizeof(english_word),.len=len,
-                           .count=0,.file_bits={.low=0,.high=0}};
-      atomic_hash_table_update(word);//frees word if it's not needed
+  the pattern of use is roughly:
+  file_info *info=setup_file_info(filenames[i++]);//or something like this
+  while(files_left){  
+    info=setup_block(info,next_thread_buffer);
+    pass next_theread_buffer+info->start_offset as an argument 
+    to a worker thread
+    if(!info->remaning){
+      info=setup_file_info(filenames[i++]);
     }
   }
-  //mark end of block with eof
-  while(!eng_accept[block[--start]]);
-  block[start+1]=0xff;
-  return (struct filebuf){.buf=block,.len=start};
+ */
+struct internal_fileinfo *setup_block(struct internal_fileinfo *info,
+                                        uint8_t *buf){
+  /*slight Issue I just though of, if I read max_buf_size bytes
+    how do I fit in the end of file marker that I need
+    to indicate that the file should stop?
+  */
+  if(max_buf_size>=info->remaning){
+    //just read the rest of the file
+    ssize_t nbytes=read(info->fd,buf,max_buf_size);
+    if(__builtin_expect((nbytes == (ssize_t)-1),0)){
+      perror("error reading from file");
+      exit(EXIT_FAILURE);
+    }
+    if(__builtin_expect((close(info->fd) == -1),0)){
+      perror("error closing file");
+      exit(EXIT_FAILURE);
+    }
+    info->remaning=0;
+    uint32_t start=nbytes-1;
+    while(!eng_accept[buf[start--]]);
+    buf[start+1]=0xff;
+  } else {
+    ssize_t nbytes=read(info->fd,buf,buf_size);
+    if(__builtin_expect((nbytes == (ssize_t)-1),0)){
+      perror("error reading from file");
+      exit(EXIT_FAILURE);
+    }
+    info->remaning-=buf_size;
+  }
+  //this happens independent of weather we read the rest of the
+  //file of still have some left, it depends on what was at
+  //the end of the last block read from this file
+  if(info->word_len){
+    uint32_t index=0;
+    if(eng_accept[buf[index]] && info->word_len <50){
+      do {
+        info->last_word[info->word_len++]=
+          buf[index++];
+      } while (eng_accept[buf[index]] && info->word_len <50);
+    }
+    if(__builtin_expect(info->word_len==50,0)){
+      while(eng_accept[buf[++index]]);
+      info->word_len=0;
+    }
+    if(info->word_len>6){
+      english_word *word=xmalloc(sizeof(english_word));
+      *word=(english_word){.str=(char*)buf,.len=info->word_len,
+                           .count=1,.file_bits={.low=0,.high=0}};
+      atomic_hash_table_update(word);
+      //deals with copying the string in buf and freeing word if needed
+    }
+    info->word_len=0;
+    info->start_offset=index;
+  } else {
+    info->start_offset=0;
+  }
+  //this 
+  if(info->remaning){
+    uint32_t start=buf_size-1;
+    if(eng_accept[buf[start]]){
+      while(eng_accept[buf[--start]]);
+      //should this be (buf_size-1)-start?
+      if(buf_size-start<50){
+        my_strcpy(info->last_word,(buf_size-start));
+      }
+      info->word_len=buf_size-start;
+    }
+    //mark eof at end of the buffer 
+    while(!eng_accept[buf[start--]]);
+    buf[start+1]=0xff;
+  }
+  return info;
 }
-
 //auxiliary routines for sorting
 #define heap_left_child(i) (2*i+1)
 #define heap_right_child(i) (2*i+2)
