@@ -1,4 +1,12 @@
 #include "prog5.h"
+void terminate_gracefully(int sig){
+  if(sig != SIGSEGV){
+    PRINT_FMT("Thread %ld recieved signal %d, exiting thread\n",thread_pids[thread_id],sig);
+    thread_exit(EXIT_SUCCESS);
+  }
+  exit(1);
+}
+const struct sigaction signal_action={.sa_handler=terminate_gracefully};
 /*
   Update the value of word in the global hash table, this means that if word
   isn't in the table then we should add it, and if it is we should increment the
@@ -12,7 +20,7 @@
   the hash table all at once whereas with locking one thread blocks all others
   even those accessing a completely different part of the table
 */
-static english_word* atomic_hash_table_update(english_word *word){
+static int atomic_hash_table_update(english_word *word){
   uint64_t hashv=fnv_hash(word->str,word->len);
   uint64_t index=hashv%global_hash_table_size;
   int low=(word->file_bits.low?1:0);
@@ -24,7 +32,6 @@ static english_word* atomic_hash_table_update(english_word *word){
     void *prev=global_hash_table[index];
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
     if(test){
-      HERE();
       //we added the word
       //this needs to be atomic to prevent two threads writing different
       //values to the same index of indices
@@ -32,7 +39,7 @@ static english_word* atomic_hash_table_update(english_word *word){
       //this doesn't need to be atomic, since indices_index will never be
       //decremented, so no one else will change this
       hash_table_indices[old_indices_index]=index;
-      goto end;
+      goto end1;
     }
     //else, someone else changed the value of global_hash_table[index] before us
   }
@@ -49,8 +56,7 @@ static english_word* atomic_hash_table_update(english_word *word){
         } else {
           atomic_or(&global_hash_table[index]->file_bits.high,word->file_bits.high);
         }
-        free(word);
-        goto end;
+        goto end0;
       }
     } while(global_hash_table[++index]);
     //not in the table use next free index (if we can)
@@ -59,12 +65,14 @@ static english_word* atomic_hash_table_update(english_word *word){
     if(test){
       uint64_t old_indices_index=atomic_fetch_add(&indices_index,1);
       hash_table_indices[old_indices_index]=index;
-      goto end;
+      goto end1;
     }
     //if !test the compare exchange failed and we need to keep looping
   }
- end:
-  return word;
+ end0:
+  return 0;
+ end1:
+  return 1;
 }
 struct filebuf read_full_file(char *filename){
   static struct stat stat_buf;
@@ -153,7 +161,9 @@ void parse_buf(register const uint8_t *buf_,int file_id){
     english_word *word=xmalloc(sizeof(english_word));
     *word=(english_word){.str=(char*)buf,.len=index,.count=1,
                          .file_bits=bitmask};
-    atomic_hash_table_update(word);//frees word if it's not needed
+    if(!atomic_hash_table_update(word)){
+      free(word);
+    }
   }
   if(buf[index]!=0xff){
     buf+=index;
@@ -178,7 +188,7 @@ void thread_main(void *arg){
     futex_spin_lock(&thread_queue_lock);
     PRINT_FMT("Worker thread %ld locked spin lock\n",thread_id);
     thread_queue[thread_queue_index++]=thread_id;
-    atomic_inc(main_thread_wait_ptr);
+    atomic_inc(&main_thread_wait);
     futex_retval=futex_wake(main_thread_wait_ptr,10);
     futex_spin_unlock(&thread_queue_lock);
     PRINT_FMT("Worker thread %ld unlocked spin lock\n",thread_id);
@@ -199,15 +209,12 @@ void thread_main(void *arg){
        difference (which it shouldn't) I'll take it out
      */
     PRINT_FMT("Worker thread %ld waiting for main\n",thread_id);
-    sigwait(&sigwait_set,&signo);
+    futex_wait((int*)thread_futexes+thread_id,0);
+    //sigwait(&sigwait_set,&signo);
     __atomic_store_n(thread_status+thread_id,1,__ATOMIC_SEQ_CST);//this prevents the race contition
-    PRINT_FMT("Worker thread %ld recieved signal %d\n",thread_id,signo);
+    __atomic_store_n(thread_futexes+thread_id,0,__ATOMIC_SEQ_CST);
     //the main thread runs a loop while(!thread_status[worker_thread_id]){
     //tgkill(-1,thread_pids[worker_thread_id],<SIGNAL>);}
-    if(signo == SIGTERM){
-      PRINT_FMT("Worker thread %ld finished\n",thread_id);
-      thread_exit(EXIT_SUCCESS);
-    }
   }
 }
 //setup the buffer and file_id for the thread with thread_id
@@ -218,6 +225,7 @@ int setup_thread_args(int thread_id_num){
   //fileinfo_queue[0] should always contain a vaild struct fileinfo
   static struct fileinfo *info;
   info=setup_block(fileinfo_queue[fileinfo_queue_index],thread_bufs[thread_id_num]);
+  PRINT_MSG("setup block in setup_thread_args\n");
   thread_file_ids[thread_id_num]=info->file_id;
   //these conditionals make sure that fileinfo_queue has a valid entry
   //if it does not and there are no files left, we return 0 to indicate
@@ -255,11 +263,15 @@ int refill_fileinfo_queue(){
   }
   return (fileinfo_queue_index?(fileinfo_queue_index-1):0);
 }
-void main_wait_loop(){
+void main_wait_loop(int have_data){
   uint8_t worker_thread_id;
-  int have_data=1;
-  int32_t val=-1;
+  int32_t val=1;
   int32_t futex_retval;
+  PRINT_FMT("fileinfo_queue_index = %ld at the start of the main wait loop",
+            fileinfo_queue_index);
+  if(atomic_load_n(&main_thread_wait)>1){
+    goto ALLOCATE_LOOP;
+  }
   while(1){
     //wait untill a thread is done;
     PRINT_FMT("Main waiting with val %d\n",main_thread_wait);
@@ -269,22 +281,32 @@ void main_wait_loop(){
       perror("Futex failure\n");
       exit(1);
     }
-    while(atomic_sub(&main_thread_wait,-1)>=0){
+  ALLOCATE_LOOP:
+    while(atomic_fetch_add(&main_thread_wait,-1)>0){
+      if(main_thread_wait>NUM_PROCS){
+        fprintf(stderr,"More threads waiting then exist, exiting\n");
+        exit(1);
+      }
+      PRINT_FMT("main_thread_wait = %d\n",main_thread_wait);
       PRINT_MSG("Allocating thread_data\n");
       futex_spin_lock(&thread_queue_lock);
       worker_thread_id=thread_queue[--thread_queue_index];
       futex_spin_unlock(&thread_queue_lock);
+      PRINT_MSG("Calling setup thread args\n");
       if(!setup_thread_args(worker_thread_id)){
+        tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
         goto OUT_OF_DATA;
       }
       PRINT_MSG("Waking up thread\n");
+      futex_wake((int*)thread_futexes+worker_thread_id,10);
+      /*
       do {
         tgkill(tgid,thread_pids[worker_thread_id],SIGCONT);
         __asm__ volatile("pause\n\tpause\n");//give the worker thread time to set
         //its staus
       } while(!(__atomic_load_n(thread_status+worker_thread_id,__ATOMIC_SEQ_CST)));
-      PRINT_MSG("thread woke up\n");
-    }
+      PRINT_MSG("thread woke up\n");*/
+    } 
     //I don't think it should be possible for this to return 0
     //but I'm not 100% sure
     if(!refill_fileinfo_queue()){
@@ -292,24 +314,28 @@ void main_wait_loop(){
     }
   }
  OUT_OF_DATA:{
+    PRINT_FMT("main_thread_wait = %d\n",main_thread_wait);
     PRINT_MSG("Out of data\n");
-    int live_threads=NUM_PROCS-1;
+    int live_threads=NUM_PROCS-2;
+    if(main_thread_wait==0){
+      goto WAIT;
+    }
     while(live_threads){
-      while(thread_queue_index > 0){
+      while(atomic_fetch_add(&main_thread_wait,-1)>0){
         futex_spin_lock(&thread_queue_lock);
-        worker_thread_id=thread_queue[thread_queue_index--];
+        worker_thread_id=thread_queue[--thread_queue_index];
         futex_spin_unlock(&thread_queue_lock);
         //I suppose here is where the race condition might actually matter
         //if we actually needed to make sure the thread was waiting
         //use SIGTERM, if the thread isn't already waiting it'll just terminate
         //instead, I assume this will only terminate that thread, but if not
         //I'll set up a signal hanler to allow indivual theads to terminate
+        PRINT_FMT("Killing thread %d\n",worker_thread_id);
         tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
         live_threads--;
       }
-      int val = -1;
-      val=atomic_add(&val,main_thread_wait);
-      //wait untill another thread is done;
+    WAIT:
+      PRINT_MSG("Waiting for threads\n");
       futex_wait(&main_thread_wait,val);
     }
     PRINT_MSG("All worker threads finished\n")
@@ -337,6 +363,7 @@ void main_wait_loop(){
   }
  */
 struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
+  PRINT_MSG("Setting up block\n");
   if(max_buf_size>info->remaining){
     //just read the rest of the file
     ssize_t nbytes=read(info->fd,buf,max_buf_size);
@@ -399,7 +426,7 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
     if(eng_accept[buf[cur]]){
       while(eng_accept[buf[--cur]]);      
       //should this be (buf_size-1)-start?
-      cur++
+      cur++;
       if(buf_size-start<50){
         my_strcpy((uint8_t*)info->last_word,buf+cur,(start-cur));
       }
@@ -438,8 +465,14 @@ struct fileinfo *setup_fileinfo(char *filename){
     perror("error calling stat on file");
     exit(1);
   }
+  if(builtin_unlikely(stat_buf.st_size == 0)){
+    fprintf(stderr,"Found empty file, %s, no words common to all files\n",
+            filename);
+    exit(1);
+  }
   //this will probably change to using statically allocated memory
-  struct fileinfo *info=xmalloc(sizeof(struct fileinfo));
+  struct fileinfo *info=fileinfo_mem+fileinfo_mem_index;
+  fileinfo_mem_index+=1;
   *info=(struct fileinfo){.fd=fd,.len=stat_buf.st_size,
                           .file_id=next_file_id++,.remaining=stat_buf.st_size};
   return info;
@@ -529,21 +562,29 @@ int main(int argc,char *argv[]){
   filenames=argv+1;
   if(num_files<=0){
     fprintf(stderr,"Error no filenames given\n");
+    exit(1);
   }
   main_thread_wait=0;
   tgid=gettgid();
   //this is used when threads are waiting for more data
-  sigemptyset(&sigwait_set);
-  sigaddset(&sigwait_set,SIGCONT);
-  sigaddset(&sigwait_set,SIGTERM);
+  sigaction(SIGTERM,&signal_action,NULL);
   struct fileinfo *info;
   int i;
+  int have_data=1;
   if(num_files>NUM_PROCS-1){
     for(i=1;i<NUM_PROCS;i++){
       info=setup_fileinfo(filenames[current_file++]);
       info=init_thread_filestart(info,i);
       if(info){
         fileinfo_queue[++fileinfo_queue_index]=info;
+      }
+    }
+    if(fileinfo_queue_index==-1){
+      if(current_file<num_files){
+        fileinfo_queue[++fileinfo_queue_index]=
+          setup_fileinfo(filenames[current_file++]);
+      } else {
+        have_data=0;
       }
     }
   } else {
@@ -561,13 +602,16 @@ int main(int argc,char *argv[]){
         info=fileinfo_queue[fileinfo_queue_index];
         info=init_thread(info,i);
         if(!info){
-          fileinfo_queue_index--;
+          --fileinfo_queue_index;
         }
         i++;
       } while(i<NUM_PROCS && fileinfo_queue_index>=0);
     }
+    if(fileinfo_queue_index<0){
+      have_data=0;
+    }
   }
-  main_wait_loop();
+  main_wait_loop(have_data);
 }
 #if 0
   //temporally assume one file

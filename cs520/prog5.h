@@ -72,13 +72,17 @@
    while atomic_fetch_add is lock xadd val,(ptr)
  */
 #define atomic_inc(ptr)                         \
-  __asm__ volatile("lock incq (%0)" : :"r" (ptr));
+  __asm__ volatile("lock incq (%0)" : :"r" (ptr))
+#define atomic_dec(ptr)                         \
+  __asm__ volatile("lock decq (%0)" : :"r" (ptr))
 #define atomic_add(ptr,val)                     \
   __atomic_add_fetch(ptr,val,__ATOMIC_SEQ_CST)
 #define atomic_sub(ptr,val)                     \
   __atomic_sub_fetch(ptr,val,__ATOMIC_SEQ_CST)
 #define atomic_fetch_add(ptr,val)                     \
   __atomic_fetch_add(ptr,val,__ATOMIC_SEQ_CST)
+#define atomic_load_n(ptr)                     \
+  __atomic_load_n(ptr,__ATOMIC_SEQ_CST)
 //with this (and pretty much any binary operation but add) the difference
 //between fetch_or and or_fetch is a lot bigger, or_fetch is just a lock or
 //whereas fetch_or translates into a cmpxcgh loop
@@ -149,7 +153,8 @@
 //flagss that entail the least ammount of copying, meaning that
 //the new thread shares pretty much everything with it's parent
 #define SIMPLE_CLONE_FLAGS  (CLONE_VM|CLONE_SIGHAND|CLONE_SYSVSEM|CLONE_PTRACE| \
-                             CLONE_PARENT_SETTID|CLONE_FS|CLONE_FILES|CLONE_THREAD|0)
+                             CLONE_PARENT_SETTID|CLONE_FS|              \
+                             CLONE_FILES|CLONE_THREAD|0)
 //typedefs
 typedef unsigned __int128 uint128_t;
 typedef __int128 int128_t;
@@ -157,6 +162,7 @@ typedef struct english_word english_word;
 typedef struct internal_buf internal_buf;
 typedef union file_bitfield file_bitfield;
 struct pt_regs;
+typedef int __attribute__((aligned(8))) aligned_int;
 
 //forward declarations
 long futex_up(int *futex_addr);
@@ -200,7 +206,7 @@ static pid_t tgid;
 //and concidering how lightweight my spinlocks are I think it's
 //ok to lok for this
 static uint8_t thread_queue[NUM_PROCS];
-static uint8_t thread_queue_index;
+static uint8_t thread_queue_index=0;
 //holds the information about the data to be given to threads
 static struct fileinfo *fileinfo_queue[NUM_PROCS];
 static uint64_t fileinfo_queue_index=-1;
@@ -211,8 +217,10 @@ static /*volatile*/ int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
 //and call futex_wake. Whenever a worker thread finishes it increments this
 //and calls futex_wake, thus whenever this is > 0 the main thread will keep 
 //passing data to threads (as long as there is data left)
-/*volatile*/ int32_t main_thread_wait __attribute__((aligned (16)));
+
+/*volatile*/ int32_t main_thread_wait __attribute__((aligned (16)))=1;
 /*volatile*/ int32_t *main_thread_wait_ptr = &main_thread_wait;
+static long thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
 static sigset_t sigwait_set;
 static uint64_t num_files;
 static uint64_t current_file=0;
@@ -312,6 +320,8 @@ union file_bitfield{
 struct heap {english_word **heap; uint32_t size;};
 //I NEVER SET THIS, FIX THAT
 static file_bitfield all_file_bits={.uint128=0};
+static struct fileinfo fileinfo_mem[100];
+static uint32_t fileinfo_mem_index=0;
 /*structure for storing data about each word
   contains:
   -the word iself as a char * (not necessarly null terminated)
@@ -558,7 +568,7 @@ int futex_wait(int *uaddr,int val){//ignore timeout argument
                     "movq %3,%%rax\n\t"
                     "xorq %%rcx,%%rcx\n\t"
                     "xorq %%r8,%%r8\n\t"
-                    "lock subq $1,(%4)\n\t"
+                    //                    "lock subq $1,(%4)\n\t"
                     //hopefully if another thread adds to the futex before
                     //the kernel makes us wait the syscall return
                     //immediately
@@ -666,8 +676,8 @@ long my_clone(unsigned long flags_,void *child_stack_,void *ptid_,
   register void *child_stack __asm__("%rsi")=child_stack_;
   register void *ptid __asm__("%rdx")=ptid_;
   __asm__("movq %0,%%rax\n\t"
-          "xorq %%rcx,%%rcx\n\t"
-          "xorq %%r8,%%r8\n\t"
+          "xorq %%rcx,%%rcx\n\t" 
+          "movq  $1,%%r8\n\t"
           "syscall\n"
           : : "i" (__NR_clone), "r" (retval), "r" (flags),"r" (child_stack), "r" (ptid)
           :"rcx","r8");
