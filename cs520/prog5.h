@@ -133,8 +133,6 @@
 //the new thread shares pretty much everything with it's parent
 #define SIMPLE_CLONE_FLAGS  (CLONE_VM|CLONE_SIGHAND|CLONE_SYSVSEM| \
                               CLONE_PARENT_SETTID|CLONE_THREAD|0)
-
-
 //typedefs
 typedef unsigned __int128 uint128_t;
 typedef __int128 int128_t;
@@ -159,8 +157,7 @@ void parse_buf(const uint8_t *buf);//core function
 struct filebuf read_full_file(char *filename);
 struct fileinfo open_file_simple(char *filename);
 struct heap sort_words();
-struct internal_fileinfo *setup_block(struct internal_fileinfo *info,
-                                       uint8_t *buf);
+struct fileinfo *setup_block(struct fileinfo *info,uint8_t *buf);
 long my_clone(unsigned long flags,void *child_stack,void *ptid,
               void (*fn)(void*),void *arg);
 static int tgkill(int tgid, int tid, int sig);
@@ -249,18 +246,18 @@ static uint32_t hash_table_indices[GLOBAL_HASH_TABLE_SIZE/2];
 //This keeps track of in hash_table_indices to but the next entry, and as
 //a side effect keeps track of the number of entries in the hash table
 static uint32_t indices_index=0;
-
-
+static uint32_t next_file_id=0;
 //structure definitions
 struct internal_buf {
   char *buf;
   int file_id;
-  int buf_num;
+  //  int buf_num;//why do i need this 
 };
-struct internal_fileinfo {
-  long fd;
+//if I allocate these statically I'll need 100 of them
+struct fileinfo {
   off_t len;
   off_t remaning;
+  int fd;
   int file_id;//some number between 0-100 indicating what file
   //this represents
   int word_len;
@@ -269,10 +266,6 @@ struct internal_fileinfo {
 };
 struct filebuf {
   uint8_t *buf;
-  off_t len;
-};
-struct fileinfo {
-  long fd;
   off_t len;
 };
 union file_bitfield{
@@ -316,22 +309,40 @@ static const uint8_t eng_accept[256]=
 //the Nth entry consists of a 64 bit integer with the least significant
 //N+1 bits set and the rest of the bits unset
 static const uint64_t file_bit_strings[64] =
-  {0x1,0x3,0x7,0xf,
-   0x1f,0x3f,0x7f,0xff,
-   0x1ff,0x3ff,0x7ff,0xfff,
-   0x1fff,0x3fff,0x7fff,0xffff,
-   0x1ffff,0x3ffff,0x7ffff,0xfffff,
-   0x1fffff,0x3fffff,0x7fffff,0xffffff,
-   0x1ffffff,0x3ffffff,0x7ffffff,0xfffffff,
-   0x1fffffff,0x3fffffff,0x7fffffff,0xffffffff,
-   0x1ffffffff,0x3ffffffff,0x7ffffffff,0xfffffffff,
-   0x1fffffffff,0x3fffffffff,0x7fffffffff,0xffffffffff,
-   0x1ffffffffff,0x3ffffffffff,0x7ffffffffff,0xfffffffffff,
-   0x1fffffffffff,0x3fffffffffff,0x7fffffffffff,0xffffffffffff,
-   0x1ffffffffffff,0x3ffffffffffff,0x7ffffffffffff,0xfffffffffffff,
-   0x1fffffffffffff,0x3fffffffffffff,0x7fffffffffffff,0xffffffffffffff,
-   0x1ffffffffffffff,0x3ffffffffffffff,0x7ffffffffffffff,0xfffffffffffffff,
-   0x1fffffffffffffff,0x3fffffffffffffff,0x7fffffffffffffff,0xffffffffffffffff};
+  {0x1, 0x3, 0x7, 0xf,
+   0x1f, 0x3f, 0x7f, 0xff,
+   0x1ff, 0x3ff, 0x7ff, 0xfff,
+   0x1fff, 0x3fff, 0x7fff, 0xffff,
+   0x1ffff, 0x3ffff, 0x7ffff, 0xfffff,
+   0x1fffff, 0x3fffff, 0x7fffff, 0xffffff,
+   0x1ffffff, 0x3ffffff, 0x7ffffff, 0xfffffff,
+   0x1fffffff, 0x3fffffff, 0x7fffffff, 0xffffffff,
+   0x1ffffffff, 0x3ffffffff, 0x7ffffffff, 0xfffffffff,
+   0x1fffffffff, 0x3fffffffff, 0x7fffffffff, 0xffffffffff,
+   0x1ffffffffff, 0x3ffffffffff, 0x7ffffffffff, 0xfffffffffff,
+   0x1fffffffffff, 0x3fffffffffff, 0x7fffffffffff, 0xffffffffffff,
+   0x1ffffffffffff, 0x3ffffffffffff, 0x7ffffffffffff, 0xfffffffffffff,
+   0x1fffffffffffff, 0x3fffffffffffff, 0x7fffffffffffff, 0xffffffffffffff,
+   0x1ffffffffffffff, 0x3ffffffffffffff, 0x7ffffffffffffff, 0xfffffffffffffff,
+   0x1fffffffffffffff, 0x3fffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff};
+//the Nth entry is a 64 bit integer with only the Nth bit set
+static const uint64_t file_bit_masks[64] = 
+  {0x1, 0x2, 0x4, 0x8,
+   0x10, 0x20, 0x40, 0x80,
+   0x100, 0x200, 0x400, 0x800,
+   0x1000, 0x2000, 0x4000, 0x8000,
+   0x10000, 0x20000, 0x40000, 0x80000,
+   0x100000, 0x200000, 0x400000, 0x800000,
+   0x1000000, 0x2000000, 0x4000000, 0x8000000,
+   0x10000000, 0x20000000, 0x40000000, 0x80000000,
+   0x100000000, 0x200000000, 0x400000000, 0x800000000,
+   0x1000000000, 0x2000000000, 0x4000000000, 0x8000000000,
+   0x10000000000, 0x20000000000, 0x40000000000, 0x80000000000,
+   0x100000000000, 0x200000000000, 0x400000000000, 0x800000000000,
+   0x1000000000000, 0x2000000000000, 0x4000000000000, 0x8000000000000,
+   0x10000000000000, 0x20000000000000, 0x40000000000000, 0x80000000000000,
+   0x100000000000000, 0x200000000000000, 0x400000000000000, 0x800000000000000,
+   0x1000000000000000, 0x2000000000000000, 0x4000000000000000, 0x8000000000000000};
 
 //memory allocation wrappers
 //these should be rewritten so I don't terminate the program if

@@ -110,7 +110,7 @@ void *mmap_file(char *filename){
   off_t len=file_size(fd);
   uint8_t *buf=mmap(NULL,PAGE_ROUND_UP(len),);
 }*/
-struct fileinfo open_file_simple(char *filename){
+/*struct fileinfo open_file_simple(char *filename){
   long fd=open(filename,O_RDONLY);
   if(fd == -1){
     perror("error opening file");
@@ -123,7 +123,7 @@ struct fileinfo open_file_simple(char *filename){
     exit(1);
   }
   return (struct fileinfo){.fd=fd,.len=len};
-}
+  }*/
 
 struct filebuf read_full_file(char *filename){
   long fd=open(filename,O_RDONLY);
@@ -153,34 +153,6 @@ struct filebuf read_full_file(char *filename){
   buf[end+1]=0xff;
   return (struct filebuf){.buf=buf,.len=end};
 }
-#if 0
-char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
-  char *filename;
-  int i=0,j=0;
-  //guess on average each file is 2 pages
-  char **retval=xmalloc(num_files*2*sizeof(filebuf));
-  while(i<num_files){
-    filename=filenames[i];
-  }
-  ssize_t nbytes=read(fd,buf,len);
-  if(nbytes == (ssize_t)-1 /*|| nbytes != len*/){
-    perror("error reading from file");
-    exit(exit_failure);
-  }
-  if(close(fd) == -1){
-    perror("error closing file");
-    exit(exit_failure);
-  }
-  if(len > PAGESIZE){
-    uint32_t offset=0;
-    while(offset<len){
-      *retval[j++]=buf+offset;
-      offset++;
-      //      if(j
-    }
-  }
-}
-#endif
 /*
    main work function, searches buf for english words (matching [a-za-z]{6,50})
    and puts/updates the word in the global hash table.
@@ -192,16 +164,22 @@ char** open_files(char **filenames,uint32_t num_files,uint32_t *bufs){
   be fixed by some prefetching
 */
 
-void parse_buf(register const uint8_t *buf_){
+void parse_buf(register const uint8_t *buf_,int file_id){
   register const uint8_t *buf __asm__ ("%rbx")=buf_;
   const uint8_t *initial_buf=buf;
   uint64_t index=1;
+  union file_bitfield bitmask;
+  if(file_id>=64){file_id-=64;
+    bitmask.high=file_bitmasks[file_id];
+  } else {
+    bitmask.low=file_bitmasks[file_id];
+  }
  PREFETCH:{
     __asm__ volatile ("prefetchnta 768(%rbx)");
   }
   //these cause tons of branch mispredictions
   //but I'm not sure how I should fix this
-  //re-rolling the loop probably wouldn't help but I can try
+  //un-unrolling the loop probably wouldn't help but I can try
  START:
   if(eng_accept[*(buf)]){goto ACCEPT_0;}
   if(eng_accept[*(buf+1)]){goto ACCEPT_1;}
@@ -230,21 +208,9 @@ void parse_buf(register const uint8_t *buf_){
   index++;
  REJECT_0:
   if(index >= 6 && index <= 50){
-    /*//what used to do, really slow because I copy every word
-    void *mem=xmalloc(sizeof(english_word)+index);
-    my_strcpy(mem+sizeof(english_word),buf,index);
-    english_word *word=mem;
-    //need to modify this function to pass the file index to put
-    //into this
-    *word=(english_word){.str=mem+sizeof(english_word),.len=index,
-                         .count=1,.file_bits={.low=0,.high=0}};*/
     english_word *word=xmalloc(sizeof(english_word));
     *word=(english_word){.str=(char*)buf,.len=index,.count=1,
-                         .file_bits={.low=0,.high=0}};
-    /* english_word word={.str=(char*)buf,.len=index,.count=1,
-       .file_bits={.low=0,.high=0}};
-       atomic_hash_table_update(word);
-     */
+                         .file_bits=bitmask};
     atomic_hash_table_update(word);//frees word if it's not needed
   }
   if(buf[index]!=0xff){
@@ -371,7 +337,7 @@ void init_threads(){
     }
   }
  */
-struct internal_fileinfo *setup_block(struct internal_fileinfo *info,
+struct fileinfo *setup_block(struct fileinfo *info,
                                         uint8_t *buf){
   /*slight Issue I just though of, if I read max_buf_size bytes
     how do I fit in the end of file marker that I need
@@ -773,6 +739,47 @@ static inline char* __attribute__((const)) ordinal_sufffix(uint32_t num){
   }
   return "th";
 }
+/*What I need to do with the return value from this is 
+  if(info->len<max_buf_len){
+    read_whole_buf;
+  } else {
+    setup_block;
+  }
+  pass to thread;
+*/
+struct fileinfo *setup_fileinfo(char *filename){
+  int fd=open(filename,O_RDONLY);
+  if(fd == -1){
+    perror("error opening file");
+    exit(1);
+  }
+  off_t len=lseek(fd,0,SEEK_END);
+  lseek(fd,0,SEEK_SET);
+  if(len == (off_t)-1){
+    perror("error seeking file");
+    exit(1);
+  }
+  //this will probably change to using statically allocated memory
+  struct fileinfo *info=xmalloc(sizeof(struct fileinfo));
+  *info=(struct fileinfo){.fd=fd,.len=len,
+                          .file_id=next_file_id++,.remaning=len};
+  return info;
+}
+
+/* with threads heres what to do:
+   if(argc>=NUM_PROCS-1){
+   //more files than processors
+   //just get the threads working on different files to start
+   //then setup a queue of fileinfo structs to pass more data to the threads
+   } else {
+   //more processors than files
+   //start num_files threads first
+   //then if there is data left start more threads by calling setup_block 
+   //untill there is no data left or there are NUM_PROCS threads running
+   }
+   //once threads are started it should be the same pattern regardless
+   //of the number of files
+ */
 int main(int argc,char *argv[]){
   //remove the program name from the arguments (its just eaiser)
   num_files=(--argc);
@@ -788,7 +795,7 @@ int main(int argc,char *argv[]){
   PRINT_MSG("program start\n");
   struct filebuf file_buf=read_full_file(argv[0]);
   PRINT_MSG("read file\n");
-  parse_buf(file_buf.buf);
+  parse_buf(file_buf.buf,0);//the 0 is temporary
   PRINT_MSG("parsed file\n");
   PRINT_FMT("Read %d words\n",indices_index);
   struct heap common_words=sort_words();
