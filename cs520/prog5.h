@@ -1,6 +1,7 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC optimize (2)
+#pragma GCC optimize ("whole-program")
 /* What this program does
    open files given filename on command line,
    count words in each file, determine words common to each file
@@ -38,123 +39,8 @@
 #include <string.h>
 #include <linux/futex.h>
 #include <sys/time.h>
+#include "prog5_macros.h"
 
-//macros
-/*Agate has simd instructions up to sse4.2*/
-#ifndef NUM_PROCS
-#ifdef AGATE
-#define NUM_PROCS 16
-#else
-#define NUM_PROCS 8
-#endif
-#endif
-#define PAGE_ROUND_DOWN(x) (((uint64_t)(x)) & (~(PAGESIZE-1)))
-#define PAGE_ROUND_UP(x) ( (((uint64_t)(x)) + PAGESIZE-1)  & (~(PAGESIZE-1)) )
-//this used to use lseek, but lseek is slower than fstat because
-//it involves two syscalls becasue the file position needs to be reset
-//after getting the file size.
-#define file_size(fd)                           \
-  ({struct stat buf;                            \
-    fstat(fd,&buf);                             \
-    buf.st_size;})
-//desired is a pointer
-#define atomic_compare_exchange(ptr,expected,desired)           \
-  __atomic_compare_exchange(ptr,expected,desired,0,             \
-                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
-//desired isn't a pointer
-#define atomic_compare_exchange_n(ptr,expected,desired)           \
-  __atomic_compare_exchange_n(ptr,expected,desired,0,             \
-                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
-#define atomic_bts(bit_index,mem_pointer)                       \
-  __asm__("lock bts %0,%1\n"                                    \
-          : : "r" (bit_index), "m" (mem_pointer))
-/* atomic_add_fetch is lock add val,(ptr)
-   while atomic_fetch_add is lock xadd val,(ptr)
- */
-#define atomic_inc(ptr)                         \
-  __asm__ volatile("lock incq (%0)" : :"r" (ptr))
-#define atomic_dec(ptr)                         \
-  __asm__ volatile("lock decq (%0)" : :"r" (ptr))
-#define atomic_add(ptr,val)                     \
-  __atomic_add_fetch(ptr,val,__ATOMIC_SEQ_CST)
-#define atomic_sub(ptr,val)                     \
-  __atomic_sub_fetch(ptr,val,__ATOMIC_SEQ_CST)
-#define atomic_fetch_add(ptr,val)                     \
-  __atomic_fetch_add(ptr,val,__ATOMIC_SEQ_CST)
-#define atomic_load_n(ptr)                     \
-  __atomic_load_n(ptr,__ATOMIC_SEQ_CST)
-//with this (and pretty much any binary operation but add) the difference
-//between fetch_or and or_fetch is a lot bigger, or_fetch is just a lock or
-//whereas fetch_or translates into a cmpxcgh loop
-#define atomic_or(ptr,val)                                      \
-  __atomic_or_fetch(ptr,val,__ATOMIC_SEQ_CST)
-#define gettid()                                \
-  ({register uint64_t tid __asm__ ("rax");          \
-  __asm__("movq %1,%%rax\n"                      \
-          "syscall"                              \
-          : "=r" (tid) : "i" (__NR_gettid));     \
-  tid;})
-#define gettgid()                                \
-  ({register uint64_t tid __asm__ ("rax");           \
-    __asm__("movq %1,%%rax\n"                    \
-            "syscall"                            \
-            : "=r" (tid) : "i" (__NR_getpid));   \
-  tid;})
-#define array_swap_ptr(arr,_i,_j)                   \
-  ({uint32_t i=_i,j=_j;                             \
-    void *temp=arr[i];                              \
-    arr[i]=arr[j];                                  \
-    arr[j]=temp;})
-#define array_swap_typed(arr,_i,_j,type)            \
-  ({uint32_t i=_i,j=_j;                             \
-    type temp=arr[i];                               \
-    arr[i]=arr[j];                                  \
-    arr[j]=temp;})
-#define SWAP(a,b)                               \
-  ({ __typeof__ (a) _a = a;                     \
-    a=b;                                        \
-    b=_a;                                       \
-    ;})
-#define PREFETCH_0(mem)                         \
-  (__asm__ volatile ("prefetcht0 %0" : : "m" (mem));)
-#define PREFETCH_1(mem)                                 \
-   (__asm__ volatile ("prefetcht1 %0" : : "m" (mem));)
-#define PREFETCH_2(mem)                                 \
-   (__asm__ volatile ("prefetcht2 %0" : : "m" (mem));)
-#define PREFETCH_NT(mem)                                \
-  (__asm__ volatile ("prefetchnta %0" : : "m" (mem));)
-#define builtin_expect(expr,c) __builtin_expect((expr),c)
-#define builtin_unlikely(expr) __builtin_expect((expr),0)
-#define builtin_likely(expr) __builtin_expect((expr),1)
-#define offset_basis_32 2166136261
-#define offset_basis_64 14695981039346656037UL
-#define fnv_prime_32 16777619
-#define fnv_prime_64 1099511628211UL
-#define futex_lock futex_down
-#define futex_unlock futex_up
-#define futex_spin_lock futex_spin_down
-#define futex_spin_unlock futex_spin_up
-
-#define DEBUG
-#if (defined DEBUG) && !(defined NDEBUG)
-#define HERE() fprintf(stderr,"here at %s,line %d\n",__FILE__,__LINE__)
-#define PRINT_MSG(string) fprintf(stderr,string);
-#define PRINT_FMT(string,fmt...) fprintf(stderr,string,##fmt);
-#define PRINT_STRING_ERR(/*english_word* */x) fwrite(x->str,x->len,1,stderr)
-#else
-#define HERE()
-#define PRINT_MSG(string)
-#define PRINT_FMT(string,fmt...)
-#define PRINT_STRING_ERR(x)
-#endif
-#define PTHREAD_CLONE_FLAGS   (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|\
-                               CLONE_SETTLS|CLONE_PARENT_SETTID|\
-                               CLONE_CHILD_CLEARTID|CLONE_SYSVSEM|0)
-//flagss that entail the least ammount of copying, meaning that
-//the new thread shares pretty much everything with it's parent
-#define SIMPLE_CLONE_FLAGS  (CLONE_VM|CLONE_SIGHAND|CLONE_SYSVSEM|CLONE_PTRACE| \
-                             CLONE_PARENT_SETTID|CLONE_FS|              \
-                             CLONE_FILES|CLONE_THREAD|0)
 //typedefs
 typedef unsigned __int128 uint128_t;
 typedef __int128 int128_t;
@@ -198,7 +84,9 @@ static uint8_t thread_status[NUM_PROCS];
 static __thread uint64_t thread_id;
 //static uint64_t next_thread_id=0;
 static pid_t thread_pids[NUM_PROCS];
+static uint8_t thread_buf_start_offsets[NUM_PROCS];
 static pid_t tgid;
+#include "prog5_consts.h"
 //this queue is only accessed after locking the thread_queue_lock
 //Both the queue update and incremunting/decrementing the
 //queue index have to be done in one atomic step, meaning
@@ -218,18 +106,13 @@ static /*volatile*/ int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
 //and calls futex_wake, thus whenever this is > 0 the main thread will keep 
 //passing data to threads (as long as there is data left)
 
-/*volatile*/ int32_t main_thread_wait __attribute__((aligned (16)))=1;
-/*volatile*/ int32_t *main_thread_wait_ptr = &main_thread_wait;
+int32_t main_thread_wait __attribute__((aligned (16)))=0;
+int32_t *main_thread_wait_ptr = &main_thread_wait;
 static long thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
 static sigset_t sigwait_set;
 static uint64_t num_files;
 static uint64_t current_file=0;
 static char **filenames;//=argv+1
-static const uint64_t PAGESIZE=4096;
-static const uint64_t buf_size=128*(1<<10);//128kb
-static const uint64_t min_buf_size=8*(1<<10);//8Kb
-static const uint64_t max_buf_size=136*(1<<10);//128+8Kb
-#define MAX_BUF_SIZE (136*(1<<10))
 //min_buf_size is the minium size of any one buffer, so if there
 //are say 132Kb left in a file it will be read as one buffer
 //rather than divining it into a 128kb buffer and a 4kb buffer
@@ -338,57 +221,6 @@ struct english_word {
   uint32_t count;
   file_bitfield file_bits;
 };
-
-//global initialized arrays
-/*1 if char is in the set [A-Za-z] zero otherwise */
-static const uint8_t eng_accept[256]=
-  {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-   0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
-   1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-//the Nth entry consists of a 64 bit integer with the least significant
-//N+1 bits set and the rest of the bits unset
-static const uint64_t file_bit_strings[64] =
-  {0x1, 0x3, 0x7, 0xf,
-   0x1f, 0x3f, 0x7f, 0xff,
-   0x1ff, 0x3ff, 0x7ff, 0xfff,
-   0x1fff, 0x3fff, 0x7fff, 0xffff,
-   0x1ffff, 0x3ffff, 0x7ffff, 0xfffff,
-   0x1fffff, 0x3fffff, 0x7fffff, 0xffffff,
-   0x1ffffff, 0x3ffffff, 0x7ffffff, 0xfffffff,
-   0x1fffffff, 0x3fffffff, 0x7fffffff, 0xffffffff,
-   0x1ffffffff, 0x3ffffffff, 0x7ffffffff, 0xfffffffff,
-   0x1fffffffff, 0x3fffffffff, 0x7fffffffff, 0xffffffffff,
-   0x1ffffffffff, 0x3ffffffffff, 0x7ffffffffff, 0xfffffffffff,
-   0x1fffffffffff, 0x3fffffffffff, 0x7fffffffffff, 0xffffffffffff,
-   0x1ffffffffffff, 0x3ffffffffffff, 0x7ffffffffffff, 0xfffffffffffff,
-   0x1fffffffffffff, 0x3fffffffffffff, 0x7fffffffffffff, 0xffffffffffffff,
-   0x1ffffffffffffff, 0x3ffffffffffffff, 0x7ffffffffffffff, 0xfffffffffffffff,
-   0x1fffffffffffffff, 0x3fffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff};
-//the Nth entry is a 64 bit integer with only the Nth bit set
-static const uint64_t file_bit_masks[64] = 
-  {0x1, 0x2, 0x4, 0x8,
-   0x10, 0x20, 0x40, 0x80,
-   0x100, 0x200, 0x400, 0x800,
-   0x1000, 0x2000, 0x4000, 0x8000,
-   0x10000, 0x20000, 0x40000, 0x80000,
-   0x100000, 0x200000, 0x400000, 0x800000,
-   0x1000000, 0x2000000, 0x4000000, 0x8000000,
-   0x10000000, 0x20000000, 0x40000000, 0x80000000,
-   0x100000000, 0x200000000, 0x400000000, 0x800000000,
-   0x1000000000, 0x2000000000, 0x4000000000, 0x8000000000,
-   0x10000000000, 0x20000000000, 0x40000000000, 0x80000000000,
-   0x100000000000, 0x200000000000, 0x400000000000, 0x800000000000,
-   0x1000000000000, 0x2000000000000, 0x4000000000000, 0x8000000000000,
-   0x10000000000000, 0x20000000000000, 0x40000000000000, 0x80000000000000,
-   0x100000000000000, 0x200000000000000, 0x400000000000000, 0x800000000000000,
-   0x1000000000000000, 0x2000000000000000, 0x4000000000000000, 0x8000000000000000};
-
 //memory allocation wrappers
 //these should be rewritten so I don't terminate the program if
 //I use too much memory
@@ -469,26 +301,6 @@ static inline int string_compare(english_word *x,english_word *y){
     return !memcmp(x->str,y->str,x->len);
   }
 }
-/* 
-   I don't even know why this doesn't work,
-   but if I can't fix this I'll just stick to memcmp 
-   because there's not way besides using repne cmpsb
-   that I can make this small enough to inline 
-*/
-static inline int my_string_compare_asm(english_word *x,english_word *y){
-  if(x->len != y->len){
-    return 0;
-  } else {
-    uint64_t cnt=y->len;
-    __asm__("movq %2,%%rdi\n\t"
-            "movq %3,%%rsi\n\t"
-            "movq %0,%%rcx\n\t"
-            "repne cmpsb"
-            : "=g" (cnt) : "0" (cnt),"g" (x->str), "g" (y->str)
-            : "%rcx","%rdi","%rsi");
-    return !cnt;
-  }
-}
 //since my strings aren't null terminated I can't use
 //the %s printf specifier so these functions are a convience to
 //make printing eaiser
@@ -514,200 +326,3 @@ static inline void print_count_word(english_word *x){
    Hash tree/trie //almost certantily won't use
      -complicated, not sure if it would be any faster either
 */
-//really this is more memcpy than strcpy, but the reason I wrote it
-//is that I know I'll only be coping 6-50 bytes and the cost of aligning the
-//data and copying in chunks isn't worth it. Plus it's small enough to inline
-static inline char *my_strcpy(uint8_t *dest_,const uint8_t *src_,uint64_t len_){
-  uint8_t *retval=dest_;
-  register uint8_t *dest __asm__ ("%rdi")=dest_;
-  const register uint8_t *src __asm__ ("%rsi")=src_;
-  register uint64_t len __asm__ ("%rcx")=len_;
-  __asm__("rep movsb"
-          : : "r" (dest), "r" (src), "r" (len));
-  return (char*)dest_;
-}
-//the glibc wrapper to _exit doesn't actually call _exit it calls
-//exit_group, which isn't what we want, so this is actually a wrapper
-//over the _exit syscall
-static inline void __attribute__((noreturn)) thread_exit(int status_){
-  register int status __asm__ ("%rdi")=status_;
-  __asm__ volatile ("mov %0,%%rax\n\t"
-          "syscall\n"
-          : : "i" (__NR_exit), "r" (status));
-  __builtin_unreachable();
-}
-//just call this with -1 in the first arg, this will signal in the
-//current thread group.
-//Need to add register specific vars if I want to inline this
-static int tgkill(int tgid_, int tid_, int sig_){
-  register int retval __asm__ ("%rax")=__NR_tgkill;
-  register int tgid  __asm__ ("%rdi")=tgid_;
-  register int tid __asm__ ("%rsi")=tid_;
-  register int sig __asm__ ("%rdx")=sig_;
-  __asm__ volatile ("syscall\n"
-                    : "+r" (retval): "r" (tgid),"r"(tid),"r"(sig));
-  return retval;
-}
-/* Assembly for futex routines
-   the futex stuff will probably only be used for inter thread
-   communication (i.e passing arguments/indicating a thread
-   needs more data,etc) since my hash table is done using
-   atomic opperations
-*/
-/*these next two functions will be useful for using futexs
-  for things other than basic locks
-*/
-
-//interfate to the raw syscall
-//check that *uadder==val then wait until a FUTEX_WAKE
-int futex_wait(int *uaddr,int val){//ignore timeout argument
-  register int retval __asm__ ("%rax");
-  register int *futex_addr __asm__("%rdi")=uaddr;
-  __asm__ volatile ("movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
-                    "movq %2,%%rsi\n\t"
-                    "movq %3,%%rax\n\t"
-                    "xorq %%rcx,%%rcx\n\t"
-                    "xorq %%r8,%%r8\n\t"
-                    //                    "lock subq $1,(%4)\n\t"
-                    //hopefully if another thread adds to the futex before
-                    //the kernel makes us wait the syscall return
-                    //immediately
-                    "syscall\n"
-                    : "=r" (retval)
-                    : "r" (val), "i" (FUTEX_WAIT), "i" (__NR_futex), "r" (futex_addr)
-                    : "%rsi","%rcx","%rdx","%r8");
-  return retval;
-}
-//interfate to the raw syscall
-//wake up upto val processes waiting on the futex at uaddr
-int futex_wake(int *uaddr,int val){//timeout ignored by syscall
-  PRINT_MSG("Calling futex wake\n")
-  register int retval __asm__ ("%rax");
-  register int *futex_addr __asm__("%rdi")=uaddr;
-  __asm__ volatile ("movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
-                    "movq %2,%%rsi\n\t"
-                    "movq %3,%%rax\n\t"
-                    "syscall\n"
-                    : "=r" (retval)
-                    : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex),"r" (futex_addr)
-                    :"%rsi","%rdx");
-  PRINT_MSG("Called futex wake\n")
-  return retval;
-}
-//futexs 1=free, 0=locked, no waiters -1=locked, waiters
-//futex_up and futex_down implement the locking mechanism described
-//int the futex(7) man page
-long __attribute__((noinline))futex_up(int *uaddr){
-  register int *futex_addr __asm__("%rdi") = uaddr;
-  register long retval __asm__("%rax");
-  __asm__ volatile("lock addq $1,(%1)\n\t"
-                   "testq $1,(%1)\n\t"
-                   //assume non contested case is most common, only jmp
-                   //if contested
-                   "jne 1f\n\t"
-                   "retq\n"
-                   "1:\n\t"
-                   //if we get here it's contested, so setup futex syscall
-                   "movq $1,(%1)\n\t"
-                   "movq $0,%%rsi\n\t"
-                   "movq $1,%%rdx\n\t"
-                   "movq $202, %%rax\n\t" /*put futex syscall no in rax*/
-                   "syscall\n\t"
-                   : "=r" (retval) : "r"(futex_addr) :"%rsi","%rdx");
-  return retval;
-}
-
-long __attribute ((noinline))futex_down(int *uaddr){
-  register int *futex_addr __asm__("%rdi") = uaddr;
-  register long retval __asm__("%rax");
-  __asm__ volatile("lock subq $1,(%1)\n\t"
-                   "cmpq $0,(%1)\n\t"
-                   //same idea as with futex_up, assume non contested is most common
-                   "jne 1f\n\t"
-                   "retq\n"
-                   "1:\n\t"
-                   //if we get here it's contested, so setup futex syscall
-                   "movq $-1,(%1)\n\t"
-                   "movq $-1,%%rdx\n\t"
-                   "movq $0,%%rsi\n\t"//this is FUTEX_WAIT
-                   "xorq %%rcx,%%rcx\n\t"
-                   "movq $202,%%rax\n\t"
-                   "syscall\n\t"
-                   : "=r" (retval) : "r"(futex_addr) :"%rsi","%rdx","%rcx");
-  return retval;
-}
-
-
-/*        //unlock spin lock
-        "ENTRY futex_spin_up\n\t"
-        //much eaiser, we do the same thing no matter what
-        "movq $1,%rax\n\t"
-        "lock xchg %rax,(%rdi)\n"
-        "END futex_spin_up\n\n"
-
-        //lock spin lock
-        "ENTRY futex_spin_down\n\t"
-        "movq $1,%rax\n\t"
-        "xorq %rcx,%rcx\n"
-        "1:\n\t"//start spining
-        "cmpq %rax,%rdi\n\t"//is the lock free?
-        "je 2f\n\t"//if yes try to get it
-        "pause\n\t"//if no pause
-        "jmp 1b\n"//spin again
-        "2:\n\t"
-        "lock cmpxchgq %rcx,(%rdi)\n\t"//try to get lock
-        "jnz 1b\n"//if we failed spin again
-        "END futex_spin_down\n\n"*/
-//clone returns 0 for new child and child tid for parent
-long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
-                   void *ctid,struct pt_regs *regs){
-  //this won't actually exist in the generated code, it's just a bookkeeping 
-  //mechanism so gcc knows how to return
-  register long retval __asm__ ("%rax");
-  __asm__("movq %1,%%rax\n\t"
-          "syscall\n"
-          : "=r" (retval) : "i" (__NR_clone));
-  return retval;
-}
-long my_clone(unsigned long flags_,void *child_stack_,void *ptid_,
-              void (*fn)(void*),void *arg){
-  register long retval __asm__ ("%rax");
-  register unsigned long flags __asm__("%rdi")=flags_;
-  register void *child_stack __asm__("%rsi")=child_stack_;
-  register void *ptid __asm__("%rdx")=ptid_;
-  __asm__("movq %0,%%rax\n\t"
-          "xorq %%rcx,%%rcx\n\t" 
-          "movq  $1,%%r8\n\t"
-          "syscall\n"
-          : : "i" (__NR_clone), "r" (retval), "r" (flags),"r" (child_stack), "r" (ptid)
-          :"rcx","r8");
-  if(retval < 0){
-    perror("Clone failed");
-    exit(EXIT_FAILURE);
-  } else if(retval > 0) {
-    return retval;
-  } else {
-    //this is in the new thread
-    fn(arg);
-    __builtin_unreachable();//tell gcc that we can never get here
-  }
-}
-void futex_spin_up(register int *uaddr){        //unlock spin lock
-  register long one=1;
-  __asm__ volatile ("lock xchgq %0,(%1)\n"
-                    : : "r" (one), "r" (uaddr));
-}
-
-void futex_spin_down(register int *uaddr){
-  register int one __asm__ ("%rax")=1;
-  register int zero = 0;
-  __asm__ volatile("1:\n\t"//start spining
-                   "cmpl %0,(%1)\n\t"//is the lock free?
-                   "je 2f\n\t"//if yes try to get it
-                   "pause\n\t"//if no pause
-                   "jmp 1b\n"//spin again
-                   "2:\n\t"
-                   "lock cmpxchgl %2,(%1)\n\t"//try to get lock
-                   "jnz 1b\n"//if we failed spin again
-                   : : "r" (one), "r" (uaddr), "r" (zero));
-}
