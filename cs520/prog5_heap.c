@@ -97,16 +97,25 @@ struct heap sort_words(){
   while(i<31 && j<indices_index){
 //    PRINT_FMT("Loop %d\n",j);
     english_word *cur_word=global_hash_table[hash_table_indices[j++]];
-//    if(cur_word->file_bits.uint128 == all_file_bits.uint128){
+//    print_word_and_count(cur_word);
+//    printf("The file bitfield in that word was %#016lx %#016lx\n",
+//           cur_word->file_bits.high,cur_word->file_bits.low);
+    if(cur_word->file_bits.uint128 == all_file_bits.uint128){
       if(cur_word->count < minimum){
         minimum=cur_word->count;
       }
       heap_insert(most_common,cur_word,i);
       i++;
-//    }
+    }
   }
+//  printf("Expected bitfield was %#016lx %#016lx\n",
+  //       all_file_bits.high,all_file_bits.low);
   if(i<20){
     PRINT_MSG("Less than twenty words found\n");
+    int j;
+    for(j=0;j<i;j++){
+      print_word_and_count(most_common[j]);
+    }
     return (struct heap){.heap=heap_sort(most_common,i),.size=i};
   }
   PRINT_MSG("added initial 20 words\n");
@@ -134,10 +143,10 @@ struct heap sort_words_2(){
   PRINT_MSG("start of sort_words\n");
   while(j<indices_index){
     english_word *cur_word=global_hash_table[hash_table_indices[j++]];
-//    if(cur_word->file_bits.uint128 == all_file_bits.uint128){
+    if(cur_word->file_bits.uint128 == all_file_bits.uint128){
     heap_insert(most_common,cur_word,i);
     i++;
-//    }
+    }
   }
   return (struct heap){.heap=heap_sort(most_common,i),.size=i};
 }

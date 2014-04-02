@@ -22,6 +22,7 @@
 */
 //includes
 #define _GNU_SOURCE
+#include <stdarg.h>
 #include <alloca.h>
 #include <asm/unistd.h> //syscall numbers
 #include <assert.h>
@@ -33,11 +34,11 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <sys/stat.h>
+#include <time.h>
 //#include <sys/mman.h>
 #include <sys/types.h>//off_t,pid_t,ssize_t,etc
 #include <unistd.h>//bunch of stuff, including close
 #include <string.h>
-#include <linux/futex.h>
 #include <sys/time.h>
 #include "prog5_macros.h"
 
@@ -56,7 +57,7 @@ long futex_down(int *futex_addr);
 void futex_spin_up(register int *futex_addr);
 void futex_spin_down(register int *futex_addr);
 int futex_wake(int *uaddr,int val);
-int futex_wait(int *uaddr,int val);
+int futex_wait(int *uaddr,int val,const struct timespec *timeout);
 long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
                    void *ctid,struct pt_regs *regs);
 //glibc clone wrapper
@@ -68,10 +69,12 @@ struct fileinfo open_file_simple(char *filename);
 struct heap sort_words();
 struct fileinfo *setup_block(struct fileinfo *info,uint8_t *buf);
 struct fileinfo *setup_fileinfo(char *filename);
+int setup_thread_args(int thread_id_num);
+int refill_fileinfo_queue();
 long my_clone(unsigned long flags,void *child_stack,void *ptid,
               void (*fn)(void*),void *arg);
 static int tgkill(int tgid, int tid, int sig);
-void __attribute__((noreturn)) print_results(struct heap);
+void print_results(struct heap);
 static char* __attribute__((const)) ordinal_suffix(uint32_t num);
 
 //global scalars/uninitialized arrays
@@ -97,6 +100,9 @@ static uint8_t thread_queue[NUM_PROCS];
 static uint8_t thread_queue_index=0;
 //holds the information about the data to be given to threads
 static struct fileinfo *fileinfo_queue[NUM_PROCS];
+long thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
+uint8_t thread_bufs[NUM_PROCS][MAX_BUF_SIZE];
+uint32_t thread_file_ids[NUM_PROCS];
 static uint64_t fileinfo_queue_index=-1;
 //the aligned 16 here is probably excessive
 static /*volatile*/ int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
@@ -105,21 +111,12 @@ static /*volatile*/ int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
 //and call futex_wake. Whenever a worker thread finishes it increments this
 //and calls futex_wake, thus whenever this is > 0 the main thread will keep 
 //passing data to threads (as long as there is data left)
-
 int32_t main_thread_wait __attribute__((aligned (16)))=0;
-int32_t *main_thread_wait_ptr = &main_thread_wait;
-static long thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
-static sigset_t sigwait_set;
-static uint64_t num_files;
-static uint64_t current_file=0;
-static char **filenames;//=argv+1
-//min_buf_size is the minium size of any one buffer, so if there
-//are say 132Kb left in a file it will be read as one buffer
-//rather than divining it into a 128kb buffer and a 4kb buffer
-static uint8_t thread_bufs[NUM_PROCS][MAX_BUF_SIZE];
-static uint32_t thread_file_ids[NUM_PROCS];
+sigset_t sigwait_set;
+uint64_t num_files;
+uint64_t current_file=0;
+char **filenames;//=argv+1
 /*
-
   The basic idea with threading is to have NUM_PROC-1 worker threads
   which are activly parsing buffers and updating the hash table and
   1 thread to allocate data to those working threads. For simplicity
@@ -326,3 +323,54 @@ static inline void print_count_word(english_word *x){
    Hash tree/trie //almost certantily won't use
      -complicated, not sure if it would be any faster either
 */
+//really this is more memcpy than strcpy, but the reason I wrote it
+//is that I know I'll only be coping 6-50 bytes and the cost of aligning the
+//data and copying in chunks isn't worth it. Plus it's small enough to inline
+static inline char *my_strcpy(uint8_t *dest_,const uint8_t *src_,uint64_t len_){
+  uint8_t *retval=dest_;
+  register uint8_t *dest __asm__ ("%rdi")=dest_;
+  const register uint8_t *src __asm__ ("%rsi")=src_;
+  register uint64_t len __asm__ ("%rcx")=len_;
+  __asm__("rep movsb"
+          : : "r" (dest), "r" (src), "r" (len));
+  return (char*)dest_;
+}
+/* 
+   I don't even know why this doesn't work,
+   but if I can't fix this I'll just stick to memcmp 
+   because there's not way besides using repne cmpsb
+   that I can make this small enough to inline 
+*/
+static inline int my_string_compare_asm(english_word *x,english_word *y){
+  if(x->len != y->len){
+    return 0;
+  } else {
+    uint64_t cnt=y->len;
+    __asm__("movq %2,%%rdi\n\t"
+            "movq %3,%%rsi\n\t"
+            "movq %0,%%rcx\n\t"
+            "repne cmpsb"
+            : "=g" (cnt) : "0" (cnt),"g" (x->str), "g" (y->str)
+            : "%rcx","%rdi","%rsi");
+    return !cnt;
+  }
+}
+static inline void perror_fmt(const char *fmt,...){
+  va_list ap;
+  int errsave=errno;
+  va_start(ap,fmt);  
+  vfprintf(stderr,fmt,ap);
+  fprintf(stderr,"%s number %d\n",sys_errlist[errsave],errsave);
+}
+static inline void my_perror(const char *msg){
+  if(msg){
+    fprintf(stderr,"%s: %s; Error number %d\n",msg,sys_errlist[errno],errno);
+  } else {
+    fprintf(stderr,"%s; Error number %d\n",sys_errlist[errno],errno);
+  }
+}
+int microsleep(long msec){
+  static struct timespec sleep_time={.tv_sec=0,.tv_nsec=0};
+  sleep_time.tv_nsec=msec*1000;
+  return nanosleep(&sleep_time,NULL);
+}

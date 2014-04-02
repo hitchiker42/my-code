@@ -1,5 +1,7 @@
 #include "prog5.h"
-#include "prog5_asm.c"
+#define NDEBUG
+#include "my_threads.c"
+#undef NDEBUG
 void terminate_gracefully(int sig){
   if(sig != SIGSEGV){
     PRINT_FMT("Thread %ld recieved signal %d, exiting thread\n",
@@ -112,8 +114,10 @@ struct filebuf read_full_file(char *filename){
 */
 
 void parse_buf(register const uint8_t *buf_,int file_id){
+  //we know we're going to need buf for awhile, and we need to
+  //save it across function calls so put it in rbx
   register const uint8_t *buf __asm__ ("%rbx")=buf_;
-  const uint8_t *initial_buf=buf;
+  const uint8_t *initial_buf=buf;//return value?
   uint64_t index=1;
   union file_bitfield bitmask;
   if(file_id>=64){
@@ -122,7 +126,7 @@ void parse_buf(register const uint8_t *buf_,int file_id){
   } else {
     bitmask.low=file_bit_masks[file_id];
   }
-  PRINT_FMT("Start of parse buf in thread %ld\n",thread_id);
+//  PRINT_FMT("Start of parse buf in thread %ld\n",thread_id);
 //this doesn't seem to do much, positively or negitively
 //it might be worth trying different precetch instructions different
 //memory locations and different locations for the instruction
@@ -173,38 +177,118 @@ void parse_buf(register const uint8_t *buf_,int file_id){
     index=1;
     goto PREFETCH;
   }
-  PRINT_FMT("End of parse buf in thread %ld\n",thread_id);
-  //no one else should need this buffer after us
-  xfree((void*)initial_buf);
+//  PRINT_FMT("End of parse buf in thread %ld\n",thread_id);
+  //I used to free the buffer here, but now buffers are statically allocated
+  return;
 }
-
+//main function for worker threads
 void thread_main(void *arg){
   int futex_retval=-1;
-  thread_id=(uint64_t)(arg);//once
+  thread_id=(uint64_t)(arg);//set the thread local thread_id
   PRINT_FMT("Worker thread %ld started\n",thread_id);
   while(1){
     parse_buf(thread_bufs[thread_id]+thread_buf_start_offsets[thread_id],
               thread_file_ids[thread_id]);//do stuff
 //    PRINT_FMT("Worker thread %ld parsed_buf\n",thread_id);
     //tell main thread we're done
-    atomic_store_n(thread_status+thread_id,0);
+    atomic_store_n(thread_status+thread_id,0);//I don't think I use this anymore
     futex_spin_lock(&thread_queue_lock);
-    PRINT_FMT("Worker thread %ld locked spin lock\n",thread_id);
+//    PRINT_FMT("Worker thread %ld locked spin lock\n",thread_id);
     thread_queue[thread_queue_index++]=thread_id;
     atomic_inc(&main_thread_wait);
-    futex_retval=futex_wake(main_thread_wait_ptr,10);
+    futex_retval=futex_wake(&main_thread_wait,10);
     futex_spin_unlock(&thread_queue_lock);
-    PRINT_FMT("Worker thread %ld unlocked spin lock\n",thread_id);
+//    PRINT_FMT("Worker thread %ld unlocked spin lock\n",thread_id);
     if(futex_retval==-1){
       perror("Futex failure\n");
       exit(1);
     }
     //wait for main thread to give us more data
-    PRINT_FMT("Worker thread %ld waiting for main\n",thread_id);
-    futex_wait((int*)thread_futexes+thread_id,0);
+//    PRINT_FMT("Worker thread %ld waiting for main\n",thread_id);
+    futex_wait((int*)thread_futexes+thread_id,0,NULL);
     //sigwait(&sigwait_set,&signo);
-    atomic_store_n(thread_status+thread_id,1);//this prevents the race contition
-    atomic_store_n(thread_futexes+thread_id,0);
+    atomic_store_n(thread_status+thread_id,1);//this prevents a race contition,maybe
+    atomic_store_n(thread_futexes+thread_id,0);//
+  }
+}
+void main_wait_loop(int have_data){
+  uint8_t worker_thread_id;
+  int32_t futex_retval;
+  int live_threads;//used when we run out of data to monitor the number
+  //of threads left running
+  //if there are already threads waiting on us skip the wait code
+  if(atomic_load_n(&main_thread_wait)>1){
+    goto ALLOCATE_LOOP;
+  }
+  while(1){
+    //wait untill a thread is done;
+//    PRINT_FMT("Main waiting with val %d\n",main_thread_wait);
+    futex_retval=futex_wait(&main_thread_wait,const_zero_32,NULL);
+//    PRINT_FMT("Main woke up with val %d\n",main_thread_wait);
+    if(futex_retval==-1){
+      my_perror("Futex failure");
+      exit(1);
+    }
+    if(main_thread_wait<-1){
+      fprintf(stderr,"Invalid value in futex main_thread_wait\n");
+      exit(1);
+    }
+  ALLOCATE_LOOP:
+    //
+    while(atomic_fetch_add(&main_thread_wait,-1)>0){
+      if(main_thread_wait>NUM_PROCS){
+        fprintf(stderr,"More threads waiting then exist, exiting\n");
+        exit(1);
+      }
+      futex_spin_lock(&thread_queue_lock);
+      worker_thread_id=thread_queue[--thread_queue_index];
+      futex_spin_unlock(&thread_queue_lock);
+      if(!setup_thread_args(worker_thread_id)){
+        //if there's no data left, kill this thread and then
+        //wait for the others to finish
+        tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
+        live_threads=NUM_PROCS-2;
+        goto OUT_OF_DATA;
+      }
+      futex_wake((int*)thread_futexes+worker_thread_id,10);
+    }
+    //we decremented one more time then we should (we need to do this)
+    //so add one to the wait counter to fix that
+    atomic_add(&main_thread_wait,1);
+    //this returns 0 if the queue has only one entry 
+    //and that entry is empty
+    if(!refill_fileinfo_queue()){
+      live_threads=NUM_PROCS-1;
+      goto OUT_OF_DATA;
+    }
+  }
+ OUT_OF_DATA:{
+    PRINT_MSG("Out of data\n");
+    if(live_threads && main_thread_wait==0){
+      goto WAIT;
+    }
+    while(live_threads>0){
+      while(atomic_fetch_add(&main_thread_wait,-1)>0 && live_threads){
+        futex_spin_lock(&thread_queue_lock);
+        worker_thread_id=thread_queue[--thread_queue_index];
+        futex_spin_unlock(&thread_queue_lock);
+        //I suppose here is where the race condition might actually matter
+        //if we actually needed to make sure the thread was waiting
+        //use SIGTERM, if the thread isn't already waiting it'll just terminate
+        //instead, I assume this will only terminate that thread, but if not
+        //I'll set up a signal hanler to allow indivual theads to terminate
+        PRINT_FMT("Killing thread %d\n",worker_thread_id);
+        tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
+        live_threads--;
+      }
+    WAIT:
+      PRINT_MSG("Waiting for threads\n");
+      futex_wait(&main_thread_wait,const_zero_32,NULL);
+    }
+    PRINT_MSG("All worker threads finished\n")
+    struct heap common_words=sort_words();
+    print_results(common_words);
+    exit(EXIT_SUCCESS);
   }
 }
 //setup the buffer and file_id for the thread with thread_id
@@ -215,7 +299,7 @@ int setup_thread_args(int thread_id_num){
   //fileinfo_queue[0] should always contain a vaild struct fileinfo
   static struct fileinfo *info;
   info=setup_block(fileinfo_queue[fileinfo_queue_index],thread_bufs[thread_id_num]);
-  PRINT_MSG("setup block in setup_thread_args\n");
+//  PRINT_MSG("setup block in setup_thread_args\n");
   thread_file_ids[thread_id_num]=info->file_id;
   thread_buf_start_offsets[thread_id_num]=info->start_offset;
   //these conditionals make sure that fileinfo_queue has a valid entry
@@ -243,92 +327,24 @@ int setup_thread_args(int thread_id_num){
 //this should get called when there are no threads waiting for data
 //so that data can be given quickly when threads need it
 int refill_fileinfo_queue(){
-  PRINT_MSG("Calling refill_fileinfo_queue\n");
+//  PRINT_MSG("Calling refill_fileinfo_queue\n");
   static struct fileinfo *info;
   while(fileinfo_queue_index<NUM_PROCS){
     if(current_file<num_files){
       info=setup_fileinfo(filenames[current_file++]);
       fileinfo_queue[fileinfo_queue_index++]=info;
     } else {
+//      PRINT_MSG("Finished refilling fileinfo queue\n");
       break;
     }
   }
-  return (fileinfo_queue_index?(--fileinfo_queue_index):0);
-}
-void main_wait_loop(int have_data){
-  uint8_t worker_thread_id;
-  int32_t val=0;
-  int32_t futex_retval;
-  int live_threads;
-  if(atomic_load_n(&main_thread_wait)>1){
-    goto ALLOCATE_LOOP;
-  }
-  while(1){
-    //wait untill a thread is done;
-    PRINT_FMT("Main waiting with val %d\n",main_thread_wait);
-    futex_retval=futex_wait(&main_thread_wait,val);
-    PRINT_FMT("Main woke up with val %d\n",main_thread_wait);
-    if(futex_retval==-1 || main_thread_wait<-1){
-      perror("Futex failure\n");
-      exit(1);
-    }
-  ALLOCATE_LOOP:
-    while(atomic_fetch_add(&main_thread_wait,-1)>0){
-      if(main_thread_wait>NUM_PROCS){
-        fprintf(stderr,"More threads waiting then exist, exiting\n");
-        exit(1);
-      }
-      PRINT_MSG("Allocating thread_data\n");
-      futex_spin_lock(&thread_queue_lock);
-      worker_thread_id=thread_queue[--thread_queue_index];
-      futex_spin_unlock(&thread_queue_lock);
-      if(!setup_thread_args(worker_thread_id)){
-        //if there's no data left, kill this thread and then
-        //wait for the others to finish
-        tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
-        live_threads=NUM_PROCS-2;
-        goto OUT_OF_DATA;
-      }
-      PRINT_MSG("Waking up thread\n");
-      futex_wake((int*)thread_futexes+worker_thread_id,10);
-    }
-    atomic_add(&main_thread_wait,1);
-    //I don't think it should be possible for this to return 0
-    //but I'm not 100% sure
-    if(!refill_fileinfo_queue()){
-      live_threads=NUM_PROCS-1;
-      goto OUT_OF_DATA;
-    }
-  }
- OUT_OF_DATA:{
-    PRINT_MSG("Out of data\n");
-    if(main_thread_wait==0){
-      goto WAIT;
-    }
-    while(live_threads){
-      while(atomic_fetch_add(&main_thread_wait,-1)>0 && live_threads){
-        futex_spin_lock(&thread_queue_lock);
-        worker_thread_id=thread_queue[--thread_queue_index];
-        futex_spin_unlock(&thread_queue_lock);
-        //I suppose here is where the race condition might actually matter
-        //if we actually needed to make sure the thread was waiting
-        //use SIGTERM, if the thread isn't already waiting it'll just terminate
-        //instead, I assume this will only terminate that thread, but if not
-        //I'll set up a signal hanler to allow indivual theads to terminate
-        PRINT_FMT("Killing thread %d\n",worker_thread_id);
-        tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
-        live_threads--;
-      }
-    WAIT:
-      PRINT_MSG("Waiting for threads\n");
-      futex_wait(&main_thread_wait,val);
-    }
-    PRINT_MSG("All worker threads finished\n")
-    struct heap common_words=sort_words();
-    print_results(common_words);
+  if((fileinfo_queue_index?fileinfo_queue_index--:0) ||
+     fileinfo_queue[fileinfo_queue_index]->remaining){
+    return 1;
+  } else {
+    return 0;
   }
 }
-
 /*
   Read the next block of memory by the file given in the info argument.
   This function deals with words that lie on the boundries of blocks
@@ -337,7 +353,7 @@ void main_wait_loop(int have_data){
   based on the start of the next block.
 */
 struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
-  PRINT_MSG("Setting up block\n");
+//  PRINT_MSG("Setting up block\n");
   if(max_buf_size>info->remaining){
     //just read the rest of the file
     ssize_t nbytes=read(info->fd,buf,max_buf_size);
@@ -369,10 +385,13 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
   //file of still have some left, it depends on what was at
   //the end of the last block read from this file
   if(info->word_len){
+    PRINT_MSG("Trying to complete incomplete word ");
+    fwrite(info->last_word,info->word_len,1,stderr);
+    PRINT_MSG("\n");
     uint32_t index=0;
     if(eng_accept[buf[index]] && info->word_len <50){
       do {
-        info->last_word[info->word_len++]=
+        info->last_word[++info->word_len]=
           buf[index++];
       } while (eng_accept[buf[index]] && info->word_len <50);
     }
@@ -382,7 +401,7 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
     }
     if(info->word_len>6){
       english_word *word=xmalloc(sizeof(english_word));
-      *word=(english_word){.str=(char*)buf,.len=info->word_len,
+      *word=(english_word){.str=(char*)info->last_word,.len=info->word_len,
                            .count=1,.file_bits={.low=0,.high=0}};
       atomic_hash_table_update(word);
       //deals with copying the string in buf and freeing word if needed
@@ -402,9 +421,9 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
       //should this be (buf_size-1)-start?
       cur++;
       if(buf_size-start<50){
-        my_strcpy((uint8_t*)info->last_word,buf+cur,(start-cur));
+        my_strcpy((uint8_t*)info->last_word,buf+cur,(buf_size-cur));
       }
-      info->word_len=start-cur;
+      info->word_len=buf_size-cur;
     }
     //mark eof at end of the buffer
     while(!eng_accept[buf[--cur]]);
@@ -441,7 +460,7 @@ struct fileinfo *setup_fileinfo(char *filename){
   //this will probably change to using statically allocated memory
   struct fileinfo *info=fileinfo_mem+fileinfo_mem_index;
   fileinfo_mem_index+=1;
-  *info=(struct fileinfo){.fd=fd,.len=stat_buf.st_size,
+  *info=(struct fileinfo){.fd=fd,.len=stat_buf.st_size,.word_len=0,
                           .file_id=next_file_id++,.remaining=stat_buf.st_size};
   return info;
 }
@@ -491,7 +510,7 @@ struct fileinfo *init_thread(struct fileinfo *info,int thread_id_num){
     return NULL;
   }
 }
-void __attribute__((noreturn)) print_results(struct heap common_words){
+void print_results(struct heap common_words){
 #if (defined DEBUG) && !(defined NDEBUG)
   if(!is_sorted(common_words.heap,common_words.size)){
     printf("Failed to sort the heap\n");
@@ -508,7 +527,6 @@ void __attribute__((noreturn)) print_results(struct heap common_words){
     print_string(common_words.heap[i]);
     printf(", with %d occurances\n",common_words.heap[i]->count);
   }
-  exit(EXIT_SUCCESS);
 }
 /* with threads heres what to do:
    if(argc>=NUM_PROCS-1){

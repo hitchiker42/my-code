@@ -16,49 +16,6 @@
   ({struct stat buf;                            \
     fstat(fd,&buf);                             \
     buf.st_size;})
-//desired is a pointer
-#define atomic_compare_exchange(ptr,expected,desired)           \
-  __atomic_compare_exchange(ptr,expected,desired,0,             \
-                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
-//desired isn't a pointer
-#define atomic_compare_exchange_n(ptr,expected,desired)           \
-  __atomic_compare_exchange_n(ptr,expected,desired,0,             \
-                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
-#define atomic_bts(bit_index,mem_pointer)                       \
-  __asm__("lock bts %0,%1\n"                                    \
-          : : "r" (bit_index), "m" (mem_pointer))
-/* atomic_add_fetch is lock add val,(ptr)
-   while atomic_fetch_add is lock xadd val,(ptr)
- */
-#define atomic_inc(ptr)                         \
-  __asm__ volatile("lock incq (%0)" : :"r" (ptr));
-#define atomic_add(ptr,val)                     \
-  __atomic_add_fetch(ptr,val,__ATOMIC_SEQ_CST)
-#define atomic_sub(ptr,val)                     \
-  __atomic_sub_fetch(ptr,val,__ATOMIC_SEQ_CST)
-#define atomic_fetch_add(ptr,val)                     \
-  __atomic_fetch_add(ptr,val,__ATOMIC_SEQ_CST)
-#define atomic_load_n(ptr)                     \
-  __atomic_load_n(ptr,__ATOMIC_SEQ_CST)
-#define atomic_store_n(ptr,val)                 \
-  __atomic_store_n(ptr,val,__ATOMIC_SEQ_CST)
-//with this (and pretty much any binary operation but add) the difference
-//between fetch_or and or_fetch is a lot bigger, or_fetch is just a lock or
-//whereas fetch_or translates into a cmpxcgh loop
-#define atomic_or(ptr,val)                                      \
-  __atomic_or_fetch(ptr,val,__ATOMIC_SEQ_CST)
-#define gettid()                                \
-  ({register uint64_t tid __asm__ ("rax");          \
-  __asm__("movq %1,%%rax\n"                      \
-          "syscall"                              \
-          : "=r" (tid) : "i" (__NR_gettid));     \
-  tid;})
-#define gettgid()                                \
-  ({register uint64_t tid __asm__ ("rax");           \
-    __asm__("movq %1,%%rax\n"                    \
-            "syscall"                            \
-            : "=r" (tid) : "i" (__NR_getpid));   \
-  tid;})
 #define array_swap_ptr(arr,_i,_j)                   \
   ({uint32_t i=_i,j=_j;                             \
     void *temp=arr[i];                              \
@@ -92,10 +49,7 @@
 #define offset_basis_64 14695981039346656037UL
 #define fnv_prime_32 16777619
 #define fnv_prime_64 1099511628211UL
-#define futex_lock futex_down
-#define futex_unlock futex_up
-#define futex_spin_lock futex_spin_down
-#define futex_spin_unlock futex_spin_up
+
 
 #define DEBUG
 #if (defined DEBUG) && !(defined NDEBUG)
@@ -109,10 +63,3 @@
 #define PRINT_FMT(string,fmt...)
 #define PRINT_STRING_ERR(x)
 #endif
-#define PTHREAD_CLONE_FLAGS   (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|\
-                               CLONE_SETTLS|CLONE_PARENT_SETTID|\
-                               CLONE_CHILD_CLEARTID|CLONE_SYSVSEM|0)
-//flagss that entail the least ammount of copying, meaning that
-//the new thread shares pretty much everything with it's parent
-#define SIMPLE_CLONE_FLAGS  (CLONE_VM|CLONE_SIGHAND|CLONE_SYSVSEM|CLONE_PTRACE| \
-                             CLONE_PARENT_SETTID|CLONE_FS|CLONE_FILES|CLONE_THREAD|0)
