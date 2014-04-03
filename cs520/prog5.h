@@ -113,7 +113,6 @@ static __thread uint64_t thread_id;
 static pid_t thread_pids[NUM_PROCS];
 static uint8_t thread_buf_start_offsets[NUM_PROCS];
 static pid_t tgid;
-#include "prog5_consts.h"
 //this queue is only accessed after locking the thread_queue_lock
 //Both the queue update and incremunting/decrementing the
 //queue index have to be done in one atomic step, meaning
@@ -232,6 +231,7 @@ struct heap {english_word **heap; uint32_t size;};
 static file_bitfield all_file_bits={.uint128=0};
 static struct fileinfo fileinfo_mem[100];
 static uint32_t fileinfo_mem_index=0;
+#include "prog5_consts.h"
 /*structure for storing data about each word
   contains:
   -the word iself as a char * (not necessarly null terminated)

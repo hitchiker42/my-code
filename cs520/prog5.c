@@ -119,13 +119,10 @@ void parse_buf(register const uint8_t *buf_,int file_id){
   register const uint8_t *buf __asm__ ("%rbx")=buf_;
   const uint8_t *initial_buf=buf;//return value?
   uint64_t index=1;
-  union file_bitfield bitmask;
-  if(file_id>=64){
-    file_id-=64;
-    bitmask.high=file_bit_masks[file_id];
-  } else {
-    bitmask.low=file_bit_masks[file_id];
-  }
+  union file_bitfield bitmask=file_bit_masks[file_id-1];
+  printf("file_id = %d\n",file_id);
+  printf("Current bitmask is %#016lx %#016lx\n",
+         bitmask.high,bitmask.low);
 //  PRINT_FMT("Start of parse buf in thread %ld\n",thread_id);
 //this doesn't seem to do much, positively or negitively
 //it might be worth trying different precetch instructions different
@@ -167,6 +164,7 @@ void parse_buf(register const uint8_t *buf_,int file_id){
     english_word *word=xmalloc(sizeof(english_word));
     *word=(english_word){.str=(char*)buf,.len=index,.count=1,
                          .file_bits=bitmask};
+
     if(!atomic_hash_table_update(word)){
       free(word);
     }
@@ -402,7 +400,7 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
     if(info->word_len>6){
       english_word *word=xmalloc(sizeof(english_word));
       *word=(english_word){.str=(char*)info->last_word,.len=info->word_len,
-                           .count=1,.file_bits={.low=0,.high=0}};
+                           .count=1,.file_bits=file_bit_masks[info->file_id-1]};
       atomic_hash_table_update(word);
       //deals with copying the string in buf and freeing word if needed
     }
@@ -550,12 +548,8 @@ int main(int argc,char *argv[]){
     fprintf(stderr,"Error no filenames given\n");
     exit(1);
   }
-  if(num_files>64){
-    all_file_bits.low=file_bit_strings[63];
-    all_file_bits.high=file_bit_strings[num_files-64];
-  } else {
-    all_file_bits.low=file_bit_strings[num_files];
-  }
+  all_file_bits=file_bit_strings[num_files-1];
+  PRINT_FMT("all_file_bits=\n%#016lx %#016lx\n",all_file_bits.high,all_file_bits.low);
   tgid=gettgid();
   //this is used when threads are waiting for more data
   sigaction(SIGTERM,&signal_action,NULL);

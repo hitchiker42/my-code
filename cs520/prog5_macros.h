@@ -7,6 +7,7 @@
 #define NUM_PROCS 2
 #endif
 #endif
+#define MAX_BUF_SIZE (136*(1<<10))
 #define PAGE_ROUND_DOWN(x) (((uint64_t)(x)) & (~(PAGESIZE-1)))
 #define PAGE_ROUND_UP(x) ( (((uint64_t)(x)) + PAGESIZE-1)  & (~(PAGESIZE-1)) )
 //this used to use lseek, but lseek is slower than fstat because
