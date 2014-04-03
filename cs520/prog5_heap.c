@@ -95,11 +95,7 @@ struct heap sort_words(){
   //then this is all we need to do
   PRINT_MSG("start of sort_words\n");
   while(i<31 && j<indices_index){
-//    PRINT_FMT("Loop %d\n",j);
     english_word *cur_word=global_hash_table[hash_table_indices[j++]];
-    /*    print_word_and_count(cur_word);
-    printf("The file bitfield in that word was %#016lx %#016lx\n",
-    cur_word->file_bits.high,cur_word->file_bits.low);*/
     if(cur_word->file_bits.uint128 == all_file_bits.uint128){
       if(cur_word->count < minimum){
         minimum=cur_word->count;
@@ -108,8 +104,6 @@ struct heap sort_words(){
       i++;
     }
   }
-//  printf("Expected bitfield was %#016lx %#016lx\n",
-  //       all_file_bits.high,all_file_bits.low);
   if(i<20){
     if(i==0){
       fprintf(stderr,"No words common to all files\n");
@@ -156,10 +150,8 @@ struct heap sort_words_2(){
 }
 //works by modifying memory, but returns a value for convience
 static inline english_word** heap_sort(english_word **heap,uint32_t size){
-  PRINT_MSG("Running heapsort\n");
   uint32_t end=size-1;
   while(end>0){
-    PRINT_FMT("Heapsort end == %d\n",end);
     SWAP(heap[end],heap[0]);
     end--;
     sift_down(heap,0,end);

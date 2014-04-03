@@ -117,6 +117,80 @@ int futex_wake(int *uaddr,int val){//timeout ignored by syscall
   }
   return (int)retval;
 }
+int futex_wait_locking(int *uaddr,int val,const struct timespec *timeout,int *uaddr2){
+  DEBUG_PRINT("Calling futex wait locking");
+  register uint32_t retval __asm__ ("%rax");
+  register int *futex_addr __asm__("%rdi")=uaddr;
+  register int *lock __asm__("%r9")=uaddr2;
+  __asm__ volatile ("movq $1,%%r10\n\t"
+                    "movq $0,%%r11\n\t"
+                    "movq $1,%%rax\n\t"
+                    "1:\n\t"//lock
+                    "cmpl %%r10d,(%%r9)\n\t"//is the lock free?
+                    "je 2f\n\t"//if yes try to get it
+                    "pause\n\t"//if no pause
+                    "jmp 1b\n"//spin again
+                    "2:\n\t"
+                    "lock cmpxchgl %%r11d,(%%r9)\n\t"//try to get lock
+                    "jnz 1b\n"//if we failed spin again
+                    //Shift args
+                    //apperently the timespec argument
+                    //gets passed my value, so I need to xor r8 and rcx
+                    "xorq %%rcx,%%rcx\n\t"//timeout to arg4
+                    "xorq %%r8,%%r8\n\t"//timeout to arg4
+                    "movl %1,%%edx\n\t"//val to arg3
+                    "movq %2,%%rsi\n\t"
+                    "movl %3,%%eax\n\t"
+                    //unlock
+                    "lock xchgl %%r10d,(%%r9)\n\t"
+                    "syscall\n"
+                    : "=r" (retval)
+                    : /*"g" (timeout),*/ "r" (val), "i" (FUTEX_WAIT), 
+                      "i" (__NR_futex), "r" (futex_addr), "r"(lock)
+                    : "%rsi","%rcx","%rdx","%r8","%r10","%r11");
+  if(retval>=min_error_val_u32){
+    fprintf(stderr,"value of &futex_addr = %d\nvalue of val = %d\n",*futex_addr,val);
+    errno=-retval;
+    if(errno==EWOULDBLOCK){//this means we just skip waiting
+      return 1;
+    }
+    return -1;
+  }
+  return (int)retval;
+}
+//interfate to the raw syscall with FUTEX_WAKE as the op argument
+//wake up upto val processes waiting on the futex at uaddr
+int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout ignored by syscall
+  DEBUG_PRINT("Calling futex wake\n")
+  register uint32_t retval __asm__ ("%rax");
+  register int *futex_addr __asm__("%rdi")=uaddr;
+  register int *lock __asm__("%rcx")=uaddr2;
+  __asm__ volatile ("movq $1,%%r8\n\t"
+                    "movq $0,%%r9\n\t"
+                    "movq $1,%%rax\n\t"
+                    "1:\n\t"//lock
+                    "cmpl %%r8d,(%%rcx)\n\t"//is the lock free?
+                    "je 2f\n\t"//if yes try to get it
+                    "pause\n\t"//if no pause
+                    "jmp 1b\n"//spin again
+                    "2:\n\t"
+                    "lock cmpxchgl %%r9d,(%%rcx)\n\t"//try to get lock
+                    "jnz 1b\n"//if we failed spin again
+                    "movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
+                    "movq %2,%%rsi\n\t"
+                    "movq %3,%%rax\n\t"
+                    "lock xchgl %%r8d,(%%rcx)\n\t"
+                    "syscall\n"
+                    : "=r" (retval)
+                    : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex),"r" (futex_addr), "r" (lock)
+                    :"%rsi","%rdx","%r8","%r9");
+  DEBUG_PRINT("Called futex wake\n");
+  if(retval>=min_error_val_u32){
+    errno=-retval;
+    return -1;
+  }
+  return (int)retval;
+}
 /*interfate to the raw syscall with FUTEX_CMP_REQUEUE as the op argument
   effectly a double call to futex, first wakes up val procsses waiting
   at uaddr, then essently calls futex with op=FUTEX_WAIT, 
@@ -175,23 +249,20 @@ int futex_requeue(int *uaddr,int val,int *uaddr2){
 //futex_up and futex_down implement the locking mechanism described
 //int the futex(7) man page
 //this is equivlent to a basic mutex
-#define futex_unlock(uaddr) futex_up(uaddr)
+#define futex_unlock futex_up
 long futex_up(int *uaddr){
-  register int *futex_addr __asm__("%rdi") = uaddr;
-  register uint64_t retval __asm__("%rax")=__NR_futex;
-  __asm__ volatile("lock addq $1,(%1)\n\t"
-                   "testq $1,(%1)\n\t"
-                   //assume non contested case is most common, only jmp
-                   //if contested
-                   "jne 1f\n\t"
-                   "retq\n"
-                   "1:\n\t"
+  register int *futex_addr __asm__("%rdi")= uaddr;
+  register uint64_t retval __asm__("%rax")= __NR_futex;
+  __asm__ volatile("lock addq $1,(%%rdi)\n\t"
+                   "testq $1,(%%rdi)\n\t"
+                   "je 1f\n\t"
                    //if we get here it's contested, so setup futex syscall
-                   "movq $1,(%1)\n\t"//first set futex to 1
+                   "movq $1,(%%rdi)\n\t"//first set futex to 1
                    "movq $1,%%rdx\n\t"//then move 1 to val argument
                    "movq %2,%%rsi\n\t"//set op to FUTEX_WAKE
                    "movq %0, %%rax\n\t" /*put futex syscall no in rax*/
                    "syscall\n\t"//make the syscall
+                   "1:\n\t"
                    : "+r" (retval) : "r"(futex_addr), "i"(FUTEX_WAKE) :"%rsi","%rdx");
   if(retval>=min_error_val_u64){
     errno=-retval;
@@ -199,25 +270,23 @@ long futex_up(int *uaddr){
   }
   return (long)retval;
 }
-#define futex_lock(uaddr) futex_down(uaddr)
+#define futex_lock futex_down
 long futex_down(int *uaddr){
-  register int *futex_addr __asm__("%rdi") = uaddr;
   register uint64_t retval __asm__("%rax")=__NR_futex;
-  __asm__ volatile("lock subq $1,(%1)\n\t"
-                   "cmpq $0,(%1)\n\t"
-                   //same idea as with futex_up, assume non contested is most common
-                   "jne 1f\n\t"
-                   "retq\n"
-                   "1:\n\t"
+  register int *futex_addr __asm__("%rdi") = uaddr;
+  __asm__ volatile("lock subq $1,(%%rdi)\n\t"
+                   "cmpq $0,(%%rdi)\n\t"
+                   "je 1f\n\t"
                    //if we get here it's contested, so setup futex syscall
-                   "movq $-1,(%1)\n\t"//first set the futex to -1
+                   "movq $-1,(%%rdi)\n\t"//first set the futex to -1
                    "movq $-1,%%rdx\n\t"//then move a -1 into the val argument
                    "movq %2,%%rsi\n\t"//set op to FUTEX_WAIT
                    "xorq %%rcx,%%rcx\n\t"//set timer argument to NULL
                    "xorq %%r8,%%r8\n\t"//set timer argument to NULL
-                   "movq %0,%%rax\n\t"//move syscall number to rax
                    "syscall\n\t"//make the syscall
+                   "1:\n\t"
                    : "+r" (retval) : "r"(futex_addr),"i"(FUTEX_WAIT) :"%rsi","%rdx","%rcx","%r8");
+  fprintf(stderr,"Futex down exit\n");
   if(retval>=min_error_val_u64){
     errno=-retval;
     return -1;
@@ -284,16 +353,15 @@ inline_safe_syscall5(long,clone_syscall,unsigned long, flags,void *, child_stack
 //a wrapper around clone similar to the glibc wrapper/pthread_create
 long my_clone(unsigned long flags_,void *child_stack_,void *ptid_,
               void (*fn)(void*),void *arg){
-  register long retval __asm__ ("%rax");
+  register long retval __asm__ ("%rax") = __NR_clone;
   register unsigned long flags __asm__("%rdi")=flags_;
   register void *child_stack __asm__("%rsi")=child_stack_;
   register void *ptid __asm__("%rdx")=ptid_;
-  __asm__("movq %0,%%rax\n\t"
-          "xorq %%rcx,%%rcx\n\t" 
-          "movq  $1,%%r8\n\t"
-          "syscall\n"
-          : : "i" (__NR_clone), "r" (retval), "r" (flags),"r" (child_stack), "r" (ptid)
-          :"rcx","r8");
+  __asm__ volatile ("xorq %%rcx,%%rcx\n\t"
+                    "movq  $0,%%r8\n\t"
+                    "syscall\n"
+                    :"+r"(retval) : "r" (flags),"r" (child_stack), "r" (ptid)
+                    :"rcx","r8");
   if((uint64_t)retval >= min_error_val_u64){//no new thread is created on error
     errno=-retval;
     return -1;

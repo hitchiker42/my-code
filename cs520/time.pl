@@ -7,6 +7,7 @@ my $sys=0;
 my $count=100;
 while($count--){
   my $raw_output=qx"bash -c 'time ./prog5 prog5_files_all &>/dev/null' 2>&1";
+  print($count);
   my @output=split('\n',$raw_output);
   shift(@output);#get rid of leading newline
   for(@output){s/[a-z]*\s*0m(0\.[0-9]{3})s/\1/}

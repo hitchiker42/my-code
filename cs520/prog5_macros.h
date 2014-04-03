@@ -4,7 +4,7 @@
 #ifdef AGATE
 #define NUM_PROCS 16
 #else
-#define NUM_PROCS 2
+#define NUM_PROCS 3
 #endif
 #endif
 #define MAX_BUF_SIZE (136*(1<<10))
@@ -57,10 +57,16 @@
 #define HERE() fprintf(stderr,"here at %s,line %d\n",__FILE__,__LINE__)
 #define PRINT_MSG(string) fprintf(stderr,string);
 #define PRINT_FMT(string,fmt...) fprintf(stderr,string,##fmt);
-#define PRINT_STRING_ERR(/*english_word* */x) fwrite(x->str,x->len,1,stderr)
+#define PRINT_WORD_ERR(/*english_word* */x) fwrite(x->str,x->len,1,stderr)
+#define PRINT_STRING_ERR(str,len) fwrite(str,len,1,stderr)
+#define PRINT_STRING_LINE_ERR(str,len) (fwrite(str,len,1,stderr);fputs("\n",stderr)
+#define BREAKPOINT() __asm__ volatile ("int $3\n")
 #else
 #define HERE()
 #define PRINT_MSG(string)
 #define PRINT_FMT(string,fmt...)
+#define PRINT_WORD_ERR(x)
 #define PRINT_STRING_ERR(x)
+#define PRINT_STRING_LINE_ERR(x)
+#define BREAKPOINT()
 #endif

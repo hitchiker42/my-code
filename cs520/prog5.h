@@ -1,7 +1,7 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC optimize (2)
-#pragma GCC optimize ("whole-program")
+#pragma GCC optimize ("Og")
+//#pragma GCC optimize ("whole-program")
 /* What this program does
    open files given filename on command line,
    count words in each file, determine words common to each file
@@ -53,14 +53,17 @@
 #include <string.h>
 #include <sys/time.h>//not really sure
 #include "prog5_macros.h"
+#define GC_DEBUG
+#include <gc.h>
 
 //typedefs
 
 typedef unsigned __int128 uint128_t;
 typedef __int128 int128_t;
 
+typedef struct thread_fileinfo thread_fileinfo;
 typedef struct english_word english_word;
-typedef struct internal_buf internal_buf;
+typedef struct fileinfo fileinfo;
 typedef union file_bitfield file_bitfield;
 struct pt_regs;
 typedef int __attribute__((aligned(8))) aligned_int;
@@ -75,7 +78,6 @@ int futex_wait(int *uaddr,int val,const struct timespec *timeout);
 long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
                    void *ctid,struct pt_regs *regs);
 void parse_buf(const uint8_t *buf,int file_id);//core function
-struct filebuf read_full_file(char *filename);
 struct fileinfo open_file_simple(char *filename);
 struct heap sort_words();
 struct fileinfo *setup_block(struct fileinfo *info,uint8_t *buf);
@@ -87,6 +89,39 @@ long my_clone(unsigned long flags,void *child_stack,void *ptid,
 static int tgkill(int tgid, int tid, int sig);
 void print_results(struct heap);
 static char* __attribute__((const)) ordinal_suffix(uint32_t num);
+//structure definitions
+//if I allocate these statically I'll need 100 of them
+struct fileinfo {
+  off_t len;
+  off_t remaining;
+  int fd;
+  int file_id;//some number between 0-100 indicating what file
+  //this represents
+  int word_len;
+  uint32_t start_offset;
+  char last_word[50];
+};
+union file_bitfield{
+  uint128_t uint128;
+  struct {
+    uint64_t low;
+    uint64_t high;
+  };
+  //just because I can
+  struct {
+    uint32_t one;
+    uint32_t two;
+    uint32_t three;
+    uint32_t four;
+  };
+  uint16_t words[8];
+  uint8_t bytes[16];
+};
+struct thread_fileinfo {
+  int32_t file_id;
+  uint32_t start_offset;
+};
+struct heap {english_word **heap; uint32_t size;};
 
 //global scalars/uninitialized arrays
 //The majority of memory I use is allocated statically, and is
@@ -102,39 +137,39 @@ static char* __attribute__((const)) ordinal_suffix(uint32_t num);
 //In addition to this between 38 (32+6) and 82(32+50) bytes
 //are needed to store each word, this is dynamically allocated
 
+//Per thread id,-1 in main thread, 0-NUM_PROCS-1 for the worker threads
+//tls isn't working, I need to figure out how to do tls, or just keep thread id's 
+//on the stack and pass them around
 //allocate NUM_PROCS*2MB space for the thread stacks
 static uint8_t thread_stacks[NUM_PROCS*(2<<20)];
 #define THREAD_STACK_TOP(thread_id)             \
   ((thread_stacks+((thread_id+1)*(2<<20)))-1)
-static uint8_t thread_status[NUM_PROCS];
-//static int thread_futexes[NUM_PROCS];
-static __thread uint64_t thread_id;
 //static uint64_t next_thread_id=0;
 static pid_t thread_pids[NUM_PROCS];
-static uint8_t thread_buf_start_offsets[NUM_PROCS];
-static pid_t tgid;
+static pid_t tgid;//thread_group_id
 //this queue is only accessed after locking the thread_queue_lock
 //Both the queue update and incremunting/decrementing the
 //queue index have to be done in one atomic step, meaning
 //if I didn't lock I would have to do something using cmpxchg
 //and concidering how lightweight my spinlocks are I think it's
-//ok to lok for this
+//ok to lock for this
 static uint8_t thread_queue[NUM_PROCS];
 static uint8_t thread_queue_index=0;
 //holds the information about the data to be given to threads
 static struct fileinfo *fileinfo_queue[NUM_PROCS];
-long thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
+//these are really ints, but we need them aligned on 8 byte boundries
+int64_t thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
 uint8_t thread_bufs[NUM_PROCS][MAX_BUF_SIZE];
-uint32_t thread_file_ids[NUM_PROCS];
-static uint64_t fileinfo_queue_index=-1;
-//the aligned 16 here is probably excessive
-static /*volatile*/ int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
+thread_fileinfo thread_fileinfo_vals[NUM_PROCS];
+static int64_t fileinfo_queue_index=-1;
+static int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
 //this serves as a counter for threads waiting for data
 //when it is 0 the main thread waits for some worker theread to increment it
 //and call futex_wake. Whenever a worker thread finishes it increments this
 //and calls futex_wake, thus whenever this is > 0 the main thread will keep 
 //passing data to threads (as long as there is data left)
 int32_t main_thread_wait __attribute__((aligned (16)))=0;
+int32_t main_thread_wait_lock __attribute__((aligned (16)))=1;
 sigset_t sigwait_set;
 uint64_t num_files;
 uint64_t current_file=0;
@@ -188,46 +223,7 @@ static uint32_t hash_table_indices[GLOBAL_HASH_TABLE_SIZE/2];
 //This keeps track of in hash_table_indices to but the next entry, and as
 //a side effect keeps track of the number of entries in the hash table
 static uint32_t indices_index=0;
-static uint32_t next_file_id=0;
-//structure definitions
-struct internal_buf {
-  char *buf;
-  int file_id;
-  //  int buf_num;//why do i need this 
-};
-//if I allocate these statically I'll need 100 of them
-struct fileinfo {
-  off_t len;
-  off_t remaining;
-  int fd;
-  int file_id;//some number between 0-100 indicating what file
-  //this represents
-  int word_len;
-  uint32_t start_offset;
-  char last_word[50];
-};
-struct filebuf {
-  uint8_t *buf;
-  off_t len;
-};
-union file_bitfield{
-  uint128_t uint128;
-  struct {
-    uint64_t low;
-    uint64_t high;
-  };
-  //just because I can
-  struct {
-    uint32_t one;
-    uint32_t two;
-    uint32_t three;
-    uint32_t four;
-  };
-  uint16_t words[8];
-  uint8_t bytes[16];
-};
-struct heap {english_word **heap; uint32_t size;};
-//I NEVER SET THIS, FIX THAT
+static uint32_t next_file_id=1;
 static file_bitfield all_file_bits={.uint128=0};
 static struct fileinfo fileinfo_mem[100];
 static uint32_t fileinfo_mem_index=0;
@@ -331,8 +327,15 @@ static inline int string_compare(english_word *x,english_word *y){
 //since my strings aren't null terminated I can't use
 //the %s printf specifier so these functions are a convience to
 //make printing eaiser
-static inline void print_string(english_word *x){
+static inline void print_word(english_word *x){
   fwrite(x->str,x->len,1,stdout);
+}
+static inline void print_string(const char *str, uint32_t len){
+  fwrite(str,len,1,stdout);
+}
+static inline void print_string_line(const char *str, uint32_t len){
+  fwrite(str,len,1,stdout);
+  fputs("\n",stdout);
 }
 static inline void print_word_and_count(english_word *x){
   printf("The word ");
@@ -404,3 +407,36 @@ int microsleep(long msec){
   sleep_time.tv_nsec=msec*1000;
   return nanosleep(&sleep_time,NULL);
 }
+//Taken from stackoverflow and modified to print in hex rather than decimal
+int print_uint128(uint128_t n) {
+  char str[40] = {0}; // log10(1 << 128) + '\0'
+  char *s = str + sizeof(str) - 1; // start at the end
+  while (n != 0) {
+    if (s == str) return -1; // never happens
+
+    *--s = "0123456789abcdef"[n % 16]; // save last digit
+    n >>= 4;                     // drop it
+  }
+  while(s-str>8){
+    *--s='0';
+  }
+  *--s='x';
+  *--s='0';
+  return printf("%s\n", s);
+}
+#if (defined DEBUG) && !(defined NDEBUG)
+static inline void print_fileinfo(struct fileinfo *info){
+  fprintf(stderr,"Printing fileinfo struct at memory location %p\n",info);
+  fprintf(stderr,"len = %ld\n",info->len);
+  fprintf(stderr,"remaining = %ld\n",info->remaining);
+  fprintf(stderr,"fd = %d\n",info->fd);
+  fprintf(stderr,"file_id = %d\n",info->file_id);
+  fprintf(stderr,"word_len = %d\n",info->word_len);
+  fprintf(stderr,"start_offset = %d\n",info->start_offset);
+  fprintf(stderr,"last_word = ");
+  fwrite(info->last_word,info->word_len,1,stderr);
+  fprintf(stderr,"\n");
+};
+#else
+#define print_fileinfo(info)
+#endif
