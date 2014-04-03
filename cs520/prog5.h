@@ -18,33 +18,47 @@
    pretty much every english word). This hash table uses open adressing with
    linear probing (meaning no linked lists, and collisions are resolved by
    putting the colliding value into the next free bucket), the large size of
-   the hash table means the load factor will be small and this will be efficient.
+   the hash table means the load factor will be small and this will be 
+   efficient. All modifications to this hash table are done atomically
+   without using locks in any way.
+
+   A note about the 100 file max, I use a bit vector internally to
+   indicate which files any given word has appeared in, this lets me avoid 
+   the complexity of merging hash tables while still being able to insure
+   that a word has appeared in each file. Because there can be up to 100 
+   files I need 128 bits for this bit vector. For convience I sometimes
+   represent this value with the 128 bit integer type provided by gcc 
+   as an extension. Most of the mainipulations I do treat this value
+   as a pair of 64 bit integers for speed most of the time, but it's just
+   something to be aware of.
 */
 //includes
-#define _GNU_SOURCE
-#include <stdarg.h>
-#include <alloca.h>
+#define _GNU_SOURCE //makes some nonportable extensions available
+#include <stdarg.h>//vfprintf and the va_arg macros
+#include <alloca.h>//alloca, unecessary because of _GNU_SOURCE 
 #include <asm/unistd.h> //syscall numbers
-#include <assert.h>
-#include <errno.h>
+#include <assert.h>//unused as of now
+#include <errno.h>//declares errno and error macros
 #include <fcntl.h>//open
-#include <sched.h>
+#include <sched.h>//the manual page for clone says to include it
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
-#include <sys/stat.h>
+#include <sys/stat.h>//fstat
 #include <time.h>
 //#include <sys/mman.h>
 #include <sys/types.h>//off_t,pid_t,ssize_t,etc
 #include <unistd.h>//bunch of stuff, including close
 #include <string.h>
-#include <sys/time.h>
+#include <sys/time.h>//not really sure
 #include "prog5_macros.h"
 
 //typedefs
+
 typedef unsigned __int128 uint128_t;
 typedef __int128 int128_t;
+
 typedef struct english_word english_word;
 typedef struct internal_buf internal_buf;
 typedef union file_bitfield file_bitfield;
@@ -52,17 +66,14 @@ struct pt_regs;
 typedef int __attribute__((aligned(8))) aligned_int;
 
 //forward declarations
-long futex_up(int *futex_addr);
-long futex_down(int *futex_addr);
-void futex_spin_up(register int *futex_addr);
-void futex_spin_down(register int *futex_addr);
+long futex_up(int *futex_addr);//also #defined as futex_unlock
+long futex_down(int *futex_addr);//"""" futex_lock
+void futex_spin_up(register int *futex_addr);//"""" futex_spin_unlock
+void futex_spin_down(register int *futex_addr);//"""" futex_spin_lock
 int futex_wake(int *uaddr,int val);
 int futex_wait(int *uaddr,int val,const struct timespec *timeout);
 long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
                    void *ctid,struct pt_regs *regs);
-//glibc clone wrapper
-int clone(int (*fn)(void*),void *child_stack,int flags,void *arg,...);
-/*...=pid_t *ptid, struct user_desc *tls, pid_t *ctid*/
 void parse_buf(const uint8_t *buf,int file_id);//core function
 struct filebuf read_full_file(char *filename);
 struct fileinfo open_file_simple(char *filename);
@@ -78,6 +89,19 @@ void print_results(struct heap);
 static char* __attribute__((const)) ordinal_suffix(uint32_t num);
 
 //global scalars/uninitialized arrays
+//The majority of memory I use is allocated statically, and is
+//large enough to handle anything I need, this ultimately adds up
+//to (1<<20)*sizeof(english_word*) = 8MB (hash table)
+//+  (1<<19)*sizeof(uint32_t) = 2MB      (hash table indices)
+//+  (2<<20)*NUM_PROCS = 4-32MB          (thread stacks)
+//+  136*(1<<10)*NUM_PROCS = 272-2176KB  (thread buffers)
+//+  various other data   <= 1MB
+// ~14MB + 256KB - ~44MB + 128KB
+//which is a lot of memory, to be fair, but no where near
+//enough to put a strain on any modern computer's ram.
+//In addition to this between 38 (32+6) and 82(32+50) bytes
+//are needed to store each word, this is dynamically allocated
+
 //allocate NUM_PROCS*2MB space for the thread stacks
 static uint8_t thread_stacks[NUM_PROCS*(2<<20)];
 #define THREAD_STACK_TOP(thread_id)             \
@@ -146,24 +170,21 @@ char **filenames;//=argv+1
   won't exceed 50% capacity regardless of input. and 8 MB isn't so large as
   to be ridiculous, it's the same size as the default stack
   also no need to monitor the capacity because of how big the hash table is.
-
-  though this may have its own issues in that iterating over this will take
-  quite a lot of time. I think I need an auxaliry array with the indices of
-  the used buckets.
 */
 //it'd be nice to have this be an array of structs rather than an array of
 //pointers but that would prevent atomic updates. if I did change I'd use
 //static english_word global_hash_table[1<<17];
 //this uses the same ammount of memory, but doesn't use pointers it only
 //holds 1/4 as many entries but it means I almost never have to call malloc
-static const uint64_t global_hash_table_size=1<<18;//size in 8 byte blocks
-#define GLOBAL_HASH_TABLE_SIZE (1<<18)
+static const uint64_t global_hash_table_size=1<<20;//size in 8 byte blocks
+#define GLOBAL_HASH_TABLE_SIZE (1<<20)
 static english_word *global_hash_table[GLOBAL_HASH_TABLE_SIZE];
 
 //this hash table is big, really big, so big infact that iterating through
 //it would be wasteful because of how many empty entries there are. So i use
 //this array to keep track of which blocks of the hash table are actually
-//in use
+//in use, this artifically limits the hash table to only using 50% of
+//it's space, but this limit is necessary to avoid collisions
 static uint32_t hash_table_indices[GLOBAL_HASH_TABLE_SIZE/2];
 //This keeps track of in hash_table_indices to but the next entry, and as
 //a side effect keeps track of the number of entries in the hash table
@@ -196,6 +217,15 @@ union file_bitfield{
     uint64_t low;
     uint64_t high;
   };
+  //just because I can
+  struct {
+    uint32_t one;
+    uint32_t two;
+    uint32_t three;
+    uint32_t four;
+  };
+  uint16_t words[8];
+  uint8_t bytes[16];
 };
 struct heap {english_word **heap; uint32_t size;};
 //I NEVER SET THIS, FIX THAT
