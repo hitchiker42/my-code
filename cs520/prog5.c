@@ -218,13 +218,14 @@ void thread_main(void *arg){
     atomic_store_n(thread_futexes+thread_id,0);//
   }
  EXIT:  
-  atomic_dec(&live_threads);
+  //  atomic_dec(&live_threads);
   PRINT_FMT("Worker thread %ld exiting\n",thread_pids[thread_id]);
   thread_exit(EXIT_SUCCESS);
 }
 void main_wait_loop(int have_data){
   uint8_t worker_thread_id=0;
   int32_t futex_retval;
+  uint32_t out_of_data_local=0;
   if(!have_data){goto OUT_OF_DATA;}
   //of threads left running
   //if there are already threads waiting on us skip the wait code
@@ -259,17 +260,22 @@ void main_wait_loop(int have_data){
       worker_thread_id=thread_queue[--thread_queue_index];
       futex_spin_unlock(&thread_queue_lock);
       PRINT_FMT("main thread unlocked spin lock\n");
-      if(!setup_thread_args(worker_thread_id)){
-        //if there's no data left, kill this thread and then
-        //wait for the others to finish
-        //        tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
-        goto OUT_OF_DATA;
-      }
+      /*The issue is here, when setup_thread_args returns 0 it means that 
+        there's no data left, but arguments for a thread have already been 
+        setup. So I need to make sure I process this last set of data
+        before I finish, and also I need to make sure to decrement the 
+        count of live threads when the thread finishes, THIS was the
+        source of my problems with joining threads (probably)
+      */
+      out_of_data_local=(!setup_thread_args(worker_thread_id));
       futex_retval=futex_wake_locking((int*)(thread_futexes+worker_thread_id),10,
                                       (int*)(thread_futex_locks+worker_thread_id));
       if(futex_retval==-1){
         my_perror("Futex failure");
         exit(1);
+      }
+      if(out_of_data_local){
+        goto OUT_OF_DATA;
       }
     }
     //we decremented one more time then we should (we need to do this)
@@ -279,16 +285,13 @@ void main_wait_loop(int have_data){
     //and that entry is empty
     if(!refill_fileinfo_queue()){
       live_threads=NUM_PROCS-1;
-      worker_thread_id=0;
+      worker_thread_id=-1;
       goto OUT_OF_DATA;
     }
   }
  OUT_OF_DATA:{
     PRINT_MSG("Out of data\n");
     atomic_store_n(&out_of_data,1);
-    if(worker_thread_id){
-      futex_wake((int*)(thread_futexes+worker_thread_id),10);
-    }
     //    __asm__ volatile("int $3\n");
     while(live_threads>0){
       while(atomic_load_n(&main_thread_wait)>0){
@@ -297,6 +300,7 @@ void main_wait_loop(int have_data){
         worker_thread_id=thread_queue[--thread_queue_index];
         futex_spin_unlock(&thread_queue_lock);
         futex_wake((int*)(thread_futexes+worker_thread_id),10);
+        live_threads--;
       }
       __asm__ volatile("pause\n\tpause\n\tpause\n\t");
     }
