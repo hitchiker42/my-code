@@ -23,6 +23,7 @@ static void *str_malloc(uint64_t size){
   return retval;
 }
 void terminate_gracefully(int sig){
+  //thread_exit(EXIT_SUCCESS);
   if(sig != SIGSEGV){
     PRINT_FMT("Thread %ld recieved signal %d, exiting thread\n",
               gettid(),sig);
@@ -30,7 +31,6 @@ void terminate_gracefully(int sig){
   }
   exit(1);
 }
-const struct sigaction signal_action={.sa_handler=terminate_gracefully};
 /*
   Update the value of word in the global hash table, this means that if word
   isn't in the table then we should add it, and if it is we should increment the
@@ -180,30 +180,34 @@ void thread_main(void *arg){
   auto uint64_t thread_id=(uint64_t)(arg);
   auto void *thread_mem_pointer=mmap(NULL,(2*(1<<20)),PROT_READ|PROT_WRITE,
                                      MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
-  PRINT_FMT("Worker thread %ld started\n",thread_id);
+  PRINT_FMT("Worker thread %ld started\n",thread_pids[thread_id]);
   while(1){
     thread_mem_pointer=
       parse_buf(thread_bufs[thread_id]+thread_fileinfo_vals[thread_id].start_offset,
                 thread_fileinfo_vals[thread_id].file_id,thread_mem_pointer);//do stuff
 //    PRINT_FMT("Worker thread %ld parsed_buf\n",thread_id);
     //tell main thread we're done
-    PRINT_FMT("Worker thread %ld locking spin lock\n",thread_id);
+    PRINT_FMT("Worker thread %ld locking spin lock\n",thread_pids[thread_id]);
     futex_spin_lock(&thread_queue_lock);
-    PRINT_FMT("Worker thread %ld locked spin lock\n",thread_id);
+    PRINT_FMT("Worker thread %ld locked spin lock\n",thread_pids[thread_id]);
     thread_queue[thread_queue_index++]=thread_id;
+    futex_spin_unlock(&thread_queue_lock);
+    PRINT_FMT("Worker thread %ld unlocked spin lock\n",thread_pids[thread_id]);
+    //the main thread kills us with sigterm(which I may change because of this)
+    //so we need to block it when we're 
+    //    rt_sigprocmask(SIG_BLOCK,&block_sigterm,NULL);
     atomic_inc(&main_thread_wait);
     futex_retval=futex_wake_locking(&main_thread_wait,10,&main_thread_wait_lock);
-    futex_spin_unlock(&thread_queue_lock);
-    PRINT_FMT("Worker thread %ld unlocked spin lock\n",thread_id);
+    //    rt_sigprocmask(SIG_UNBLOCK,&block_sigterm,NULL);
     if(futex_retval==-1){
       perror("Futex failure\n");
       exit(1);
     }
     //wait for main thread to give us more data
-    PRINT_FMT("Worker thread %ld waiting for main\n",thread_id);
+    PRINT_FMT("Worker thread %ld waiting for main\n",thread_pids[thread_id]);
     futex_retval=futex_wait_locking((int*)(thread_futexes+thread_id),0,NULL,
                                     (int*)(thread_futex_locks+thread_id));
-    PRINT_FMT("Worker thread %ld woke up\n",thread_id);
+    PRINT_FMT("Worker thread %ld woke up\n",thread_pids[thread_id]);
     if(futex_retval==-1){
       perror("Futex failure\n");
       exit(1);
@@ -252,7 +256,7 @@ void main_wait_loop(int have_data){
       if(!setup_thread_args(worker_thread_id)){
         //if there's no data left, kill this thread and then
         //wait for the others to finish
-        tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
+        //        tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
         live_threads=NUM_PROCS-2;
         goto OUT_OF_DATA;
       }
@@ -277,12 +281,24 @@ void main_wait_loop(int have_data){
     }
   }
  OUT_OF_DATA:{
+    //    __asm__ volatile("int $3\n");
     PRINT_MSG("Out of data\n");
-    if(live_threads && main_thread_wait==0){
+    while(live_threads>0){
+      PRINT_FMT("main_thread_wait = %d\n",main_thread_wait);
+      PRINT_FMT("live_threads = %d\n",live_threads);
+      while(atomic_load_n(&main_thread_wait)>0){
+        atomic_dec(&main_thread_wait);
+        --live_threads;
+      }
+      PRINT_FMT("live_threads = %d\n",live_threads);
+      BREAKPOINT();
+      __asm__ volatile("pause\n\tpause\n\tpause\n\t");
+    }
+    /*    if(live_threads && main_thread_wait==0){
       HERE();
       goto WAIT;
-    }
-    while(live_threads>0){
+      }*/
+    /*    while(live_threads>0){
       while(atomic_load_n(&main_thread_wait)>0 && live_threads){
         atomic_add(&main_thread_wait,-1);
         futex_spin_lock(&thread_queue_lock);
@@ -295,9 +311,11 @@ void main_wait_loop(int have_data){
         //I'll set up a signal hanler to allow indivual theads to terminate
         PRINT_FMT("Killing thread %d\n",worker_thread_id);
         tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
-        live_threads--;
+        atomic_dec(live_threads);
       }
-    WAIT:
+      __asm__ volatile("pause");
+      }*/
+      /*    WAIT:
       if(live_threads<=0){break;}
       PRINT_MSG("Waiting for threads\n");
       futex_retval=futex_wait_locking(&main_thread_wait,const_zero_32,NULL,
@@ -306,7 +324,7 @@ void main_wait_loop(int have_data){
         my_perror("Futex failure");
         exit(1);
       }
-    }
+      }*/
     PRINT_MSG("All worker threads finished\n")
     struct heap common_words=sort_words();
     print_results(common_words);
@@ -571,6 +589,12 @@ int main(int argc,char *argv[]){
   struct fileinfo *info;
   int i;
   int have_data=1;
+  sigemptyset(&block_sigtrap);
+  sigaddset(&block_sigtrap,SIGTRAP);
+  //  sigemptyset(&block_sigterm);
+  //  sigaddset(&block_sigterm,SIGTERM);
+  const struct sigaction signal_action={.sa_handler=terminate_gracefully,
+                                      .sa_mask=block_sigtrap};
   //remove the program name from the arguments (its just eaiser)
   num_files=argc-1;
   PRINT_FMT("Given %ld files\n",num_files);

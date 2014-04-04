@@ -123,7 +123,7 @@ int futex_wait_locking(int *uaddr,int val,const struct timespec *timeout,int *ua
   register int *futex_addr __asm__("%rdi")=uaddr;
   register int *lock __asm__("%r9")=uaddr2;
   __asm__ volatile ("movq $1,%%r10\n\t"
-                    "movq $0,%%r11\n\t"
+                    "movq $0,%%r11\n"
                     "1:\n\t"//lock
                     "movq $1,%%rax\n\t"
                     "cmpl %%eax,(%%r9)\n\t"//is the lock free?
@@ -164,28 +164,29 @@ int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout ignored by sysc
   DEBUG_PRINT("Calling futex wake\n")
   register uint32_t retval __asm__ ("%rax");
   register int *futex_addr __asm__("%rdi")=uaddr;
-  register int *lock __asm__("%rcx")=uaddr2;
-  __asm__ volatile ("movq $1,%%r8\n\t"
-                    "movq $0,%%r9\n\t"
+  register int *lock __asm__("%rbx")=uaddr2;
+  register long one  __asm__("%rbp")=1;
+  __asm__ volatile ("movq $0,%%r9\n"
                     "1:\n\t"//lock
                     "movq $1,%%rax\n\t"
-                    "cmpl %%eax,(%%rcx)\n\t"//is the lock free?
-                    "je 2f\n\t"//if yes try to get it
+                    "cmpl %%eax,(%%rbx)\n\t"//is the lock free?
+                    "je 2f\n\t"//if it is try to get it
                     "pause\n\t"//if no pause
                     "jmp 1b\n"//spin again
                     "2:\n\t"
-                    "lock cmpxchgl %%r9d,(%%rcx)\n\t"//try to get lock
-                    "jnz 1b\n"//if we failed spin again
+                    "lock cmpxchgl %%r9d,(%%rbx)\n\t"//try to get lock
+                    "jnz 1b\n\t"//if we failed spin again
                     "movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
                     "movq %2,%%rsi\n\t"
                     "movq %3,%%rax\n\t"
-                    "lock xchgl %%r8d,(%%rcx)\n\t"//can't use rax
-                    "syscall\n"
+                    "syscall\n\t"
+                    "lock xchgl %%ebp,(%%rbx)\n"
                     : "=r" (retval)
-                    : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex),"r" (futex_addr), "r" (lock)
-                    :"%rsi","%rdx","%r8","%r9");
+                    : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex),
+                      "r" (futex_addr), "r" (lock),"r"(one)
+                    :"%rsi","%rdx","%r9");
   DEBUG_PRINT("Called futex wake\n");
-  if(retval>=min_error_val_u32){
+  if(builtin_unlikely(retval>=min_error_val_u32)){
     errno=-retval;
     return -1;
   }
@@ -377,6 +378,9 @@ long my_clone(unsigned long flags_,void *child_stack_,void *ptid_,
   }
 }
 
+//int rt_sigprocmask(int how,const sigset_t *set,sigset_t *oldset)
+inline_safe_syscall3(int, rt_sigprocmask, int, how, const sigset_t *,
+                     set, sigset_t*, oldset,__NR_rt_sigprocmask);
 //the glibc wrapper to _exit doesn't actually call _exit it calls
 //exit_group, which isn't what we want, so this is actually a wrapper
 //over the _exit syscall, it's akin to pthread_exit

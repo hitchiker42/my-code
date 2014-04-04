@@ -1,5 +1,18 @@
+/* TODO: Add two atomic global variables
+   out_of_data=0:
+   num_threads=NUM_PROCS-1;
+   when there's no data left the main thread does
+   atomic_inc(out_of_data);
+   each worker thread checks this variable before waiting
+   for more data, if it's one then the thread atomicly decrements
+   num_threads and exits.
+   
+   the main thread waits untill num_threads == 0 after setting 
+   out_of_data to 1
+ */
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wformat"
 #pragma GCC optimize ("Og")
 //#pragma GCC optimize ("whole-program")
 /* What this program does
@@ -190,6 +203,8 @@ int32_t main_thread_wait_lock __attribute__((aligned (16)))=1;
 sigset_t sigwait_set;
 uint64_t num_files;
 uint64_t current_file=0;
+sigset_t block_sigterm;
+sigset_t block_sigtrap;
 /* 
    I can't use malloc since my threads aren't visable to libc which messes
    up the internal locking done by malloc, and just messes everything up.
@@ -392,13 +407,13 @@ static inline void perror_fmt(const char *fmt,...){
   int errsave=errno;
   va_start(ap,fmt);  
   vfprintf(stderr,fmt,ap);
-  fprintf(stderr,"%s number %d\n",sys_errlist[errsave],errsave);
+  fprintf(stderr,"%s number %d\n",_sys_errlist[errsave],errsave);
 }
 static inline void my_perror(const char *msg){
   if(msg){
-    fprintf(stderr,"%s: %s; Error number %d\n",msg,sys_errlist[errno],errno);
+    fprintf(stderr,"%s: %s; Error number %d\n",msg,_sys_errlist[errno],errno);
   } else {
-    fprintf(stderr,"%s; Error number %d\n",sys_errlist[errno],errno);
+    fprintf(stderr,"%s; Error number %d\n",_sys_errlist[errno],errno);
   }
 }
 int microsleep(long msec){
