@@ -203,6 +203,8 @@ int32_t main_thread_wait_lock __attribute__((aligned (16)))=1;
 sigset_t sigwait_set;
 uint64_t num_files;
 uint64_t current_file=0;
+uint64_t out_of_data=0;
+uint64_t live_threads=0;
 sigset_t block_sigterm;
 sigset_t block_sigtrap;
 /* 

@@ -3,10 +3,8 @@
 #ifndef NUM_PROCS
 #ifdef AGATE
 #define NUM_PROCS 16
-#define ARRAY_PROCS(val) {ARRAY_16(val)
 #else
 #define NUM_PROCS 4
-#define ARRAY_PROCS(val) {ARRAY_4(val)
 #endif
 #endif
 #define MAX_BUF_SIZE (136*(1<<10))
@@ -75,6 +73,10 @@
 
 //really hacky version of a cpp loop, I only use it
 //to fill an array that's sized based on the number of processors
+//and even just doing that I need to use some tricks with joining symbols
+//to get it to work
+#define CPP_JOIN(x,y) x##y
+#define CPP_JOIN2(x,y) CPP_JOIN(x,y)
 #define ARRAY_0(val) }
 #define ARRAY_1(val) val ARRAY_0(val)
 #define ARRAY_2(val) val, ARRAY_1(val)
@@ -95,3 +97,5 @@
 #define ARRAY_17(val) val, ARRAY_16(val)
 #define ARRAY_18(val) val, ARRAY_17(val)
 #define ARRAY_19(val) val, ARRAY_18(val)
+#define ARRAY_N(val,N) CPP_JOIN(ARRAY,N)(val)
+#define ARRAY_PROCS(val) {CPP_JOIN2(ARRAY_,NUM_PROCS)(val)
