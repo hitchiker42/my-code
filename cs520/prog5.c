@@ -6,6 +6,22 @@
 #else
 #include "my_threads.c"
 #endif
+//strings never need to be freed but the ammout of space needed for them
+//varies wildly so I allocate space for strings dynamically
+static void *str_malloc(uint64_t size){
+  futex_spin_lock(&string_mem_lock);
+  if(string_mem_pointer+size>string_mem_end){
+    string_mem_pointer=mmap(NULL,(8*(1<<20)),PROT_READ|PROT_WRITE,
+                            MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+    string_mem_end=string_mem_pointer+(8*(1<<20));
+  }
+  //I wish C had something akin to lisp's prog1,in lisp this would be: 
+  //(prog1 string_mem_pointer (incf string_mem_pointer size))
+  void *retval=string_mem_pointer;
+  string_mem_pointer+=size;
+  futex_spin_unlock(&string_mem_lock);
+  return retval;
+}
 void terminate_gracefully(int sig){
   if(sig != SIGSEGV){
     PRINT_FMT("Thread %ld recieved signal %d, exiting thread\n",
@@ -34,10 +50,11 @@ static int atomic_hash_table_update(english_word *word){
   uint64_t hashv=fnv_hash(word->str,word->len);
   uint64_t index=hashv%global_hash_table_size;
   int low=(word->file_bits.low?1:0);
+  uint8_t *mem=NULL;
   //this next line results in a lot of cache misses
   //for obvious reasons
   if(!global_hash_table[index]){//word isn't in the hash table, add it
-    uint8_t *mem=xmalloc(word->len);
+    mem=str_malloc(word->len);
     word->str=(char*)my_strcpy(mem,(uint8_t*)word->str,word->len);
     void *prev=global_hash_table[index];
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
@@ -70,6 +87,10 @@ static int atomic_hash_table_update(english_word *word){
       }
     } while(global_hash_table[++index]);
     //not in the table use next free index (if we can)
+    if(!mem){
+      mem=str_malloc(word->len);
+      word->str=(char*)my_strcpy(mem,(uint8_t*)word->str,word->len);
+    }
     void *prev=global_hash_table[index];
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
     if(test){
@@ -89,11 +110,11 @@ static int atomic_hash_table_update(english_word *word){
    and puts/updates the word in the global hash table.
 */
 
-void parse_buf(register const uint8_t *buf_,int file_id){
+void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
   //we know we're going to need buf for awhile, and we need to
   //save it across function calls so put it in rbx
   register const uint8_t *buf __asm__ ("%rbx")=buf_;
-  const uint8_t *initial_buf=buf;//return value?
+  //  const uint8_t *initial_buf=buf;//return value?
   uint64_t index=1;
   union file_bitfield bitmask=file_bit_masks[file_id-1];
   PRINT_FMT("Start of parse buf in thread %ld\n",gettid());
@@ -134,17 +155,14 @@ void parse_buf(register const uint8_t *buf_,int file_id){
   index++;
  REJECT_0:
   if(index >= 6 && index <= 50){
-    english_word *word=xmalloc(sizeof(english_word));
+    english_word *word=mem;
     *word=(english_word){.str=(char*)buf,.len=index,.count=1,
                          .file_bits=bitmask};
-
-    if(!atomic_hash_table_update(word)){
-     // free(word);
+    if(atomic_hash_table_update(word)){
+      mem+=32;
     }
   }
-  if(buf-initial_buf > buf_size){
-    return;
-  }
+
   if(buf[index]!=0xff){
     buf+=index;
     index=1;
@@ -152,16 +170,21 @@ void parse_buf(register const uint8_t *buf_,int file_id){
   }
   PRINT_FMT("End of parse buf in thread %ld\n",gettid());
   //I used to free the buffer here, but now buffers are statically allocated
-  return;
+  return mem;
 }
 //main function for worker threads
 void thread_main(void *arg){
   int futex_retval=-1;
+  //this needs to be allocated on the stack, so I figured I'd use auto
+  //because really, when is there ever a reason to use auto
   auto uint64_t thread_id=(uint64_t)(arg);
-  PRINT_FMT("Worker thread %d started\n",thread_id);
+  auto void *thread_mem_pointer=mmap(NULL,(2*(1<<20)),PROT_READ|PROT_WRITE,
+                                     MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+  PRINT_FMT("Worker thread %ld started\n",thread_id);
   while(1){
-    parse_buf(thread_bufs[thread_id]+thread_fileinfo_vals[thread_id].start_offset,
-              thread_fileinfo_vals[thread_id].file_id);//do stuff
+    thread_mem_pointer=
+      parse_buf(thread_bufs[thread_id]+thread_fileinfo_vals[thread_id].start_offset,
+                thread_fileinfo_vals[thread_id].file_id,thread_mem_pointer);//do stuff
 //    PRINT_FMT("Worker thread %ld parsed_buf\n",thread_id);
     //tell main thread we're done
     PRINT_FMT("Worker thread %ld locking spin lock\n",thread_id);
@@ -189,7 +212,8 @@ void thread_main(void *arg){
 void main_wait_loop(int have_data){
   uint8_t worker_thread_id;
   int32_t futex_retval;
-  int live_threads;//used when we run out of data to monitor the number
+  int live_threads=NUM_PROCS-1;//used when we run out of data to monitor the number
+  if(!have_data){goto OUT_OF_DATA;}
   //of threads left running
   //if there are already threads waiting on us skip the wait code
   if(atomic_load_n(&main_thread_wait)>1){
@@ -245,6 +269,7 @@ void main_wait_loop(int have_data){
  OUT_OF_DATA:{
     PRINT_MSG("Out of data\n");
     if(live_threads && main_thread_wait==0){
+      HERE();
       goto WAIT;
     }
     while(live_threads>0){
@@ -261,9 +286,16 @@ void main_wait_loop(int have_data){
         tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
         live_threads--;
       }
+      atomic_add(&main_thread_wait,1);
     WAIT:
+      if(live_threads<=0){break;}
       PRINT_MSG("Waiting for threads\n");
-      futex_wait(&main_thread_wait,const_zero_32,NULL);
+      futex_retval=futex_wait_locking(&main_thread_wait,const_zero_32,NULL,
+                                      &main_thread_wait_lock);
+      if(futex_retval==-1){
+        my_perror("Futex failure");
+        exit(1);
+      }
     }
     PRINT_MSG("All worker threads finished\n")
     struct heap common_words=sort_words();
@@ -278,6 +310,11 @@ int setup_thread_args(int thread_id_num){
   //nothing should ever leave fileinfo_queue completely empty,
   //fileinfo_queue[0] should always contain a vaild struct fileinfo
   static struct fileinfo *info;
+  if(fileinfo_queue_index<0){
+    BREAKPOINT();
+    fprintf(stderr,"Invalid value for fileinfo_queue_index\n");
+    exit(1);
+  }
   info=setup_block(fileinfo_queue[fileinfo_queue_index],thread_bufs[thread_id_num]);
 //  PRINT_MSG("setup block in setup_thread_args\n");
   thread_fileinfo_vals[thread_id_num].file_id=info->file_id;
@@ -370,11 +407,12 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
       info->word_len=0;
     }
     if(info->word_len>6){
-      english_word *word=xmalloc(sizeof(english_word));
+      english_word *word=border_word_mem_ptr;
       *word=(english_word){.str=(char*)info->last_word,.len=info->word_len,
                            .count=1,.file_bits=file_bit_masks[info->file_id-1]};
-      atomic_hash_table_update(word);
-      //deals with copying the string in buf and freeing word if needed
+      if(atomic_hash_table_update(word)){
+        border_word_mem_ptr++;
+      }
     }
     info->word_len=0;
     info->start_offset=index;
@@ -525,13 +563,16 @@ int main(int argc,char *argv[]){
   int have_data=1;
   //remove the program name from the arguments (its just eaiser)
   num_files=argc-1;
-  PRINT_FMT("Given %d files\n",num_files);
+  PRINT_FMT("Given %ld files\n",num_files);
   filenames=argv+1;
   if(num_files<=0){
     fprintf(stderr,"Error no filenames given\n");
     exit(1);
   }
   tgid=gettgid();
+  string_mem_pointer=mmap(NULL,(8*(1<<20)),PROT_READ|PROT_WRITE,
+                          MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+  string_mem_end=string_mem_pointer+(8*(1<<20));
   //I don't actually join threads when I'm finished processing data
   //I just kill them, I use this to be able to modify their behavior when
   //they die

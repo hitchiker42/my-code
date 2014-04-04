@@ -49,6 +49,7 @@
 #include <time.h>
 //#include <sys/mman.h>
 #include <sys/types.h>//off_t,pid_t,ssize_t,etc
+#include <sys/mman.h>
 #include <unistd.h>//bunch of stuff, including close
 #include <string.h>
 #include <sys/time.h>//not really sure
@@ -77,7 +78,7 @@ int futex_wake(int *uaddr,int val);
 int futex_wait(int *uaddr,int val,const struct timespec *timeout);
 long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
                    void *ctid,struct pt_regs *regs);
-void parse_buf(const uint8_t *buf,int file_id);//core function
+void* parse_buf(const uint8_t *buf,int file_id,void *mem);//core function
 struct fileinfo open_file_simple(char *filename);
 struct heap sort_words();
 struct fileinfo *setup_block(struct fileinfo *info,uint8_t *buf);
@@ -122,6 +123,22 @@ struct thread_fileinfo {
   uint32_t start_offset;
 };
 struct heap {english_word **heap; uint32_t size;};
+/*structure for storing data about each word
+  contains:
+  -the word iself as a char * (not necessarly null terminated)
+  -the word length in a 32 bit integer (we really only need 8 bits but
+    using 32 is more efficent alignment wise...probably)
+  -A count of how many times the word has been seen, only uses in
+    the hash table entries
+  -A means of uniquely identifying which file the word came from
+    (the actual implementation of this is a bit complicated)
+*/
+struct english_word {
+  char *str;//NOT null terminated
+  uint32_t len;
+  uint32_t count;
+  file_bitfield file_bits;
+};
 
 //global scalars/uninitialized arrays
 //The majority of memory I use is allocated statically, and is
@@ -134,13 +151,16 @@ struct heap {english_word **heap; uint32_t size;};
 // ~14MB + 256KB - ~44MB + 128KB
 //which is a lot of memory, to be fair, but no where near
 //enough to put a strain on any modern computer's ram.
-//In addition to this between 38 (32+6) and 82(32+50) bytes
+//In addition to this between 38 (32+6) and 82(32+50) bytes.
 //are needed to store each word, this is dynamically allocated
 
-//Per thread id,-1 in main thread, 0-NUM_PROCS-1 for the worker threads
-//tls isn't working, I need to figure out how to do tls, or just keep thread id's 
-//on the stack and pass them around
+//Imagine that these are thread local variables
+//static __thread uint64_t thread_id;
+//static __thread void *thread_mem_pointer;
+//static __thread uint64_t thread_mem_end;
 //allocate NUM_PROCS*2MB space for the thread stacks
+//probably could be reduced to about...256Kb I think, but eh
+//if I used pthreads this is what they would allocate
 static uint8_t thread_stacks[NUM_PROCS*(2<<20)];
 #define THREAD_STACK_TOP(thread_id)             \
   ((thread_stacks+((thread_id+1)*(2<<20)))-1)
@@ -148,16 +168,14 @@ static uint8_t thread_stacks[NUM_PROCS*(2<<20)];
 static pid_t thread_pids[NUM_PROCS];
 static pid_t tgid;//thread_group_id
 //this queue is only accessed after locking the thread_queue_lock
-//Both the queue update and incremunting/decrementing the
-//queue index have to be done in one atomic step, meaning
-//if I didn't lock I would have to do something using cmpxchg
-//and concidering how lightweight my spinlocks are I think it's
-//ok to lock for this
+//Becasue the queue update and incremunting/decrementing the
+//queue index have to be done in one atomic step.
 static uint8_t thread_queue[NUM_PROCS];
 static uint8_t thread_queue_index=0;
 //holds the information about the data to be given to threads
 static struct fileinfo *fileinfo_queue[NUM_PROCS];
 //these are really ints, but we need them aligned on 8 byte boundries
+//I think, the futex man page says to use aligned integers
 int64_t thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
 uint8_t thread_bufs[NUM_PROCS][MAX_BUF_SIZE];
 thread_fileinfo thread_fileinfo_vals[NUM_PROCS];
@@ -173,43 +191,34 @@ int32_t main_thread_wait_lock __attribute__((aligned (16)))=1;
 sigset_t sigwait_set;
 uint64_t num_files;
 uint64_t current_file=0;
+/* 
+   I can't use malloc since my threads aren't visable to libc which messes
+   up the internal locking done by malloc, and just messes everything up.
+*/
+uint8_t *string_mem_pointer;
+uint8_t *string_mem_end;
+int32_t  string_mem_lock __attribute__((aligned (16)))=1;
 char **filenames;//=argv+1
 /*
-  The basic idea with threading is to have NUM_PROC-1 worker threads
-  which are activly parsing buffers and updating the hash table and
-  1 thread to allocate data to those working threads. For simplicity
-  call the allocating thread the main thread. The main thread first
-  allocates and starts the worker threads then sleeps untill a worker
-  is finished. The main thread gets the next block of data, assuming
-  there is any left and gives it to the worker thread. If any other
-  threads finished in the meantime allocate data for them untill all
-  threads are working again, then wait again. Do this untill there is
-  no data left. Then sort the data, I'm not sure if this should be
-  done with multiple threads.
+  The basic flow of the program is that there is 1 main thread and 
+  N worker threads (where N is the number of processors -1). The worker threads
+  scan blocks of memory given to them by the main thread for english words
+  and updating the hash table as they find them. 
 
-  the basic idea for the implementation is:
-  use a stack/queue for threads,
-  after a thread has finished doing work it does the following:
-  futex_spin_lock(&thread_queue_lock:
-  thread_queue[thread_queue_index++]=thread_id;
-  futex_wake(&main_thread_wait,1);
-  futex_spin_unlock(&thread_queue_lock);
-  sigwait(&sigwait_set,&signo);
-  //check if the signal indicates that there is more data or
-  //that we're done, and take action based on that
+  The main thread waits while the worker threads are parsing and gets woken up
+  by the workers when they need more memory. The worker threads go to sleep
+  after signaling the main thread and the main thread wakes then up and gives
+  them more data to parse.
 */
 
 /*Assuming there that are ~1000000 english words, and probably half of those
   are 6-50 letters long, 8 MB should be large enough for a hash table that
-  won't exceed 50% capacity regardless of input. and 8 MB isn't so large as
-  to be ridiculous, it's the same size as the default stack
-  also no need to monitor the capacity because of how big the hash table is.
+  won't exceed 50% capacity regardless of input. 
+  (8 MB will hold ~800000 words, meaning ~400000 to keep it half full,
+  so if given 500000 words it'll probably get to ~60% capacity, which is ok)
 */
 //it'd be nice to have this be an array of structs rather than an array of
-//pointers but that would prevent atomic updates. if I did change I'd use
-//static english_word global_hash_table[1<<17];
-//this uses the same ammount of memory, but doesn't use pointers it only
-//holds 1/4 as many entries but it means I almost never have to call malloc
+//pointers but that would prevent atomic updates.
 static const uint64_t global_hash_table_size=1<<20;//size in 8 byte blocks
 #define GLOBAL_HASH_TABLE_SIZE (1<<20)
 static english_word *global_hash_table[GLOBAL_HASH_TABLE_SIZE];
@@ -227,23 +236,13 @@ static uint32_t next_file_id=1;
 static file_bitfield all_file_bits={.uint128=0};
 static struct fileinfo fileinfo_mem[100];
 static uint32_t fileinfo_mem_index=0;
+static english_word border_word_mem[64];//should be more that enough to
+static english_word *border_word_mem_ptr=border_word_mem;
+//deal with words that fall on the boarder of memory blocks
+//only accessed by the main thread, since that's the only thread that
+//calls setup_block
+
 #include "prog5_consts.h"
-/*structure for storing data about each word
-  contains:
-  -the word iself as a char * (not necessarly null terminated)
-  -the word length in a 32 bit integer (we really only need 8 bits but
-    using 32 is more efficent alignment wise...probably)
-  -A count of how many times the word has been seen, only uses in
-    the hash table entries
-  -A means of uniquely identifying which file the word came from
-    (the actual implementation of this is a bit complicated)
-*/
-struct english_word {
-  char *str;//NOT null terminated
-  uint32_t len;
-  uint32_t count;
-  file_bitfield file_bits;
-};
 //memory allocation wrappers
 //these should be rewritten so I don't terminate the program if
 //I use too much memory
@@ -364,10 +363,11 @@ static inline char *my_strcpy(uint8_t *dest_,const uint8_t *src_,uint64_t len_){
   register uint8_t *dest __asm__ ("%rdi")=dest_;
   const register uint8_t *src __asm__ ("%rsi")=src_;
   register uint64_t len __asm__ ("%rcx")=len_;
-  __asm__("rep movsb"
-          : : "r" (dest), "r" (src), "r" (len));
+  __asm__ volatile("rep movsb"
+                   : : "r" (dest), "r" (src), "r" (len));
   return (char*)dest_;
 }
+
 /* 
    I don't even know why this doesn't work,
    but if I can't fix this I'll just stick to memcmp 
