@@ -116,6 +116,7 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
   register const uint8_t *buf __asm__ ("%rbx")=buf_;
   //  const uint8_t *initial_buf=buf;//return value?
   uint64_t index=1;
+  int count=0;
   union file_bitfield bitmask=file_bit_masks[file_id-1];
   PRINT_FMT("Start of parse buf in thread %ld\n",gettid());
 //this doesn't seem to do much, positively or negitively
@@ -162,7 +163,6 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
       mem+=32;
     }
   }
-
   if(buf[index]!=0xff){
     buf+=index;
     index=1;
@@ -201,7 +201,9 @@ void thread_main(void *arg){
     }
     //wait for main thread to give us more data
     PRINT_FMT("Worker thread %ld waiting for main\n",thread_id);
-    futex_retval=futex_wait((int*)thread_futexes+thread_id,0,NULL);
+    futex_retval=futex_wait_locking((int*)(thread_futexes+thread_id),0,NULL,
+                                    (int*)(thread_futex_locks+thread_id));
+    PRINT_FMT("Worker thread %ld woke up\n",thread_id);
     if(futex_retval==-1){
       perror("Futex failure\n");
       exit(1);
@@ -221,10 +223,10 @@ void main_wait_loop(int have_data){
   }
   while(1){
     //wait untill a thread is done;
-//    PRINT_FMT("Main waiting with val %d\n",main_thread_wait);
+    PRINT_FMT("Main waiting with val %d\n",main_thread_wait);
     futex_retval=futex_wait_locking(&main_thread_wait,const_zero_32,NULL,
                                     &main_thread_wait_lock);
-//    PRINT_FMT("Main woke up with val %d\n",main_thread_wait);
+    PRINT_FMT("Main woke up with val %d\n",main_thread_wait);
     if(futex_retval==-1){
       my_perror("Futex failure");
       exit(1);
@@ -235,14 +237,18 @@ void main_wait_loop(int have_data){
     }
   ALLOCATE_LOOP:
     //
-    while(atomic_fetch_add(&main_thread_wait,-1)>0){
+    while(atomic_load_n(&main_thread_wait)>0){
+      atomic_add(&main_thread_wait,-1);
       if(main_thread_wait>NUM_PROCS){
         fprintf(stderr,"More threads waiting then exist, exiting\n");
         exit(1);
       }
+      PRINT_FMT("main thread locking spin lock\n");
       futex_spin_lock(&thread_queue_lock);
+      PRINT_FMT("main thread locked spin lock\n");
       worker_thread_id=thread_queue[--thread_queue_index];
       futex_spin_unlock(&thread_queue_lock);
+      PRINT_FMT("main thread unlocked spin lock\n");
       if(!setup_thread_args(worker_thread_id)){
         //if there's no data left, kill this thread and then
         //wait for the others to finish
@@ -250,15 +256,19 @@ void main_wait_loop(int have_data){
         live_threads=NUM_PROCS-2;
         goto OUT_OF_DATA;
       }
-      futex_retval=futex_wake((int*)thread_futexes+worker_thread_id,10);
+      HERE();
+      futex_retval=futex_wake_locking((int*)(thread_futexes+worker_thread_id),10,
+                                      (int*)(thread_futex_locks+worker_thread_id));
+      HERE();
       if(futex_retval==-1){
         my_perror("Futex failure");
         exit(1);
       }
+      HERE();
     }
     //we decremented one more time then we should (we need to do this)
     //so add one to the wait counter to fix that
-    atomic_add(&main_thread_wait,1);
+//    atomic_add(&main_thread_wait,1);
     //this returns 0 if the queue has only one entry 
     //and that entry is empty
     if(!refill_fileinfo_queue()){
@@ -273,10 +283,11 @@ void main_wait_loop(int have_data){
       goto WAIT;
     }
     while(live_threads>0){
-      while(atomic_fetch_add(&main_thread_wait,-1)>0 && live_threads){
-        futex_lock(&thread_queue_lock);
+      while(atomic_load_n(&main_thread_wait)>0 && live_threads){
+        atomic_add(&main_thread_wait,-1);
+        futex_spin_lock(&thread_queue_lock);
         worker_thread_id=thread_queue[--thread_queue_index];
-        futex_unlock(&thread_queue_lock);
+        futex_spin_unlock(&thread_queue_lock);
         //I suppose here is where the race condition might actually matter
         //if we actually needed to make sure the thread was waiting
         //use SIGTERM, if the thread isn't already waiting it'll just terminate
@@ -286,7 +297,6 @@ void main_wait_loop(int have_data){
         tgkill(tgid,thread_pids[worker_thread_id],SIGTERM);
         live_threads--;
       }
-      atomic_add(&main_thread_wait,1);
     WAIT:
       if(live_threads<=0){break;}
       PRINT_MSG("Waiting for threads\n");
@@ -471,7 +481,7 @@ struct fileinfo *setup_fileinfo(char *filename){
   *info=(struct fileinfo){.fd=fd,.len=stat_buf.st_size,.word_len=0,
                           .file_id=next_file_id++,.remaining=stat_buf.st_size};
   PRINT_MSG("Returning from setup_fileinfo\n");
-  print_fileinfo(info);
+//  print_fileinfo(info);
   return info;
 }
 //only call with an unused fileinfo, behaves specially for

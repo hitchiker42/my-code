@@ -3,8 +3,10 @@
 #ifndef NUM_PROCS
 #ifdef AGATE
 #define NUM_PROCS 16
+#define ARRAY_PROCS(val) {ARRAY_16(val)
 #else
-#define NUM_PROCS 3
+#define NUM_PROCS 4
+#define ARRAY_PROCS(val) {ARRAY_4(val)
 #endif
 #endif
 #define MAX_BUF_SIZE (136*(1<<10))
@@ -70,3 +72,26 @@
 #define PRINT_STRING_LINE_ERR(x)
 #define BREAKPOINT()
 #endif
+
+//really hacky version of a cpp loop, I only use it
+//to fill an array that's sized based on the number of processors
+#define ARRAY_0(val) }
+#define ARRAY_1(val) val ARRAY_0(val)
+#define ARRAY_2(val) val, ARRAY_1(val)
+#define ARRAY_3(val) val, ARRAY_2(val)
+#define ARRAY_4(val) val, ARRAY_3(val)
+#define ARRAY_5(val) val, ARRAY_4(val)
+#define ARRAY_6(val) val, ARRAY_5(val)
+#define ARRAY_7(val) val, ARRAY_6(val)
+#define ARRAY_8(val) val, ARRAY_7(val)
+#define ARRAY_9(val) val, ARRAY_8(val)
+#define ARRAY_10(val) val, ARRAY_9(val)
+#define ARRAY_11(val) val, ARRAY_10(val)
+#define ARRAY_12(val) val, ARRAY_11(val)
+#define ARRAY_13(val) val, ARRAY_12(val)
+#define ARRAY_14(val) val, ARRAY_13(val)
+#define ARRAY_15(val) val, ARRAY_14(val)
+#define ARRAY_16(val) val, ARRAY_15(val)
+#define ARRAY_17(val) val, ARRAY_16(val)
+#define ARRAY_18(val) val, ARRAY_17(val)
+#define ARRAY_19(val) val, ARRAY_18(val)

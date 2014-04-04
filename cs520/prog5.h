@@ -54,8 +54,6 @@
 #include <string.h>
 #include <sys/time.h>//not really sure
 #include "prog5_macros.h"
-#define GC_DEBUG
-#include <gc.h>
 
 //typedefs
 
@@ -177,12 +175,13 @@ static struct fileinfo *fileinfo_queue[NUM_PROCS];
 //these are really ints, but we need them aligned on 8 byte boundries
 //I think, the futex man page says to use aligned integers
 int64_t thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
+int64_t thread_futex_locks[NUM_PROCS] __attribute__((aligned(16)))=ARRAY_PROCS(1);
 uint8_t thread_bufs[NUM_PROCS][MAX_BUF_SIZE];
 thread_fileinfo thread_fileinfo_vals[NUM_PROCS];
 static int64_t fileinfo_queue_index=-1;
 static int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
 //this serves as a counter for threads waiting for data
-//when it is 0 the main thread waits for some worker theread to increment it
+//when it is 0 the main thread waits for so<me worker theread to increment it
 //and call futex_wake. Whenever a worker thread finishes it increments this
 //and calls futex_wake, thus whenever this is > 0 the main thread will keep 
 //passing data to threads (as long as there is data left)

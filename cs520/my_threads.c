@@ -124,9 +124,9 @@ int futex_wait_locking(int *uaddr,int val,const struct timespec *timeout,int *ua
   register int *lock __asm__("%r9")=uaddr2;
   __asm__ volatile ("movq $1,%%r10\n\t"
                     "movq $0,%%r11\n\t"
-                    "movq $1,%%rax\n\t"
                     "1:\n\t"//lock
-                    "cmpl %%r10d,(%%r9)\n\t"//is the lock free?
+                    "movq $1,%%rax\n\t"
+                    "cmpl %%eax,(%%r9)\n\t"//is the lock free?
                     "je 2f\n\t"//if yes try to get it
                     "pause\n\t"//if no pause
                     "jmp 1b\n"//spin again
@@ -167,9 +167,9 @@ int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout ignored by sysc
   register int *lock __asm__("%rcx")=uaddr2;
   __asm__ volatile ("movq $1,%%r8\n\t"
                     "movq $0,%%r9\n\t"
-                    "movq $1,%%rax\n\t"
                     "1:\n\t"//lock
-                    "cmpl %%r8d,(%%rcx)\n\t"//is the lock free?
+                    "movq $1,%%rax\n\t"
+                    "cmpl %%eax,(%%rcx)\n\t"//is the lock free?
                     "je 2f\n\t"//if yes try to get it
                     "pause\n\t"//if no pause
                     "jmp 1b\n"//spin again
@@ -179,7 +179,7 @@ int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout ignored by sysc
                     "movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
                     "movq %2,%%rsi\n\t"
                     "movq %3,%%rax\n\t"
-                    "lock xchgl %%r8d,(%%rcx)\n\t"
+                    "lock xchgl %%r8d,(%%rcx)\n\t"//can't use rax
                     "syscall\n"
                     : "=r" (retval)
                     : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex),"r" (futex_addr), "r" (lock)
@@ -254,7 +254,7 @@ long futex_up(int *uaddr){
   register int *futex_addr __asm__("%rdi")= uaddr;
   register uint64_t retval __asm__("%rax")= __NR_futex;
   __asm__ volatile("lock addq $1,(%%rdi)\n\t"
-                   "testq $1,(%%rdi)\n\t"
+                   "cmpl $1,(%%rdi)\n\t"
                    "je 1f\n\t"
                    //if we get here it's contested, so setup futex syscall
                    "movq $1,(%%rdi)\n\t"//first set futex to 1
@@ -286,7 +286,6 @@ long futex_down(int *uaddr){
                    "syscall\n\t"//make the syscall
                    "1:\n\t"
                    : "+r" (retval) : "r"(futex_addr),"i"(FUTEX_WAIT) :"%rsi","%rdx","%rcx","%r8");
-  fprintf(stderr,"Futex down exit\n");
   if(retval>=min_error_val_u64){
     errno=-retval;
     return -1;
@@ -303,34 +302,36 @@ void futex_spin_up(register int *uaddr){        //unlock spin lock
 }
 #define futex_spin_lock futex_spin_down
 void futex_spin_down(register int *uaddr){
-  register int one __asm__ ("%rax")=1;
   register int zero = 0;
   __asm__ volatile("1:\n\t"//start spining
-                   "cmpl %0,(%1)\n\t"//is the lock free?
+                   "movq $1, %%rax\n\t"
+                   "cmpl %%eax,(%0)\n\t"//is the lock free?
                    "je 2f\n\t"//if yes try to get it
                    "pause\n\t"//if no pause
                    "jmp 1b\n"//spin again
                    "2:\n\t"
-                   "lock cmpxchgl %2,(%1)\n\t"//try to get lock
+                   "lock cmpxchgl %1,(%0)\n\t"//try to get lock
                    "jnz 1b\n"//if we failed spin again
-                   : : "r" (one), "r" (uaddr), "r" (zero));
+                   : : "r" (uaddr), "r" (zero) : "%rax");
 }
 #define futex_spin_lock_slow futex_spin_down_slow
 void futex_spin_down_slow(register int *uaddr){
-  register int one __asm__ ("%rax")=1;
   register int zero = 0;
   __asm__ volatile("1:\n\t"//start spining
-                   "cmpl %0,(%1)\n\t"//is the lock free?
+                   "movq $1,%%rax\n\t"
+                   "cmpl %%eax,(%0)\n\t"//is the lock free?
                    "je 2f\n\t"//if yes try to get it
                    "pause\n\t"//if no pause
                    //slow version, pause a couple times
                    "pause\n\t"
                    "pause\n\t"
+                   "pause\n\t"
+                   "pause\n\t"
                    "jmp 1b\n"//spin again
                    "2:\n\t"
-                   "lock cmpxchgl %2,(%1)\n\t"//try to get lock
+                   "lock cmpxchgl %1,(%0)\n\t"//try to get lock
                    "jnz 1b\n"//if we failed spin again
-                   : : "r" (one), "r" (uaddr), "r" (zero));
+                   : : "r" (uaddr), "r" (zero) :"%rax");
 }
 //Routines for creating threads using the linux clone syscall
 //the syscall itself acts like fork, it returns 0 in the new child thread
@@ -483,3 +484,29 @@ inline_safe_syscall3(int,tgkill,int, tgid, int, tid, int, sig,__NR_tgkill);
   __atomic_and_fetch(ptr,val,__ATOMIC_SEQ_CST)
 #define atomic_xor(ptr,val)                     \
   __atomic_xor_fetch(ptr,val,__ATOMIC_SEQ_CST)
+union word128 {
+  uint128_t uint128;
+  struct {
+    uint64_t low;
+    uint64_t high;
+  };
+  struct {
+    uint32_t one;
+    uint32_t two;
+    uint32_t three;
+    uint32_t four;
+  };
+  uint16_t words[8];
+  uint8_t bytes[16];
+};
+static inline union word128 *compare_and_swap_16(union word128 *ptr,
+                                                 union word128 val,
+                                                 union word128 expected){
+  register uint64_t rdx __asm__ ("%rdx") = expected.low;
+  register uint64_t rax __asm__ ("%rax") = expected.high;
+  register uint64_t rcx __asm__ ("%rdx") = val.low;
+  register uint64_t rbx __asm__ ("%rax") = val.high;
+  __asm__ volatile ("cmpxchg16b (%0)\n"
+                    : "+r" (ptr) : "r"(rdx),"r"(rax),"r"(rcx),"r"(rbx));
+  return ptr;
+}
