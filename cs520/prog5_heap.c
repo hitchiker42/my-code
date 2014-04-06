@@ -93,9 +93,13 @@ struct heap sort_words(){
   uint32_t i=0,j=0,minimum=-1;
   //first get twenty words used in every file, if there are less then twenty
   //then this is all we need to do
+  file_bitfield max_file_bits={.uint128=0};
   PRINT_MSG("start of sort_words\n");
   while(i<31 && j<indices_index){
     english_word *cur_word=global_hash_table[hash_table_indices[j++]];
+    if(cur_word->file_bits.uint128>max_file_bits.uint128){
+      max_file_bits=cur_word->file_bits;
+    }
     if(cur_word->file_bits.uint128 == all_file_bits.uint128){
       if(cur_word->count < minimum){
         minimum=cur_word->count;
@@ -104,6 +108,8 @@ struct heap sort_words(){
       i++;
     }
   }
+  PRINT_FMT("max file_bits=\n%#016lx %#016lx\n",max_file_bits.high,
+            max_file_bits.low);
   if(i<20){
     if(i==0){
       fprintf(stderr,"No words common to all files\n");
@@ -130,11 +136,12 @@ struct heap sort_words(){
   i=31;
   return (struct heap){.heap=heap_sort(most_common,i),.size=i};
 }
+#if 0
 struct heap sort_words_2(){
   //maybe this should be thread local
   //this is 32 instead of 20 so we have a full 5 level binary tree
   //which needs 31 blocks and 32 is a much nicer value than 31
-  english_word **most_common=xmalloc(indices_index*sizeof(english_word*));
+  english_word **most_common=thread_stacks;
   uint32_t i=0,j=0;
   //first get twenty words used in every file, if there are less then twenty
   //then this is all we need to do
@@ -148,6 +155,7 @@ struct heap sort_words_2(){
   }
   return (struct heap){.heap=heap_sort(most_common,i),.size=i};
 }
+#endif
 //works by modifying memory, but returns a value for convience
 static inline english_word** heap_sort(english_word **heap,uint32_t size){
   uint32_t end=size-1;

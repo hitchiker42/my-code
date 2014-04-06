@@ -1,15 +1,3 @@
-/* TODO: Add two atomic global variables
-   out_of_data=0:
-   num_threads=NUM_PROCS-1;
-   when there's no data left the main thread does
-   atomic_inc(out_of_data);
-   each worker thread checks this variable before waiting
-   for more data, if it's one then the thread atomicly decrements
-   num_threads and exits.
-   
-   the main thread waits untill num_threads == 0 after setting 
-   out_of_data to 1
- */
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wformat"
@@ -48,6 +36,7 @@
 //includes
 #define _GNU_SOURCE //makes some nonportable extensions available
 #include <stdarg.h>//vfprintf and the va_arg macros
+#include <pthread.h>
 #include <alloca.h>//alloca, unecessary because of _GNU_SOURCE 
 #include <asm/unistd.h> //syscall numbers
 #include <assert.h>//unused as of now
@@ -79,26 +68,14 @@ typedef struct fileinfo fileinfo;
 typedef union file_bitfield file_bitfield;
 struct pt_regs;
 typedef int __attribute__((aligned(8))) aligned_int;
-
+typedef aligned_int spin_lock;
 //forward declarations
-long futex_up(int *futex_addr);//also #defined as futex_unlock
-long futex_down(int *futex_addr);//"""" futex_lock
-void futex_spin_up(register int *futex_addr);//"""" futex_spin_unlock
-void futex_spin_down(register int *futex_addr);//"""" futex_spin_lock
-int futex_wake(int *uaddr,int val);
-int futex_wait(int *uaddr,int val,const struct timespec *timeout);
-long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
-                   void *ctid,struct pt_regs *regs);
 void* parse_buf(const uint8_t *buf,int file_id,void *mem);//core function
-struct fileinfo open_file_simple(char *filename);
 struct heap sort_words();
 struct fileinfo *setup_block(struct fileinfo *info,uint8_t *buf);
 struct fileinfo *setup_fileinfo(char *filename);
 int setup_thread_args(int thread_id_num);
 int refill_fileinfo_queue();
-long my_clone(unsigned long flags,void *child_stack,void *ptid,
-              void (*fn)(void*),void *arg);
-static int tgkill(int tgid, int tid, int sig);
 void print_results(struct heap);
 static char* __attribute__((const)) ordinal_suffix(uint32_t num);
 //structure definitions
@@ -171,8 +148,12 @@ struct english_word {
 //static __thread uint64_t thread_mem_end;
 //allocate NUM_PROCS*2MB space for the thread stacks
 //probably could be reduced to about...256Kb I think, but eh
-//if I used pthreads this is what they would allocate
-static uint8_t thread_stacks[NUM_PROCS*(2<<20)];
+static uint8_t thread_stacks[NUM_PROCS][(2<<20)] __attribute__((aligned(4096)));
+static pthread_attr_t thread_attrs[NUM_PROCS];
+static uint64_t pthread_thread_ids[NUM_PROCS];
+static __thread uint64_t thread_id;
+static __thread uint8_t thread_mem_block[2<<20];
+static __thread void* thread_mem_pointer;
 #define THREAD_STACK_TOP(thread_id)             \
   ((thread_stacks+((thread_id+1)*(2<<20)))-1)
 //static uint64_t next_thread_id=0;
@@ -428,3 +409,22 @@ static inline void print_fileinfo(struct fileinfo *info){
 #else
 #define print_fileinfo(info)
 #endif
+void spin_lock_unlock(register int *uaddr){        //unlock spin lock
+  register long one=1;
+  __asm__ volatile ("lock xchgq %0,(%1)\n"
+                    : : "r" (one), "r" (uaddr));
+}
+#define futex_spin_lock futex_spin_down
+void spin_lock_lock(register int *uaddr){
+  register int zero = 0;
+  __asm__ volatile("1:\n\t"//start spining
+                   "movq $1, %%rax\n\t"
+                   "cmpl %%eax,(%0)\n\t"//is the lock free?
+                   "je 2f\n\t"//if yes try to get it
+                   "pause\n\t"//if no pause
+                   "jmp 1b\n"//spin again
+                   "2:\n\t"
+                   "lock cmpxchgl %1,(%0)\n\t"//try to get lock
+                   "jnz 1b\n"//if we failed spin again
+                   : : "r" (uaddr), "r" (zero) : "%rax");
+}

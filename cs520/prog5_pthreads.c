@@ -1,9 +1,9 @@
-#include "prog5.h" 
+#include "prog5_pthreads.h" 
 #include "my_threads.c"
 //strings never need to be freed but the ammout of space needed for them
 //varies wildly so I allocate space for strings dynamically
 static void *str_malloc(uint64_t size){
-  futex_spin_lock(&string_mem_lock);
+  spin_lock_lock(&string_mem_lock);
   if(string_mem_pointer+size>string_mem_end){
     string_mem_pointer=mmap(NULL,(8*(1<<20)),PROT_READ|PROT_WRITE,
                             MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
@@ -13,7 +13,7 @@ static void *str_malloc(uint64_t size){
   //(prog1 string_mem_pointer (incf string_mem_pointer size))
   void *retval=string_mem_pointer;
   string_mem_pointer+=size;
-  futex_spin_unlock(&string_mem_lock);
+  spin_lock_unlock(&string_mem_lock);
   return retval;
 }
 /*
@@ -160,12 +160,9 @@ void thread_main(void *arg){
   int futex_retval=-1;
   //this needs to be allocated on the stack, so I figured I'd use auto
   //because really, when is there ever a reason to use auto
-  auto uint64_t thread_id=(uint64_t)(arg);
-  auto void *thread_mem_pointer=mmap(NULL,(2*(1<<20)),PROT_READ|PROT_WRITE,
-                                     MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
-  if(builtin_unlikely(thread_mem_pointer==MAP_FAILED)){
-    PROGRAM_ERROR(perror("mmap failed"));
-  }
+  thread_id=(uint64_t)(arg);
+  thread_mem_pointer=thread_mem_block;
+  PRINT_FMT("Worker thread %ld started\n",thread_pids[thread_id]);
   while(!atomic_load_n(&out_of_data)){
     //do stuff
     thread_mem_pointer=
@@ -176,9 +173,9 @@ void thread_main(void *arg){
       goto EXIT;
     }
     //tell main thread we're done
-    futex_spin_lock(&thread_queue_lock);
+    spin_lock_lock(&thread_queue_lock);
     thread_queue[thread_queue_index++]=thread_id;
-    futex_spin_unlock(&thread_queue_lock);
+    spin_lock_unlock(&thread_queue_lock);
     atomic_add(&main_thread_wait,1);
     futex_retval=futex_wake_locking(&main_thread_wait,1,&main_thread_wait_lock);
     if(builtin_unlikely(futex_retval==-1)){
@@ -225,11 +222,11 @@ void main_wait_loop(int have_data){
       if(atomic_load_n(&main_thread_wait)>NUM_PROCS){
         PROGRAM_ERROR(fprintf(stderr,"More threads waiting then exist, exiting\n"));
       }
-      futex_spin_lock(&thread_queue_lock);
+      spin_lock_lock(&thread_queue_lock);
       worker_thread_id=thread_queue[--thread_queue_index];
       out_of_data_local=(!setup_thread_args(worker_thread_id));
       atomic_store_n(thread_futexes+worker_thread_id,1);
-      futex_spin_unlock(&thread_queue_lock);
+      spin_lock_unlock(&thread_queue_lock);
       /*The issue is here, when setup_thread_args returns 0 it means that 
         there's no data left, but arguments for a thread have already been 
         setup. So I need to make sure I process this last set of data
@@ -267,10 +264,10 @@ void main_wait_loop(int have_data){
       /*while(atomic_load_n(&main_thread_wait)>0){ 
        atomic_dec(&main_thread_wait);
         PRINT_FMT("main thread locking spin lock (out of data)\n");
-        futex_spin_lock(&thread_queue_lock);
+        spin_lock_lock(&thread_queue_lock);
         PRINT_FMT("main thread locked spin lock (out of data)\n");
         worker_thread_id=thread_queue[--thread_queue_index];
-        futex_spin_unlock(&thread_queue_lock);
+        spin_lock_unlock(&thread_queue_lock);
         PRINT_FMT("main thread unlocked spin lock (out of data)\n");*/
       //kind of a hack, but it works, just keep looping over all threads waking
       //them up untill they're all done
@@ -333,7 +330,7 @@ int setup_thread_args(int thread_id_num){
 int refill_fileinfo_queue(){
   //  PRINT_MSG("Calling refill_fileinfo_queue\n");
   static struct fileinfo *info;
-  //  futex_spin_lock(&thread_queue_lock);
+  //  spin_lock_lock(&thread_queue_lock);
   if(current_file<num_files){
     while(fileinfo_queue_index<NUM_PROCS && current_file<num_files){
       info=setup_fileinfo(filenames[current_file++]);
@@ -344,7 +341,7 @@ int refill_fileinfo_queue(){
     }    
   }
   int retval=fileinfo_queue[fileinfo_queue_index]->remaining?1:0;
-  //  futex_spin_unlock(&thread_queue_lock);
+  //  spin_lock_unlock(&thread_queue_lock);
   return retval;
 }
 /*
@@ -461,7 +458,7 @@ struct fileinfo *setup_fileinfo(char *filename){
   //  print_fileinfo(info);
   return info;
 }
-//only call with an unused fileinfo, behaves specially for
+/*//only call with an unused fileinfo, behaves specially for
 //files that are less then max_buf_len bytes long
 struct fileinfo *init_thread_filestart(struct fileinfo *info,int thread_id_num){
   if(info->remaining < max_buf_size){
@@ -495,13 +492,16 @@ struct fileinfo *init_thread_filestart(struct fileinfo *info,int thread_id_num){
     assert((tid == thread_pids[thread_id_num]) && tid!=0);
     return info;
   }
-}
+  }*/
 struct fileinfo *init_thread(struct fileinfo *info,int thread_id_num){
   info=setup_block(info,thread_bufs[thread_id_num]);
   thread_fileinfo_vals[thread_id_num].file_id=info->file_id;
   thread_fileinfo_vals[thread_id_num].start_offset=0;
-  long tid=my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(thread_id_num),
-                    thread_pids+thread_id_num,thread_main,(void*)(long)thread_id_num);
+  assert(thread_attrs+thread_id_num);
+  if((errno=pthread_create(pthread_thread_ids+thread_id_num,&thread_attrs[thread_id_num],
+                           (void*(*)(void*))thread_main,(void*)(uint64_t)thread_id_num))!=0){
+    PROGRAM_ERROR(perror("pthread create failed"));
+  }
   if(info->remaining){
     return info;
   } else {
@@ -561,6 +561,16 @@ int main(int argc,char *argv[]){
   string_mem_end=string_mem_pointer+(8*(1<<20));
   if(builtin_unlikely(string_mem_pointer==MAP_FAILED)){
     PROGRAM_ERROR(perror("mmap failed"));
+  }
+  //inilialize phread attrs
+  for(i=0;i<NUM_PROCS;i++){
+    pthread_attr_init(&thread_attrs[i]);
+    if((pthread_attr_setstack(&thread_attrs[i],thread_stacks[i],(2<<20)))!=0){
+      PROGRAM_ERROR(perror("setstack failed"));
+    }
+    if(pthread_attr_setdetachstate(&thread_attrs[i],PTHREAD_CREATE_DETACHED)!=0){
+      PROGRAM_ERROR(perror("setdetachstate failed"));
+    }
   }
   if(num_files==1){
     current_file=1;
@@ -625,5 +635,6 @@ int main(int argc,char *argv[]){
     }
   }
   PRINT_MSG("Finished starting threads\n");
+  BREAKPOINT();
   main_wait_loop(have_data);
 }

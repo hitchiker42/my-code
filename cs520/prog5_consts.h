@@ -2,10 +2,6 @@ static const uint64_t PAGESIZE=4096;
 static const uint64_t buf_size=128*(1<<10);//128kb
 static const uint64_t min_buf_size=8*(1<<10);//8Kb
 static const uint64_t max_buf_size=136*(1<<10);//128+8Kb
-static const uint64_t const_zero_64=0;
-static const uint32_t const_zero_32=0;
-static const uint64_t const_one_64=1;
-static const uint32_t const_one_32=1;
 //global initialized arrays
 /*1 if char is in the set [A-Za-z] zero otherwise */
 static const uint8_t eng_accept[256]=

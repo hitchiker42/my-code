@@ -4,7 +4,7 @@
 #ifdef AGATE
 #define NUM_PROCS 16
 #else
-#define NUM_PROCS 4
+#define NUM_PROCS 8
 #endif
 #endif
 #define MAX_BUF_SIZE (136*(1<<10))
@@ -71,6 +71,13 @@
 #define BREAKPOINT()
 #endif
 
+//Make sure we only have one thread calling exit/printing stuff
+#define PROGRAM_ERROR(code)                             \
+  if(atomic_add(&in_error,1)){                          \
+    code;                                               \
+    exit(EXIT_FAILURE);                                 \
+  }                                                     \
+  else{__asm__ volatile("1:\n\tpause\n\tjmp 1b\n");}
 //really hacky version of a cpp loop, I only use it
 //to fill an array that's sized based on the number of processors
 //and even just doing that I need to use some tricks with joining symbols

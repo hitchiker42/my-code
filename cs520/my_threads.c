@@ -7,14 +7,8 @@
 #include <asm/unistd.h>
 #include <time.h>
 #include <errno.h>
-#if (defined DEBUG) && !(defined NDEBUG)
 #include <stdio.h>
-#define DEBUG_PRINT(str) fprintf(stderr,str)
-#define DEBUG_PRINTF(fmt,args...) fprintf(stderr,fmt,##args...)
-#else 
-#define DEBUG_PRINT(str)
-#define DEBUG_PRINTF(fmt,args...)
-#endif
+#include <stdarg.h>
 #define PTHREAD_CLONE_FLAGS   (CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|\
                                CLONE_SETTLS|CLONE_PARENT_SETTID|\
                                CLONE_CHILD_CLEARTID|CLONE_SYSVSEM|0)
@@ -23,6 +17,8 @@
 #define SIMPLE_CLONE_FLAGS  (CLONE_VM|CLONE_SIGHAND|CLONE_SYSVSEM|CLONE_PTRACE| \
                              CLONE_PARENT_SETTID|CLONE_FS|CLONE_FILES|CLONE_THREAD|0)
 #include "inline_asm_macros.h"
+#define atomic_store_n(ptr,val)                 \
+  __atomic_store_n(ptr,val,__ATOMIC_SEQ_CST)
 /* Assembly for futex routines.
    futexes are a linux exclusive means of 'fast userspace locking'
    the futex syscall itself is a means of waiting for a value at a specific
@@ -70,8 +66,8 @@ inline_safe_syscall6(int, futex, int*, uaddr, int, op, int, val,
 //check that *uadder==val, if not return immediately
 //return value is -EWOULDBLOCK and errno is set to EWOULDBLOCK
 //otherwise wait until a FUTEX_WAKE
+#if 0
 int futex_wait(int *uaddr,int val,const struct timespec *timeout){
-  DEBUG_PRINT("Calling futex wait");
   register uint32_t retval __asm__ ("%rax")=__NR_futex;
   register int *futex_addr __asm__("%rdi")=uaddr;
   __asm__ volatile (//Shift args
@@ -88,9 +84,9 @@ int futex_wait(int *uaddr,int val,const struct timespec *timeout){
                       "r" (futex_addr)
                     : "%rsi","%rcx","%rdx","%r8");
   if(retval>=min_error_val_u32){
-    fprintf(stderr,"value of &futex_addr = %d\nvalue of val = %d\n",*futex_addr,val);
-    errno=-retval;
-    if(errno==EWOULDBLOCK){//this means we just skip waiting
+    //    microsleep(1000);
+    //fprintf(stderr,"value of &futex_addr = %d\nvalue of val = %d\n",*futex_addr,val);
+    if((-retval)==EWOULDBLOCK){//this means we just skip waiting
       return 1;
     }
     return -1;
@@ -100,7 +96,6 @@ int futex_wait(int *uaddr,int val,const struct timespec *timeout){
 //interfate to the raw syscall with FUTEX_WAKE as the op argument
 //wake up upto val processes waiting on the futex at uaddr
 int futex_wake(int *uaddr,int val){//timeout ignored by syscall
-  DEBUG_PRINT("Calling futex wake\n")
   register uint32_t retval __asm__ ("%rax");
   register int *futex_addr __asm__("%rdi")=uaddr;
   __asm__ volatile ("movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
@@ -110,15 +105,15 @@ int futex_wake(int *uaddr,int val){//timeout ignored by syscall
                     : "=r" (retval)
                     : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex),"r" (futex_addr)
                     :"%rsi","%rdx");
-  DEBUG_PRINT("Called futex wake\n");
   if(retval>=min_error_val_u32){
-    errno=-retval;
+    //    atomic_store_n(&errno,-retval);
     return -1;
   }
   return (int)retval;
 }
-int futex_wait_locking(int *uaddr,int val,const struct timespec *timeout,int *uaddr2){
-  DEBUG_PRINT("Calling futex wait locking");
+#endif
+static inline int
+futex_wait_locking(int *uaddr,int val,const struct timespec *timeout,int *uaddr2){
   register uint32_t retval __asm__ ("%rax");
   register int *futex_addr __asm__("%rdi")=uaddr;
   register int *lock __asm__("%r9")=uaddr2;
@@ -143,25 +138,25 @@ int futex_wait_locking(int *uaddr,int val,const struct timespec *timeout,int *ua
                     "movl %3,%%eax\n\t"
                     //unlock
                     "lock xchgl %%r10d,(%%r9)\n\t"
+                    //race condition?
                     "syscall\n"
                     : "=r" (retval)
                     : /*"g" (timeout),*/ "r" (val), "i" (FUTEX_WAIT), 
                       "i" (__NR_futex), "r" (futex_addr), "r"(lock)
                     : "%rsi","%rcx","%rdx","%r8","%r10","%r11");
   if(retval>=min_error_val_u32){
-    fprintf(stderr,"value of &futex_addr = %d\nvalue of val = %d\n",*futex_addr,val);
-    errno=-retval;
-    if(errno==EWOULDBLOCK){//this means we just skip waiting
+    //    fprintf(stderr,"value of &futex_addr = %d\nvalue of val = %d\n",*futex_addr,val);
+    if(-retval==EWOULDBLOCK){//this means we just skip waiting
       return 1;
     }
+    errno=-retval;
     return -1;
   }
   return (int)retval;
 }
 //interfate to the raw syscall with FUTEX_WAKE as the op argument
 //wake up upto val processes waiting on the futex at uaddr
-int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout ignored by syscall
-  DEBUG_PRINT("Calling futex wake\n")
+static inline int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout ignored by syscall
   register uint32_t retval __asm__ ("%rax");
   register int *futex_addr __asm__("%rdi")=uaddr;
   register int *lock __asm__("%rbx")=uaddr2;
@@ -185,9 +180,8 @@ int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout ignored by sysc
                     : "r" (val), "i" (FUTEX_WAKE), "i" (__NR_futex),
                       "r" (futex_addr), "r" (lock),"r"(one)
                     :"%rsi","%rdx","%r9");
-  DEBUG_PRINT("Called futex wake\n");
   if(builtin_unlikely(retval>=min_error_val_u32)){
-    errno=-retval;
+    //    atomic_store_n(&errno,-retval);
     return -1;
   }
   return (int)retval;
@@ -200,7 +194,6 @@ int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout ignored by sysc
   with the error EAGAIN
 */
 int futex_cmp_requeue(int *uaddr,int val,int *uaddr2,int val3){
-  DEBUG_PRINT("Calling futex wait");
   register uint32_t retval __asm__ ("%rax");
   register int *futex_addr __asm__("%rdi")=uaddr;
   __asm__ volatile (//Shift args
@@ -215,7 +208,7 @@ int futex_cmp_requeue(int *uaddr,int val,int *uaddr2,int val3){
                       "i" (__NR_futex), "r" (futex_addr)
                     : "%rsi","%rcx","%rdx");
   if(retval>=min_error_val_u32){
-    errno=-retval;
+    //    atomic_store_n(&errno,-retval);
     return -1;
   }
   return (int)retval;
@@ -226,7 +219,6 @@ int futex_cmp_requeue(int *uaddr,int val,int *uaddr2,int val3){
 
  */
 int futex_requeue(int *uaddr,int val,int *uaddr2){
-  DEBUG_PRINT("Calling futex wait");
   register uint32_t retval __asm__ ("%rax");
   register int *futex_addr __asm__("%rdi")=uaddr;
   __asm__ volatile (//Shift args
@@ -240,7 +232,7 @@ int futex_requeue(int *uaddr,int val,int *uaddr2){
                       "i" (__NR_futex), "r" (futex_addr)
                     : "%rsi","%rcx","%rdx");
   if(retval>=min_error_val_u32){
-    errno=-retval;
+    //    atomic_store_n(&errno,-retval);
     return -1;
   }
   return (int)retval;
@@ -266,7 +258,7 @@ long futex_up(int *uaddr){
                    "1:\n\t"
                    : "+r" (retval) : "r"(futex_addr), "i"(FUTEX_WAKE) :"%rsi","%rdx");
   if(retval>=min_error_val_u64){
-    errno=-retval;
+    //    atomic_store_n(&errno,-retval);
     return -1;
   }
   return (long)retval;
@@ -288,7 +280,7 @@ long futex_down(int *uaddr){
                    "1:\n\t"
                    : "+r" (retval) : "r"(futex_addr),"i"(FUTEX_WAIT) :"%rsi","%rdx","%rcx","%r8");
   if(retval>=min_error_val_u64){
-    errno=-retval;
+    //    atomic_store_n(&errno,-retval);
     return -1;
   }
   return (long)retval;
@@ -365,7 +357,7 @@ long my_clone(unsigned long flags_,void *child_stack_,void *ptid_,
                     :"+r"(retval) : "r" (flags),"r" (child_stack), "r" (ptid)
                     :"rcx","r8");
   if((uint64_t)retval >= min_error_val_u64){//no new thread is created on error
-    errno=-retval;
+    //    atomic_store_n(&errno,-retval);
     return -1;
   } else {
     if(retval > 0) {
@@ -473,8 +465,6 @@ inline_safe_syscall3(int,tgkill,int, tgid, int, tid, int, sig,__NR_tgkill);
   __atomic_fetch_add(ptr,val,__ATOMIC_SEQ_CST)
 #define atomic_load_n(ptr)                     \
   __atomic_load_n(ptr,__ATOMIC_SEQ_CST)
-#define atomic_store_n(ptr,val)                 \
-  __atomic_store_n(ptr,val,__ATOMIC_SEQ_CST)
 #define atomic_load(ptr,loc)                    \
   __atomic_load(ptr,loc,__ATOMIC_SEQ_CST)
 #define atomic_store(ptr,loc)                 \
@@ -514,3 +504,52 @@ static inline union word128 *compare_and_swap_16(union word128 *ptr,
                     : "+r" (ptr) : "r"(rdx),"r"(rax),"r"(rcx),"r"(rbx));
   return ptr;
 }
+#if 0
+static int32_t io_lock __attribute__((aligned (16)))=1;
+#define locked_stdio_body(fn,rettype,args...)   \
+  rettype retval;                               \
+  futex_spin_lock_slow(&io_lock);               \
+  fn##_unlocked(args);                          \
+  futex_spin_unlock(&io_lock);                  \
+  return retval
+int my_putc(int c, FILE* stream){
+  locked_stdio_body(putc,int,c,stream);
+}
+int my_putchar(int c){
+  locked_stdio_body(putchar,int,c,stream);
+}
+
+int my_getc(int c, FILE* stream){
+  locked_stdio_body(getc,int,c,stream);
+}
+int my_getchar(int c){
+  locked_stdio_body(getchar,int,c,stream);
+}
+int my_fputs(const char *s, FILE *stream){
+  locked_stdio_body(fputs,int,s,stream);
+}
+size_t my_fwrite(const void *ptr,size_t size,size_t nmemb,FILE *stream){
+  locked_stdio_body(fwrite,size_t,ptr,size,nmemb,stream);
+}
+
+int my_fprintf(FILE *stream,const char *fmt, ...){
+  char *buf;
+  va_list ap;
+  va_start(ap,fmt);
+  vasprintf(&buf,fmt,ap);
+  my_fputs(buf,stream);
+  free(buf);
+  return 0;//better return value later
+}
+  /*  uint64_t size_guess=200;
+  int vsnprintf_retval;
+  char *buf_end=buf+size_guess;
+  char *buf=alloca(size_guess);
+
+ START:
+  vsnprintf_retval=vnnprintf(buf,size_guess,fmt,ap);
+  if(vsnprintf_retval>size_guess){
+    size_guess*=2;
+    buf_end*/
+  
+#endif
