@@ -159,6 +159,7 @@ struct heap sort_words_2(){
 //works by modifying memory, but returns a value for convience
 static inline english_word** heap_sort(english_word **heap,uint32_t size){
   uint32_t end=size-1;
+  heapify(heap,0,end);//just to be safe
   while(end>0){
     SWAP(heap[end],heap[0]);
     end--;

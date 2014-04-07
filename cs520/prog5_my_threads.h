@@ -1,3 +1,15 @@
+/* TODO: Add two atomic global variables
+   out_of_data=0:
+   num_threads=NUM_PROCS-1;
+   when there's no data left the main thread does
+   atomic_inc(out_of_data);
+   each worker thread checks this variable before waiting
+   for more data, if it's one then the thread atomicly decrements
+   num_threads and exits.
+   
+   the main thread waits untill num_threads == 0 after setting 
+   out_of_data to 1
+ */
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wformat"
@@ -36,7 +48,6 @@
 //includes
 #define _GNU_SOURCE //makes some nonportable extensions available
 #include <stdarg.h>//vfprintf and the va_arg macros
-#include <pthread.h>
 #include <alloca.h>//alloca, unecessary because of _GNU_SOURCE 
 #include <asm/unistd.h> //syscall numbers
 #include <assert.h>//unused as of now
@@ -55,10 +66,8 @@
 #include <unistd.h>//bunch of stuff, including close
 #include <string.h>
 #include <strings.h>
-#include <semaphore.h>
 #include <sys/time.h>//not really sure
 #include "prog5_macros.h"
-#include <err.h>
 
 //typedefs
 
@@ -71,14 +80,26 @@ typedef struct fileinfo fileinfo;
 typedef union file_bitfield file_bitfield;
 struct pt_regs;
 typedef int __attribute__((aligned(8))) aligned_int;
-typedef aligned_int spin_lock;
+
 //forward declarations
+long futex_up(int *futex_addr);//also #defined as futex_unlock
+long futex_down(int *futex_addr);//"""" futex_lock
+void futex_spin_up(register int *futex_addr);//"""" futex_spin_unlock
+void futex_spin_down(register int *futex_addr);//"""" futex_spin_lock
+int futex_wake(int *uaddr,int val);
+int futex_wait(int *uaddr,int val,const struct timespec *timeout);
+long clone_syscall(unsigned long flags,void *child_stack,void *ptid,
+                   void *ctid,struct pt_regs *regs);
 void* parse_buf(const uint8_t *buf,int file_id,void *mem);//core function
+struct fileinfo open_file_simple(char *filename);
 struct heap sort_words();
 struct fileinfo *setup_block(struct fileinfo *info,uint8_t *buf);
 struct fileinfo *setup_fileinfo(char *filename);
 int setup_thread_args(int thread_id_num);
 int refill_fileinfo_queue();
+long my_clone(unsigned long flags,void *child_stack,void *ptid,
+              void (*fn)(void*),void *arg);
+static int tgkill(int tgid, int tid, int sig);
 void print_results(struct heap);
 static char* __attribute__((const)) ordinal_suffix(uint32_t num);
 //structure definitions
@@ -145,16 +166,14 @@ struct english_word {
 //In addition to this between 38 (32+6) and 82(32+50) bytes.
 //are needed to store each word, this is dynamically allocated
 
-//static uint8_t thread_stacks[(2<<20)] __attribute__((aligned(4096)));
-static pthread_attr_t thread_attrs[NUM_PROCS];
-static pthread_attr_t default_thread_attr;
-static uint64_t pthread_thread_ids[NUM_PROCS];
-static __thread uint64_t thread_id;
-static uint8_t thread_mem_block[NUM_PROCS][2<<20];
-static __thread void* thread_mem_pointer;
-static sem_t main_thread_waiters;
-static sem_t thread_semaphores[NUM_PROCS];
-static sigset_t full_set;
+//Imagine that these are thread local variables
+//static __thread uint64_t thread_id;
+//static __thread void *thread_mem_pointer;
+//static __thread uint64_t thread_mem_end;
+//allocate NUM_PROCS*2MB space for the thread stacks
+//probably could be reduced to about...256Kb I think, but eh
+//if I used pthreads this is what they would allocate
+static uint8_t thread_stacks[NUM_PROCS*(2<<20)];
 #define THREAD_STACK_TOP(thread_id)             \
   ((thread_stacks+((thread_id+1)*(2<<20)))-1)
 //static uint64_t next_thread_id=0;
@@ -167,18 +186,29 @@ static uint8_t thread_queue[NUM_PROCS];
 static uint8_t thread_queue_index=0;
 //holds the information about the data to be given to threads
 static struct fileinfo *fileinfo_queue[NUM_PROCS];
+//these are really ints, but we need them aligned on 8 byte boundries
+//I think, the futex man page says to use aligned integers
+int64_t thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
+int64_t thread_futex_locks[NUM_PROCS] __attribute__((aligned(16)))=ARRAY_PROCS(1);
 uint8_t thread_bufs[NUM_PROCS][MAX_BUF_SIZE];
 thread_fileinfo thread_fileinfo_vals[NUM_PROCS];
 static int64_t fileinfo_queue_index=-1;
 static int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
+//this serves as a counter for threads waiting for data
+//when it is 0 the main thread waits for so<me worker theread to increment it
+//and call futex_wake. Whenever a worker thread finishes it increments this
+//and calls futex_wake, thus whenever this is > 0 the main thread will keep 
+//passing data to threads (as long as there is data left)
+int32_t main_thread_wait __attribute__((aligned (16)))=0;
+int32_t main_thread_wait_lock __attribute__((aligned (16)))=1;
 int32_t in_error = 0;
-//  sigset_t sigwait_set;
+sigset_t sigwait_set;
 uint64_t num_files;
 uint64_t current_file=0;
 uint64_t out_of_data=0;
 uint64_t live_threads=0;
-/*sigset_t block_sigterm;
-  sigset_t block_sigtrap;*/
+sigset_t block_sigterm;
+sigset_t block_sigtrap;
 /* 
    I can't use malloc since my threads aren't visable to libc which messes
    up the internal locking done by malloc, and just messes everything up.
@@ -279,7 +309,7 @@ static inline int string_compare(english_word *x,english_word *y){
   if(x->len != y->len){
     return 0;
   } else {
-    //return !memcmp(x->str,y->str,x->len);
+    //    return !memcmp(x->str,y->str,x->len);
     return !strncasecmp(x->str,y->str,x->len);
   }
 }
@@ -306,6 +336,15 @@ static inline void print_count_word(english_word *x){
   fwrite(x->str,x->len,1,stdout);
   puts("");
 }
+/*
+   ideas for storing info:
+   One hash table //currently used
+   Trie //might use, but unlikely at this point
+     -faster than a binary tree (which is why thats not an option)
+     -Significantly more compilcated to implement
+   Hash tree/trie //almost certantily won't use
+     -complicated, not sure if it would be any faster either
+*/
 //really this is more memcpy than strcpy, but the reason I wrote it
 //is that I know I'll only be coping 6-50 bytes and the cost of aligning the
 //data and copying in chunks isn't worth it. Plus it's small enough to inline
@@ -317,6 +356,26 @@ static inline char *my_strcpy(uint8_t *dest_,const uint8_t *src_,uint64_t len_){
   __asm__ volatile("rep movsb"
                    : : "r" (dest), "r" (src), "r" (len));
   return (char*)dest_;
+}
+/* 
+   I don't even know why this doesn't work,
+   but if I can't fix this I'll just stick to memcmp 
+   because there's not way besides using repne cmpsb
+   that I can make this small enough to inline 
+*/
+static inline int my_string_compare_asm(english_word *x,english_word *y){
+  if(x->len != y->len){
+    return 0;
+  } else {
+    uint64_t cnt=y->len;
+    __asm__("movq %2,%%rdi\n\t"
+            "movq %3,%%rsi\n\t"
+            "movq %0,%%rcx\n\t"
+            "repne cmpsb"
+            : "=g" (cnt) : "0" (cnt),"g" (x->str), "g" (y->str)
+            : "%rcx","%rdi","%rsi");
+    return !cnt;
+  }
 }
 static inline void perror_fmt(const char *fmt,...){
   va_list ap;
@@ -370,29 +429,3 @@ static inline void print_fileinfo(struct fileinfo *info){
 #else
 #define print_fileinfo(info)
 #endif
-void spin_lock_unlock(register int *uaddr){        //unlock spin lock
-  register long one=1;
-  __asm__ volatile ("mfence\n\t"
-                    "lock xchgq %0,(%1)\n"
-                    : : "r" (one), "r" (uaddr));
-}
-#define futex_spin_lock futex_spin_down
-void spin_lock_lock(register int *uaddr){
-  register int zero = 0;
-  __asm__ volatile("1:\n\t"//start spining
-                   "movq $1, %%rax\n\t"
-                   "cmpl %%eax,(%0)\n\t"//is the lock free?
-                   "je 2f\n\t"//if yes try to get it
-                   "pause\n\t"//if no pause
-                   "jmp 1b\n"//spin again
-                   "2:\n\t"
-                   "lock cmpxchgl %1,(%0)\n\t"//try to get lock
-                   "jnz 1b\n"//if we failed spin again
-                   : : "r" (uaddr), "r" (zero) : "%rax");
-}
-#define cond_wait_simple(mx,cnd,test)           \
-  pthread_mutex_lock(mx);                       \
-  while(test){                                  \
-    pthread_cond_wait(cnd,mx);                  \
-  }                                             \
-  pthread_mutex_unlock(mx)

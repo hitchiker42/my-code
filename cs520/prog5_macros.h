@@ -52,7 +52,7 @@
 #define fnv_prime_64 1099511628211UL
 
 
-#define DEBUG
+#define NDEBUG
 #if (defined DEBUG) && !(defined NDEBUG)
 #define HERE() fprintf(stderr,"here at %s,line %d\n",__FILE__,__LINE__)
 #define PRINT_MSG(string) fprintf(stderr,string);
