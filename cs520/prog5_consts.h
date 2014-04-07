@@ -1,4 +1,4 @@
-static const uint64_t PAGESIZE=4096;
+//static const uint64_t PAGESIZE=4096;
 static const uint64_t buf_size=128*(1<<10);//128kb
 static const uint64_t min_buf_size=8*(1<<10);//8Kb
 static const uint64_t max_buf_size=136*(1<<10);//128+8Kb

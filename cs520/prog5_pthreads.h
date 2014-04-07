@@ -58,6 +58,7 @@
 #include <semaphore.h>
 #include <sys/time.h>//not really sure
 #include "prog5_macros.h"
+#include <err.h>
 
 //typedefs
 
@@ -144,20 +145,15 @@ struct english_word {
 //In addition to this between 38 (32+6) and 82(32+50) bytes.
 //are needed to store each word, this is dynamically allocated
 
-//Imagine that these are thread local variables
-//static __thread uint64_t thread_id;
-//static __thread void *thread_mem_pointer;
-//static __thread uint64_t thread_mem_end;
-//allocate NUM_PROCS*2MB space for the thread stacks
-//probably could be reduced to about...256Kb I think, but eh
-static uint8_t thread_stacks[(2<<20)] __attribute__((aligned(4096)));
+//static uint8_t thread_stacks[(2<<20)] __attribute__((aligned(4096)));
 static pthread_attr_t thread_attrs[NUM_PROCS];
 static pthread_attr_t default_thread_attr;
 static uint64_t pthread_thread_ids[NUM_PROCS];
 static __thread uint64_t thread_id;
-static __thread uint8_t thread_mem_block[2<<20];
+static uint8_t thread_mem_block[NUM_PROCS][2<<20];
 static __thread void* thread_mem_pointer;
 static sem_t main_thread_waiters;
+static sem_t thread_semaphores[NUM_PROCS];
 static sigset_t full_set;
 #define THREAD_STACK_TOP(thread_id)             \
   ((thread_stacks+((thread_id+1)*(2<<20)))-1)
@@ -171,29 +167,18 @@ static uint8_t thread_queue[NUM_PROCS];
 static uint8_t thread_queue_index=0;
 //holds the information about the data to be given to threads
 static struct fileinfo *fileinfo_queue[NUM_PROCS];
-//these are really ints, but we need them aligned on 8 byte boundries
-//I think, the futex man page says to use aligned integers
-int64_t thread_futexes[NUM_PROCS] __attribute__((aligned(16)));
-int64_t thread_futex_locks[NUM_PROCS] __attribute__((aligned(16)))=ARRAY_PROCS(1);
 uint8_t thread_bufs[NUM_PROCS][MAX_BUF_SIZE];
 thread_fileinfo thread_fileinfo_vals[NUM_PROCS];
 static int64_t fileinfo_queue_index=-1;
 static int32_t thread_queue_lock __attribute__((aligned (16))) = 1;
-//this serves as a counter for threads waiting for data
-//when it is 0 the main thread waits for so<me worker theread to increment it
-//and call futex_wake. Whenever a worker thread finishes it increments this
-//and calls futex_wake, thus whenever this is > 0 the main thread will keep 
-//passing data to threads (as long as there is data left)
-int32_t main_thread_wait __attribute__((aligned (16)))=0;
-int32_t main_thread_wait_lock __attribute__((aligned (16)))=1;
 int32_t in_error = 0;
-sigset_t sigwait_set;
+//  sigset_t sigwait_set;
 uint64_t num_files;
 uint64_t current_file=0;
 uint64_t out_of_data=0;
 uint64_t live_threads=0;
-sigset_t block_sigterm;
-sigset_t block_sigtrap;
+/*sigset_t block_sigterm;
+  sigset_t block_sigtrap;*/
 /* 
    I can't use malloc since my threads aren't visable to libc which messes
    up the internal locking done by malloc, and just messes everything up.
@@ -321,15 +306,6 @@ static inline void print_count_word(english_word *x){
   fwrite(x->str,x->len,1,stdout);
   puts("");
 }
-/*
-   ideas for storing info:
-   One hash table //currently used
-   Trie //might use, but unlikely at this point
-     -faster than a binary tree (which is why thats not an option)
-     -Significantly more compilcated to implement
-   Hash tree/trie //almost certantily won't use
-     -complicated, not sure if it would be any faster either
-*/
 //really this is more memcpy than strcpy, but the reason I wrote it
 //is that I know I'll only be coping 6-50 bytes and the cost of aligning the
 //data and copying in chunks isn't worth it. Plus it's small enough to inline
@@ -341,27 +317,6 @@ static inline char *my_strcpy(uint8_t *dest_,const uint8_t *src_,uint64_t len_){
   __asm__ volatile("rep movsb"
                    : : "r" (dest), "r" (src), "r" (len));
   return (char*)dest_;
-}
-
-/* 
-   I don't even know why this doesn't work,
-   but if I can't fix this I'll just stick to memcmp 
-   because there's not way besides using repne cmpsb
-   that I can make this small enough to inline 
-*/
-static inline int my_string_compare_asm(english_word *x,english_word *y){
-  if(x->len != y->len){
-    return 0;
-  } else {
-    uint64_t cnt=y->len;
-    __asm__("movq %2,%%rdi\n\t"
-            "movq %3,%%rsi\n\t"
-            "movq %0,%%rcx\n\t"
-            "repne cmpsb"
-            : "=g" (cnt) : "0" (cnt),"g" (x->str), "g" (y->str)
-            : "%rcx","%rdi","%rsi");
-    return !cnt;
-  }
 }
 static inline void perror_fmt(const char *fmt,...){
   va_list ap;
@@ -417,7 +372,8 @@ static inline void print_fileinfo(struct fileinfo *info){
 #endif
 void spin_lock_unlock(register int *uaddr){        //unlock spin lock
   register long one=1;
-  __asm__ volatile ("lock xchgq %0,(%1)\n"
+  __asm__ volatile ("mfence\n\t"
+                    "lock xchgq %0,(%1)\n"
                     : : "r" (one), "r" (uaddr));
 }
 #define futex_spin_lock futex_spin_down

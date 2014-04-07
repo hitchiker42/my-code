@@ -1,5 +1,5 @@
 #include "prog5_pthreads.h" 
-#include "my_threads.c"
+//#include "my_threads.c"
 //strings never need to be freed but the ammout of space needed for them
 //varies wildly so I allocate space for strings dynamically
 static void *str_malloc(uint64_t size){
@@ -158,7 +158,7 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
 //main function for worker threads
 void thread_main(void *arg){
   thread_id=(uint64_t)(arg);
-  thread_mem_pointer=thread_mem_block;
+  thread_mem_pointer=thread_mem_block+thread_id;
   while(!atomic_load_n(&out_of_data)){
     //do stuff
     thread_mem_pointer=
@@ -172,95 +172,76 @@ void thread_main(void *arg){
     spin_lock_lock(&thread_queue_lock);
     thread_queue[thread_queue_index++]=thread_id;
     spin_lock_unlock(&thread_queue_lock);
-    atomic_add(&main_thread_wait,1);
-    if(builtin_unlikely(!sem_post(&main_thread_waiters))){
-      PROGRAM_ERROR(perror("sem_post failure\n"));
+    if(builtin_unlikely(sem_post(&main_thread_waiters)!=0)){
+      PROGRAM_ERROR(warn("sem_post failure in worker thread %ld\n",thread_id));
     }
     //wait for main thread to give us more data
-    if(builtin_unlikely(!sem_wait(thread_semaphors+thread_id)!=0)){
-      PROGRAM_ERROR(perror("sem_wait failure\n"));
+    if(builtin_unlikely(sem_wait(thread_semaphores+thread_id)!=0)){
+      PROGRAM_ERROR(warn("sem_wait failure in worker thread %ld\n",thread_id));
     }
   }
  EXIT:  
-  atomic_dec(&live_threads);
-  thread_exit(EXIT_SUCCESS);
+  atomic_add(&live_threads,-1);
+  //doesn't matter if this gets bigger than the number of threads at this point
+  //since the main thread uses live_threads to test if all threads are done
+  sem_post(&main_thread_waiters);
+  pthread_exit(EXIT_SUCCESS);
 }
 void main_wait_loop(int have_data){
   uint8_t worker_thread_id=0;
-  int32_t futex_retval;
   uint32_t out_of_data_local=0;
   if(!have_data){goto OUT_OF_DATA;}
-  while(!sem_wait(&main_thread_waiters)){
-    atomic_add(&main_thread_wait,-1);
-    if(atomic_load_n(&main_thread_wait)>NUM_PROCS){
-      PROGRAM_ERROR(fprintf(stderr,"More threads waiting then exist, exiting\n"));
-    }
-    spin_lock_lock(&thread_queue_lock);
-    worker_thread_id=thread_queue[--thread_queue_index];
-    out_of_data_local=(!setup_thread_args(worker_thread_id));
-    atomic_store_n(thread_futexes+worker_thread_id,1);
-    spin_lock_unlock(&thread_queue_lock);
-    /*The issue is here, when setup_thread_args returns 0 it means that 
-      there's no data left, but arguments for a thread have already been 
-      setup. So I need to make sure I process this last set of data
-      before I finish, and also I need to make sure to decrement the 
-      count of live threads when the thread finishes, THIS was the
-      source of my problems with joining threads (probably)
-    */
-    if(!sem_post(thread_semaphores+worker_thread_id)){
-      PROGRAM_ERROR(perror("sem_post failure\n"));
-    }
-    if(out_of_data_local){
-      PRINT_MSG("going to OUT_OF_DATA because out_of_data_local\n");
-      goto OUT_OF_DATA;
+  while(1){
+    if(!sem_wait(&main_thread_waiters)){
+      PRINT_FMT("locking in main\n");
+      spin_lock_lock(&thread_queue_lock);
+      worker_thread_id=thread_queue[--thread_queue_index];
+      out_of_data_local=(!setup_thread_args(worker_thread_id));
+      spin_lock_unlock(&thread_queue_lock);
+      PRINT_FMT("unlocked in main\n");
+      /*The issue is here, when setup_thread_args returns 0 it means that 
+        there's no data left, but arguments for a thread have already been 
+        setup. So I need to make sure I process this last set of data
+        before I finish, and also I need to make sure to decrement the 
+        count of live threads when the thread finishes, THIS was the
+        source of my problems with joining threads (probably)
+      */
+      if(sem_post(thread_semaphores+worker_thread_id)!=0){
+        PROGRAM_ERROR(perror("sem_post failure\n"));
+      }
+      if(out_of_data_local){
+        PRINT_MSG("going to OUT_OF_DATA because out_of_data_local\n");
+        /* The issue here is that the last bit of data to be processed won't be unless
+           the thread processing it tests out_of_data before main sets it.
+         */
+        microsleep(1);
+        goto OUT_OF_DATA;
+      }
+    } else {
+      PROGRAM_ERROR(perror("Error in sem_wait"));
     }
   }
-  PROGRAM_ERROR(perror("Error in sem_wait"));
   //   PRINT_MSG("Refilling fileinfo queue\n");
   //if(!refill_fileinfo_queue()){
   //PRINT_MSG("going to OUT_OF_DATA because !refill_fileinfo_queue\n");
   //goto OUT_OF_DATA;
   //}
   //    PRINT_MSG("Refilled fileinfo queue\n"); */
-OUT_OF_DATA:{
-  PRINT_MSG("Out of data\n");
-  atomic_store_n(&out_of_data,1);
-  //    __asm__ volatile("int $3\n");
-  //this can probably just be changed to
-  //  while(sem_wait(&main_thread_waiters)){
-  //if(!live_threads){break;}
-  //}
-  //then in the worker threads the exit process is
-  //atomic_dec(live_threads);
-  //sem_post(main_thread_wait);
-  //pthread_exit();
-  while(atomic_load_n(&live_threads)>0){
-    /*while(atomic_load_n(&main_thread_wait)>0){ 
-      atomic_dec(&main_thread_wait);
-      PRINT_FMT("main thread locking spin lock (out of data)\n");
-      spin_lock_lock(&thread_queue_lock);
-      PRINT_FMT("main thread locked spin lock (out of data)\n");
-      worker_thread_id=thread_queue[--thread_queue_index];
-      spin_lock_unlock(&thread_queue_lock);
-      PRINT_FMT("main thread unlocked spin lock (out of data)\n");*/
-    //kind of a hack, but it works, just keep looping over all threads waking
-    //them up untill they're all done
-    for(worker_thread_id=0;worker_thread_id<NUM_PROCS-1;worker_thread_id++){
-      atomic_store_n(thread_futexes+worker_thread_id,1);
-      futex_retval=
-        futex_wake_locking((int*)(thread_futexes+worker_thread_id),1,
-                           (int*)(thread_futex_locks+worker_thread_id));
-      if(builtin_unlikely(futex_retval==-1)){
-        PROGRAM_ERROR(my_perror("Futex failure"));
-      }
+ OUT_OF_DATA:{
+    PRINT_MSG("Out of data\n");
+    atomic_store_n(&out_of_data,1);
+    int i;
+    for(i=0;i<NUM_PROCS-1/*should this be 1 or 2?*/;i++){
+      sem_post(thread_semaphores+i);
     }
-    __asm__ volatile("pause\n\tpause\n\tpause\n\t");
+    while(sem_wait(&main_thread_waiters)){
+      if(atomic_load_n(&live_threads)==0){break;}
+    }
+    PRINT_MSG("All worker threads finished\n");
+    struct heap common_words=sort_words();
+    print_results(common_words);
+    exit(EXIT_SUCCESS);
   }
-  PRINT_MSG("All worker threads finished\n");
-  struct heap common_words=sort_words();
-  print_results(common_words);
-  exit(EXIT_SUCCESS);
-}
 }
 //setup the buffer and file_id for the thread with thread_id
 //then do the minimal ammount of work possible to insure
@@ -431,48 +412,16 @@ struct fileinfo *setup_fileinfo(char *filename){
   //  print_fileinfo(info);
   return info;
 }
-/*//only call with an unused fileinfo, behaves specially for
-//files that are less then max_buf_len bytes long
-struct fileinfo *init_thread_filestart(struct fileinfo *info,int thread_id_num){
-  if(info->remaining < max_buf_size){
-    ssize_t nbytes=read(info->fd,thread_bufs[thread_id_num],max_buf_size);
-    if(builtin_unlikely(nbytes == (ssize_t)-1)){
-      PROGRAM_ERROR(perror("error reading from file"));
-    }
-    if(builtin_unlikely(close(info->fd) == -1)){
-      PROGRAM_ERROR(perror("error closing file"));
-    }
-    uint8_t *buf=thread_bufs[thread_id_num];
-    uint32_t start=nbytes-1;
-    if(eng_accept[buf[start]]){
-      buf[start+1]=0xff;
-    } else {
-      while(!eng_accept[buf[--start]]);
-      buf[start+1]=0xff;
-    }
-    thread_fileinfo_vals[thread_id_num].file_id=info->file_id;
-    thread_fileinfo_vals[thread_id_num].start_offset=0;
-    long tid=my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(thread_id_num),
-                      thread_pids+thread_id_num,thread_main,(void*)(long)thread_id_num);
-    assert((tid == thread_pids[thread_id_num]) &&  tid != 0);
-    return NULL;
-  } else {
-    info=setup_block(info,thread_bufs[thread_id_num]);
-    thread_fileinfo_vals[thread_id_num].file_id=info->file_id;
-    thread_fileinfo_vals[thread_id_num].start_offset=0;
-    long tid=my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(thread_id_num),
-                      thread_pids+thread_id_num,thread_main,(void*)(long)thread_id_num);
-    assert((tid == thread_pids[thread_id_num]) && tid!=0);
-    return info;
-  }
-  }*/
 struct fileinfo *init_thread(struct fileinfo *info,int thread_id_num){
   info=setup_block(info,thread_bufs[thread_id_num]);
   thread_fileinfo_vals[thread_id_num].file_id=info->file_id;
   thread_fileinfo_vals[thread_id_num].start_offset=0;
   assert(thread_attrs+thread_id_num);
-  if((errno=pthread_create((pthread_t*)(&thread_id+thread_id_num),
-                           (const pthread_attr_t *)(&default_thread_attr),
+  size_t stacksz;
+  pthread_attr_getstacksize(&default_thread_attr,&stacksz);
+  PRINT_FMT("Attr stack size = %ld \n",stacksz);
+  if((errno=pthread_create((pthread_t*)(pthread_thread_ids+thread_id_num),
+                           &default_thread_attr,
                            (void* (*) (void*))thread_main,
                            (void*)(uint64_t)thread_id_num))!=0){
     PROGRAM_ERROR(perror("pthread create failed"));
@@ -503,29 +452,33 @@ void print_results(struct heap common_words){
     printf(", with %d occurances\n",common_words.heap[i]->count);
   }
 }
-/* with threads heres what to do:
-   if(argc>=NUM_PROCS-1){
-   //more files than processors
-   //just get the threads working on different files to start
-   //then setup a queue of fileinfo structs to pass more data to the threads
-   } else {
-   //more processors than files
-   //start num_files threads first
-   //then if there is data left start more threads by calling setup_block
-   //untill there is no data left or there are NUM_PROCS threads running
-   }
-   //once threads are started it should be the same pattern regardless
-   //of the number of files
-   */
 void sem_cleanup(){
   sem_destroy(&main_thread_waiters);
 }
+void *trivial_thread_main(void *arg){
+  fprintf(stderr,"Theread number %ld\n",(uint64_t)pthread_self());
+  return 0;
+}
 int main(int argc,char *argv[]){
-  struct fileinfo *info;
+  //inilialize phread attrs
+  pthread_attr_t default_thread_attr;
+  pthread_attr_init(&default_thread_attr);
+  pthread_attr_setdetachstate(&default_thread_attr,PTHREAD_CREATE_DETACHED);
+  pthread_attr_setstacksize(&default_thread_attr,(2<<15));
+    size_t stacksz;
+  pthread_attr_getstacksize(&default_thread_attr,&stacksz);
+  PRINT_FMT("Attr stack size = %ld \n",stacksz);
+  pthread_t *threads=alloca(sizeof(pthread_t)*argc-1);
+  if((errno=pthread_create(threads,
+                           &default_thread_attr,
+                           (void* (*) (void*))trivial_thread_main,
+                           NULL))!=0){
+    HERE();
+    PROGRAM_ERROR(perror("pthread create failed"));
+  }
+    struct fileinfo *info;
   int i;
   int have_data=1;
-  //  sigemptyset(&block_sigterm);
-  //  sigaddset(&block_sigterm,SIGTERM);
   //remove the program name from the arguments (its just eaiser)
   num_files=argc-1;
   PRINT_FMT("Given %ld files\n",num_files);
@@ -533,36 +486,21 @@ int main(int argc,char *argv[]){
   if(num_files<=0){
     PROGRAM_ERROR(fprintf(stderr,"Error no filenames given\n"));
   }
-  tgid=gettgid();
+  tgid=gettgid();//probably don't need this anymore
   string_mem_pointer=mmap(NULL,(8*(1<<20)),PROT_READ|PROT_WRITE,
                           MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
   string_mem_end=string_mem_pointer+(8*(1<<20));
   if(builtin_unlikely(string_mem_pointer==MAP_FAILED)){
     PROGRAM_ERROR(perror("mmap failed"));
   }
-  //inilialize phread attrs
-  pthread_attr_init(&default_thread_attr);
-  pthread_attr_setdetachstate(&default_thread_attr,PTHREAD_CREATE_DETACHED);
-  pthread_attr_setstacksize(&default_thread_attr,(2<<17));
-  if(pthread_setattr_default_np(&default_thread_attr)!=0){
-    PROGRAM_ERROR(perror("error setting default thread attrs"));
+  atexit(sem_cleanup);//clean up the semaphore when we're done
+  //I'm pretty sure only named semaphores have kernel persistance but
+  //it doesn't hurt anything to delete it anyway
+  sem_init(&main_thread_waiters,0,0);
+  for(i=0;i<NUM_PROCS;i++){
+    sem_init(thread_semaphores+i,0,0);
   }
-  atexit(sem_cleanup);
-  sem_init(main_thread_waiters,0,0);
-  //inlitialize signal handlers
-  /* sigfillset(&full_set); */
-  /* int sa_flags=SA_RESETHAND; */
-  /* const struct sigaction signal_action= */
-  /*   {.sa_handler=sem_cleanup_handler,.sa_mask=full_set, */
-  /*    .sa_flags=sa_flags}; */
-  /* sigaction(SIGABRT,&signal_action,NULL); */
-  /* sigaction(SIGTERM,&signal_action,NULL); */
-  /* sigaction(SIGSEGV,&signal_action,NULL); */
-  /* sigaction(SIGQUIT,&signal_action,NULL); */
-  
-  /*  for(i=0;i<NUM_PROCS;i++){
-    pthread_getattr_default_np(&thread_attrs[i]);
-    }*/
+  //special case for 1 file
   if(num_files==1){
     current_file=1;
     all_file_bits.low=1;
@@ -580,8 +518,9 @@ int main(int argc,char *argv[]){
       fileinfo_queue[++fileinfo_queue_index]=info;
     }
   } else {
-    all_file_bits=file_bit_strings[num_files-1];
+    all_file_bits=file_bit_strings[num_files-1];    
     if(num_files>=NUM_PROCS-1){
+      //more files then processors, just start each thread on it's own file
       for(i=1;i<NUM_PROCS;i++){
         info=setup_fileinfo(filenames[current_file++]);
         info=init_thread(info,i-1);
@@ -591,16 +530,21 @@ int main(int argc,char *argv[]){
         }
       }
       if(fileinfo_queue_index==-1){
+        //if all the files were less then the block size we get here
         if(current_file<num_files){
+          //if there are files left the no problem
           fileinfo_queue[++fileinfo_queue_index]=
             setup_fileinfo(filenames[current_file++]);
         } else {
+          //otherwise we have no more data left to process
           have_data=0;
         }
       }
     } else {
+      //more processors than files
       int i=1;
       while(current_file<num_files){
+        //start a thread for each file
         info=setup_fileinfo(filenames[current_file++]);
         info=init_thread(info,i-1);
         live_threads++;
@@ -610,6 +554,8 @@ int main(int argc,char *argv[]){
         i++;
       }
       if(fileinfo_queue_index>=0){
+        //if there is data left to process start threads unill
+        //we have NUM_PROCS threads or no data left to process
         do {
           info=fileinfo_queue[fileinfo_queue_index];
           info=init_thread(info,i-1);

@@ -55,9 +55,8 @@ void *thread_main(void *filename_void){
   //the hard way
   pthread_mutex_lock(&lock);
   global_count_hard+=count;
-  if(--threads_left){
-    pthread_cond_signal(&cond);
-  }
+  --threads_left;
+  pthread_cond_signal(&cond);
   printf("%s %d\n",filename,count);
   pthread_mutex_unlock(&lock);
   return NULL;
@@ -67,20 +66,30 @@ int main(int argc,char *argv[]){
     fprintf(stderr,"Error no filenames given\n");
     return 1;
   }
+  pthread_attr_t default_thread_attr;
+  pthread_attr_init(&default_thread_attr);
+  pthread_attr_setdetachstate(&default_thread_attr,PTHREAD_CREATE_DETACHED);
+  pthread_attr_setstacksize(&default_thread_attr,(2<<15));
+    size_t stacksz;
+  pthread_attr_getstacksize(&default_thread_attr,&stacksz);
+  fprintf(stderr,"Attr stack size = %ld \n",stacksz);
   pthread_t *threads=alloca(sizeof(pthread_t)*argc-1);
   int i;   
   threads_left=argc-1;
   for(i=1;i<argc;i++){
-    pthread_create(threads+(i-1),NULL,thread_main,argv[i]);
+    if(pthread_create(threads+(i-1),&default_thread_attr,thread_main,argv[i])!=0){
+      perror("pthread create");
+      exit(1);
+    }
   }
   //the easy way
-  for(i=1;i<argc;i++){
-    void **retval;
-    pthread_join(threads[i-1],NULL);
-  }
+  //    for(i=1;i<argc;i++){
+  //    void **retval;
+  //    pthread_join(threads[i-1],NULL);
+  //  }
   //the hard way
   pthread_mutex_lock(&lock);
-  while(threads_left){
+  while(threads_left>=1){
     pthread_cond_wait(&cond,&lock);
   }
   pthread_mutex_unlock(&lock);

@@ -3,6 +3,8 @@
    various kinds of locking, atomic operations and signaling threads
    Copyright (C) Tucker DiNapoli 2014
 */
+#ifndef MY_THREADS
+#define MY_THREADS
 #include <linux/futex.h>
 #include <asm/unistd.h>
 #include <time.h>
@@ -562,4 +564,5 @@ int my_fprintf(FILE *stream,const char *fmt, ...){
     size_guess*=2;
     buf_end*/
   
+#endif
 #endif

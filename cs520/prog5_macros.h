@@ -4,7 +4,7 @@
 #ifdef AGATE
 #define NUM_PROCS 16
 #else
-#define NUM_PROCS 2
+#define NUM_PROCS 8
 #endif
 #endif
 #define MAX_BUF_SIZE (136*(1<<10))
@@ -73,11 +73,10 @@
 
 //Make sure we only have one thread calling exit/printing stuff
 #define PROGRAM_ERROR(code)                             \
-  if(atomic_add(&in_error,1)){                          \
+  if(atomic_add(&in_error,1)==1){                       \
     code;                                               \
     exit(EXIT_FAILURE);                                 \
-  }                                                     \
-  else{__asm__ volatile("1:\n\tpause\n\tjmp 1b\n");}
+  } else{pthread_exit((void*)EXIT_FAILURE);}
 //really hacky version of a cpp loop, I only use it
 //to fill an array that's sized based on the number of processors
 //and even just doing that I need to use some tricks with joining symbols
@@ -106,3 +105,113 @@
 #define ARRAY_19(val) val, ARRAY_18(val)
 #define ARRAY_N(val,N) CPP_JOIN(ARRAY,N)(val)
 #define ARRAY_PROCS(val) {CPP_JOIN2(ARRAY_,NUM_PROCS)(val)
+#ifndef MY_THREADS
+extern inline void __attribute__((noreturn)) thread_exit(int status_){
+  register int status __asm__ ("%rdi")=status_;
+  __asm__ volatile ("mov %0,%%rax\n\t"
+          "syscall\n"
+          : : "i" (__NR_exit), "r" (status));
+  __builtin_unreachable();
+}
+//just call this with -1 in the first arg, this will signal in the
+//current thread group, akin to pthread_kill
+/*declares int tgkill(int tgid,int tid,int sig)
+ */
+//can't fail
+#define gettid()                                \
+  ({register uint64_t tid __asm__ ("rax");          \
+  __asm__("movq %1,%%rax\n"                      \
+          "syscall"                              \
+          : "=r" (tid) : "i" (__NR_gettid));     \
+  tid;})
+#define gettgid()                                \
+  ({register uint64_t tid __asm__ ("rax");           \
+    __asm__("movq %1,%%rax\n"                    \
+            "syscall"                            \
+            : "=r" (tid) : "i" (__NR_getpid));   \
+  tid;})
+
+/* Atomic operations using a combination of builtin gcc functions
+   and assembly. All the gcc functions are called with
+   __ATOMIC_SEQ_CST as the memory model, this is the strongest memory model
+   and so insures things are atomic.
+*/
+//desired is a pointer
+#define atomic_compare_exchange(ptr,expected,desired)           \
+  __atomic_compare_exchange(ptr,expected,desired,0,             \
+                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
+//desired isn't a pointer
+#define atomic_compare_exchange_n(ptr,expected,desired)           \
+  __atomic_compare_exchange_n(ptr,expected,desired,0,             \
+                            __ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)
+//indiviual bit manipulation instructions
+//bit test and set
+#define atomic_bit_set(bit_index,mem_pointer)           \
+  __asm__ volatile ("lock bts %0,%1\n"                            \
+          : : "r" (bit_index), "m" (mem_pointer))
+#define atomic_bit_test_and_set(bit_index,mem_pointer)          \
+  ({ uint8_t test;                                              \
+    __asm__("lock bts %1,%2\n\t"                                \
+            "setc %0\n"                                         \
+            : "g"(test): "r" (bit_index), "m" (mem_pointer));   \
+    test;})
+//bit test and compliment
+#define atomic_bit_compliment(bit_index,mem_pointer)    \
+  __asm__ volatile ("lock btc %0,%1\n"                            \
+          : : "r" (bit_index), "m" (mem_pointer))
+#define atomic_bit_test_and_compliment(bit_index,mem_pointer)   \
+  ({ uint8_t test;                                              \
+    __asm__("lock btc %1,%2\n\t"                                \
+            "setc %0\n"                                         \
+            : "g"(test): "r" (bit_index), "m" (mem_pointer));   \
+    test;})
+//bit test and reset
+#define atomic_bit_reset(bit_index,mem_pointer)         \
+  __asm__ volatile ("lock btr %1,%0\n"                            \
+          : : "r" (bit_index), "m" (mem_pointer))
+#define atomic_bit_test_and_reset(bit_index,mem_pointer)        \
+  ({ uint8_t test;                                              \
+    __asm__("lock btr %1,%2\n\t"                                \
+            "setc %0\n"                                         \
+            : "g"(test): "r" (bit_index), "m" (mem_pointer));   \
+    test;})
+#define atomic_not(mem_pointer)                 \
+  __asm__("lock not %0\n"                       \
+          : "+m" (mem_pointer));
+/* atomic_add_fetch is lock add val,(ptr)
+   while atomic_fetch_add is lock xadd val,(ptr)
+ */
+#define atomic_inc(ptr)                                 \
+  __asm__ volatile("lock incq (%0)" : :"r" (ptr));
+#define atomic_dec(ptr)                                 \
+  __asm__ volatile("lock decq (%0)" : :"r" (ptr));
+#define atomic_add(ptr,val)                     \
+  __atomic_add_fetch(ptr,val,__ATOMIC_SEQ_CST)
+#define atomic_sub(ptr,val)                     \
+  __atomic_sub_fetch(ptr,val,__ATOMIC_SEQ_CST)
+#define atomic_fetch_add(ptr,val)               \
+  __atomic_fetch_add(ptr,val,__ATOMIC_SEQ_CST)
+#define atomic_load_n(ptr)                     \
+  __atomic_load_n(ptr,__ATOMIC_SEQ_CST)
+#define atomic_load(ptr,loc)                    \
+  __atomic_load(ptr,loc,__ATOMIC_SEQ_CST)
+#define atomic_store(ptr,loc)                 \
+  __atomic_store_n(ptr,loc,__ATOMIC_SEQ_CST)
+#define atomic_store_n(ptr,val)                 \
+  __atomic_store_n(ptr,val,__ATOMIC_SEQ_CST)
+//with this (and pretty much any binary operation but add) the difference
+//between fetch_or and or_fetch is a lot bigger, or_fetch is just a lock or
+//whereas fetch_or translates into a cmpxcgh loop
+#define atomic_or(ptr,val)                      \
+  __atomic_or_fetch(ptr,val,__ATOMIC_SEQ_CST)
+#define atomic_and(ptr,val)                     \
+  __atomic_and_fetch(ptr,val,__ATOMIC_SEQ_CST)
+#define atomic_xor(ptr,val)                     \
+  __atomic_xor_fetch(ptr,val,__ATOMIC_SEQ_CST)
+#define memory_fence()                          \
+  __asm__ volatile("mfence\n")
+#define store_fence()                          \
+  __asm__ volatile("sfence\n")
+#define load_fence()                          \
+  __asm__ volatile("lfence\n")
+#endif
