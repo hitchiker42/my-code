@@ -41,7 +41,7 @@ static int atomic_hash_table_update(english_word *word){
   if(!global_hash_table[index]){//word isn't in the hash table, add it
     mem=str_malloc(word->len);
     word->str=(char*)my_strcpy(mem,(uint8_t*)word->str,word->len);
-    void *prev=global_hash_table[index];
+    void *prev=global_hash_table[index];//should be void
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
     if(test){
       //we added the word
@@ -61,7 +61,7 @@ static int atomic_hash_table_update(english_word *word){
       //if so update the value already in the table
       if(string_compare(global_hash_table[index],word)){
         //atomically increment word count
-        atomic_add(&global_hash_table[index]->count,1);
+        atomic_add(&(global_hash_table[index]->count),1);
         //atomiclly update the file index
         if(low){
           atomic_or(&global_hash_table[index]->file_bits.low,word->file_bits.low);
@@ -72,7 +72,7 @@ static int atomic_hash_table_update(english_word *word){
       }
     } while(global_hash_table[++index]);
     //not in the table use next free index (if we can)
-    if(!mem){
+    if(!mem){//don't allocate memory more than once
       mem=str_malloc(word->len);
       word->str=(char*)my_strcpy(mem,(uint8_t*)word->str,word->len);
     }
@@ -101,7 +101,7 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
   register const uint8_t *buf __asm__ ("%rbx")=buf_;
   //  const uint8_t *initial_buf=buf;//return value?
   uint64_t index=1;
-  int count=0;
+  //  int count=0;
   union file_bitfield bitmask=file_bit_masks[file_id-1];
   //this doesn't seem to do much, positively or negitively
   //it might be worth trying different precetch instructions different
@@ -147,7 +147,7 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
       mem+=32;
     }
   }
-  if(buf[index]!=0xff){
+  if(buf[index]!=0xff){//eof always comes after a word
     buf+=index;
     index=1;
     goto PREFETCH;
@@ -191,9 +191,11 @@ void thread_main(void *arg){
       PROGRAM_ERROR(perror("Futex failure\n"));
     }
     atomic_store_n(thread_futexes+thread_id,0);//
+    PRINT_MSG("Thread loop\n");
   }
- EXIT:  
-  atomic_dec(&live_threads);
+ EXIT:
+  PRINT_MSG("THread exiting\n");
+  atomic_add(&live_threads,-1);
   thread_exit(EXIT_SUCCESS);
 }
 void main_wait_loop(int have_data){
@@ -208,23 +210,22 @@ void main_wait_loop(int have_data){
   }
   while(1){
     //wait untill a thread is done;
-    PRINT_FMT("Main waiting with val %d\n",main_thread_wait);
     futex_retval=futex_wait_locking(&main_thread_wait,0,NULL,
                                     &main_thread_wait_lock);
-    PRINT_FMT("Main woke up with val %d\n",main_thread_wait);
     if(builtin_unlikely(futex_retval==-1)){
       PROGRAM_ERROR(my_perror("Futex failure"));
     }
     if(builtin_unlikely(main_thread_wait<-1)){
-      PROGRAM_ERROR(fprintf(stderr,"Invalid value in futex main_thread_wait\n"));
+      PROGRAM_ERROR(fprintf(stderr,
+                            "Invalid value in futex main_thread_wait\n"));
     }
   ALLOCATE_LOOP:
     //
     while(atomic_load_n(&main_thread_wait)>0){
       atomic_add(&main_thread_wait,-1);
-      if(atomic_load_n(&main_thread_wait)>NUM_PROCS){
+      /*      if(atomic_load_n(&main_thread_wait)>NUM_PROCS){
         PROGRAM_ERROR(fprintf(stderr,"More threads waiting then exist, exiting\n"));
-      }
+        }*/
       futex_spin_lock(&thread_queue_lock);
       worker_thread_id=thread_queue[--thread_queue_index];
       out_of_data_local=(!setup_thread_args(worker_thread_id));
@@ -237,13 +238,13 @@ void main_wait_loop(int have_data){
         count of live threads when the thread finishes, THIS was the
         source of my problems with joining threads (probably)
       */
-      PRINT_FMT("Main thread calling futex wake on Worker thread %ld\n",
-                thread_pids[worker_thread_id]);
+      //      PRINT_FMT("Main thread calling futex wake on Worker thread %ld\n",
+      //          thread_pids[worker_thread_id]);
       futex_retval=
         futex_wake_locking((int*)(thread_futexes+worker_thread_id),1,
                            (int*)(thread_futex_locks+worker_thread_id));
-      PRINT_FMT("Main thread returned from futex wake on Worker thread %ld\n",
-                thread_pids[worker_thread_id]);
+      //      PRINT_FMT("Main thread returned from futex wake on Worker thread %ld\n",
+      //                thread_pids[worker_thread_id]);
       if(builtin_unlikely(futex_retval==-1)){
         PROGRAM_ERROR(my_perror("Futex failure"));
       }
@@ -257,6 +258,8 @@ void main_wait_loop(int have_data){
       PRINT_MSG("going to OUT_OF_DATA because !refill_fileinfo_queue\n");
       goto OUT_OF_DATA;
     }
+    memory_fence();
+    //    PRINT_MSG("End of main loop\n");
     //    PRINT_MSG("Refilled fileinfo queue\n"); */
  }
  OUT_OF_DATA:{
@@ -283,7 +286,7 @@ void main_wait_loop(int have_data){
           PROGRAM_ERROR(my_perror("Futex failure"));
         }
       }
-      __asm__ volatile("pause\n\tpause\n\tpause\n\t");
+      //      __asm__ volatile("pause\n\tpause\n\tpause\n\t");
     }
     PRINT_MSG("All worker threads finished\n");
     struct heap common_words=sort_words();
@@ -299,10 +302,11 @@ int setup_thread_args(int thread_id_num){
   //fileinfo_queue[0] should always contain a vaild struct fileinfo
   static struct fileinfo *info;
   if(builtin_unlikely(fileinfo_queue_index<0)){
-    BREAKPOINT();
+    //    BREAKPOINT();
     PROGRAM_ERROR(fprintf(stderr,"Invalid value for fileinfo_queue_index\n"));
   }
-  info=setup_block(fileinfo_queue[fileinfo_queue_index],thread_bufs[thread_id_num]);
+  info=setup_block(fileinfo_queue[fileinfo_queue_index],
+                   thread_bufs[thread_id_num]);
   //  PRINT_MSG("setup block in setup_thread_args\n");
   thread_fileinfo_vals[thread_id_num].file_id=info->file_id;
   thread_fileinfo_vals[thread_id_num].start_offset=info->start_offset;
@@ -359,6 +363,8 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
   if(max_buf_size>info->remaining){
     //just read the rest of the file
     ssize_t nbytes=read(info->fd,buf,max_buf_size);
+    PRINT_FMT("Read remaning %lu bytes from file number %d\n",
+              nbytes,info->file_id);
     if(builtin_unlikely(nbytes == (ssize_t)-1)){
       PROGRAM_ERROR(perror("error reading from file"));
     }
@@ -380,7 +386,7 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
     }
     info->remaining-=buf_size;
   }
-  //this happens independent of weather we read the rest of the
+  //this happens independent of weather we read the respt of the
   //file of still have some left, it depends on what was at
   //the end of the last block read from this file
   if(info->word_len){
@@ -461,41 +467,7 @@ struct fileinfo *setup_fileinfo(char *filename){
   //  print_fileinfo(info);
   return info;
 }
-//only call with an unused fileinfo, behaves specially for
-//files that are less then max_buf_len bytes long
-struct fileinfo *init_thread_filestart(struct fileinfo *info,int thread_id_num){
-  if(info->remaining < max_buf_size){
-    ssize_t nbytes=read(info->fd,thread_bufs[thread_id_num],max_buf_size);
-    if(builtin_unlikely(nbytes == (ssize_t)-1)){
-      PROGRAM_ERROR(perror("error reading from file"));
-    }
-    if(builtin_unlikely(close(info->fd) == -1)){
-      PROGRAM_ERROR(perror("error closing file"));
-    }
-    uint8_t *buf=thread_bufs[thread_id_num];
-    uint32_t start=nbytes-1;
-    if(eng_accept[buf[start]]){
-      buf[start+1]=0xff;
-    } else {
-      while(!eng_accept[buf[--start]]);
-      buf[start+1]=0xff;
-    }
-    thread_fileinfo_vals[thread_id_num].file_id=info->file_id;
-    thread_fileinfo_vals[thread_id_num].start_offset=0;
-    long tid=my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(thread_id_num),
-                      thread_pids+thread_id_num,thread_main,(void*)(long)thread_id_num);
-    assert((tid == thread_pids[thread_id_num]) &&  tid != 0);
-    return NULL;
-  } else {
-    info=setup_block(info,thread_bufs[thread_id_num]);
-    thread_fileinfo_vals[thread_id_num].file_id=info->file_id;
-    thread_fileinfo_vals[thread_id_num].start_offset=0;
-    long tid=my_clone(SIMPLE_CLONE_FLAGS,THREAD_STACK_TOP(thread_id_num),
-                      thread_pids+thread_id_num,thread_main,(void*)(long)thread_id_num);
-    assert((tid == thread_pids[thread_id_num]) && tid!=0);
-    return info;
-  }
-}
+
 struct fileinfo *init_thread(struct fileinfo *info,int thread_id_num){
   info=setup_block(info,thread_bufs[thread_id_num]);
   thread_fileinfo_vals[thread_id_num].file_id=info->file_id;

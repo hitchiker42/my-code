@@ -4,7 +4,7 @@
 #ifdef AGATE
 #define NUM_PROCS 16
 #else
-#define NUM_PROCS 8
+#define NUM_PROCS 2
 #endif
 #endif
 #define MAX_BUF_SIZE (136*(1<<10))

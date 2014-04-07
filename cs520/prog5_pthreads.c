@@ -157,12 +157,8 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
 }
 //main function for worker threads
 void thread_main(void *arg){
-  int futex_retval=-1;
-  //this needs to be allocated on the stack, so I figured I'd use auto
-  //because really, when is there ever a reason to use auto
   thread_id=(uint64_t)(arg);
   thread_mem_pointer=thread_mem_block;
-  PRINT_FMT("Worker thread %ld started\n",thread_pids[thread_id]);
   while(!atomic_load_n(&out_of_data)){
     //do stuff
     thread_mem_pointer=
@@ -177,17 +173,13 @@ void thread_main(void *arg){
     thread_queue[thread_queue_index++]=thread_id;
     spin_lock_unlock(&thread_queue_lock);
     atomic_add(&main_thread_wait,1);
-    futex_retval=futex_wake_locking(&main_thread_wait,1,&main_thread_wait_lock);
-    if(builtin_unlikely(futex_retval==-1)){
-      PROGRAM_ERROR(perror("Futex failure\n"));
+    if(builtin_unlikely(!sem_post(&main_thread_waiters))){
+      PROGRAM_ERROR(perror("sem_post failure\n"));
     }
     //wait for main thread to give us more data
-    futex_retval=futex_wait_locking((int*)(thread_futexes+thread_id),0,NULL,
-                                    (int*)(thread_futex_locks+thread_id));
-    if(builtin_unlikely(futex_retval==-1)){
-      PROGRAM_ERROR(perror("Futex failure\n"));
+    if(builtin_unlikely(!sem_wait(thread_semaphors+thread_id)!=0)){
+      PROGRAM_ERROR(perror("sem_wait failure\n"));
     }
-    atomic_store_n(thread_futexes+thread_id,0);//
   }
  EXIT:  
   atomic_dec(&live_threads);
@@ -198,95 +190,77 @@ void main_wait_loop(int have_data){
   int32_t futex_retval;
   uint32_t out_of_data_local=0;
   if(!have_data){goto OUT_OF_DATA;}
-  //of threads left running
-  //if there are already threads waiting on us skip the wait code
-  if(atomic_load_n(&main_thread_wait)>1){
-    goto ALLOCATE_LOOP;
+  while(!sem_wait(&main_thread_waiters)){
+    atomic_add(&main_thread_wait,-1);
+    if(atomic_load_n(&main_thread_wait)>NUM_PROCS){
+      PROGRAM_ERROR(fprintf(stderr,"More threads waiting then exist, exiting\n"));
+    }
+    spin_lock_lock(&thread_queue_lock);
+    worker_thread_id=thread_queue[--thread_queue_index];
+    out_of_data_local=(!setup_thread_args(worker_thread_id));
+    atomic_store_n(thread_futexes+worker_thread_id,1);
+    spin_lock_unlock(&thread_queue_lock);
+    /*The issue is here, when setup_thread_args returns 0 it means that 
+      there's no data left, but arguments for a thread have already been 
+      setup. So I need to make sure I process this last set of data
+      before I finish, and also I need to make sure to decrement the 
+      count of live threads when the thread finishes, THIS was the
+      source of my problems with joining threads (probably)
+    */
+    if(!sem_post(thread_semaphores+worker_thread_id)){
+      PROGRAM_ERROR(perror("sem_post failure\n"));
+    }
+    if(out_of_data_local){
+      PRINT_MSG("going to OUT_OF_DATA because out_of_data_local\n");
+      goto OUT_OF_DATA;
+    }
   }
-  while(1){
-    //wait untill a thread is done;
-    PRINT_FMT("Main waiting with val %d\n",main_thread_wait);
-    futex_retval=futex_wait_locking(&main_thread_wait,0,NULL,
-                                    &main_thread_wait_lock);
-    PRINT_FMT("Main woke up with val %d\n",main_thread_wait);
-    if(builtin_unlikely(futex_retval==-1)){
-      PROGRAM_ERROR(my_perror("Futex failure"));
-    }
-    if(builtin_unlikely(main_thread_wait<-1)){
-      PROGRAM_ERROR(fprintf(stderr,"Invalid value in futex main_thread_wait\n"));
-    }
-  ALLOCATE_LOOP:
-    //
-    while(atomic_load_n(&main_thread_wait)>0){
-      atomic_add(&main_thread_wait,-1);
-      if(atomic_load_n(&main_thread_wait)>NUM_PROCS){
-        PROGRAM_ERROR(fprintf(stderr,"More threads waiting then exist, exiting\n"));
-      }
+  PROGRAM_ERROR(perror("Error in sem_wait"));
+  //   PRINT_MSG("Refilling fileinfo queue\n");
+  //if(!refill_fileinfo_queue()){
+  //PRINT_MSG("going to OUT_OF_DATA because !refill_fileinfo_queue\n");
+  //goto OUT_OF_DATA;
+  //}
+  //    PRINT_MSG("Refilled fileinfo queue\n"); */
+OUT_OF_DATA:{
+  PRINT_MSG("Out of data\n");
+  atomic_store_n(&out_of_data,1);
+  //    __asm__ volatile("int $3\n");
+  //this can probably just be changed to
+  //  while(sem_wait(&main_thread_waiters)){
+  //if(!live_threads){break;}
+  //}
+  //then in the worker threads the exit process is
+  //atomic_dec(live_threads);
+  //sem_post(main_thread_wait);
+  //pthread_exit();
+  while(atomic_load_n(&live_threads)>0){
+    /*while(atomic_load_n(&main_thread_wait)>0){ 
+      atomic_dec(&main_thread_wait);
+      PRINT_FMT("main thread locking spin lock (out of data)\n");
       spin_lock_lock(&thread_queue_lock);
+      PRINT_FMT("main thread locked spin lock (out of data)\n");
       worker_thread_id=thread_queue[--thread_queue_index];
-      out_of_data_local=(!setup_thread_args(worker_thread_id));
-      atomic_store_n(thread_futexes+worker_thread_id,1);
       spin_lock_unlock(&thread_queue_lock);
-      /*The issue is here, when setup_thread_args returns 0 it means that 
-        there's no data left, but arguments for a thread have already been 
-        setup. So I need to make sure I process this last set of data
-        before I finish, and also I need to make sure to decrement the 
-        count of live threads when the thread finishes, THIS was the
-        source of my problems with joining threads (probably)
-      */
-      PRINT_FMT("Main thread calling futex wake on Worker thread %ld\n",
-                thread_pids[worker_thread_id]);
+      PRINT_FMT("main thread unlocked spin lock (out of data)\n");*/
+    //kind of a hack, but it works, just keep looping over all threads waking
+    //them up untill they're all done
+    for(worker_thread_id=0;worker_thread_id<NUM_PROCS-1;worker_thread_id++){
+      atomic_store_n(thread_futexes+worker_thread_id,1);
       futex_retval=
         futex_wake_locking((int*)(thread_futexes+worker_thread_id),1,
                            (int*)(thread_futex_locks+worker_thread_id));
-      PRINT_FMT("Main thread returned from futex wake on Worker thread %ld\n",
-                thread_pids[worker_thread_id]);
       if(builtin_unlikely(futex_retval==-1)){
         PROGRAM_ERROR(my_perror("Futex failure"));
       }
-      if(out_of_data_local){
-        PRINT_MSG("going to OUT_OF_DATA because out_of_data_local\n");
-        goto OUT_OF_DATA;
-      }
     }
-    //   PRINT_MSG("Refilling fileinfo queue\n");
-    if(!refill_fileinfo_queue()){
-      PRINT_MSG("going to OUT_OF_DATA because !refill_fileinfo_queue\n");
-      goto OUT_OF_DATA;
-    }
-    //    PRINT_MSG("Refilled fileinfo queue\n"); */
- }
- OUT_OF_DATA:{
-    PRINT_MSG("Out of data\n");
-    atomic_store_n(&out_of_data,1);
-    //    __asm__ volatile("int $3\n");
-    while(atomic_load_n(&live_threads)>0){
-      /*while(atomic_load_n(&main_thread_wait)>0){ 
-       atomic_dec(&main_thread_wait);
-        PRINT_FMT("main thread locking spin lock (out of data)\n");
-        spin_lock_lock(&thread_queue_lock);
-        PRINT_FMT("main thread locked spin lock (out of data)\n");
-        worker_thread_id=thread_queue[--thread_queue_index];
-        spin_lock_unlock(&thread_queue_lock);
-        PRINT_FMT("main thread unlocked spin lock (out of data)\n");*/
-      //kind of a hack, but it works, just keep looping over all threads waking
-      //them up untill they're all done
-      for(worker_thread_id=0;worker_thread_id<NUM_PROCS-1;worker_thread_id++){
-        atomic_store_n(thread_futexes+worker_thread_id,1);
-        futex_retval=
-          futex_wake_locking((int*)(thread_futexes+worker_thread_id),1,
-                             (int*)(thread_futex_locks+worker_thread_id));
-        if(builtin_unlikely(futex_retval==-1)){
-          PROGRAM_ERROR(my_perror("Futex failure"));
-        }
-      }
-      __asm__ volatile("pause\n\tpause\n\tpause\n\t");
-    }
-    PRINT_MSG("All worker threads finished\n");
-    struct heap common_words=sort_words();
-    print_results(common_words);
-    exit(EXIT_SUCCESS);
+    __asm__ volatile("pause\n\tpause\n\tpause\n\t");
   }
+  PRINT_MSG("All worker threads finished\n");
+  struct heap common_words=sort_words();
+  print_results(common_words);
+  exit(EXIT_SUCCESS);
+}
 }
 //setup the buffer and file_id for the thread with thread_id
 //then do the minimal ammount of work possible to insure
@@ -296,7 +270,6 @@ int setup_thread_args(int thread_id_num){
   //fileinfo_queue[0] should always contain a vaild struct fileinfo
   static struct fileinfo *info;
   if(builtin_unlikely(fileinfo_queue_index<0)){
-    BREAKPOINT();
     PROGRAM_ERROR(fprintf(stderr,"Invalid value for fileinfo_queue_index\n"));
   }
   info=setup_block(fileinfo_queue[fileinfo_queue_index],thread_bufs[thread_id_num]);
@@ -498,8 +471,10 @@ struct fileinfo *init_thread(struct fileinfo *info,int thread_id_num){
   thread_fileinfo_vals[thread_id_num].file_id=info->file_id;
   thread_fileinfo_vals[thread_id_num].start_offset=0;
   assert(thread_attrs+thread_id_num);
-  if((errno=pthread_create(pthread_thread_ids+thread_id_num,&thread_attrs[thread_id_num],
-                           (void*(*)(void*))thread_main,(void*)(uint64_t)thread_id_num))!=0){
+  if((errno=pthread_create((pthread_t*)(&thread_id+thread_id_num),
+                           (const pthread_attr_t *)(&default_thread_attr),
+                           (void* (*) (void*))thread_main,
+                           (void*)(uint64_t)thread_id_num))!=0){
     PROGRAM_ERROR(perror("pthread create failed"));
   }
   if(info->remaining){
@@ -542,6 +517,9 @@ void print_results(struct heap common_words){
    //once threads are started it should be the same pattern regardless
    //of the number of files
    */
+void sem_cleanup(){
+  sem_destroy(&main_thread_waiters);
+}
 int main(int argc,char *argv[]){
   struct fileinfo *info;
   int i;
@@ -563,15 +541,28 @@ int main(int argc,char *argv[]){
     PROGRAM_ERROR(perror("mmap failed"));
   }
   //inilialize phread attrs
-  for(i=0;i<NUM_PROCS;i++){
-    pthread_attr_init(&thread_attrs[i]);
-    if((pthread_attr_setstack(&thread_attrs[i],thread_stacks[i],(2<<20)))!=0){
-      PROGRAM_ERROR(perror("setstack failed"));
-    }
-    if(pthread_attr_setdetachstate(&thread_attrs[i],PTHREAD_CREATE_DETACHED)!=0){
-      PROGRAM_ERROR(perror("setdetachstate failed"));
-    }
+  pthread_attr_init(&default_thread_attr);
+  pthread_attr_setdetachstate(&default_thread_attr,PTHREAD_CREATE_DETACHED);
+  pthread_attr_setstacksize(&default_thread_attr,(2<<17));
+  if(pthread_setattr_default_np(&default_thread_attr)!=0){
+    PROGRAM_ERROR(perror("error setting default thread attrs"));
   }
+  atexit(sem_cleanup);
+  sem_init(main_thread_waiters,0,0);
+  //inlitialize signal handlers
+  /* sigfillset(&full_set); */
+  /* int sa_flags=SA_RESETHAND; */
+  /* const struct sigaction signal_action= */
+  /*   {.sa_handler=sem_cleanup_handler,.sa_mask=full_set, */
+  /*    .sa_flags=sa_flags}; */
+  /* sigaction(SIGABRT,&signal_action,NULL); */
+  /* sigaction(SIGTERM,&signal_action,NULL); */
+  /* sigaction(SIGSEGV,&signal_action,NULL); */
+  /* sigaction(SIGQUIT,&signal_action,NULL); */
+  
+  /*  for(i=0;i<NUM_PROCS;i++){
+    pthread_getattr_default_np(&thread_attrs[i]);
+    }*/
   if(num_files==1){
     current_file=1;
     all_file_bits.low=1;
@@ -635,6 +626,5 @@ int main(int argc,char *argv[]){
     }
   }
   PRINT_MSG("Finished starting threads\n");
-  BREAKPOINT();
   main_wait_loop(have_data);
 }

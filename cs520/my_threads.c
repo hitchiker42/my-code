@@ -136,6 +136,7 @@ futex_wait_locking(int *uaddr,int val,const struct timespec *timeout,int *uaddr2
                     "movl %1,%%edx\n\t"//val to arg3
                     "movq %2,%%rsi\n\t"
                     "movl %3,%%eax\n\t"
+                    "mfence\n\t"//make sure memory is up to date
                     //unlock
                     "lock xchgl %%r10d,(%%r9)\n\t"
                     //race condition?
@@ -174,6 +175,7 @@ static inline int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout i
                     "movl %1,%%edx\n\t"//move val to rdx (because it's the third arg
                     "movq %2,%%rsi\n\t"
                     "movq %3,%%rax\n\t"
+                    "mfence\n\t"//make sure memory is up to date
                     "syscall\n\t"
                     "lock xchgl %%ebp,(%%rbx)\n"
                     : "=r" (retval)
@@ -193,6 +195,7 @@ static inline int futex_wake_locking(int *uaddr,int val,int *uaddr2){//timeout i
   on uaddr. Except that if *uaddr2!=val3 then the operation will fail
   with the error EAGAIN
 */
+/*
 int futex_cmp_requeue(int *uaddr,int val,int *uaddr2,int val3){
   register uint32_t retval __asm__ ("%rax");
   register int *futex_addr __asm__("%rdi")=uaddr;
@@ -213,11 +216,11 @@ int futex_cmp_requeue(int *uaddr,int val,int *uaddr2,int val3){
   }
   return (int)retval;
 }
-/* Same as above but no check that on val3, you probably don't want to use this
+* Same as above but no check that on val3, you probably don't want to use this
    as cmp_requeue avoids a race condition that this has, at least for the 
    typical use. But there might be some other use for this.
 
- */
+ /
 int futex_requeue(int *uaddr,int val,int *uaddr2){
   register uint32_t retval __asm__ ("%rax");
   register int *futex_addr __asm__("%rdi")=uaddr;
@@ -237,7 +240,7 @@ int futex_requeue(int *uaddr,int val,int *uaddr2){
   }
   return (int)retval;
 }
-
+*/
 //futexs 1=free, 0=locked, no waiters -1=locked, waiters
 //futex_up and futex_down implement the locking mechanism described
 //int the futex(7) man page
@@ -290,7 +293,8 @@ long futex_down(int *uaddr){
 #define futex_spin_unlock futex_spin_up
 void futex_spin_up(register int *uaddr){        //unlock spin lock
   register long one=1;
-  __asm__ volatile ("lock xchgq %0,(%1)\n"
+  __asm__ volatile ("mfence\n\t"
+                    "lock xchgq %0,(%1)\n"
                     : : "r" (one), "r" (uaddr));
 }
 #define futex_spin_lock futex_spin_down
@@ -478,6 +482,12 @@ inline_safe_syscall3(int,tgkill,int, tgid, int, tid, int, sig,__NR_tgkill);
   __atomic_and_fetch(ptr,val,__ATOMIC_SEQ_CST)
 #define atomic_xor(ptr,val)                     \
   __atomic_xor_fetch(ptr,val,__ATOMIC_SEQ_CST)
+#define memory_fence()                          \
+  __asm__ volatile("mfence\n")
+#define store_fence()                          \
+  __asm__ volatile("sfence\n")
+#define load_fence()                          \
+  __asm__ volatile("lfence\n")
 union word128 {
   uint128_t uint128;
   struct {

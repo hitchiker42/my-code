@@ -65,6 +65,7 @@
 #include <sys/mman.h>
 #include <unistd.h>//bunch of stuff, including close
 #include <string.h>
+#include <strings.h>
 #include <sys/time.h>//not really sure
 #include "prog5_macros.h"
 
@@ -308,7 +309,8 @@ static inline int string_compare(english_word *x,english_word *y){
   if(x->len != y->len){
     return 0;
   } else {
-    return !memcmp(x->str,y->str,x->len);
+    //    return !memcmp(x->str,y->str,x->len);
+    return !strncasecmp(x->str,y->str,x->len);
   }
 }
 //since my strings aren't null terminated I can't use
@@ -355,7 +357,6 @@ static inline char *my_strcpy(uint8_t *dest_,const uint8_t *src_,uint64_t len_){
                    : : "r" (dest), "r" (src), "r" (len));
   return (char*)dest_;
 }
-
 /* 
    I don't even know why this doesn't work,
    but if I can't fix this I'll just stick to memcmp 

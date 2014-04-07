@@ -54,6 +54,8 @@
 #include <sys/mman.h>
 #include <unistd.h>//bunch of stuff, including close
 #include <string.h>
+#include <strings.h>
+#include <semaphore.h>
 #include <sys/time.h>//not really sure
 #include "prog5_macros.h"
 
@@ -148,12 +150,15 @@ struct english_word {
 //static __thread uint64_t thread_mem_end;
 //allocate NUM_PROCS*2MB space for the thread stacks
 //probably could be reduced to about...256Kb I think, but eh
-static uint8_t thread_stacks[NUM_PROCS][(2<<20)] __attribute__((aligned(4096)));
+static uint8_t thread_stacks[(2<<20)] __attribute__((aligned(4096)));
 static pthread_attr_t thread_attrs[NUM_PROCS];
+static pthread_attr_t default_thread_attr;
 static uint64_t pthread_thread_ids[NUM_PROCS];
 static __thread uint64_t thread_id;
 static __thread uint8_t thread_mem_block[2<<20];
 static __thread void* thread_mem_pointer;
+static sem_t main_thread_waiters;
+static sigset_t full_set;
 #define THREAD_STACK_TOP(thread_id)             \
   ((thread_stacks+((thread_id+1)*(2<<20)))-1)
 //static uint64_t next_thread_id=0;
@@ -289,7 +294,8 @@ static inline int string_compare(english_word *x,english_word *y){
   if(x->len != y->len){
     return 0;
   } else {
-    return !memcmp(x->str,y->str,x->len);
+    //return !memcmp(x->str,y->str,x->len);
+    return !strncasecmp(x->str,y->str,x->len);
   }
 }
 //since my strings aren't null terminated I can't use
@@ -428,3 +434,9 @@ void spin_lock_lock(register int *uaddr){
                    "jnz 1b\n"//if we failed spin again
                    : : "r" (uaddr), "r" (zero) : "%rax");
 }
+#define cond_wait_simple(mx,cnd,test)           \
+  pthread_mutex_lock(mx);                       \
+  while(test){                                  \
+    pthread_cond_wait(cnd,mx);                  \
+  }                                             \
+  pthread_mutex_unlock(mx)
