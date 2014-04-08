@@ -187,7 +187,7 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
 void thread_main(void *arg){
   thread_id=(uint64_t)(arg);
   thread_mem_pointer=thread_mem_block+thread_id;
-  while(!atomic_load_n(&out_of_data)){//test if there's still data to process
+  while(!atomic_load_n(&out_of_data) || keep_alive[thread_id]){
     //do work
     thread_mem_pointer=
       parse_buf(thread_bufs[thread_id] +
@@ -240,14 +240,9 @@ void main_wait_loop(int have_data){
       }
       if(out_of_data_local){
         PRINT_MSG("going to OUT_OF_DATA because out_of_data_local\n");
-        /* The issue here is that the last bit of data to be processed won't be unless
-           the thread processing it tests out_of_data before main sets it.
-           Should be fixable by having some value, int special_threads[NUM_PROCS];
-           and setting special_threads[worker_thread_id]=1 here
-           and changing the while test in thread main to be
-           while(!atomic_fetch_n(&out_of_data) || special_threads[thread_id])
-         */
-        microsleep(100);
+        keep_alive[worker_thread_id]=1;
+        sched_yield();//give other threads priority
+        microsleep(2000);
         goto OUT_OF_DATA;
       }
     } else {
@@ -259,7 +254,9 @@ void main_wait_loop(int have_data){
     PRINT_MSG("Out of data\n");
     atomic_store_n(&out_of_data,1);
     int i;
-    for(i=0;i<NUM_PROCS-1/*should this be 1 or 2? I think a 1*/;i++){
+    /*should this be 1 or 2? I think a 1*/
+    for(i=0;i<NUM_PROCS-1;i++){
+      //wake any waiting worker thread
       sem_post(thread_semaphores+i);
     }
     while(sem_wait(&main_thread_waiters)){
@@ -471,10 +468,11 @@ void print_results(struct heap common_words){
 #endif
   int i;
   uint32_t size=common_words.size;
-  for(i=size-1;i>=size-30;i--){
+  //  for(i=size-1;i>=size-30;i--){
+  for(i=0;i<size;i++){
     //We can't use the %s format specifier of printf to print the actual word
     //because its not null terminated
-    printf("The %d%s most common word was ",size-i,ordinal_suffix(size-i));
+    printf("The %d%s most common word was ",i,ordinal_suffix(i));
     print_word(common_words.heap[i]);
     printf(", with %d occurances\n",common_words.heap[i]->count);
   }

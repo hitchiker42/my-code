@@ -35,31 +35,29 @@
 */
 //includes
 #define _GNU_SOURCE //makes some nonportable extensions available
-#include <stdarg.h>//vfprintf and the va_arg macros
-#include <pthread.h>
 #include <alloca.h>//alloca, unecessary because of _GNU_SOURCE 
 #include <asm/unistd.h> //syscall numbers
 #include <assert.h>//unused as of now
+#include <err.h>
 #include <errno.h>//declares errno and error macros
 #include <fcntl.h>//open
+#include <pthread.h>
 #include <sched.h>//the manual page for clone says to include it
+#include <semaphore.h>
+#include <signal.h>
+#include <stdarg.h>//vfprintf and the va_arg macros
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <signal.h>
-#include <sys/stat.h>//fstat
-#include <time.h>
-//#include <sys/mman.h>
-#include <sys/types.h>//off_t,pid_t,ssize_t,etc
-#include <sys/mman.h>
-#include <unistd.h>//bunch of stuff, including close
 #include <string.h>
 #include <strings.h>
-#include <semaphore.h>
+#include <sys/mman.h>
+#include <sys/stat.h>//fstat
 #include <sys/time.h>//not really sure
+#include <sys/types.h>//off_t,pid_t,ssize_t,etc
+#include <time.h>
+#include <unistd.h>//bunch of stuff, including close
 #include "prog5_macros.h"
-#include <err.h>
-
 //typedefs
 
 typedef unsigned __int128 uint128_t;
@@ -144,7 +142,8 @@ struct english_word {
 //enough to put a strain on any modern computer's ram.
 //In addition to this between 38 (32+6) and 82(32+50) bytes.
 //are needed to store each word, this is dynamically allocated
-
+#define THREAD_STACK_TOP(thread_id)             \
+  ((thread_stacks+((thread_id+1)*(2<<20)))-1)
 //static uint8_t thread_stacks[(2<<20)] __attribute__((aligned(4096)));
 static pthread_attr_t thread_attrs[NUM_PROCS];
 static pthread_attr_t default_thread_attr;
@@ -155,11 +154,9 @@ static __thread void* thread_mem_pointer;
 static sem_t main_thread_waiters;
 static sem_t thread_semaphores[NUM_PROCS];
 static sigset_t full_set;
-#define THREAD_STACK_TOP(thread_id)             \
-  ((thread_stacks+((thread_id+1)*(2<<20)))-1)
-//static uint64_t next_thread_id=0;
 static pid_t thread_pids[NUM_PROCS];
 static pid_t tgid;//thread_group_id
+static uint8_t keep_alive[NUM_PROCS];
 //this queue is only accessed after locking the thread_queue_lock
 //Becasue the queue update and incremunting/decrementing the
 //queue index have to be done in one atomic step.

@@ -10,6 +10,14 @@
 #define MAX_BUF_SIZE (136*(1<<10))
 #define PAGE_ROUND_DOWN(x) (((uint64_t)(x)) & (~(PAGESIZE-1)))
 #define PAGE_ROUND_UP(x) ( (((uint64_t)(x)) + PAGESIZE-1)  & (~(PAGESIZE-1)) )
+#define MAX(a,b)                                \
+  ({ __typeof__ (a) _a = (a);                   \
+    __typeof__ (b) _b = (b);                    \
+    _a > _b ? _a : _b;})
+#define MIN(a,b)                                \
+  ({ __typeof__ (a) _a = (a);                   \
+    __typeof__ (b) _b = (b);                    \
+    _a < _b ? _a : _b;})
 //this used to use lseek, but lseek is slower than fstat because
 //it involves two syscalls becasue the file position needs to be reset
 //after getting the file size.
