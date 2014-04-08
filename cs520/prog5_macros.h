@@ -68,7 +68,6 @@
 #define PRINT_WORD_ERR(/*english_word* */x) fwrite(x->str,x->len,1,stderr)
 #define PRINT_STRING_ERR(str,len) fwrite(str,len,1,stderr)
 #define PRINT_STRING_LINE_ERR(str,len) (fwrite(str,len,1,stderr);fputs("\n",stderr)
-#define BREAKPOINT() __asm__ volatile ("int $3\n")
 #else
 #define HERE()
 #define PRINT_MSG(string)
@@ -76,9 +75,11 @@
 #define PRINT_WORD_ERR(x)
 #define PRINT_STRING_ERR(x)
 #define PRINT_STRING_LINE_ERR(x)
-#define BREAKPOINT()
 #endif
-
+#define BREAKPOINT() __asm__ volatile ("int $3\n")
+//sometimes I think that ascii is a pretty well desigened encoding scheme
+#define DOWNCASE(c) (c|0x20)
+#define UPCASE(c) (c&0xdf)
 //Make sure we only have one thread calling exit/printing stuff
 #define PROGRAM_ERROR(code)                             \
   if(atomic_add(&in_error,1)==1){                       \

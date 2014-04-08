@@ -1,4 +1,6 @@
-#include "prog5.h" 
+#include "prog5.h"
+struct heap sort_words_2();
+void print_results_heap(struct heap heap);
 //strings never need to be freed but the ammout of space needed for them
 //varies wildly so I allocate space for strings dynamically
 //I don't use malloc because it's faster to do it myself
@@ -48,7 +50,7 @@ static int atomic_hash_table_update(english_word *word){
       uint64_t old_indices_index=atomic_fetch_add(&indices_index,1);
       //this doesn't need to be atomic, since indices_index will never be
       //decremented, so no one else will change this
-      hash_table_indices[old_indices_index]=index;
+      atomic_store_n(hash_table_indices+old_indices_index,index);
       goto end1;
     }
     //else, someone else changed the value of global_hash_table[index] before us
@@ -78,7 +80,8 @@ static int atomic_hash_table_update(english_word *word){
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
     if(test){
       uint64_t old_indices_index=atomic_fetch_add(&indices_index,1);
-      hash_table_indices[old_indices_index]=index;
+      atomic_store_n(hash_table_indices+old_indices_index,index);
+//      hash_table_indices[old_indices_index]=index;
       goto end1;
     }
     //if !test the compare exchange failed and we need to keep looping
@@ -167,6 +170,7 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
   index++;
  REJECT_0:
   if(index >= 6 && index <= 50){
+    downcase((char*)buf,index);
     english_word *word=mem;
     *word=(english_word){.str=(char*)buf,.len=index,.count=1,
                          .file_bits=bitmask};
@@ -187,15 +191,13 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
 void thread_main(void *arg){
   thread_id=(uint64_t)(arg);
   thread_mem_pointer=thread_mem_block+thread_id;
-  while(!atomic_load_n(&out_of_data) || keep_alive[thread_id]){
+  while(1){
     //do work
     thread_mem_pointer=
       parse_buf(thread_bufs[thread_id] +
                 thread_fileinfo_vals[thread_id].start_offset,
                 thread_fileinfo_vals[thread_id].file_id,thread_mem_pointer);
-    if(atomic_load_n(&out_of_data)){
-      goto EXIT;
-    }
+    keep_alive[thread_id]=0;
     //tell main thread we're done
     spin_lock_lock(&thread_queue_lock);
     thread_queue[thread_queue_index++]=thread_id;
@@ -206,6 +208,9 @@ void thread_main(void *arg){
     //wait for main thread to give us more data
     if(builtin_unlikely(sem_wait(thread_semaphores+thread_id)!=0)){
       PROGRAM_ERROR(warn("sem_wait failure in worker thread %ld\n",thread_id));
+    }
+    if(!keep_alive[thread_id]){
+      goto EXIT;
     }
   }
  EXIT:  
@@ -235,14 +240,12 @@ void main_wait_loop(int have_data){
         count of live threads when the thread finishes, THIS was the
         source of my problems with joining threads (probably)
       */
+      atomic_store_n(keep_alive+worker_thread_id,1);
       if(sem_post(thread_semaphores+worker_thread_id)!=0){
         PROGRAM_ERROR(perror("sem_post failure\n"));
       }
       if(out_of_data_local){
         PRINT_MSG("going to OUT_OF_DATA because out_of_data_local\n");
-        keep_alive[worker_thread_id]=1;
-        sched_yield();//give other threads priority
-        microsleep(2000);
         goto OUT_OF_DATA;
       }
     } else {
@@ -252,19 +255,22 @@ void main_wait_loop(int have_data){
   //refill_fileinfo_queue goes here if used
  OUT_OF_DATA:{
     PRINT_MSG("Out of data\n");
-    atomic_store_n(&out_of_data,1);
     int i;
     /*should this be 1 or 2? I think a 1*/
-    for(i=0;i<NUM_PROCS-1;i++){
-      //wake any waiting worker thread
-      sem_post(thread_semaphores+i);
-    }
-    while(sem_wait(&main_thread_waiters)){
-      if(atomic_load_n(&live_threads)==0){break;}
+    while(live_threads){
+      for(i=0;i<NUM_PROCS-1;i++){
+        //wake any waiting worker thread
+        sem_post(thread_semaphores+i);
+      }
+      while(sem_wait(&main_thread_waiters)){
+        if(atomic_load_n(&live_threads)==0){break;}
+      }
     }
     PRINT_MSG("All worker threads finished\n");
+    __asm__ volatile("mfence");
+    spin_lock_lock(&thread_queue_lock);    
     struct heap common_words=sort_words();
-    print_results(common_words);
+    print_results_heap(common_words);
     exit(EXIT_SUCCESS);
   }
 }
@@ -370,7 +376,8 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
       while(eng_accept[buf[++index]]);
       info->word_len=0;
     }
-    if(info->word_len>6){
+    if(info->word_len>=6){
+      downcase((char*)border_word_mem_ptr,info->word_len);
       english_word *word=border_word_mem_ptr;
       *word=(english_word){.str=(char*)info->last_word,.len=info->word_len,
                            .count=1,.file_bits=file_bit_masks[info->file_id-1]};
@@ -459,20 +466,18 @@ struct fileinfo *init_thread(struct fileinfo *info,int thread_id_num){
 }
 //print out the most common words, needs a bit of work
 void print_results(struct heap common_words){
-#if (defined DEBUG) && !(defined NDEBUG)
   if(!is_sorted(common_words.heap,common_words.size)){
     printf("Failed to sort the heap\n");
   } else {
     printf("Sorted the heap\n");
   }
-#endif
   int i;
-  uint32_t size=common_words.size;
+  uint32_t size=common_words.size-1;
   //  for(i=size-1;i>=size-30;i--){
-  for(i=0;i<size;i++){
+  for(i=size;i>size-30;i--){
     //We can't use the %s format specifier of printf to print the actual word
     //because its not null terminated
-    printf("The %d%s most common word was ",i,ordinal_suffix(i));
+    printf("The %d%s most common word was ",(size-i)+1,ordinal_suffix(size-i));
     print_word(common_words.heap[i]);
     printf(", with %d occurances\n",common_words.heap[i]->count);
   }
@@ -488,12 +493,12 @@ int main(int argc,char *argv[]){
   if(num_files<=0){
     PROGRAM_ERROR(fprintf(stderr,"Error no filenames given\n"));
   }
-  tgid=gettgid();//probably don't need this anymore
+//  tgid=gettgid();//probably don't need this anymore
   string_mem_pointer=mmap(NULL,(8*(1<<20)),PROT_READ|PROT_WRITE,
                           MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
   string_mem_end=string_mem_pointer+(8*(1<<20));
   if(builtin_unlikely(string_mem_pointer==MAP_FAILED)){
-    PROGRAM_ERROR(perror("mmap failed"));
+    PROGRAM_ERROR(warn("mmap failed %d",errno));
   }
     //inilialize phread attrs
   pthread_attr_t default_thread_attr;
