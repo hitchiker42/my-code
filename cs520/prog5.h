@@ -1,7 +1,9 @@
+#ifndef __PROG5__
+#define __PROG5__
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wformat"
-#pragma GCC optimize ("Og")
+#pragma GCC optimize ("O2")
 //#pragma GCC optimize ("whole-program")
 /* What this program does
    open files given filename on command line,
@@ -20,7 +22,7 @@
    linear probing (meaning no linked lists, and collisions are resolved by
    putting the colliding value into the next free bucket), the large size of
    the hash table means the load factor will be small and this will be 
-b   efficient. All modifications to this hash table are done atomically
+   efficient. All modifications to this hash table are done atomically
    without using locks in any way.
 
    A note about the 100 file max, I use a bit vector internally to
@@ -32,6 +34,17 @@ b   efficient. All modifications to this hash table are done atomically
    as an extension. Most of the mainipulations I do treat this value
    as a pair of 64 bit integers for speed most of the time, but it's just
    something to be aware of.
+
+   This program is always multithreaded, a minimum of 2 threads are needed.
+
+   The number of threads used is determined by the macro NUM_PROCS, which
+   defaults to 16 unless NOT_AGATE is defined in which case it defaults to 8.
+   if NUM_PROCS is set to less then 2 something will break, so don't do that.
+   
+   The basic flow of the program is that there is 1 main thread and 
+   N worker threads (where N is NUM_PROCS-1). The worker threads
+   scan blocks of memory given to them by the main thread for english words
+   and updating the hash table as they find them. 
 */
 //includes
 #define _GNU_SOURCE //makes some nonportable extensions available
@@ -59,6 +72,7 @@ b   efficient. All modifications to this hash table are done atomically
 #include <unistd.h>//bunch of stuff, including close
 #include <x86intrin.h>
 #include "prog5_macros.h"
+#endif
 //typedefs
 
 typedef unsigned __int128 uint128_t;
@@ -135,17 +149,14 @@ struct english_word {
 //large enough to handle anything I need, this ultimately adds up
 //to (1<<20)*sizeof(english_word*) = 8MB (hash table)
 //+  (1<<19)*sizeof(uint32_t) = 2MB      (hash table indices)
-//+  (2<<20)*NUM_PROCS = 4-32MB          (thread stacks)
 //+  136*(1<<10)*NUM_PROCS = 272-2176KB  (thread buffers)
+//+  16 MB (memory for strings)
+//+  2MB*NUM_PROCS (16-32MB) (memory for everything else)
 //+  various other data   <= 1MB
-// ~14MB + 256KB - ~44MB + 128KB
+//=  ~27-~45 MB
 //which is a lot of memory, to be fair, but no where near
 //enough to put a strain on any modern computer's ram.
-//In addition to this between 38 (32+6) and 82(32+50) bytes.
-//are needed to store each word, this is dynamically allocated
-#define THREAD_STACK_TOP(thread_id)             \
-  ((thread_stacks+((thread_id+1)*(2<<20)))-1)
-static uint8_t string_mem[(2<<22)] __attribute__((aligned(4096)));
+static uint8_t string_mem[(2<<23)] __attribute__((aligned(4096)));
 uint8_t *string_mem_pointer=string_mem;
 //uint8_t *string_mem_pointer;
 static pthread_attr_t thread_attrs[NUM_PROCS];
@@ -187,18 +198,6 @@ uint64_t live_threads=0;
 uint8_t *string_mem_end;
 int32_t  string_mem_lock __attribute__((aligned (16)))=1;
 char **filenames;//=argv+1
-/*
-  The basic flow of the program is that there is 1 main thread and 
-  N worker threads (where N is the number of processors -1). The worker threads
-  scan blocks of memory given to them by the main thread for english words
-  and updating the hash table as they find them. 
-
-  The main thread waits while the worker threads are parsing and gets woken up
-  by the workers when they need more memory. The worker threads go to sleep
-  after signaling the main thread and the main thread wakes then up and gives
-  them more data to parse.
-*/
-
 /*Assuming there that are ~1000000 english words, and probably half of those
   are 6-50 letters long, 8 MB should be large enough for a hash table that
   won't exceed 50% capacity regardless of input. 
@@ -222,9 +221,9 @@ static uint32_t hash_table_indices[GLOBAL_HASH_TABLE_SIZE/2];
 static uint32_t indices_index=0;
 static uint32_t next_file_id=1;
 static file_bitfield all_file_bits={.uint128=0};
-static struct fileinfo fileinfo_mem[100];
+static struct fileinfo fileinfo_mem[200];//double what we need, just to be safe
 static uint32_t fileinfo_mem_index=0;
-static english_word border_word_mem[8192];//should be more that enough to
+static english_word border_word_mem[8192];
 static english_word *border_word_mem_ptr=border_word_mem;
 //deal with words that fall on the boarder of memory blocks
 //only accessed by the main thread, since that's the only thread that

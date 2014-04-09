@@ -498,11 +498,11 @@ struct fileinfo *setup_fileinfo(char *filename){
   static struct stat stat_buf;
   int fd=open(filename,O_RDONLY);
   if(builtin_unlikely(fd == -1)){
-    PROGRAM_ERROR(perror("error opening file"));
+    PROGRAM_ERROR(warn("error opening file %s",filename));
   }
   int stat_retval=fstat(fd,&stat_buf);
   if(builtin_unlikely(stat_retval == -1)){
-    PROGRAM_ERROR(perror("error calling stat on file"));
+    PROGRAM_ERROR(warn("error calling stat on file %s",filename));
   }
   if(builtin_unlikely(stat_buf.st_size == 0)){
     PROGRAM_ERROR
@@ -539,6 +539,7 @@ struct fileinfo *init_thread(struct fileinfo *info,int thread_id_num){
   }
 }
 //print out the most common words, needs a bit of work
+//currently unused
 void print_results(struct heap common_words){
   if(!is_sorted(common_words.heap,common_words.size)){
     printf("Failed to sort the heap\n");
@@ -558,8 +559,7 @@ void print_results(struct heap common_words){
 }
 int main(int argc,char *argv[]){
   struct fileinfo *info;
-  int i;
-  int have_data=1;
+  int i,have_data=1;
   //remove the program name from the arguments (its just eaiser)
   num_files=argc-1;
   PRINT_FMT("Given %ld files\n",num_files);

@@ -1,7 +1,39 @@
 //macros
 /*Agate has simd instructions up to sse4.2*/
+#ifndef __PROG5__
+#define __PROG5__
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wformat"
+#pragma GCC optimize ("O2")
+#define _GNU_SOURCE //makes some nonportable extensions available
+#include <alloca.h>//alloca, unecessary because of _GNU_SOURCE 
+#include <asm/unistd.h> //syscall numbers
+#include <assert.h>//unused as of now
+#include <err.h>
+#include <errno.h>//declares errno and error macros
+#include <fcntl.h>//open
+#include <pthread.h>
+#include <sched.h>//the manual page for clone says to include it
+#include <semaphore.h>
+#include <signal.h>
+#include <stdarg.h>//vfprintf and the va_arg macros
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <sys/mman.h>
+#include <sys/stat.h>//fstat
+#include <sys/time.h>//not really sure
+#include <sys/types.h>//off_t,pid_t,ssize_t,etc
+#include <time.h>
+#include <unistd.h>//bunch of stuff, including close
+#include <x86intrin.h>
+#include "prog5_macros.h"
+#endif
 #ifndef NUM_PROCS
-#ifdef AGATE
+#ifndef NOT_AGATE
 #define NUM_PROCS 16
 #else
 #define NUM_PROCS 8

@@ -1,9 +1,16 @@
+/*Constants used in the program, mainly lookup tables used to speed things up
+  at the cost of space
+ */
 //static const uint64_t PAGESIZE=4096;
 static const uint64_t buf_size=128*(1<<10);//128kb
 static const uint64_t min_buf_size=8*(1<<10);//8Kb
 static const uint64_t max_buf_size=136*(1<<10);//128+8Kb
 //global initialized arrays
 /*1 if char is in the set [A-Za-z] zero otherwise */
+/*This effectively replaces calls to strspn/strpbrk
+  i.e int index=strspn(str,"ABC....xyz"); becomes
+  int index=0;while(eng_accept[str[index++]]);
+*/
 static const uint8_t eng_accept[256]=
   {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -37,6 +44,8 @@ static const uint64_t file_bit_strings64[64] =
    0x1fffffffffffff, 0x3fffffffffffff, 0x7fffffffffffff, 0xffffffffffffff,
    0x1ffffffffffffff, 0x3ffffffffffffff, 0x7ffffffffffffff, 0xfffffffffffffff,
    0x1fffffffffffffff, 0x3fffffffffffffff, 0x7fffffffffffffff, 0xffffffffffffffff};
+//Nth entry effectively consists of a 128 bit integer with the least 
+//significant N+1 bits set and the rest of the bits unset
 static const file_bitfield file_bit_strings[128] ={
   {.low=0x1},{.low=0x3},
   {.low=0x7},{.low=0xf},
@@ -66,6 +75,10 @@ static const file_bitfield file_bit_strings[128] ={
   {.low=0x7ffffffffffff},{.low=0xfffffffffffff},
   {.low=0x1fffffffffffff},{.low=0x3fffffffffffff},
   {.low=0x7fffffffffffff},{.low=0xffffffffffffff},
+  {.low=0x1ffffffffffffff},{.low=0x3ffffffffffffff},
+  {.low=0x7ffffffffffffff},{.low=0xfffffffffffffff},
+  {.low=0x1fffffffffffffff},{.low=0x3fffffffffffffff},
+  {.low=0x7fffffffffffffff},{.low=0xffffffffffffffff},
   {.high=0x1,.low=0xffffffffffffffff},{.high=0x3,.low=0xffffffffffffffff},
   {.high=0x7,.low=0xffffffffffffffff},{.high=0xf,.low=0xffffffffffffffff},
   {.high=0x1f,.low=0xffffffffffffffff},{.high=0x3f,.low=0xffffffffffffffff},

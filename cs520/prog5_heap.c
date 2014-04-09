@@ -102,6 +102,10 @@ struct heap sort_words(){
       sift_up(most_common,i++);
     }
   }
+  if(i==0){
+    fprintf(stderr,"No words common to all files\n");
+    exit(EXIT_SUCCESS);
+  }
   return (struct heap){.heap=most_common,.size=i};
 }
 //works by modifying memory, but returns a value for convience
