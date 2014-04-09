@@ -89,9 +89,14 @@ struct heap sort_words(){
   //first get twenty words used in every file, if there are less then twenty
   //then this is all we need to do
   PRINT_MSG("start of sort_words\n");
-  english_word *cur_word;
+  english_word *cur_word,*last_word=NULL;
   while(j<indices_index){
     cur_word=global_hash_table[hash_table_indices[j++]];
+//    if(last_word==cur_word){
+  //    fprintf(stderr,"HERE\n");
+//      continue;
+//    }
+//    last_word=cur_word;
     if(cur_word->file_bits.uint128 == all_file_bits.uint128){
       most_common[i]=cur_word;
       sift_up(most_common,i++);
@@ -125,7 +130,7 @@ static int is_sorted(english_word **arr,int32_t size){
 static inline void print_nth(english_word *word,int i){
   printf("The %2d%s most common word was ",i,ordinal_suffix(i));
   print_word(word);
-  printf(", with %d occurances\n",word->count);
+  printf(" with %d occurances\n",word->count);
 }
 void print_results_heap(struct heap heap_){
   //heap satisifies the heap property, but isn't sorted
@@ -137,12 +142,12 @@ void print_results_heap(struct heap heap_){
   english_word *most_common[20];
   while(count<20){
     nth=*heap;
-    if(nth==most_common[count-1]){
+/*    if(nth==most_common[count-1]){
       heap[0]=heap[size--];
       sift_down(heap,0,size);
       nth=*heap;
       most_common[count-1]->count+=1;
-    }
+    }*/
     most_common[count]=nth;
     
 /*    for(i=0;i<count;i++){
@@ -150,8 +155,8 @@ void print_results_heap(struct heap heap_){
         assert(most_common[i]->count>=most_common[j]->count);
         assert((i == j) || !string_compare(most_common[i],most_common[j]));
       }
-    }
-    last=nth;*/
+    }*/
+/*    last=nth;*/
     ++count;
     heap[0]=heap[size--];
     sift_down(heap,0,size);

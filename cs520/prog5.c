@@ -1,11 +1,23 @@
 #include "prog5.h"
+/* using downcase is a pretty big hit, but I need to compare the cost of downcase
+   vs the cost of strncasecmp, but I'll probably switch back since not
+   using downcase should make things easier at the end
+
+   then again maybe not, I call memcmp a lot, it really might be worth it
+   to use a slower inline version, since I imagine the cost of calling it
+   is quite high. (same goes for strncasecmp if I use that)
+*/
 struct heap sort_words_2();
 void print_results_heap(struct heap heap);
 //strings never need to be freed but the ammout of space needed for them
 //varies wildly so I allocate space for strings dynamically
 //I don't use malloc because it's faster to do it myself
-static void *str_malloc(uint64_t size){
-  spin_lock_lock(&string_mem_lock);
+
+//this is basically the slowest part of my program,
+//try mmaping a larger ammount of memory and using
+//atomic_fetch_add(string_mem_ptr,size);
+static inline void *str_malloc(uint64_t size){
+/*  spin_lock_lock(&string_mem_lock);
   if(string_mem_pointer+size>string_mem_end){
     string_mem_pointer=mmap(NULL,(8*(1<<20)),PROT_READ|PROT_WRITE,
                             MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
@@ -16,7 +28,8 @@ static void *str_malloc(uint64_t size){
   void *retval=string_mem_pointer;
   string_mem_pointer+=size;
   spin_lock_unlock(&string_mem_lock);
-  return retval;
+  return retval;*/
+  return atomic_fetch_add(&string_mem_pointer,size);
 }
 /*
   Update the value of word in the global hash table, this means that if word
@@ -32,6 +45,53 @@ static void *str_malloc(uint64_t size){
   
   return 0 if word in already in the table, return 1 if word was added
 */
+#define UPDATE()                                                  \
+  atomic_add(&global_hash_table[index]->count,1);               \
+  if(low){                                                              \
+    atomic_or(&global_hash_table[index]->file_bits.low,word->file_bits.low); \
+  } else {                                                              \
+    atomic_or(&global_hash_table[index]->file_bits.high,word->file_bits.high); \
+  }                                                                     \
+  goto end0;
+static int atomic_hash_table_update(english_word *word){
+  uint64_t hashv=fnv_hash(word->str,word->len);
+  uint64_t index=hashv%global_hash_table_size;
+  int low=(word->file_bits.low?1:0);
+  uint8_t *mem=NULL;//memory for copying strings
+  //this next line results in a lot of cache misses for obvious reasons
+  while(1){
+    while(global_hash_table[index]){
+      if(string_compare(global_hash_table[index],word)){
+        UPDATE();
+      }
+      index++;
+    }
+    if(!mem){//insures we only allocate memory for a string once
+      mem=str_malloc(word->len);
+      word->str=(char*)my_strcpy(mem,(uint8_t*)word->str,word->len);
+    }
+    void *prev=global_hash_table[index];
+    if(prev){
+      if(string_compare(global_hash_table[index],word)){
+        UPDATE();
+      }
+      continue;
+    }
+    int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
+    if(test){
+      uint64_t old_indices_index=atomic_fetch_add(&indices_index,1);
+//      atomic_store_n(hash_table_indices+old_indices_index,index);
+      hash_table_indices[old_indices_index]=index;
+      goto end1;
+    }
+    //if !test the compare exchange failed and we need to keep looping
+  }
+ end0:
+  return 0;
+ end1:
+  return 1;
+}
+/*
 static int atomic_hash_table_update(english_word *word){
   uint64_t hashv=fnv_hash(word->str,word->len);
   uint64_t index=hashv%global_hash_table_size;
@@ -42,6 +102,12 @@ static int atomic_hash_table_update(english_word *word){
     mem=str_malloc(word->len);
     word->str=(char*)my_strcpy(mem,(uint8_t*)word->str,word->len);
     void *prev=global_hash_table[index];
+    if(prev){
+      if(string_compare(global_hash_table[index],word)){
+        goto UPDATE;
+      }
+      goto LOOP;
+    }
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
     if(test){
       //we added the word
@@ -56,10 +122,12 @@ static int atomic_hash_table_update(english_word *word){
     //else, someone else changed the value of global_hash_table[index] before us
   }
   while(1){//loop untill we find a free spot or an existing copy of word
+    LOOP:
     do {
       //see if the value in the table is the same as our value
       //if so update the value already in the table
       if(string_compare(global_hash_table[index],word)){
+      UPDATE:
         //atomically increment word count
         atomic_add(&global_hash_table[index]->count,1);
         //atomiclly update the file index
@@ -77,6 +145,12 @@ static int atomic_hash_table_update(english_word *word){
       word->str=(char*)my_strcpy(mem,(uint8_t*)word->str,word->len);
     }
     void *prev=global_hash_table[index];
+    if(prev){
+      if(string_compare(global_hash_table[index],word)){
+        goto UPDATE;
+      }
+      continue;
+    }
     int test=atomic_compare_exchange_n(global_hash_table+index,&prev,word);
     if(test){
       uint64_t old_indices_index=atomic_fetch_add(&indices_index,1);
@@ -90,7 +164,7 @@ static int atomic_hash_table_update(english_word *word){
   return 0;
  end1:
   return 1;
-}
+}*/
 /*
   main work function, searches buf for english words (matching [a-za-z]{6,50})
   and puts/updates the word in the global hash table.
@@ -170,7 +244,7 @@ void *parse_buf(register const uint8_t *buf_,int file_id,void *mem){
   index++;
  REJECT_0:
   if(index >= 6 && index <= 50){
-    downcase((char*)buf,index);
+    downcase_short((char*)buf,index);
     english_word *word=mem;
     *word=(english_word){.str=(char*)buf,.len=index,.count=1,
                          .file_bits=bitmask};
@@ -377,7 +451,7 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
       info->word_len=0;
     }
     if(info->word_len>=6){
-      downcase((char*)border_word_mem_ptr,info->word_len);
+      downcase_short((char*)border_word_mem_ptr,info->word_len);
       english_word *word=border_word_mem_ptr;
       *word=(english_word){.str=(char*)info->last_word,.len=info->word_len,
                            .count=1,.file_bits=file_bit_masks[info->file_id-1]};
@@ -410,7 +484,6 @@ struct fileinfo *setup_block(struct fileinfo *info, uint8_t *buf){
   }
   return info;
 }
-#include "prog5_heap.c"
 //simple little helper function to print ordinal suffixes
 static inline char* __attribute__((const)) ordinal_suffix(uint32_t num){
   if(num == 1){return "st";}
@@ -442,6 +515,7 @@ struct fileinfo *setup_fileinfo(char *filename){
                           .file_id=next_file_id++,.remaining=stat_buf.st_size};
   return info;
 }
+#include "prog5_heap.c"
 //creates a thread with thread_id_num and starts it processing data
 //determined by info
 struct fileinfo *init_thread(struct fileinfo *info,int thread_id_num){
@@ -494,9 +568,9 @@ int main(int argc,char *argv[]){
     PROGRAM_ERROR(fprintf(stderr,"Error no filenames given\n"));
   }
 //  tgid=gettgid();//probably don't need this anymore
-  string_mem_pointer=mmap(NULL,(8*(1<<20)),PROT_READ|PROT_WRITE,
-                          MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
-  string_mem_end=string_mem_pointer+(8*(1<<20));
+//  string_mem_pointer=mmap(NULL,(8*(1<<20)),PROT_READ|PROT_WRITE,
+//                          MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
+//  string_mem_end=string_mem_pointer+(8*(1<<20));
   if(builtin_unlikely(string_mem_pointer==MAP_FAILED)){
     PROGRAM_ERROR(warn("mmap failed %d",errno));
   }

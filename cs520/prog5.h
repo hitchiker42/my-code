@@ -1,7 +1,7 @@
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wformat"
-//#pragma GCC optimize ("O2")
+#pragma GCC optimize ("Og")
 //#pragma GCC optimize ("whole-program")
 /* What this program does
    open files given filename on command line,
@@ -145,7 +145,9 @@ struct english_word {
 //are needed to store each word, this is dynamically allocated
 #define THREAD_STACK_TOP(thread_id)             \
   ((thread_stacks+((thread_id+1)*(2<<20)))-1)
-//static uint8_t thread_stacks[(2<<20)] __attribute__((aligned(4096)));
+static uint8_t string_mem[(2<<22)] __attribute__((aligned(4096)));
+uint8_t *string_mem_pointer=string_mem;
+//uint8_t *string_mem_pointer;
 static pthread_attr_t thread_attrs[NUM_PROCS];
 static pthread_attr_t default_thread_attr;
 static uint64_t pthread_thread_ids[NUM_PROCS];
@@ -181,7 +183,7 @@ uint64_t live_threads=0;
    I can't use malloc since my threads aren't visable to libc which messes
    up the internal locking done by malloc, and just messes everything up.
 */
-uint8_t *string_mem_pointer;
+
 uint8_t *string_mem_end;
 int32_t  string_mem_lock __attribute__((aligned (16)))=1;
 char **filenames;//=argv+1
@@ -222,7 +224,7 @@ static uint32_t next_file_id=1;
 static file_bitfield all_file_bits={.uint128=0};
 static struct fileinfo fileinfo_mem[100];
 static uint32_t fileinfo_mem_index=0;
-static english_word border_word_mem[64];//should be more that enough to
+static english_word border_word_mem[8192];//should be more that enough to
 static english_word *border_word_mem_ptr=border_word_mem;
 //deal with words that fall on the boarder of memory blocks
 //only accessed by the main thread, since that's the only thread that
@@ -484,7 +486,7 @@ static void downcase(char *str,int len){
 }
 static inline void downcase_short(char *str,int len){
   while(len--){
-    *str=*str|0xdf;
+    *str=*str|0x20;
     str++;
   }
 }
