@@ -1,10 +1,17 @@
 #ifndef __PROG5__
 #define __PROG5__
+//disable debugging code
+#ifndef NDEBUG
+#define NDEBUG
+#endif
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wformat"
+//is this cheating?, I don't think so, it's just akin to adding
+// __attribute__ ((optmize "02")) to each function, and I don't
+//this function attributes are cheating
 #pragma GCC optimize ("O2")
-//#pragma GCC optimize ("whole-program")
+#pragma GCC optimize ("whole-program")
 /* What this program does
    open files given filename on command line,
    count words in each file, determine words common to each file
@@ -45,32 +52,37 @@
    N worker threads (where N is NUM_PROCS-1). The worker threads
    scan blocks of memory given to them by the main thread for english words
    and updating the hash table as they find them. 
+
+   as a note, I didn't really try to make all my functions static since
+   this is a standalone program not something to be liked with. Also
+   some lines go over 80 characters, but I'm pretty sure the only lines
+   that do are initializers for constant arrays
 */
 //includes
 #define _GNU_SOURCE //makes some nonportable extensions available
 #include <alloca.h>//alloca, unecessary because of _GNU_SOURCE 
-#include <asm/unistd.h> //syscall numbers
-#include <assert.h>//unused as of now
-#include <err.h>
+#include <asm/unistd.h> //syscall numbers (
+#include <assert.h> //NDEBUG being defined disables assertations
+#include <err.h>//useful nonstandard functions for printing formatted errors
 #include <errno.h>//declares errno and error macros
 #include <fcntl.h>//open
 #include <pthread.h>
-#include <sched.h>//the manual page for clone says to include it
+//#include <sched.h>//the manual page for clone says to include it
 #include <semaphore.h>
-#include <signal.h>
+//#include <signal.h>
 #include <stdarg.h>//vfprintf and the va_arg macros
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
-#include <sys/mman.h>
+#include <strings.h>//strcasecmp, unused
+#include <sys/mman.h>//mmap, I don't think I use it anymore
 #include <sys/stat.h>//fstat
-#include <sys/time.h>//not really sure
+#include <sys/time.h>//nanosleep
 #include <sys/types.h>//off_t,pid_t,ssize_t,etc
 #include <time.h>
 #include <unistd.h>//bunch of stuff, including close
-#include <x86intrin.h>
+#include <x86intrin.h>//simd intrinsics
 #include "prog5_macros.h"
 #endif
 //typedefs
@@ -92,10 +104,12 @@ struct fileinfo *setup_block(struct fileinfo *info,uint8_t *buf);
 struct fileinfo *setup_fileinfo(char *filename);
 int setup_thread_args(int thread_id_num);
 int refill_fileinfo_queue();
-void print_results(struct heap);
+void print_results(struct heap);//not used anymore
+void print_results_heap(struct heap heap);
+//I used this to print results (it returns st given 1, nd given 2, rd given 3
+//and otherwise st, 
 static char* __attribute__((const)) ordinal_suffix(uint32_t num);
 //structure definitions
-//if I allocate these statically I'll need 100 of them
 struct fileinfo {
   off_t len;
   off_t remaining;
@@ -126,6 +140,7 @@ struct thread_fileinfo {
   int32_t file_id;
   uint32_t start_offset;
 };
+//binary heap used for collecting and sorting results
 struct heap {english_word **heap; uint32_t size;};
 /*structure for storing data about each word
   contains:
@@ -159,7 +174,9 @@ struct english_word {
 static uint8_t string_mem[(2<<23)] __attribute__((aligned(4096)));
 uint8_t *string_mem_pointer=string_mem;
 //uint8_t *string_mem_pointer;
-static pthread_attr_t thread_attrs[NUM_PROCS];
+//for default thread attributes I set the thread state to detached
+//and the stack size to (2<<15)
+//static pthread_attr_t thread_attrs[NUM_PROCS];
 static pthread_attr_t default_thread_attr;
 static uint64_t pthread_thread_ids[NUM_PROCS];
 static __thread uint64_t thread_id;
@@ -167,7 +184,7 @@ static uint8_t thread_mem_block[NUM_PROCS][2<<20];
 static __thread void* thread_mem_pointer;
 static sem_t main_thread_waiters;
 static sem_t thread_semaphores[NUM_PROCS];
-static sigset_t full_set;
+//static sigset_t full_set;
 static pid_t thread_pids[NUM_PROCS];
 static pid_t tgid;//thread_group_id
 static uint8_t keep_alive[NUM_PROCS];
@@ -176,6 +193,7 @@ static uint8_t keep_alive[NUM_PROCS];
 //queue index have to be done in one atomic step.
 static uint8_t thread_queue[NUM_PROCS];
 static uint8_t thread_queue_index=0;
+static uint8_t *thread_queue_ptr=thread_queue;
 //holds the information about the data to be given to threads
 static struct fileinfo *fileinfo_queue[NUM_PROCS];
 uint8_t thread_bufs[NUM_PROCS][MAX_BUF_SIZE];
@@ -190,13 +208,8 @@ uint64_t out_of_data=0;
 uint64_t live_threads=0;
 /*sigset_t block_sigterm;
   sigset_t block_sigtrap;*/
-/* 
-   I can't use malloc since my threads aren't visable to libc which messes
-   up the internal locking done by malloc, and just messes everything up.
-*/
-
 uint8_t *string_mem_end;
-int32_t  string_mem_lock __attribute__((aligned (16)))=1;
+//int32_t  string_mem_lock __attribute__((aligned (16)))=1;
 char **filenames;//=argv+1
 /*Assuming there that are ~1000000 english words, and probably half of those
   are 6-50 letters long, 8 MB should be large enough for a hash table that
@@ -249,37 +262,20 @@ static uint64_t fnv_hash(const void *key,int keylen){
   }
   return hash;
 }
-//this might result in a more even distribution, but it might not
-static uint32_t fnv_hash_32_folded(const void *key,int keylen){
-  const uint8_t *raw_data=(const uint8_t *)key;
-  int i;
-  union {
-    uint64_t uint64;
-    struct {uint32_t low; uint32_t high;} uint32;
-  } hash;
-  hash.uint64=offset_basis_64;
-  for(i=0; i < keylen; i++){
-    hash.uint64 = (hash.uint64 ^ raw_data[i])*fnv_prime_64;
-  }
-  return (hash.uint32.high ^ hash.uint32.low);
-}
-//32 bit version, just for completeness
-static uint32_t fnv_hash_32(const void *key,int keylen){
-  const uint8_t *raw_data=(const uint8_t *)key;
-  int i;
-  uint64_t hash=offset_basis_32;
-  for(i=0; i < keylen; i++){
-    hash = (hash ^ raw_data[i])*fnv_prime_32;
-  }
-  return hash;
-}
-
 static inline int string_compare(english_word *x,english_word *y){
   if(x->len != y->len){
     return 0;
   } else {
+    /*    const register char *a __asm__ ("%rdi")=x->str;
+    const register char *b __asm__ ("%rsi")=y->str;
+    register uint64_t len __asm__ ("%rcx")=x->len;
+    uint8_t output;
+    __asm__ volatile("repe cmpsb\n\t"
+                     "setz %0"
+                     : "=g" (output): "r" (a), "r" (b), "r" (len));
+                     return output;*/
     return !memcmp(x->str,y->str,x->len);
-//    return !strncasecmp(x->str,y->str,x->len);
+    //return !strncasecmp(x->str,y->str,x->len);
   }
 }
 //since my strings aren't null terminated I can't use
@@ -312,14 +308,18 @@ static inline void print_count_word(english_word *x){
 //really this is more memcpy than strcpy, but the reason I wrote it
 //is that I know I'll only be coping 6-50 bytes and the cost of aligning the
 //data and copying in chunks isn't worth it. Plus it's small enough to inline
+
+//however it turns out that calling memcpy is faster...damn, I thought I was
+//being clever, well, at least I tested it to be sure, and found out I was wrong
 static inline char *my_strcpy(uint8_t *dest_,const uint8_t *src_,uint64_t len_){
-  uint8_t *retval=dest_;
+  return memcpy(dest_,src_,len_);
+  /*  uint8_t *retval=dest_;
   register uint8_t *dest __asm__ ("%rdi")=dest_;
   const register uint8_t *src __asm__ ("%rsi")=src_;
   register uint64_t len __asm__ ("%rcx")=len_;
   __asm__ volatile("rep movsb"
                    : : "r" (dest), "r" (src), "r" (len));
-  return (char*)dest_;
+                   return (char*)dest_;*/
 }
 static inline void perror_fmt(const char *fmt,...){
   va_list ap;
@@ -335,12 +335,14 @@ static inline void my_perror(const char *msg){
     fprintf(stderr,"%s; Error number %d\n",_sys_errlist[errno],errno);
   }
 }
+//used in debugging unused in the actual program
 int microsleep(long msec){
   static struct timespec sleep_time={.tv_sec=0,.tv_nsec=0};
   sleep_time.tv_nsec=msec*1000;
   return nanosleep(&sleep_time,NULL);
 }
 //Taken from stackoverflow and modified to print in hex rather than decimal
+//unused in actual program
 int print_uint128(uint128_t n) {
   char str[40] = {0}; // log10(1 << 128) + '\0'
   char *s = str + sizeof(str) - 1; // start at the end
@@ -373,13 +375,19 @@ static inline void print_fileinfo(struct fileinfo *info){
 #else
 #define print_fileinfo(info)
 #endif
+
+/* The only data that needs locking is the thread queue, and the
+   only operations done with the lock are setting/getting a thread id
+   and decrementing the counter, in fact I could probably
+   figure out a way to do it atomically, but I went to all the trouble
+   of writing a spin lock so I at least want to use it
+*/
 void spin_lock_unlock(register int *uaddr){        //unlock spin lock
   register long one=1;
   __asm__ volatile ("mfence\n\t"
                     "lock xchgq %0,(%1)\n"
                     : : "r" (one), "r" (uaddr));
 }
-#define futex_spin_lock futex_spin_down
 void spin_lock_lock(register int *uaddr){
   register int zero = 0;
   __asm__ volatile("1:\n\t"//start spining
@@ -393,17 +401,12 @@ void spin_lock_lock(register int *uaddr){
                    "jnz 1b\n"//if we failed spin again
                    : : "r" (uaddr), "r" (zero) : "%rax");
 }
-#define cond_wait_simple(mx,cnd,test)           \
-  pthread_mutex_lock(mx);                       \
-  while(test){                                  \
-    pthread_cond_wait(cnd,mx);                  \
-  }                                             \
-  pthread_mutex_unlock(mx)
 /* Assuming inputs are alphabetic characters i.e [A-Za-z] then
    in the ascii encoding A=0x41=0b01000001 and a=0x61=0b01100001
    the only difference is the thrird bit, this holds for all letters.
    so upcase just masks off the third bit and downcase sets it, i.e
    upcase(c)=c&0xdf and downcase(c)=c|0x20
+   ascii is suprisingly confident
 */
 typedef union m128i {
   __m128i m128i;
@@ -453,6 +456,11 @@ static inline void upcase_short(char *str,int len){
     str++;
   }
 }
+/* This is much more efficent in the long run then what I use, but 
+   since I never operate on a word longer than 50 characters
+   the startup cost and size of this make it slower than 
+   the slow small version.   
+ */
 static void downcase(char *str,int len){
   register __m128i mask=downcase_mask.m128i;
   __m128i chars;
@@ -483,6 +491,10 @@ static void downcase(char *str,int len){
   }
   return;
 }
+//this is what I actually use, it's no where near as
+//efficient as the function above, but it's really short
+//and runs fast enough, it's the same idea in using
+//my handwritten strcpy
 static inline void downcase_short(char *str,int len){
   while(len--){
     *str=*str|0x20;
