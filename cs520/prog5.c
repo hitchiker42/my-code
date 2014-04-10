@@ -1,22 +1,17 @@
 #include "prog5.h"
-/* using downcase is a pretty big hit, but I need to compare the cost of downcase
-   vs the cost of strncasecmp, but I'll probably switch back since not
-   using downcase should make things easier at the end
+/* There's a lot of commented out code in here, I tried a lot of different 
+   things in this program. I first attempted to write it using my own 
+   threads via the use of the linux syscalls clone and futex, I managed
+   to get quite a bit done there, but getting things to synchronize would've
+   involved writing way more code than would be reasonable. 
 
-   then again maybe not, I call memcmp a lot, it really might be worth it
-   to use a slower inline version, since I imagine the cost of calling it
-   is quite high. (same goes for strncasecmp if I use that)
+   So then I switched to pthreads, I tried doing locking manually
+   which didn't work and I was going to use condition variables and mutexes
+   but I found semaphores serve my purpose much better, I've never actually
+   used semaphores before, mostly because I didn't really understand them,
+   but they're realy convient for synchronizing threads.
 */
-struct heap sort_words_2();
-void print_results_heap(struct heap heap);
-//strings never need to be freed but the ammout of space needed for them
-//varies wildly so I allocate space for strings dynamically
-//I don't use malloc because it's faster to do it myself
-
-//this is basically the slowest part of my program,
-//try mmaping a larger ammount of memory and using
-//atomic_fetch_add(string_mem_ptr,size);
-static inline void *str_malloc(uint64_t size){
+static inline void *str_malloc(uint64_t size){  
 /*  spin_lock_lock(&string_mem_lock);
   if(string_mem_pointer+size>string_mem_end){
     string_mem_pointer=mmap(NULL,(8*(1<<20)),PROT_READ|PROT_WRITE,
@@ -304,8 +299,8 @@ void main_wait_loop(int have_data){
       PRINT_FMT("locking in main\n");
       spin_lock_lock(&thread_queue_lock);
       worker_thread_id=thread_queue[--thread_queue_index];
-      out_of_data_local=(!setup_thread_args(worker_thread_id));
       spin_lock_unlock(&thread_queue_lock);
+      out_of_data_local=(!setup_thread_args(worker_thread_id));
       PRINT_FMT("unlocked in main\n");
       /*The issue is here, when setup_thread_args returns 0 it means that 
         there's no data left, but arguments for a thread have already been 
@@ -579,8 +574,8 @@ int main(int argc,char *argv[]){
   pthread_attr_init(&default_thread_attr);
   pthread_attr_setdetachstate(&default_thread_attr,PTHREAD_CREATE_DETACHED);
   pthread_attr_setstacksize(&default_thread_attr,(2<<15));
-    size_t stacksz;
-  pthread_attr_getstacksize(&default_thread_attr,&stacksz);
+  //  size_t stacksz;
+  //  pthread_attr_getstacksize(&default_thread_attr,&stacksz);
   for(i=0;i<NUM_PROCS;i++){
     sem_init(thread_semaphores+i,0,0);
   }

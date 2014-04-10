@@ -71,25 +71,22 @@ static inline int heap_swap_min(english_word **heap,english_word *new){
   sift_up(heap,heap_index);
   return min_count[0];
 }
-int compare(const english_word *a,const english_word *b){
-  if(a->count==b->count){
-    return 0;
-  } else if(a->count > b->count){
-    return 1;
-  } else {
-    return -1;
-  }
-}
 //no args because all the data used is global
 struct heap sort_words(){
   //reuse some static memory we don't need anymore
   static english_word *most_common[8000];
   //  memset(thread_bufs,'\0',100*sizeof(english_word*));
   int32_t i=0,j=0;
-  //first get twenty words used in every file, if there are less then twenty
-  //then this is all we need to do
   PRINT_MSG("start of sort_words\n");
   english_word *cur_word,*last_word=NULL;
+  //if I had more time I would've liked to parallize this
+  //but I'm not sure how I would've done it, probably
+  //divide indices_index by NUM_PROCS have each thread
+  //pick out the words that are in every file for the range
+  //indices_index/NUM_PROCS*thread_no - indices_index/NUM_PROCS+thread_no+1
+  //then go back to one thread to sort it
+  //it's 10PM on wednesday as I write this, if I had another day I would
+  //probably do that, then again I've spent enough time on this as it is
   while(j<indices_index){
     cur_word=global_hash_table[hash_table_indices[j++]];
 //    if(last_word==cur_word){
@@ -132,19 +129,24 @@ static int is_sorted(english_word **arr,int32_t size){
   return 1;
 }
 static inline void print_nth(english_word *word,int i){
-  printf("The %2d%s most common word was ",i,ordinal_suffix(i));
+  //this is the way I would print it, but
+  //looking at the description of the program we are only supposed
+  //to print one word per line, and I figure it'll be eaiser
+  //to parse if  it's just a word follower by a count
+  //  printf("The %2d%s most common word was ",i,ordinal_suffix(i));
   print_word(word);
-  printf(" with %d occurances\n",word->count);
+  //  printf(" with %d occurances\n",word->count);
+  printf(" %d\n",word->count);
 }
 void print_results_heap(struct heap heap_){
   //heap satisifies the heap property, but isn't sorted
   english_word **heap=heap_.heap;
   int count=0,i,j;
-  uint32_t size=heap_.size-1;
+  int32_t size=heap_.size-1;
 //  heapify(heap,size);
   english_word *nth=*heap,*last=heap[1],*twentieth;
   english_word *most_common[20];
-  while(count<20){
+  while(count<20 && size >= 0 ){
     nth=*heap;
 /*    if(nth==most_common[count-1]){
       heap[0]=heap[size--];
@@ -165,14 +167,16 @@ void print_results_heap(struct heap heap_){
     heap[0]=heap[size--];
     sift_down(heap,0,size);
   }
-  for(i=0;i<20;i++){
+  for(i=0;i<count;i++){
     print_nth(most_common[i],i+1);
   }
-  twentieth=nth;
-  while((nth=*heap)->count==twentieth->count){
-    print_nth(nth,++count);
-    heap[0]=heap[size--];
-    sift_down(heap,0,size);
+  if(count == 20){
+    twentieth=nth;
+    while((nth=*heap)->count==twentieth->count){
+      print_nth(nth,++count);
+      heap[0]=heap[size--];
+      sift_down(heap,0,size);
+    }
   }
 }
 //would probably be faster but doesn't work
