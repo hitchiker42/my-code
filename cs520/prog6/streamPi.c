@@ -23,8 +23,13 @@ static void *gEventLoop;
 static void *gStream;
 
 // handler for the "data" event
-static void processValue(void *arg)
-{
+//how I would do it
+/* void processValue(void *arg){
+   double val=(double)arg;
+   sum+=arg;
+   }
+*/
+static void processValue(void *arg){
   sum += ((Double *) arg)->value;
 
   free(arg);
