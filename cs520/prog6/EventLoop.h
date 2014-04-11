@@ -164,6 +164,12 @@ void startEventLoop(void *handle, handler_fn initialFunc,
 void register_event(event_loop_handle,const char *,handler_fn);
 void registerEvent(void *handle,const char *eventName, handler_fn handler)
   __attribute__((alias("register_event")));
+/* (let ((old-event (assoc (slot-value handler event_alist) eventName)))
+   (if (not (null old-event))
+   (set-cdr old-event handler)
+   (setf (slot-value handler event_alist) 
+   (cons (cons eventName handler) (slot-value handler event_alist)))))
+*/
 
 /* announce that an event has occurred
  * if an handler is registered for it, the handler function will be
