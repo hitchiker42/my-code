@@ -34,6 +34,10 @@
      without if the +/- only [0-9]|1[0-9]|2[0-3]|00 are valid
      for the first two digits and only [0-9]|[1-5][0-9] are 
      valid for the second. 
+
+     stop: stop any running alarms
+     
+     time formats will use parse_datatime from gnulib
        
 */
 #ifndef _ALARMD_H
@@ -50,8 +54,43 @@
 #include <time.h>
 #include <unistd.h>
 #include "sd-daemon.h"
-//Put functions relating to time here
-#include "time_manipulation.h"
+#include "heap.h"//binary heap for use as a priority queue
+/* Parse a date/time string, storing the resulting time value into *RESULT.
+   string itself is pointed to by P. Return true if successful.
+   can be an incomplete or relative time specification; if so, use
+   as the basis for the returned time. */
+int parse_datetime(struct timespec *result, const char *P, 
+                   const struct timespec *now);
 typedef struct internal_alarm *alarm_ptr;
 typedef uint64_t alarm_id;
+struct alarm_state{
+}
+#define MAX(a,b)                                \
+  ({ __typeof__ (a) _a = (a);                   \
+    __typeof__ (b) _b = (b);                    \
+    _a > _b ? _a : _b;})
+#define MIN(a,b)                                \
+  ({ __typeof__ (a) _a = (a);                   \
+    __typeof__ (b) _b = (b);                    \
+    _a < _b ? _a : _b;})
+#define SWAP(a,b)                               \
+  ({ __typeof__ (a) _a = a;                     \
+    a=b;                                        \
+    b=_a;                                       \
+    ;})
+#if (defined DEBUG) && !(defined NDEBUG)
+#define HERE() fprintf(stderr,"here at %s,line %d\n",__FILE__,__LINE__)
+#define PRINT_MSG(string) fprintf(stderr,string);
+#define PRINT_FMT(string,fmt...) fprintf(stderr,string,##fmt);
+#define FN_START fprintf(stderr,"starting %s\n",__func__);
+#define FN_END fprintf(stderr,"finishing %s\n",__func__);
+#else
+#define HERE()
+#define PRINT_MSG(string)
+#define PRINT_FMT(string,fmt...)
+#define FN_START
+#define FN_END
 #endif
+
+#endif
+
