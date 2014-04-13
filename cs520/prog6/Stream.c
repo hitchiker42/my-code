@@ -23,11 +23,55 @@
  * be coordinated by the producer (implementing the "produce" function)
  * and the consumer (responding to the "data" events).
  */
+#define _GNU_SOURCE
+#include "Stream.h"
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <semaphore.h>
+#include <pthread.h>
+void *xmalloc (size_t n){
+  void *p = malloc (n);
+  if (!p && n != 0){
+    perror("out of memory");
+    exit(1);
+  }
+  return p;
+}
 
-#ifndef STREAM_H
-#define STREAM_H
+/* Change the size of an allocated block of memory P to N bytes,
+   with error checking.  */
+
+void *xrealloc (void *p, size_t n){
+  if (!n && p){
+    free (p);
+    return NULL;
+  }
+  p = realloc (p, n);
+  if (!p && n){
+    perror("out of memory");
+    exit(1);
+  }
+  return p;
+}
+void *xcalloc (size_t s){
+  return memset(xmalloc (s), 0, s);
+}
+void *xmemdup (void const *p, size_t s){
+  return memcpy (xmalloc (s), p, s);
+}
+
+/* Clone STRING.  */
+
+char *xstrdup (char const *string){
+  return xmemdup (string, strlen (string) + 1);
+}
+
+typedef struct event_loop_data *event_loop_handle;
 pthread_attr_t stream_thread_attr;
-pthread_once_t stream_once=PTRHEAD_ONCE_INIT;
+pthread_once_t stream_once=PTHREAD_ONCE_INIT;
 void stream_attr_init(){
   pthread_attr_init(&stream_thread_attr);
   pthread_attr_setdetachstate(&stream_thread_attr,PTHREAD_CREATE_DETACHED);
@@ -36,8 +80,8 @@ typedef void*(produce_fn)(void*);
 typedef void*(init_fn)(void*);
 typedef struct stream_data *stream_handle;
 struct stream_data {
-  const char *data_event_name;
-  const char *end_event_name;
+  char *data_event_name;
+  char *end_event_name;
   produce_fn *produce;
   init_fn *init;
   event_loop_handle handle;
@@ -49,7 +93,7 @@ stream_handle create_stream(const char *data_event_name,const char *end_event_na
   strcpy(data_event_copy,data_event_name);
   char *end_event_copy=xmalloc(strlen(end_event_name));//inefficent use of strlen, but eh
   strcpy(end_event_copy,end_event_name);
-  *new_stream=(struct stream_data){.data_event_name=data_event_copy,.produce=produce
+  *new_stream=(struct stream_data){.data_event_name=data_event_copy,.produce=produce,
                                    .end_event_name=end_event_copy,.init=init,
                                    .handle=handle};
   return new_stream;
@@ -73,14 +117,13 @@ void * createStream(const char *dataEventName,const char *endEventName,
  * returns 1
  */
 int start_stream(stream_handle handle,void *client_data){
-  void *init_retval=handle->init_fn(client_data);
+  void *init_retval=handle->init(client_data);
   if(init_retval==NULL){
     return 0;
   } else {
     pthread_once(&stream_once,stream_attr_init);
     pthread_t new_thread;
-    if(pthread_create(&new_thread,&stream_attr_init,
-                      handle->produce,client_data)!=0){
+    if(pthread_create(&new_thread,&stream_thread_attr,handle->produce,client_data)!=0){
       perror("pthread create failed");
       exit(1);
     }
@@ -97,14 +140,13 @@ int startStream(void *handle,void *initializeArg)
  * cleans up any memory used by the Stream
  */
 void cleanup_stream(stream_handle handle){
-  xfree(handle->data_event_name);
-  xfree(handle->end_event_name);
-  xfree(handle);
+  free(handle->data_event_name);
+  free(handle->end_event_name);
+  free(handle);
   return;
 }
 void cleanup_stream(stream_handle);
 void cleanupStream(void *handle )
   __attribute__((alias("cleanup_stream")));
 
-#endif
 
