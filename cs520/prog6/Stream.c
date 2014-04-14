@@ -25,6 +25,7 @@
  */
 #define _GNU_SOURCE
 #include "Stream.h"
+#include "EventLoop.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -32,7 +33,20 @@
 #include <unistd.h>
 #include <semaphore.h>
 #include <pthread.h>
-void *xmalloc (size_t n){
+#define NDEBUG
+#if (defined DEBUG) && !(defined NDEBUG)
+#define HERE() fprintf(stderr,"here at %s,line %d\n",__FILE__,__LINE__)
+#define PRINT_MSG(string) fprintf(stderr,string);
+#define PRINT_FMT(string,fmt...) fprintf(stderr,string,##fmt);
+#define PRINT_LN(string) fprintf(stderr,"%s%s",string,"\n")
+#else
+#define HERE()
+#define PRINT_MSG(string)
+#define PRINT_FMT(string,fmt...)
+#define PRINT_LN()
+#endif
+#define announce_event announceEvent
+static void *xmalloc (size_t n){
   void *p = malloc (n);
   if (!p && n != 0){
     perror("out of memory");
@@ -43,8 +57,8 @@ void *xmalloc (size_t n){
 
 /* Change the size of an allocated block of memory P to N bytes,
    with error checking.  */
-
-void *xrealloc (void *p, size_t n){
+/*
+static void *xrealloc (void *p, size_t n){
   if (!n && p){
     free (p);
     return NULL;
@@ -55,20 +69,19 @@ void *xrealloc (void *p, size_t n){
     exit(1);
   }
   return p;
-}
-void *xcalloc (size_t s){
+  }*/
+static void *xcalloc (size_t s){
   return memset(xmalloc (s), 0, s);
 }
-void *xmemdup (void const *p, size_t s){
+static void *xmemdup (void const *p, size_t s){
   return memcpy (xmalloc (s), p, s);
 }
 
 /* Clone STRING.  */
 
-char *xstrdup (char const *string){
+static char *xstrdup (char const *string){
   return xmemdup (string, strlen (string) + 1);
 }
-
 typedef struct event_loop_data *event_loop_handle;
 pthread_attr_t stream_thread_attr;
 pthread_once_t stream_once=PTHREAD_ONCE_INIT;
@@ -84,19 +97,28 @@ struct stream_data {
   char *end_event_name;
   produce_fn *produce;
   init_fn *init;
+  void *user_data;
   event_loop_handle handle;
 };
 stream_handle create_stream(const char *data_event_name,const char *end_event_name,
                             produce_fn produce,init_fn init,event_loop_handle handle){
-  struct stream_data *new_stream=xmalloc(sizeof(struct stream_data));
-  char *data_event_copy=xmalloc(strlen(data_event_name));//inefficent use of strlen, but eh
-  strcpy(data_event_copy,data_event_name);
-  char *end_event_copy=xmalloc(strlen(end_event_name));//inefficent use of strlen, but eh
+  struct stream_data *new_stream=xcalloc(sizeof(struct stream_data));
+  char *data_event_copy=xstrdup(data_event_name);
+  char *end_event_copy=xstrdup(end_event_name);
   strcpy(end_event_copy,end_event_name);
   *new_stream=(struct stream_data){.data_event_name=data_event_copy,.produce=produce,
                                    .end_event_name=end_event_copy,.init=init,
                                    .handle=handle};
   return new_stream;
+}
+void *stream_main(void *stream_){
+  stream_handle stream=stream_;
+  void *data;
+  while((data=stream->produce(stream->user_data))){
+    announce_event(stream->handle,"data",data);
+  };
+  announce_event(stream->handle,"end",NULL);
+  return NULL;
 }
 /* create a Stream
  * returns a "handle" to be passed into startStream and cleanupStream
@@ -121,11 +143,12 @@ int start_stream(stream_handle handle,void *client_data){
   if(init_retval==NULL){
     return 0;
   } else {
+    handle->user_data=init_retval;
     pthread_once(&stream_once,stream_attr_init);
     pthread_t new_thread;
-    if(pthread_create(&new_thread,&stream_thread_attr,handle->produce,client_data)!=0){
+    if(pthread_create(&new_thread,&stream_thread_attr,stream_main,handle)!=0){
       perror("pthread create failed");
-      exit(1);
+      return 0;
     }
     return 1;
   }

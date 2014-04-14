@@ -19,7 +19,7 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include "EventLoop.h"
-#define DEBUG
+#define NDEBUG
 #if (defined DEBUG) && !(defined NDEBUG)
 #define HERE() fprintf(stderr,"here at %s,line %d\n",__FILE__,__LINE__)
 #define PRINT_MSG(string) fprintf(stderr,string);
@@ -32,11 +32,10 @@
 #define PRINT_LN()
 #endif
 //do this instead of making everything static
-//#pragma GCC visibility push("hidden")
 //I didn't write these versions of the checked memory allocation I got
 //them from gnulib, but really they're pretty much the same functions everywhere
 /* Allocate N bytes of memory dynamically, with error checking.  */
-void *xmalloc (size_t n){
+static void *xmalloc (size_t n){
   void *p = malloc (n);
   if (!p && n != 0){
     perror("out of memory");
@@ -47,8 +46,8 @@ void *xmalloc (size_t n){
 
 /* Change the size of an allocated block of memory P to N bytes,
    with error checking.  */
-
-void *xrealloc (void *p, size_t n){
+/*
+static void *xrealloc (void *p, size_t n){
   if (!n && p){
     free (p);
     return NULL;
@@ -60,19 +59,19 @@ void *xrealloc (void *p, size_t n){
   }
   return p;
 }
-void *xcalloc (size_t s){
+*/
+static void *xcalloc (size_t s){
   return memset(xmalloc (s), 0, s);
 }
-void *xmemdup (void const *p, size_t s){
+static void *xmemdup (void const *p, size_t s){
   return memcpy (xmalloc (s), p, s);
 }
 
 /* Clone STRING.  */
 
-char *xstrdup (char const *string){
+static char *xstrdup (char const *string){
   return xmemdup (string, strlen (string) + 1);
 }
-
 #define FUNCALL_VOID(f,args...) (*(void(*)())f)(args)
 #define NIL NULL
 #define XCAR(cons) cons->car
@@ -154,11 +153,14 @@ static inline tail_queue *queue_push(tail_queue *queue,void *data){
   queue->head=new_head;
   return queue;
 }
-static inline void *queue_pop(tail_queue *queue){
-  cons *popped=queue->head;
-  queue->head=XCDR(queue->head);
-  void *retval=XCAR(popped);
-  free(popped);
+static inline cons *queue_pop(tail_queue *queue){
+  cons *retval=queue->head;
+  if(queue->head==queue->tail){
+    queue->head=NULL;
+    queue->tail=NULL;
+  } else {
+    queue->head=XCDR(queue->head);
+  }
   return retval;
 }
 static inline tail_queue* queue_append(tail_queue *queue,void *data){
@@ -198,11 +200,14 @@ static void run_handler(event_loop_handle handle){
   pthread_spin_lock(&handle->queue_lock);
   cons *handler=queue_pop(&handle->handler_queue);
   pthread_spin_unlock(&handle->queue_lock);
-  FUNCALL_VOID(XCAR(handler),XCDR(handler));
+  FUNCALL_VOID(XCAAR(handler),XCADR(handler));
+  __asm__ volatile("mfence");
+  free(XCAR(handler));
   free(handler);
+
 }
 void main_loop(event_loop_handle handle){
-  while(handle->state > 0){
+  while(atomic_load_n(&handle->state) > 0){
     sem_wait(&handle->semaphore);
     run_handler(handle);
   }
@@ -215,10 +220,10 @@ void main_loop(event_loop_handle handle){
 event_loop_handle create_event_loop(){
   struct event_loop_data *new_event_loop =
     xcalloc(sizeof(struct event_loop_data));
-  new_event_loop->state=1;
   sem_init(&new_event_loop->semaphore,0,0);
   pthread_spin_init(&new_event_loop->queue_lock,0);
   pthread_rwlock_init(&new_event_loop->alist_lock,NULL);
+  atomic_store_n(&new_event_loop->state,1);
   return new_event_loop;
 };  
 void *createEventLoop(void)
@@ -295,7 +300,7 @@ void stop_event_loop(event_loop_handle handle){
     fprintf(stderr,"Error, Trying to stop an already stopped event loop\n");
     abort();
   } else {
-    handle->state=0;
+    atomic_store_n(&handle->state,0);
   }
 }
 void stopEventLoop(void *handle) __attribute__((alias("stop_event_loop")));
@@ -304,13 +309,18 @@ void stopEventLoop(void *handle) __attribute__((alias("stop_event_loop")));
  * the behavior is undefined if the EventLoop is not stopped
  */
 void cleanup_event_loop(event_loop_handle handle){
-  if(handle->state){
+  HERE();
+  if(atomic_load_n(&handle->state)){
+    HERE();
     abort();
   }
+  pthread_spin_lock(&handle->queue_lock);
+  pthread_rwlock_wrlock(&handle->alist_lock);
   //we can assume this will only even be called when
   //no other thread is modifying handle
   cons *temp;
   cons *alist=handle->event_alist;
+  HERE();
   while(alist){
     temp=XCDR(alist);
     if(XCAR(alist)){
@@ -320,13 +330,19 @@ void cleanup_event_loop(event_loop_handle handle){
     free(alist);
     alist=temp;
   }
+  HERE();
   cons *node=handle->handler_queue.head;
   while(node && (temp=XCDR(node))){
     free(node);
     node=temp;
   }
+  HERE();
+  pthread_spin_unlock(&handle->queue_lock);
+  pthread_rwlock_unlock(&handle->alist_lock);
+  pthread_spin_destroy(&handle->queue_lock);
+  pthread_rwlock_destroy(&handle->alist_lock);
+  sem_destroy(&handle->semaphore);
   free(handle);
-  free(NULL);
 }
 void cleanupEventLoop(void *handle)
   __attribute__((alias("cleanup_event_loop")));
