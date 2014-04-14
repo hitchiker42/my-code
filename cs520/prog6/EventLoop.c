@@ -19,6 +19,18 @@
 #include <semaphore.h>
 #include <pthread.h>
 #include "EventLoop.h"
+#define DEBUG
+#if (defined DEBUG) && !(defined NDEBUG)
+#define HERE() fprintf(stderr,"here at %s,line %d\n",__FILE__,__LINE__)
+#define PRINT_MSG(string) fprintf(stderr,string);
+#define PRINT_FMT(string,fmt...) fprintf(stderr,string,##fmt);
+#define PRINT_LN(string) fprintf(stderr,"%s%s",string,"\n")
+#else
+#define HERE()
+#define PRINT_MSG(string)
+#define PRINT_FMT(string,fmt...)
+#define PRINT_LN()
+#endif
 //do this instead of making everything static
 //#pragma GCC visibility push("hidden")
 //I didn't write these versions of the checked memory allocation I got
@@ -65,12 +77,21 @@ char *xstrdup (char const *string){
 #define NIL NULL
 #define XCAR(cons) cons->car
 #define XCDR(cons) cons->cdr
-#define PUSH(obj,cons) (cons->cdr=cons,cons->car=obj,cons)
+#define XCAAR(_cons) ((cons*)_cons->car)->car
+#define XCADR(_cons) ((cons*)_cons->car)->cdr
+#define PUSH(obj,cons)                          \
+  ({cons->cdr=cons;                             \
+    cons->car=obj;                              \
+    cons;})
 #define POP(cons) \
   ({void *retval=XCAR(cons);                    \
     cons=XCDR(cons);                            \
     retval;})
-
+#define Acons(_car,_cdr)                        \
+  ({cons *retval=alloca(sizeof(cons));          \
+    retval->car=_car;                           \
+    retval->cdr=_cdr;                           \
+    retval;})
 //desired is a pointer
 #define atomic_compare_exchange(ptr,expected,desired)           \
   __atomic_compare_exchange(ptr,expected,desired,0,             \
@@ -98,20 +119,14 @@ typedef struct event_loop_data *event_loop_handle;
 typedef struct tail_queue tail_queue;
 typedef struct queue_node queue_node;
 typedef struct cons cons;
-struct queue_node {
-  queue_node *prev;//NULL for head node
-  queue_node *next;//NULL for tail node
-  void *data;//this is probably a pointer to a 
-  //struct {hanlder_fn handler; void *client_data};
-};
 struct cons {
   void *car;
   void *cdr;
 };
 static const cons nil={NIL,NIL};
 struct tail_queue {
-  queue_node *head;
-  queue_node *tail;
+  cons *head;
+  cons *tail;
 };
 struct event_loop_data {
   tail_queue handler_queue;//queue of cons cells (handler_fn . client_data)
@@ -120,64 +135,48 @@ struct event_loop_data {
   //and it is decremented when a handler is run
   pthread_spinlock_t queue_lock;
   pthread_rwlock_t alist_lock;
-  int state;//running or not
+  int state;//running or not 1=created, 2 = running, 0=stopped
 };
 static inline cons* Fcons(void *car, void *cdr){
-  cons *retval=xmalloc(sizeof(cons));
+  cons *retval=xcalloc(sizeof(cons));
   retval->car=car;
   retval->cdr=cdr;
   return retval;
 }
-static void queue_cleanup_recursive(tail_queue *queue){
-  queue_node *current_node=queue->head,*last_node;
-  while(current_node){
-    last_node=current_node;
-    current_node=last_node->next;
-    free(last_node->data);
-    free(last_node);
-  }
-  return;
-}
 static inline tail_queue *queue_push(tail_queue *queue,void *data){
-  queue_node *new_head=xcalloc(sizeof(queue_node));
-  new_head->data=data;
-  new_head->next=queue->head;
+  cons *new_head=xcalloc(sizeof(cons));
+  XCAR(new_head)=data;
   if(queue->head){
-    queue->head->prev=new_head;
+    XCDR(new_head)=queue->head;
+  } else {
+    queue->tail=new_head;
   }
   queue->head=new_head;
   return queue;
 }
 static inline void *queue_pop(tail_queue *queue){
-  queue_node *retval=queue->head;
-  queue->head=queue->head->next;
-  if(queue->head){
-    queue->head->prev=NULL;
-  }
-  return retval->data;
+  cons *popped=queue->head;
+  queue->head=XCDR(queue->head);
+  void *retval=XCAR(popped);
+  free(popped);
+  return retval;
 }
 static inline tail_queue* queue_append(tail_queue *queue,void *data){
-  queue_node *new_tail=xcalloc(sizeof(queue_node));
-  new_tail->data=data;
-  new_tail->prev=queue->tail;
+  cons *new_tail=xcalloc(sizeof(cons));
+  XCAR(new_tail)=data;
   if(queue->tail){
-    queue->tail->next=new_tail;
+    XCDR(queue->tail)=new_tail;
+  }
+  if(!queue->head){
+    queue->head=new_tail;
   }
   queue->tail=new_tail;
   return queue;
 }
-static inline void*queue_poplast(tail_queue *queue){
-  queue_node *retval=queue->tail;
-  queue->tail=queue->tail->prev;
-  if(queue->tail){
-    queue->tail->next=NULL;
-  }
-  return retval->data;
-}
 //takes a literal cons cell, so 
 static cons* assoc(cons* list,void *key,int (*cmp_fn)(void*,void*)){
-  while(list->cdr != NIL){
-    if(cmp_fn(list->car,key)){
+  while(list != NIL){
+    if(cmp_fn(XCAAR(list),key)){
       return list;
     }
     list=list->cdr;//no typechecking or anything
@@ -191,15 +190,16 @@ static int event_cmp(void *a,void *b){
 static handler_fn get_event_handler(event_loop_handle handle,cons *event){
   cons *handler_cons;
   if((handler_cons=assoc(handle->event_alist,event->car,event_cmp))){
-    return XCDR(handler_cons);
+    return XCADR(handler_cons);
   }
   return NIL;
 }
 static void run_handler(event_loop_handle handle){
   pthread_spin_lock(&handle->queue_lock);
-  cons *handler=queue_poplast(&handle->handler_queue);  
+  cons *handler=queue_pop(&handle->handler_queue);
   pthread_spin_unlock(&handle->queue_lock);
   FUNCALL_VOID(XCAR(handler),XCDR(handler));
+  free(handler);
 }
 void main_loop(event_loop_handle handle){
   while(handle->state > 0){
@@ -214,7 +214,7 @@ void main_loop(event_loop_handle handle){
  */
 event_loop_handle create_event_loop(){
   struct event_loop_data *new_event_loop =
-    xmalloc(sizeof(struct event_loop_data));
+    xcalloc(sizeof(struct event_loop_data));
   new_event_loop->state=1;
   sem_init(&new_event_loop->semaphore,0,0);
   pthread_spin_init(&new_event_loop->queue_lock,0);
@@ -229,6 +229,7 @@ void *createEventLoop(void)
 */
 void start_event_loop(event_loop_handle handle, handler_fn fn, void* user_data){
   if(atomic_load_n(&handle->state) != 1){
+    fprintf(stderr,"Error, Trying to start an already started event loop\n");
     abort();
   }
   atomic_store_n(&handle->state,2);
@@ -266,7 +267,7 @@ void unhandled_event(const char *event_name){
 }
 void announce_event(event_loop_handle handle ,char *event_name,
                     void *client_data){
-  cons *event=Fcons(event_name,client_data);
+  cons *event=Acons(event_name,client_data);
   pthread_rwlock_rdlock(&handle->alist_lock);
   handler_fn event_handler=get_event_handler(handle,event);
   pthread_rwlock_unlock(&handle->alist_lock);
@@ -274,7 +275,7 @@ void announce_event(event_loop_handle handle ,char *event_name,
     unhandled_event(XCAR(event));
   } else {
     pthread_spin_lock(&handle->queue_lock);
-    queue_push(&handle->handler_queue,Fcons(event_handler,XCDR(event)));
+    queue_append(&handle->handler_queue,Fcons(event_handler,XCDR(event)));
     pthread_spin_unlock(&handle->queue_lock);
     sem_post(&handle->semaphore);
   }
@@ -290,7 +291,8 @@ void announceEvent(void *handle,const char *eventName,void *info)
  * handler run by the EventLoop
 */
 void stop_event_loop(event_loop_handle handle){
-  if(atomic_load_n(&handle->state)){
+  if(atomic_load_n(&handle->state) != 2){
+    fprintf(stderr,"Error, Trying to stop an already stopped event loop\n");
     abort();
   } else {
     handle->state=0;
@@ -307,14 +309,24 @@ void cleanup_event_loop(event_loop_handle handle){
   }
   //we can assume this will only even be called when
   //no other thread is modifying handle
-  cons *handler;
-  while((handler=POP(handle->event_alist))){
-    free(XCAR(handler));
-    free(handler);
+  cons *temp;
+  cons *alist=handle->event_alist;
+  while(alist){
+    temp=XCDR(alist);
+    if(XCAR(alist)){
+      free(XCAAR(alist));
+      free(XCAR(alist));
+    }
+    free(alist);
+    alist=temp;
   }
-  queue_cleanup_recursive(&handle->handler_queue);
+  cons *node=handle->handler_queue.head;
+  while(node && (temp=XCDR(node))){
+    free(node);
+    node=temp;
+  }
   free(handle);
+  free(NULL);
 }
-  
 void cleanupEventLoop(void *handle)
   __attribute__((alias("cleanup_event_loop")));
