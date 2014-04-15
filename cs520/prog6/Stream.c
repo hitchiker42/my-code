@@ -111,13 +111,13 @@ stream_handle create_stream(const char *data_event_name,const char *end_event_na
                                    .handle=handle};
   return new_stream;
 }
-void *stream_main(void *stream_){
+static void *stream_main(void *stream_){
   stream_handle stream=stream_;
   void *data;
   while((data=stream->produce(stream->user_data))){
-    announce_event(stream->handle,"data",data);
+    announce_event(stream->handle,stream->data_event_name,data);
   };
-  announce_event(stream->handle,"end",NULL);
+  announce_event(stream->handle,stream->end_event_name,stream->user_data);
   return NULL;
 }
 /* create a Stream
@@ -153,8 +153,6 @@ int start_stream(stream_handle handle,void *client_data){
     return 1;
   }
 }
-    
-  
 int start_stream(stream_handle,void*);
 int startStream(void *handle,void *initializeArg)
   __attribute__((alias("start_stream")));

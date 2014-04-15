@@ -1,13 +1,17 @@
 /*
-* Interface to an EventLoop
-* A handler function can be registered for an event, as events occur
-* handler functions are put into an fifo queue and executed asynchronously.
-* Events will be accepted event when handler functions are being run. If
-* there are no functions left to run the loop will wait until an event occurs
+  Interface to an EventLoop
+  A handler function can be registered for an event, as events occur
+  handler functions are put into an fifo queue and executed asynchronously.
+  Events will be accepted event when handler functions are being run. If
+  there are no functions left to run the loop will wait until an event occurs
 
-* events are identified by strings
-*
-* the event loop does NOT start a new thread to execute the event loop
+  events are identified by strings
+
+  the event loop does NOT start a new thread to execute the event loop
+  
+  I'm not a fan of camelCase so I defined all my functions with underscore
+  seperators, but I aliased the actual functions to my functions so externally
+  this should be unoticeable 
 */
 
 #define _GNU_SOURCE
