@@ -210,7 +210,7 @@ static void run_handler(event_loop_handle handle){
   free(handler);
 
 }
-void main_loop(event_loop_handle handle){
+static void main_loop(event_loop_handle handle){
   while(atomic_load_n(&handle->state) > 0){
     sem_wait(&handle->semaphore);
     run_handler(handle);
@@ -221,7 +221,7 @@ void main_loop(event_loop_handle handle){
  * returns a "handle" for the EventLoop or NULL on failure
  * defined as
  */
-event_loop_handle create_event_loop(){
+static event_loop_handle create_event_loop(){
   struct event_loop_data *new_event_loop =
     xcalloc(sizeof(struct event_loop_data));
   sem_init(&new_event_loop->semaphore,0,0);
@@ -236,7 +236,7 @@ void *createEventLoop(void)
 /* start an EventLoop
    the behavior is undefined if an EventLoop is started more than once
 */
-void start_event_loop(event_loop_handle handle, handler_fn fn, void* user_data){
+static void start_event_loop(event_loop_handle handle, handler_fn fn, void* user_data){
   if(atomic_load_n(&handle->state) != 1){
     fprintf(stderr,"Error, Trying to start an already started event loop\n");
     abort();
@@ -254,7 +254,7 @@ void startEventLoop(void *handle, handler_fn initialFunc,
  */
 //since I'm using an alist I can just push the new handler 
 //onto the front of the list
-void register_event(event_loop_handle handle, const char *name, handler_fn fn){
+static void register_event(event_loop_handle handle, const char *name, handler_fn fn){
   cons *event=Fcons(xstrdup(name),fn);
   pthread_rwlock_wrlock(&handle->alist_lock);
   handle->event_alist=Fcons(event,handle->event_alist);
@@ -271,10 +271,10 @@ void registerEvent(void *handle,const char *eventName, handler_fn handler)
  * "unhandled event: " followed by the event name and a newline, and
  * then continues
 */
-void unhandled_event(const char *event_name){
+static inline void unhandled_event(const char *event_name){
   fprintf(stderr,"unhandled event: %s\n",event_name);
 }
-void announce_event(event_loop_handle handle ,char *event_name,
+static void announce_event(event_loop_handle handle ,char *event_name,
                     void *client_data){
   cons *event=Acons(event_name,client_data);
   pthread_rwlock_rdlock(&handle->alist_lock);
@@ -299,7 +299,7 @@ void announceEvent(void *handle,const char *eventName,void *info)
  * the behavior is also undefined if this function is not called by a
  * handler run by the EventLoop
 */
-void stop_event_loop(event_loop_handle handle){
+static void stop_event_loop(event_loop_handle handle){
   if(atomic_load_n(&handle->state) != 2){
     fprintf(stderr,"Error, Trying to stop an already stopped event loop\n");
     abort();
@@ -312,7 +312,7 @@ void stopEventLoop(void *handle) __attribute__((alias("stop_event_loop")));
 /* cleanup any allocated memory for an EventLoop
  * the behavior is undefined if the EventLoop is not stopped
  */
-void cleanup_event_loop(event_loop_handle handle){
+static void cleanup_event_loop(event_loop_handle handle){
   HERE();
   if(atomic_load_n(&handle->state)){
     HERE();

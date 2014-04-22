@@ -11,21 +11,22 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-typedef struct event_loop_data *event_loop_handle;
+#include "EventLoop.h"
+#include "Stream.h"
 typedef void (*handler_fn)(void *);
 typedef void*(produce_fn)(void*);
 typedef void*(init_fn)(void*);
-typedef struct stream_data *stream_handle;
-event_loop_handle create_event_loop();
-void cleanup_event_loop(event_loop_handle);
-void stop_event_loop(event_loop_handle);
-void announce_event(event_loop_handle,char *,void *);
-void register_event(event_loop_handle , const char *, handler_fn);
-void start_event_loop(event_loop_handle , handler_fn , void*);
-stream_handle create_stream(const char *,const char *,
-                            produce_fn ,init_fn,event_loop_handle);
-int start_stream(stream_handle,void*);
-void cleanup_stream(stream_handle);
+typedef void *stream_handle;
+typedef void *event_loop_handle;
+#define create_event_loop() createEventLoop()
+#define cleanup_event_loop(x) cleanupEventLoop(x)
+#define stop_event_loop(x) stopEventLoop(x)
+#define announce_event(x,y) announceEvent(x,y)
+#define register_event(x,y,z) registerEvent(x,y,z)
+#define start_event_loop(x,y,z) startEventLoop(x,y,z)
+#define create_stream(x,y,z,a,b) createStream(x,y,z,a,b)
+#define start_stream(x,y) startStream(x,y)
+#define cleanup_stream(x) cleanupStream(x)
 #define MAX(a,b)                                \
   ({ __typeof__ (a) _a = (a);                   \
     __typeof__ (b) _b = (b);                    \
