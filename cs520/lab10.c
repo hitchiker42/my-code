@@ -17,7 +17,6 @@ long global_count_hard=0;
 //the easy way
 long global_count_mem=0;
 long *global_count=&global_count_mem;
-int syscall(int number,...);
 #define file_size(fd)                           \
   ({off_t len=lseek(fd,0,SEEK_END);             \
     lseek(fd,0,SEEK_SET);                       \

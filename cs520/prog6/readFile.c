@@ -56,32 +56,37 @@ struct read_file_data {
   void *mmaped_file;
   void *stream;
   void *event_loop;
+  uint8_t *mem_ptr;
+  uint8_t *mem_ptr_last;
   off_t file_len;
   off_t file_offset;
+  ssize_t block_size;
   char *filename;
   int32_t newline_count;
 };
 void *read_file_produce(void *client_data){
-  HERE();
   read_file_data *data=(read_file_data*)(client_data);
-  uint8_t *mem=data->mmaped_file+data->file_offset;
-  uint8_t *last_mem=mem;
-  ssize_t size=MAX(data->file_len-data->file_offset,1000);
-  data->file_offset+=size;
-  while(size>0){
-    mem=memchr(mem,'\n',size);
-    if(!mem){
-      break;
-    }
-    mem++;
-    size-=(mem-last_mem);
-    last_mem=mem;
-    data->newline_count++;
-  }
   if(data->file_offset>=data->file_len){
     return NULL;
-  } else {
-    return data;
+  }
+  HERE();
+  data->mem_ptr=data->mmaped_file+data->file_offset;
+  data->mem_ptr_last=data->mem_ptr;
+  data->block_size=MAX(data->file_len-data->file_offset,1000);
+  data->file_offset+=data->block_size;
+  return data;
+}
+void process_data(void *client_data){
+  read_file_data *data=(read_file_data*)(client_data);
+  while(data->block_size>0){
+    data->mem_ptr=memchr(data->mem_ptr,'\n',data->block_size);
+    if(!data->mem_ptr){
+      break;
+    }
+    data->mem_ptr++;
+    data->block_size-=(data->mem_ptr-data->mem_ptr_last);
+    data->mem_ptr_last=data->mem_ptr;
+    data->newline_count++;
   }
 }
 void read_file_end(void *client_data){
@@ -106,7 +111,7 @@ void *read_file_init(void *client_data){
   }
   data->file_len=file_size(fd);
   //it doesn't really matter if the flags argument is private or shared here
-  if((data->mmaped_file = 
+  if((data->mmaped_file =
       mmap(NULL,data->file_len,PROT_READ,MAP_PRIVATE,fd,0))==MAP_FAILED){
     perror("mmap failed");
     exit(1);
@@ -117,9 +122,6 @@ void *read_file_init(void *client_data){
   }
   return data;
 }
-void do_nothing(){
-  return;
-}
 static void stream_main(read_file_data *data){
   stream_handle stream;
   if((stream=create_stream("data","end",read_file_produce,
@@ -128,11 +130,11 @@ static void stream_main(read_file_data *data){
     exit(1);
   }
   data->stream=stream;
-  register_event(data->event_loop,"data",do_nothing);
+  register_event(data->event_loop,"data",process_data);
   register_event(data->event_loop,"end",read_file_end);
   start_stream(stream,data);
 }
-  
+
 int main(int argc,char *argv[]){
   if(argc < 2){
     fprintf(stderr,"Error no file name given\n");
