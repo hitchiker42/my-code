@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <limits.h>//included because UINT_MAX is 2^32
 #include <sys/mman.h>
+#include <stdlib.h>
 #define DEBUG
 #if (defined DEBUG) && !(defined NDEBUG)
 #define HERE() fprintf(stderr,"here at %s,line %d\n",__FILE__,__LINE__)
@@ -33,6 +34,11 @@
   ({ __typeof__ (a) _a = (a);                   \
     __typeof__ (b) _b = (b);                    \
     _a < _b ? _a : _b;})
+#define SWAP(a,b)                               \
+  ({ __typeof__ (a) _a = a;                     \
+    a=b;                                        \
+    b=_a;                                       \
+    ;})
 //some bit twiddling hacks for working with powers of two
 #define POW_OF_2_ROUND_DOWN(x,pow) (((uint64_t)(x)) & (~((1<<pow)-1)))
 #define POW_OF_2_ROUND_UP(x,pow) ( (((uint64_t)(x)) + (1<<pow)-1)  & (~((1<<pow)-1)) )
@@ -47,8 +53,10 @@ enum replace_algorithm {
   rr_replace=0,
   lru_replace=1,
 };
+//need to rethink this a bit, because if the page table and the tlb
+//don't use the same algorithm it won't work
 struct page_table_entry {
-  uint time_stamp;
+  uint time;
   uint dirty_bit :1;
   uint addr :31;
 };
@@ -74,13 +82,26 @@ struct virtual_memory {
   uchar pg_replace_alg;
   uchar tlb_replace_alg;
 };
+static inline void print_vm_struct(vm_handle vm){
+  fprintf(stderr,"struct address = %p\n"
+          "mem size = %#0x\n"
+          "vm size = %#0x\n"
+          "pm size = %#0x\n"
+          "pg size = %#0x\n"
+          "tlb size = %#0x\n"
+          "page table size = %#0x\n"
+          "log_2(page size) = %#0x\n",
+          vm,vm->mem_size,vm->vm_size,vm->pm_size,
+          vm->pg_size,vm->tlb_size,vm->pg_table_size,
+          vm->lg2_pg_size);
+}
 #define heap_left_child(i) (2*i+1)
 #define heap_right_child(i) (2*i+2)
 #define heap_parent(i) ((i-1)/2)
 static int sift_down(page_table_entry *heap,int start,int size){
   heap+=start;
-  int root=start,child,swap;
-  while((child=heap_left_child(i)) <=size){
+  int root=start,child,swap; 
+  while((child=heap_left_child(root)) <=size){
     swap=root;
     if(heap[child].time < heap[swap].time){
       swap=child;
@@ -95,6 +116,7 @@ static int sift_down(page_table_entry *heap,int start,int size){
       return root;
     }
   }
+  return root;
 }
 static inline void __attribute__((noreturn))range_err(uint addr){
   fprintf(stderr,"Error address %#0x is out of range\n",addr);
@@ -106,7 +128,7 @@ static inline uint page_of(vm_handle vm,uint addr){
   }
   return (addr>>vm->lg2_pg_size);
 }
-static inline void rr_replace_pg(vm_handle vm,uint new_page){
+static inline uint rr_replace_pg(vm_handle vm,uint new_page){
   vm->pg_faults++;
   uint old_pg=vm->pg_table_rr_index;
   vm->pg_table_rr_index=((vm->pg_table_rr_index+1)%vm->pg_table_size);
@@ -115,27 +137,26 @@ static inline void rr_replace_pg(vm_handle vm,uint new_page){
     vm->page_table[old_pg].dirty_bit=0;
   }
   SWAP(vm->page_table[old_pg],vm->page_table[new_page]);
+  return old_pg;
 }
 static inline void rr_replace_tlb(vm_handle vm,uint new_page){
   vm->tlb_misses++;
   uint old_pg=vm->tlb_rr_index;
   vm->tlb_rr_index=((vm->tlb_rr_index+1)%vm->tlb_size);
-  vm->tlb[old_pg]=vm->page_table[new_page]);
+  vm->tlb[old_pg]=vm->page_table[new_page];
 }
-static inline void lru_replace_pg(vm_handle vm,uint new_page){
+static inline uint lru_replace_pg(vm_handle vm,uint new_page){
   if(vm->page_table[0].dirty_bit){
     vm->disk_writes++;
     vm->page_table[0].dirty_bit=0;
   }
-  vm->page_table[0].valid=0;
   SWAP(vm->page_table[0],vm->page_table[new_page]);
   vm->page_table[0].time=vm->time;
-  vm->page_table[0].vaild=1;
   sift_down(vm->page_table,0,vm->pg_table_size);
   return;
 }
 static inline void lru_replace_tlb(vm_handle vm,uint new_page){
-  vm->tlb[0]=vm->page_table[new_page]);
+  vm->tlb[0]=vm->page_table[new_page];
   sift_down(vm->tlb,0,vm->tlb_size);
   return;
 }
@@ -153,7 +174,7 @@ static vm_handle create_vm(uint vm_size,uint pm_size,
      //if we don't cast to long it could overflow
      (long)vm_size*(long)pg_size > UINT_MAX  ||
      pg_replace_alg > 1                      ||
-     tlb_replace_alg > 1                     ||
+     tlb_replace_alg > 1){
     return NULL;
   }
   uint mem_size=sizeof(struct virtual_memory)+//virtual memory struct
@@ -168,23 +189,31 @@ static vm_handle create_vm(uint vm_size,uint pm_size,
     perror("mmap failure");
     exit(EXIT_FAILURE);
   }
+  PRINT_FMT("mmap size = %#0x\nmmap addr = %p\n",mem_size,mem);
   int i;
   uchar lg2_pg_size=POW_OF_2_LOG_2(pg_size);
-  vm_size<<=lg2_pg_size
+  uint pg_table_size=vm_size;
+  PRINT_FMT("page size = %#0x, lg2 page size = %#0x\n",pg_size,lg2_pg_size);
+  vm_size<<=lg2_pg_size;
   pm_size<<=lg2_pg_size;
   vm_handle retval=mem;
-  uint *vm=mem+sizeof(struct virtual_memory);
-  page_table_entry *pg_table=vm+(vm_size*sizeof(uint));
-  uint pg_table_size=vm_size>>lg2_pg_size;
-  for(i=0;i<(pg_table_size);i++){
-    pg_table[i]={.valid=1,.addr=i<<lg2_pg_size};
+  uint *vm=(void*)mem+sizeof(struct virtual_memory);
+  PRINT_FMT("vm_size = %#0x\nvm addr = %p\n",vm_size,vm);
+  page_table_entry *pg_table=(void*)vm+(vm_size*sizeof(uint));
+  PRINT_FMT("page_table_entry size = %#0x\n"
+            "page_table_size = %#0x\npage_table addr = %p\n",
+            sizeof(page_table_entry),pg_table_size,pg_table);
+  for(i=0;i<pg_table_size;i++){
+    pg_table[i].addr=i<<lg2_pg_size;
   }
-  tlb_entry *tlb=pg_table+(pg_table_size*sizeof(page_table_entry));
+  tlb_entry *tlb=(void*)pg_table+(pg_table_size*sizeof(page_table_entry));
+  PRINT_FMT("tlb_size = %#0x\ntlb addr = %p\n",tlb_size,tlb);
   for(i=0;i<tlb_size;i++){
-    tlb[i]={.addr=i<<lg2_pg_size};
+    PRINT_FMT("%p %d\n",tlb+i,i);
+    tlb[i].addr=i<<lg2_pg_size;
   }
   *retval=(struct virtual_memory)
-    {.vm=vm,.page_table=pg_table,.pm_size=pm_size.tlb=tlb,.vm_size=vm_size,
+    {.vm=vm,.page_table=pg_table,.pm_size=pm_size,.tlb=tlb,.vm_size=vm_size,
      .pg_size=pg_size,.tlb_size=tlb_size,.lg2_pg_size=lg2_pg_size,
      .pg_replace_alg=pg_replace_alg,.mem_size=mem_size,
      .pg_table_size=pg_table_size,.tlb_replace_alg=tlb_replace_alg};
@@ -192,11 +221,14 @@ static vm_handle create_vm(uint vm_size,uint pm_size,
 }
 //routines common to read/write int/float
 static inline void pg_replace(vm_handle vm,uint page_no){
+  uint old_pg;
   if(vm->pg_replace_alg==rr_replace){
-    rr_replace_pg(vm,page_no);
+    old_pg=rr_replace_pg(vm,page_no);
   } else {
     lru_replace_pg(vm,page_no);
+    old_pg=0;
   }
+  
 }
 static inline void tlb_replace(vm_handle vm,uint page_no){
   if(vm->tlb_replace_alg==rr_replace){
@@ -206,21 +238,27 @@ static inline void tlb_replace(vm_handle vm,uint page_no){
   }
 }
 static inline void vm_update(vm_handle vm,uint page_no){
-  handle->time++;
-  if(page_no < vm->pg_table_size){
+  vm->time++;
+  if(page_no > vm->pg_table_size){
+    //if the page replaced here has a tlb entry
+    //then reuse that tlb entry for the new page
+    //this means pg_replace will need to return
+    //the page number of the replaced page
     pg_replace(vm,page_no);
+    //if the tlb entry gets replaced make sure to sift down
+    //the new entry if we're using lru
   } else {
     if(vm->pg_replace_alg==lru_replace){
       vm->page_table[page_no].time=vm->time;
       sift_down(vm->page_table,page_no,vm->pg_table_size);
     }
   }
-  if(page_no < vm->tlb_size){
+  if(page_no > vm->tlb_size){
     tlb_replace(vm,page_no);
   } else {
     if(vm->tlb_replace_alg==lru_replace){
       vm->tlb[page_no].time=vm->time;
-      sift_down(vm->tlb,page_no,vm->tlb_table_size);
+      sift_down(vm->tlb,page_no,vm->tlb_size);
     }
   }
 }
@@ -230,7 +268,7 @@ static inline void vm_update(vm_handle vm,uint page_no){
 //is done in a linear adress space and so is fairly simple
 int __attribute__((alias("read_int")))readInt(void*,uint);
 static int read_int(vm_handle vm,uint addr){
-  uint page_no=get_page(vm,addr);
+  uint page_no=page_of(vm,addr);
   vm_update(vm,page_no);
   return vm->vm[addr];
 }
