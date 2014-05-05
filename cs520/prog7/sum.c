@@ -6,15 +6,15 @@
 #include <stdlib.h>
 #include "simVM.h"
 
-#define VMEMSIZE 64*4
-#define PMEMSIZE 4*4
-#define PAGESIZE 4*4
-#define TLBSIZE 2*4
+#define VMEMSIZE 64
+#define PMEMSIZE 4
+#define PAGESIZE 4
+#define TLBSIZE 2
 #define MEMSIZE (VMEMSIZE*PAGESIZE)
 
 int main(void)
 {
-  void *h = createVM(VMEMSIZE, PMEMSIZE, PAGESIZE, TLBSIZE, 1, 0);
+  void *h = createVM(VMEMSIZE, PMEMSIZE, PAGESIZE, TLBSIZE, 0, 0);
   if (h == NULL)
   {
     fprintf(stderr, "createVM failed!\n");

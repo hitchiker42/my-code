@@ -264,7 +264,7 @@ static float read_float(vm_handle vm,uint addr){
   //suprisingly the common thing you would think to do here:
   //int val=read_int(vm,addr);
   //return *(float*)&val
-  //is technically undefined behavior (the type punning that is)
+  //is technically undefined behavior (the type punning t2hat is)
   //obviously the complier will do the sane thing but according to
   //the C standard it's undefined (The relevent secton is 6.5 paragraph 7
   //that's in the C11 standard, but it should be the same in C99);

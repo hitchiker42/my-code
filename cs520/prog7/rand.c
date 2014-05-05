@@ -7,15 +7,15 @@
 #include <time.h>
 #include "simVM.h"
 
-#define VMEMSIZE 64*8
-#define PMEMSIZE 4*8
-#define PAGESIZE 4*4
-#define TLBSIZE 2*4
+#define VMEMSIZE 64*4
+#define PMEMSIZE 4*4
+#define PAGESIZE 4*2
+#define TLBSIZE 2*2
 #define MEMSIZE (VMEMSIZE*PAGESIZE)
 
 int main(void){
-  srand(time(NULL));
-  void *h = createVM(VMEMSIZE, PMEMSIZE, PAGESIZE, TLBSIZE, 1, 0);
+  srand48(time(NULL));
+  void *h = createVM(VMEMSIZE, PMEMSIZE, PAGESIZE, TLBSIZE, 0, 0);
   if (h == NULL){
     fprintf(stderr, "createVM failed!\n");
     exit(1);
@@ -32,7 +32,7 @@ int main(void){
   i=0;
   while(i<MEMSIZE){
     j=lrand48()%MEMSIZE;
-    int tmp = readInt(h, j);    
+    int tmp = readInt(h, j);
     sum += tmp;
     sum2 += tmp;
     if(i==j){
