@@ -6,10 +6,17 @@
 #include <stdlib.h>
 #include "simVM.h"
 
+<<<<<<< HEAD
 #define VMEMSIZE 64*64
 #define PMEMSIZE 4*64
 #define PAGESIZE 4*64
 #define TLBSIZE 2*64
+=======
+#define VMEMSIZE 64
+#define PMEMSIZE 4
+#define PAGESIZE 4
+#define TLBSIZE 2
+>>>>>>> 0715b10bcbbb362098625aac229bac8588bc166a
 #define MEMSIZE (VMEMSIZE*PAGESIZE)
 
 int main(void)
