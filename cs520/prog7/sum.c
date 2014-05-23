@@ -6,27 +6,27 @@
 #include <stdlib.h>
 #include "simVM.h"
 
-#define VMEMSIZE 64*4
-#define PMEMSIZE 4*4
-#define PAGESIZE 4*4
-#define TLBSIZE 2*4
+#define VMEMSIZE 64*64
+#define PMEMSIZE 4*64
+#define PAGESIZE 4*64
+#define TLBSIZE 2*64
 #define MEMSIZE (VMEMSIZE*PAGESIZE)
 
 int main(void)
 {
-  void *h = createVM(VMEMSIZE, PMEMSIZE, PAGESIZE, TLBSIZE, 1, 0);
+  void *h = createVM(VMEMSIZE, PMEMSIZE, PAGESIZE, TLBSIZE, 0, 0);
   if (h == NULL)
   {
     fprintf(stderr, "createVM failed!\n");
     exit(-1);
   }
 
-  int i, sum, sum2;
+  float i, sum, sum2;
 
   // initialize the array
   for (i = 0; i < MEMSIZE; i++)
   {
-    writeInt(h, i, i);
+    writeFloat(h, i, i);
   }
 
   // now sum it
@@ -34,12 +34,12 @@ int main(void)
   sum2 = 0;
   for (i = 0; i < MEMSIZE; i++)
   {
-    int tmp = readInt(h, i);
+    float tmp = readFloat(h, i);
     // printf("# %d %d\n", tmp, i);
     sum += tmp;
     sum2 += i;
   }
-  printf("sum is %d (should be %d)\n", sum, sum2);
+  printf("sum is %f (should be %f4)\n", sum, sum2);
 
   // print stats
   printf("\n");
