@@ -46,13 +46,20 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+<<<<<<< HEAD
 
+=======
+#include <errno.h>
+>>>>>>> 1430394923850c3956fd6cf01244b3f09d3ee092
 #include <semaphore.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -64,10 +71,27 @@
    as the basis for the returned time. */
 int parse_datetime(struct timespec *result, const char *P, 
                    const struct timespec *now);
-typedef struct internal_alarm *alarm_ptr;
+typedef struct alarm *alarm_ptr;
 typedef uint64_t alarm_id;
-struct alarm_state{
-}
+//global state of the daemon, kept in a struct
+//rather than having a bunch of global variables
+struct alarm_state {
+  binary_heap *alarms;//priority queue of alarms
+};
+enum alarm_type {
+  ALARM_DEFAULT,//default action, only state is a time
+  ALARM_MUSIC,//play a song, state includes song and options (and time)
+  ALARM_COMMAND,//run a command, command is a string 
+};
+struct week {
+  uint8_t mon;uint8_t tues;uint8_t wed;uint8_t thurs;
+  uint8_t fri; uint8_t sat;uint8_t sun;uint8_t all;
+};
+struct alarm {
+  alarm_id id;
+  time_t time;
+  int alarm_type;
+
 #define MAX(a,b)                                \
   ({ __typeof__ (a) _a = (a);                   \
     __typeof__ (b) _b = (b);                    \
