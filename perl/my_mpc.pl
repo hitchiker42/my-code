@@ -4,13 +4,19 @@ no warnings 'experimental';
 use autodie;
 use Socket;
 use Getopt::Long;
-use vars '$mpd_socket';#dynamicly scoped 
+use vars '$mpd_socket';#dynamicly scoped
+use subs 'chomp';
+sub chomp {
+    my $line=shift;
+    return CORE::chomp($line);
+}
 Getopt::Long::Configure("gnu_getopt");
 my $host = "localhost";
 my $port = 6600;
+my %mpd_dispatch_table;
 #use of qr compiles the regex when the variable is defined, otherwise
 #the regex would be compiled each time it was used
-my $mpd_error_re=qr'ACK \[(\d+)@\(d+)\] \{(\w+)\} (\w+)\n';
+my $mpd_error_re=qr'ACK \[(\d+)@(\d+)\] \{(\w+)\} (\w+)\n';
 my $mpd_info_re=qr'([a-zA-Z]+): (.+)';
 my @mpd_commands=[
      #query status
@@ -35,19 +41,26 @@ my @mpd_commands=[
     'kill','close','ping','password','outputs','disableoutput',
     'enableoutput','toggleoutput'
 ];
-my %mpd_dispatch_table{@mpd_commands} =
+@mpd_dispatch_table{@mpd_commands} =
   map(\&gen_mpd_request_fun->($_),@mpd_commands);
 $mpd_dispatch_table{'prev'}=$mpd_dispatch_table{'previous'};
+sub regex_match { #probably significantly slower than using m//
+    my ($re,$str,$opts)=@_;
+    
+    $str =~ m{$re}"p$opts"
 
-sub getopt_long($,$,@){ #shortopts, longopts, options
+    return ${^MATCH};
+}
+    
+sub getopt_long { #shortopts, longopts, options
     my($shortopts,$longopts,@args)=@_;
     return
       split(/ /,strip(qx"getopt -u -o $shortopts --long $longopts -- @args"));
 }
-sub socket_connect($,$){        #hostname,port
+sub socket_connect {        #hostname,port
     my($host,$port)=@_;
     my $socket;
-    my $ipaddr = inet_aton($host) || return undef;
+    my $ipaddr = inet_aton($host) || return;
     my $sockaddr=pack_sockaddr_in($port,$ipaddr);
     socket($socket,PF_INET(),SOCK_STREAM(),getprotobyname("tcp"));
     #if the call to socket failed the following call to connect will also
@@ -55,12 +68,12 @@ sub socket_connect($,$){        #hostname,port
     if (connect($socket,$sockaddr)) {
         return $socket;
     } else {
-        return undef;
+        return;
     }
 }
 #if I was using this as a more conventional function I'd have the socket handle
 #come first, but this way is eaiser
-sub mpd_request($,$,@){#command, socket_handle, args
+sub mpd_request {#command, socket_handle, args
     my ($command,$socket_handle,@args) = @_;
     print($socket_handle,$command,@args);
     my (@responce,$line,$i);
@@ -73,11 +86,11 @@ sub mpd_request($,$,@){#command, socket_handle, args
         return \@responce;
     }
 }
-sub gen_mpd_request_fun($){#command
+sub gen_mpd_request_fun {#command
     my $command=shift;
-    return sub{mpd_request($command,$mpd_socket,@_);}
+    return sub{return mpd_request($command,$mpd_socket,@_);}
 }
-sub check_opts($,$,$,$){
+sub check_opts {
     my ($numargs,$reqargs,$optargs,$restarg)=@_;
     #insure than numargs is an acceptable number of arguments
     #for a function with the prototype corrsponding to the
@@ -88,10 +101,10 @@ sub check_opts($,$,$,$){
         return 1;
     }
 }
-sub mpd_connect($,$){#$hostname, $port
-    $mpd_socket = socket_connect(@_);
+sub mpd_connect {#$hostname, $port
+    $mpd_socket = &socket_connect->(@_);
     if(!$mpd_socket){
-        die (sprintf("Unable to connect to mpd serve at %d:%d",@_));
+        die (sprintf("Unable to connect to mpd server at %d:%d",@_));
     }
     my $line=chomp(readline($mpd_socket));
     if($line =~ /OK MPD [0-9.]+/){
@@ -101,7 +114,7 @@ sub mpd_connect($,$){#$hostname, $port
     }
 }
 #these two functions will only work for info on one song, or for the status command
-sub parse_mpdinfo($){#takes an array reference
+sub parse_mpdinfo {#takes an array reference
     my $aref=shift;
     my %mpdinfo;
     for my $info (@$aref) {
@@ -110,7 +123,7 @@ sub parse_mpdinfo($){#takes an array reference
     }
     return \%mpdinfo;
 }
-sub read_mpdinfo($){#takes a filehandle
+sub read_mpdinfo {#takes a filehandle
     my $fd=shift;
     my %mpdinfo;
     while(my $info=chomp(readline($fd))){
@@ -119,26 +132,32 @@ sub read_mpdinfo($){#takes a filehandle
     }
     return \%mpdinfo
 }
-sub parse_playlistinfo($){
+#read the current play list into an array whoes elements
+#are hashes containg information about the song at that
+#position in the playlist
+sub parse_playlistinfo {    
     my $fd=shift;
     my @playlist; #array of hashes
     my $i=0;
     while(my $info=chomp(readline($fd))){
         $info =~ $mpd_info_re;
-        $playlist[$i]->{$1}=$;2
+p        $playlist[$i]->{$1}=$2;
         if($1 eq 'Id'){
             $i++;
         }
     }
     return \@playlist;
 }
-
+sub format_songinfo {
+    my ($format,%info)=@_;
+    
+   
             
         
     
 GetOptions('host|h=s' => \$host,
            'port|p=i' => \$port);
-given $ARGV[0]{
+given ($ARGV[0]){
     #don't take any arguments and give no intresting output
     when(['next','prev','stop','clear','kill']){
         $mpd_dispatch_table{$_}->();

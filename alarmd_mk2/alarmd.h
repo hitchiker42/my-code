@@ -42,9 +42,11 @@
 */
 #ifndef _ALARMD_H
 #define _ALARMD_H
+
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+
 #include <semaphore.h>
 #include <signal.h>
 #include <stdint.h>
@@ -53,6 +55,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+
 #include "sd-daemon.h"
 #include "heap.h"//binary heap for use as a priority queue
 /* Parse a date/time string, storing the resulting time value into *RESULT.
