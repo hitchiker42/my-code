@@ -47,7 +47,7 @@ then evaluate then-form or else-form according to the result of test-form"
 ;;(defmacro make-alias (symbol fun)
   
 (defstruct match-data
-  (matched-string "" :type string)
+  (string "" :type string)
   (num-groups 0 :type fixnum)
   (start nil :type (or fixnum nil))
   (end nil :type (or fixnum nil))
@@ -57,23 +57,23 @@ then evaluate then-form or else-form according to the result of test-form"
   (multiple-value-bind (match-start match-end groups-start groups-end)
       (scan regexp string :start start)
     (if match-start
-        (make-match-data :matched-string string
-                         :match-start match-start
-                         :match-end match-end
+        (make-match-data :string string
+                         :start match-start
+                         :end match-end
                          :num-groups (length groups-start)
-                         :register-groups-start groups-start
-                         :register-groups-end groups-end)
+                         :groups-start groups-start
+                         :groups-end groups-end)
         nil)))
 (defun match-string (num match-data)
   (cond
-    ((zerop num) (subseq (match-data-matched-string match-data)
-                         (match-data-match-start match-data)
-                         (match-data-match-end match-data)))
+    ((zerop num) (subseq (match-data-string match-data)
+                         (match-data-start match-data)
+                         (match-data-end match-data)))
     ((<= num (match-data-num-groups match-data))
-     (let ((start (aref (match-data-register-groups-start match-data) (1- num)))
-           (end  (aref (match-data-register-groups-end match-data) (1- num))))
+     (let ((start (aref (match-data-groups-start match-data) (1- num)))
+           (end  (aref (match-data-groups-end match-data) (1- num))))
        (if (and start end)
-           (subseq (match-data-matched-string match-data) start end)
+           (subseq (match-data-string match-data) start end)
            nil)))
     (t (error 'simple-error))))
 (let ((data (string-match "(a)|(b)" "a")))
