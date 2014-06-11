@@ -4,7 +4,7 @@
            :string-split :concat :string-join
            :sequencep :while :until
            :puthash :el-if :string-match :match-string
-           :aif :awhen :acond :awhile :it 
+           :aif :awhen :acond :awhile :it) 
   (:use :COMMON-LISP :SB-EXT :CL-PPCRE))
 (in-package :util)
 (declaim (inline concat))
