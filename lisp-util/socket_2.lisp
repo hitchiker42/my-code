@@ -11,7 +11,6 @@
   (:use :cl :cffi))
 (cl:in-package :socket)
 (cffi:load-foreign-library "libc.so.6")
-
 (cl:defmacro defanonenum (cl:&body enums)
    "Converts anonymous enums to defconstants."
   `(cl:progn ,@(cl:loop for value in enums
@@ -57,8 +56,56 @@
 
 ;;;SWIG wrapper code ends here
 
+(cffi:defcstruct __sigset_t
+	(__val :pointer))
 
-(cl:defconstant _SYS_SOCKET_H 1)
+(cffi:defcstruct timeval
+	(tv_sec :long)
+	(tv_usec :long))
+
+(cffi:defcstruct fd_set
+	(__fds_bits :pointer))
+
+(cffi:defcfun ("select" select) :int
+  (__nfds :int)
+  (__readfds :pointer)
+  (__writefds :pointer)
+  (__exceptfds :pointer)
+  (__timeout :pointer))
+
+(cffi:defcfun ("pselect" pselect) :int
+  (__nfds :int)
+  (__readfds :pointer)
+  (__writefds :pointer)
+  (__exceptfds :pointer)
+  (__timeout :pointer)
+  (__sigmask :pointer))
+
+(cffi:defcstruct iovec
+	(iov_base :pointer)
+	(iov_len :unsigned-long))
+
+(cffi:defcfun ("readv" readv) :int
+  (__fd :int)
+  (__iovec :pointer)
+  (__count :int))
+
+(cffi:defcfun ("writev" writev) :int
+  (__fd :int)
+  (__iovec :pointer)
+  (__count :int))
+
+(cffi:defcfun ("preadv" preadv) :int
+  (__fd :int)
+  (__iovec :pointer)
+  (__count :int)
+  (__offset :long))
+
+(cffi:defcfun ("pwritev" pwritev) :int
+  (__fd :int)
+  (__iovec :pointer)
+  (__count :int)
+  (__offset :long))
 
 (cffi:defcenum __socket_type
 	(:SOCK_STREAM #.1)
@@ -70,6 +117,205 @@
 	(:SOCK_PACKET #.10)
 	(:SOCK_CLOEXEC #.#o2000000)
 	(:SOCK_NONBLOCK #.#o0004000))
+
+(cl:defconstant PF_UNSPEC 0)
+
+(cl:defconstant PF_LOCAL 1)
+
+(cl:defconstant PF_UNIX 1)
+
+(cl:defconstant PF_FILE 1)
+
+(cl:defconstant PF_INET 2)
+
+(cl:defconstant PF_AX25 3)
+
+(cl:defconstant PF_IPX 4)
+
+(cl:defconstant PF_APPLETALK 5)
+
+(cl:defconstant PF_NETROM 6)
+
+(cl:defconstant PF_BRIDGE 7)
+
+(cl:defconstant PF_ATMPVC 8)
+
+(cl:defconstant PF_X25 9)
+
+(cl:defconstant PF_INET6 10)
+
+(cl:defconstant PF_ROSE 11)
+
+(cl:defconstant PF_DECnet 12)
+
+(cl:defconstant PF_NETBEUI 13)
+
+(cl:defconstant PF_SECURITY 14)
+
+(cl:defconstant PF_KEY 15)
+
+(cl:defconstant PF_NETLINK 16)
+
+(cl:defconstant PF_ROUTE 16)
+
+(cl:defconstant PF_PACKET 17)
+
+(cl:defconstant PF_ASH 18)
+
+(cl:defconstant PF_ECONET 19)
+
+(cl:defconstant PF_ATMSVC 20)
+
+(cl:defconstant PF_RDS 21)
+
+(cl:defconstant PF_SNA 22)
+
+(cl:defconstant PF_IRDA 23)
+
+(cl:defconstant PF_PPPOX 24)
+
+(cl:defconstant PF_WANPIPE 25)
+
+(cl:defconstant PF_LLC 26)
+
+(cl:defconstant PF_CAN 29)
+
+(cl:defconstant PF_TIPC 30)
+
+(cl:defconstant PF_BLUETOOTH 31)
+
+(cl:defconstant PF_IUCV 32)
+
+(cl:defconstant PF_RXRPC 33)
+
+(cl:defconstant PF_ISDN 34)
+
+(cl:defconstant PF_PHONET 35)
+
+(cl:defconstant PF_IEEE802154 36)
+
+(cl:defconstant PF_CAIF 37)
+
+(cl:defconstant PF_ALG 38)
+
+(cl:defconstant PF_NFC 39)
+
+(cl:defconstant PF_VSOCK 40)
+
+(cl:defconstant PF_MAX 41)
+
+(cl:defconstant AF_UNSPEC 0)
+
+(cl:defconstant AF_LOCAL 1)
+
+(cl:defconstant AF_UNIX 1)
+
+(cl:defconstant AF_FILE 1)
+
+(cl:defconstant AF_INET 2)
+
+(cl:defconstant AF_AX25 3)
+
+(cl:defconstant AF_IPX 4)
+
+(cl:defconstant AF_APPLETALK 5)
+
+(cl:defconstant AF_NETROM 6)
+
+(cl:defconstant AF_BRIDGE 7)
+
+(cl:defconstant AF_ATMPVC 8)
+
+(cl:defconstant AF_X25 9)
+
+(cl:defconstant AF_INET6 10)
+
+(cl:defconstant AF_ROSE 11)
+
+(cl:defconstant AF_DECnet 12)
+
+(cl:defconstant AF_NETBEUI 13)
+
+(cl:defconstant AF_SECURITY 14)
+
+(cl:defconstant AF_KEY 15)
+
+(cl:defconstant AF_NETLINK 16)
+
+(cl:defconstant AF_ROUTE 16)
+
+(cl:defconstant AF_PACKET 17)
+
+(cl:defconstant AF_ASH 18)
+
+(cl:defconstant AF_ECONET 19)
+
+(cl:defconstant AF_ATMSVC 20)
+
+(cl:defconstant AF_RDS 21)
+
+(cl:defconstant AF_SNA 22)
+
+(cl:defconstant AF_IRDA 23)
+
+(cl:defconstant AF_PPPOX 24)
+
+(cl:defconstant AF_WANPIPE 25)
+
+(cl:defconstant AF_LLC 26)
+
+(cl:defconstant AF_CAN 29)
+
+(cl:defconstant AF_TIPC 30)
+
+(cl:defconstant AF_BLUETOOTH 31)
+
+(cl:defconstant AF_IUCV 32)
+
+(cl:defconstant AF_RXRPC 33)
+
+(cl:defconstant AF_ISDN 34)
+
+(cl:defconstant AF_PHONET 35)
+
+(cl:defconstant AF_IEEE802154 36)
+
+(cl:defconstant AF_CAIF 37)
+
+(cl:defconstant AF_ALG 38)
+
+(cl:defconstant AF_NFC 39)
+
+(cl:defconstant AF_VSOCK 40)
+
+(cl:defconstant AF_MAX 41)
+
+(cl:defconstant SOL_RAW 255)
+
+(cl:defconstant SOL_DECNET 261)
+
+(cl:defconstant SOL_X25 262)
+
+(cl:defconstant SOL_PACKET 263)
+
+(cl:defconstant SOL_ATM 264)
+
+(cl:defconstant SOL_AAL 265)
+
+(cl:defconstant SOL_IRDA 266)
+
+(cl:defconstant SOMAXCONN 128)
+
+(cffi:defcstruct sockaddr
+	(sa_family :unsigned-short)
+	(sa_data :pointer))
+
+(cl:defconstant _SS_SIZE 128)
+
+(cffi:defcstruct sockaddr_storage
+	(ss_family :unsigned-short)
+	(__ss_align :unsigned-long)
+	(__ss_padding :pointer))
 
 (defanonenum 
 	(MSG_OOB #.#x01)
@@ -92,8 +338,152 @@
 	(MSG_FASTOPEN #.#x20000000)
 	(MSG_CMSG_CLOEXEC #.#x40000000))
 
+(cffi:defcstruct msghdr
+	(msg_name :pointer)
+	(msg_namelen :unsigned-int)
+	(msg_iov :pointer)
+	(msg_iovlen :unsigned-long)
+	(msg_control :pointer)
+	(msg_controllen :unsigned-long)
+	(msg_flags :int))
+
+(cffi:defcstruct cmsghdr
+	(cmsg_len :unsigned-long)
+	(cmsg_level :int)
+	(cmsg_type :int))
+
+(cffi:defcfun ("__cmsg_nxthdr" __cmsg_nxthdr) :pointer
+  (__mhdr :pointer)
+  (__cmsg :pointer))
+
 (defanonenum 
 	(SCM_RIGHTS #.#x01))
+
+(cl:defconstant FIOSETOWN #x8901)
+
+(cl:defconstant SIOCSPGRP #x8902)
+
+(cl:defconstant FIOGETOWN #x8903)
+
+(cl:defconstant SIOCGPGRP #x8904)
+
+(cl:defconstant SIOCATMARK #x8905)
+
+(cl:defconstant SIOCGSTAMP #x8906)
+
+(cl:defconstant SIOCGSTAMPNS #x8907)
+
+(cl:defconstant SOL_SOCKET 1)
+
+(cl:defconstant SO_DEBUG 1)
+
+(cl:defconstant SO_REUSEADDR 2)
+
+(cl:defconstant SO_TYPE 3)
+
+(cl:defconstant SO_ERROR 4)
+
+(cl:defconstant SO_DONTROUTE 5)
+
+(cl:defconstant SO_BROADCAST 6)
+
+(cl:defconstant SO_SNDBUF 7)
+
+(cl:defconstant SO_RCVBUF 8)
+
+(cl:defconstant SO_SNDBUFFORCE 32)
+
+(cl:defconstant SO_RCVBUFFORCE 33)
+
+(cl:defconstant SO_KEEPALIVE 9)
+
+(cl:defconstant SO_OOBINLINE 10)
+
+(cl:defconstant SO_NO_CHECK 11)
+
+(cl:defconstant SO_PRIORITY 12)
+
+(cl:defconstant SO_LINGER 13)
+
+(cl:defconstant SO_BSDCOMPAT 14)
+
+(cl:defconstant SO_REUSEPORT 15)
+
+(cl:defconstant SO_PASSCRED 16)
+
+(cl:defconstant SO_PEERCRED 17)
+
+(cl:defconstant SO_RCVLOWAT 18)
+
+(cl:defconstant SO_SNDLOWAT 19)
+
+(cl:defconstant SO_RCVTIMEO 20)
+
+(cl:defconstant SO_SNDTIMEO 21)
+
+(cl:defconstant SO_SECURITY_AUTHENTICATION 22)
+
+(cl:defconstant SO_SECURITY_ENCRYPTION_TRANSPORT 23)
+
+(cl:defconstant SO_SECURITY_ENCRYPTION_NETWORK 24)
+
+(cl:defconstant SO_BINDTODEVICE 25)
+
+(cl:defconstant SO_ATTACH_FILTER 26)
+
+(cl:defconstant SO_DETACH_FILTER 27)
+
+(cl:defconstant SO_GET_FILTER 26)
+
+(cl:defconstant SO_PEERNAME 28)
+
+(cl:defconstant SO_TIMESTAMP 29)
+
+(cl:defconstant SCM_TIMESTAMP 29)
+
+(cl:defconstant SO_ACCEPTCONN 30)
+
+(cl:defconstant SO_PEERSEC 31)
+
+(cl:defconstant SO_PASSSEC 34)
+
+(cl:defconstant SO_TIMESTAMPNS 35)
+
+(cl:defconstant SCM_TIMESTAMPNS 35)
+
+(cl:defconstant SO_MARK 36)
+
+(cl:defconstant SO_TIMESTAMPING 37)
+
+(cl:defconstant SCM_TIMESTAMPING 37)
+
+(cl:defconstant SO_PROTOCOL 38)
+
+(cl:defconstant SO_DOMAIN 39)
+
+(cl:defconstant SO_RXQ_OVFL 40)
+
+(cl:defconstant SO_WIFI_STATUS 41)
+
+(cl:defconstant SCM_WIFI_STATUS 41)
+
+(cl:defconstant SO_PEEK_OFF 42)
+
+(cl:defconstant SO_NOFCS 43)
+
+(cl:defconstant SO_LOCK_FILTER 44)
+
+(cl:defconstant SO_SELECT_ERR_QUEUE 45)
+
+(cl:defconstant SO_BUSY_POLL 46)
+
+(cl:defconstant SO_MAX_PACING_RATE 47)
+
+(cl:defconstant SO_BPF_EXTENSIONS 48)
+
+(cffi:defcstruct linger
+	(l_onoff :int)
+	(l_linger :int))
 
 (cffi:defcstruct osockaddr
 	(sa_family :unsigned-short)
@@ -187,7 +577,7 @@
   (__optval :pointer)
   (__optlen :unsigned-int))
 
-(cffi:defcfun ("listen" socket-listen) :int
+(cffi:defcfun ("listen" listen) :int
   (__fd :int)
   (__n :int))
 
@@ -207,10 +597,228 @@
   (__fd :int)
   (__fdtype :int))
 
-(cl:defconstant _NETINET_IN_H 1)
-
 (cffi:defcstruct in_addr
 	(s_addr :unsigned-int))
+
+(cl:defconstant IP_OPTIONS 4)
+
+(cl:defconstant IP_HDRINCL 3)
+
+(cl:defconstant IP_TOS 1)
+
+(cl:defconstant IP_TTL 2)
+
+(cl:defconstant IP_RECVOPTS 6)
+
+(cl:defconstant IP_RETOPTS 7)
+
+(cl:defconstant IP_MULTICAST_IF 32)
+
+(cl:defconstant IP_MULTICAST_TTL 33)
+
+(cl:defconstant IP_MULTICAST_LOOP 34)
+
+(cl:defconstant IP_ADD_MEMBERSHIP 35)
+
+(cl:defconstant IP_DROP_MEMBERSHIP 36)
+
+(cl:defconstant IP_UNBLOCK_SOURCE 37)
+
+(cl:defconstant IP_BLOCK_SOURCE 38)
+
+(cl:defconstant IP_ADD_SOURCE_MEMBERSHIP 39)
+
+(cl:defconstant IP_DROP_SOURCE_MEMBERSHIP 40)
+
+(cl:defconstant IP_MSFILTER 41)
+
+(cl:defconstant MCAST_JOIN_GROUP 42)
+
+(cl:defconstant MCAST_BLOCK_SOURCE 43)
+
+(cl:defconstant MCAST_UNBLOCK_SOURCE 44)
+
+(cl:defconstant MCAST_LEAVE_GROUP 45)
+
+(cl:defconstant MCAST_JOIN_SOURCE_GROUP 46)
+
+(cl:defconstant MCAST_LEAVE_SOURCE_GROUP 47)
+
+(cl:defconstant MCAST_MSFILTER 48)
+
+(cl:defconstant IP_MULTICAST_ALL 49)
+
+(cl:defconstant IP_UNICAST_IF 50)
+
+(cl:defconstant MCAST_EXCLUDE 0)
+
+(cl:defconstant MCAST_INCLUDE 1)
+
+(cl:defconstant IP_ROUTER_ALERT 5)
+
+(cl:defconstant IP_PKTINFO 8)
+
+(cl:defconstant IP_PKTOPTIONS 9)
+
+(cl:defconstant IP_PMTUDISC 10)
+
+(cl:defconstant IP_MTU_DISCOVER 10)
+
+(cl:defconstant IP_RECVERR 11)
+
+(cl:defconstant IP_RECVTTL 12)
+
+(cl:defconstant IP_RECVTOS 13)
+
+(cl:defconstant IP_MTU 14)
+
+(cl:defconstant IP_FREEBIND 15)
+
+(cl:defconstant IP_IPSEC_POLICY 16)
+
+(cl:defconstant IP_XFRM_POLICY 17)
+
+(cl:defconstant IP_PASSSEC 18)
+
+(cl:defconstant IP_TRANSPARENT 19)
+
+(cl:defconstant IP_ORIGDSTADDR 20)
+
+(cl:defconstant IP_RECVORIGDSTADDR 20)
+
+(cl:defconstant IP_MINTTL 21)
+
+(cl:defconstant IP_PMTUDISC_DONT 0)
+
+(cl:defconstant IP_PMTUDISC_WANT 1)
+
+(cl:defconstant IP_PMTUDISC_DO 2)
+
+(cl:defconstant IP_PMTUDISC_PROBE 3)
+
+(cl:defconstant SOL_IP 0)
+
+(cl:defconstant IP_DEFAULT_MULTICAST_TTL 1)
+
+(cl:defconstant IP_DEFAULT_MULTICAST_LOOP 1)
+
+(cl:defconstant IP_MAX_MEMBERSHIPS 20)
+
+(cffi:defcstruct ip_opts
+	(ip_dst in_addr)
+	(ip_opts :pointer))
+
+(cffi:defcstruct ip_mreqn
+	(imr_multiaddr in_addr)
+	(imr_address in_addr)
+	(imr_ifindex :int))
+
+(cffi:defcstruct in_pktinfo
+	(ipi_ifindex :int)
+	(ipi_spec_dst in_addr)
+	(ipi_addr in_addr))
+
+(cl:defconstant IPV6_ADDRFORM 1)
+
+(cl:defconstant IPV6_2292PKTINFO 2)
+
+(cl:defconstant IPV6_2292HOPOPTS 3)
+
+(cl:defconstant IPV6_2292DSTOPTS 4)
+
+(cl:defconstant IPV6_2292RTHDR 5)
+
+(cl:defconstant IPV6_2292PKTOPTIONS 6)
+
+(cl:defconstant IPV6_CHECKSUM 7)
+
+(cl:defconstant IPV6_2292HOPLIMIT 8)
+
+(cl:defconstant IPV6_NEXTHOP 9)
+
+(cl:defconstant IPV6_AUTHHDR 10)
+
+(cl:defconstant IPV6_UNICAST_HOPS 16)
+
+(cl:defconstant IPV6_MULTICAST_IF 17)
+
+(cl:defconstant IPV6_MULTICAST_HOPS 18)
+
+(cl:defconstant IPV6_MULTICAST_LOOP 19)
+
+(cl:defconstant IPV6_JOIN_GROUP 20)
+
+(cl:defconstant IPV6_LEAVE_GROUP 21)
+
+(cl:defconstant IPV6_ROUTER_ALERT 22)
+
+(cl:defconstant IPV6_MTU_DISCOVER 23)
+
+(cl:defconstant IPV6_MTU 24)
+
+(cl:defconstant IPV6_RECVERR 25)
+
+(cl:defconstant IPV6_V6ONLY 26)
+
+(cl:defconstant IPV6_JOIN_ANYCAST 27)
+
+(cl:defconstant IPV6_LEAVE_ANYCAST 28)
+
+(cl:defconstant IPV6_IPSEC_POLICY 34)
+
+(cl:defconstant IPV6_XFRM_POLICY 35)
+
+(cl:defconstant IPV6_RECVPKTINFO 49)
+
+(cl:defconstant IPV6_PKTINFO 50)
+
+(cl:defconstant IPV6_RECVHOPLIMIT 51)
+
+(cl:defconstant IPV6_HOPLIMIT 52)
+
+(cl:defconstant IPV6_RECVHOPOPTS 53)
+
+(cl:defconstant IPV6_HOPOPTS 54)
+
+(cl:defconstant IPV6_RTHDRDSTOPTS 55)
+
+(cl:defconstant IPV6_RECVRTHDR 56)
+
+(cl:defconstant IPV6_RTHDR 57)
+
+(cl:defconstant IPV6_RECVDSTOPTS 58)
+
+(cl:defconstant IPV6_DSTOPTS 59)
+
+(cl:defconstant IPV6_RECVTCLASS 66)
+
+(cl:defconstant IPV6_TCLASS 67)
+
+(cl:defconstant IPV6_ADD_MEMBERSHIP 20)
+
+(cl:defconstant IPV6_DROP_MEMBERSHIP 21)
+
+(cl:defconstant IPV6_RXHOPOPTS 54)
+
+(cl:defconstant IPV6_RXDSTOPTS 59)
+
+(cl:defconstant IPV6_PMTUDISC_DONT 0)
+
+(cl:defconstant IPV6_PMTUDISC_WANT 1)
+
+(cl:defconstant IPV6_PMTUDISC_DO 2)
+
+(cl:defconstant IPV6_PMTUDISC_PROBE 3)
+
+(cl:defconstant SOL_IPV6 41)
+
+(cl:defconstant SOL_ICMPV6 58)
+
+(cl:defconstant IPV6_RTHDR_LOOSE 0)
+
+(cl:defconstant IPV6_RTHDR_STRICT 1)
+
+(cl:defconstant IPV6_RTHDR_TYPE_0 0)
 
 (defanonenum 
 	(IPPROTO_IP #.0)
@@ -286,11 +894,13 @@
 
 (cl:defconstant IN_CLASSB_NSHIFT 16)
 
+
 (cl:defconstant IN_CLASSB_MAX 65536)
 
 (cl:defconstant IN_CLASSC_NET #xffffff00)
 
 (cl:defconstant IN_CLASSC_NSHIFT 8)
+
 
 (cl:defconstant IN_LOOPBACKNET 127)
 
@@ -340,12 +950,12 @@
 
 (cffi:defcstruct group_req
 	(gr_interface :unsigned-int)
-	(gr_group :pointer))
+	(gr_group sockaddr_storage))
 
 (cffi:defcstruct group_source_req
 	(gsr_interface :unsigned-int)
-	(gsr_group :pointer)
-	(gsr_source :pointer))
+	(gsr_group sockaddr_storage)
+	(gsr_source sockaddr_storage))
 
 (cffi:defcstruct ip_msfilter
 	(imsf_multiaddr in_addr)
@@ -356,7 +966,7 @@
 
 (cffi:defcstruct group_filter
 	(gf_interface :unsigned-int)
-	(gf_group :pointer)
+	(gf_group sockaddr_storage)
 	(gf_fmode :unsigned-int)
 	(gf_numsrc :unsigned-int)
 	(gf_slist :pointer))
@@ -445,6 +1055,188 @@
   (__cp :pointer)
   (__buf :string))
 
+(cl:defconstant _UNISTD_H 1)
+
+(cl:defconstant _POSIX_VERSION 200809)
+
+(cl:defconstant __POSIX2_THIS_VERSION 200809)
+
+(cl:defconstant _POSIX2_VERSION 200809)
+
+(cl:defconstant _POSIX2_C_BIND 200809)
+
+(cl:defconstant _POSIX2_C_DEV 200809)
+
+(cl:defconstant _POSIX2_SW_DEV 200809)
+
+(cl:defconstant _POSIX2_LOCALEDEF 200809)
+
+(cl:defconstant _XOPEN_VERSION 700)
+
+(cl:defconstant _XOPEN_XCU_VERSION 4)
+
+(cl:defconstant _XOPEN_XPG2 1)
+
+(cl:defconstant _XOPEN_XPG3 1)
+
+(cl:defconstant _XOPEN_XPG4 1)
+
+(cl:defconstant _XOPEN_UNIX 1)
+
+(cl:defconstant _XOPEN_CRYPT 1)
+
+(cl:defconstant _XOPEN_ENH_I18N 1)
+
+(cl:defconstant _XOPEN_LEGACY 1)
+
+(cl:defconstant _BITS_POSIX_OPT_H 1)
+
+(cl:defconstant _POSIX_JOB_CONTROL 1)
+
+(cl:defconstant _POSIX_SAVED_IDS 1)
+
+(cl:defconstant _POSIX_PRIORITY_SCHEDULING 200809)
+
+(cl:defconstant _POSIX_SYNCHRONIZED_IO 200809)
+
+(cl:defconstant _POSIX_FSYNC 200809)
+
+(cl:defconstant _POSIX_MAPPED_FILES 200809)
+
+(cl:defconstant _POSIX_MEMLOCK 200809)
+
+(cl:defconstant _POSIX_MEMLOCK_RANGE 200809)
+
+(cl:defconstant _POSIX_MEMORY_PROTECTION 200809)
+
+(cl:defconstant _POSIX_CHOWN_RESTRICTED 0)
+
+(cl:defconstant _POSIX_VDISABLE #\\)
+
+(cl:defconstant _POSIX_NO_TRUNC 1)
+
+(cl:defconstant _XOPEN_REALTIME 1)
+
+(cl:defconstant _XOPEN_REALTIME_THREADS 1)
+
+(cl:defconstant _XOPEN_SHM 1)
+
+(cl:defconstant _POSIX_THREADS 200809)
+
+(cl:defconstant _POSIX_REENTRANT_FUNCTIONS 1)
+
+(cl:defconstant _POSIX_THREAD_SAFE_FUNCTIONS 200809)
+
+(cl:defconstant _POSIX_THREAD_PRIORITY_SCHEDULING 200809)
+
+(cl:defconstant _POSIX_THREAD_ATTR_STACKSIZE 200809)
+
+(cl:defconstant _POSIX_THREAD_ATTR_STACKADDR 200809)
+
+(cl:defconstant _POSIX_THREAD_PRIO_INHERIT 200809)
+
+(cl:defconstant _POSIX_THREAD_PRIO_PROTECT 200809)
+
+(cl:defconstant _POSIX_THREAD_ROBUST_PRIO_INHERIT 200809)
+
+(cl:defconstant _POSIX_THREAD_ROBUST_PRIO_PROTECT -1)
+
+(cl:defconstant _POSIX_SEMAPHORES 200809)
+
+(cl:defconstant _POSIX_REALTIME_SIGNALS 200809)
+
+(cl:defconstant _POSIX_ASYNCHRONOUS_IO 200809)
+
+(cl:defconstant _POSIX_ASYNC_IO 1)
+
+(cl:defconstant _LFS_ASYNCHRONOUS_IO 1)
+
+(cl:defconstant _POSIX_PRIORITIZED_IO 200809)
+
+(cl:defconstant _LFS64_ASYNCHRONOUS_IO 1)
+
+(cl:defconstant _LFS_LARGEFILE 1)
+
+(cl:defconstant _LFS64_LARGEFILE 1)
+
+(cl:defconstant _LFS64_STDIO 1)
+
+(cl:defconstant _POSIX_SHARED_MEMORY_OBJECTS 200809)
+
+(cl:defconstant _POSIX_CPUTIME 0)
+
+(cl:defconstant _POSIX_THREAD_CPUTIME 0)
+
+(cl:defconstant _POSIX_REGEXP 1)
+
+(cl:defconstant _POSIX_READER_WRITER_LOCKS 200809)
+
+(cl:defconstant _POSIX_SHELL 1)
+
+(cl:defconstant _POSIX_TIMEOUTS 200809)
+
+(cl:defconstant _POSIX_SPIN_LOCKS 200809)
+
+(cl:defconstant _POSIX_SPAWN 200809)
+
+(cl:defconstant _POSIX_TIMERS 200809)
+
+(cl:defconstant _POSIX_BARRIERS 200809)
+
+(cl:defconstant _POSIX_MESSAGE_PASSING 200809)
+
+(cl:defconstant _POSIX_THREAD_PROCESS_SHARED 200809)
+
+(cl:defconstant _POSIX_MONOTONIC_CLOCK 0)
+
+(cl:defconstant _POSIX_CLOCK_SELECTION 200809)
+
+(cl:defconstant _POSIX_ADVISORY_INFO 200809)
+
+(cl:defconstant _POSIX_IPV6 200809)
+
+(cl:defconstant _POSIX_RAW_SOCKETS 200809)
+
+(cl:defconstant _POSIX2_CHAR_TERM 200809)
+
+(cl:defconstant _POSIX_SPORADIC_SERVER -1)
+
+(cl:defconstant _POSIX_THREAD_SPORADIC_SERVER -1)
+
+(cl:defconstant _POSIX_TRACE -1)
+
+(cl:defconstant _POSIX_TRACE_EVENT_FILTER -1)
+
+(cl:defconstant _POSIX_TRACE_INHERIT -1)
+
+(cl:defconstant _POSIX_TRACE_LOG -1)
+
+(cl:defconstant _POSIX_TYPED_MEMORY_OBJECTS -1)
+
+(cl:defconstant _POSIX_V7_ILP32_OFFBIG 1)
+
+(cl:defconstant _POSIX_V6_ILP32_OFFBIG 1)
+
+(cl:defconstant _XBS5_ILP32_OFFBIG 1)
+
+(cl:defconstant _POSIX_V7_ILP32_OFF32 1)
+
+(cl:defconstant _POSIX_V6_ILP32_OFF32 1)
+
+(cl:defconstant _XBS5_ILP32_OFF32 1)
+
+(cl:defconstant __ILP32_OFF32_CFLAGS "-m32")
+
+(cl:defconstant __ILP32_OFF32_LDFLAGS "-m32")
+
+(cl:defconstant __ILP32_OFFBIG_CFLAGS "-m32 -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64")
+
+(cl:defconstant __ILP32_OFFBIG_LDFLAGS "-m32")
+
+(cl:defconstant __LP64_OFF64_CFLAGS "-m64")
+
+(cl:defconstant __LP64_OFF64_LDFLAGS "-m64")
+
 (cl:defconstant STDIN_FILENO 0)
 
 (cl:defconstant STDOUT_FILENO 1)
@@ -486,15 +1278,15 @@
   (__offset :long)
   (__whence :int))
 
-(cffi:defcfun ("close" c-close) :int
+(cffi:defcfun ("close" close) :int
   (__fd :int))
 
-(cffi:defcfun ("read" c-read) :int
+(cffi:defcfun ("read" read) :int
   (__fd :int)
   (__buf :pointer)
   (__nbytes :unsigned-long))
 
-(cffi:defcfun ("write" c-write) :int
+(cffi:defcfun ("write" write) :int
   (__fd :int)
   (__buf :pointer)
   (__n :unsigned-long))
@@ -517,7 +1309,7 @@
 (cffi:defcfun ("alarm" alarm) :unsigned-int
   (__seconds :unsigned-int))
 
-(cffi:defcfun ("sleep" c-sleep) :unsigned-int
+(cffi:defcfun ("sleep" sleep) :unsigned-int
   (__seconds :unsigned-int))
 
 (cffi:defcfun ("ualarm" ualarm) :unsigned-int
@@ -591,12 +1383,12 @@
 (cffi:defcfun ("execle" execle) :int
   (__path :string)
   (__arg :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("execl" execl) :int
   (__path :string)
   (__arg :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("execvp" execvp) :int
   (__file :string)
@@ -605,13 +1397,36 @@
 (cffi:defcfun ("execlp" execlp) :int
   (__file :string)
   (__arg :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("nice" nice) :int
   (__inc :int))
 
 (cffi:defcfun ("_exit" _exit) :void
   (__status :int))
+
+(defanonenum 
+	_PC_LINK_MAX
+	_PC_MAX_CANON
+	_PC_MAX_INPUT
+	_PC_NAME_MAX
+	_PC_PATH_MAX
+	_PC_PIPE_BUF
+	_PC_CHOWN_RESTRICTED
+	_PC_NO_TRUNC
+	_PC_VDISABLE
+	_PC_SYNC_IO
+	_PC_ASYNC_IO
+	_PC_PRIO_IO
+	_PC_SOCK_MAXBUF
+	_PC_FILESIZEBITS
+	_PC_REC_INCR_XFER_SIZE
+	_PC_REC_MAX_XFER_SIZE
+	_PC_REC_MIN_XFER_SIZE
+	_PC_REC_XFER_ALIGN
+	_PC_ALLOC_SIZE_MIN
+	_PC_SYMLINK_MAX
+	_PC_2_SYMLINKS)
 
 (cffi:defcfun ("pathconf" pathconf) :long
   (__path :string)
@@ -759,6 +1574,23 @@
 (cffi:defcfun ("setlogin" setlogin) :int
   (__name :string))
 
+(cffi:defcvar ("optarg" optarg)
+ :string)
+
+(cffi:defcvar ("optind" optind)
+ :int)
+
+(cffi:defcvar ("opterr" opterr)
+ :int)
+
+(cffi:defcvar ("optopt" optopt)
+ :int)
+
+(cffi:defcfun ("getopt" getopt) :int
+  (___argc :int)
+  (___argv :pointer)
+  (__shortopts :string))
+
 (cffi:defcfun ("gethostname" gethostname) :int
   (__name :string)
   (__len :unsigned-long))
@@ -819,11 +1651,11 @@
 
 (cffi:defcfun ("getdtablesize" getdtablesize) :int)
 
-(cffi:defcfun ("truncate" c-truncate) :int
+(cffi:defcfun ("truncate" truncate) :int
   (__file :string)
   (__length :long))
 
-(cffi:defcfun ("ftruncate" c-ftruncate) :int
+(cffi:defcfun ("ftruncate" ftruncate) :int
   (__fd :int)
   (__length :long))
 
@@ -835,7 +1667,7 @@
 
 (cffi:defcfun ("syscall" syscall) :long
   (__sysno :long)
-  &rest)
+  cl:&rest)
 
 (cl:defconstant F_ULOCK 0)
 
@@ -859,11 +1691,254 @@
 
 (cl:defconstant ____FILE_defined 1)
 
+(cl:defconstant _G_config_h 1)
+
+(cl:defconstant ____mbstate_t_defined 1)
+
+(cffi:defcstruct __mbstate_t
+	(__count :int)
+	(__value :pointer))
+
+(cffi:defcunion __mbstate_t___value
+	(__wch :unsigned-int)
+	(__wchb :pointer))
+
+(cffi:defcstruct _G_fpos_t
+	(__pos :long)
+	(__state __mbstate_t))
+
+(cffi:defcstruct _G_fpos64_t
+	(__pos :long-long)
+	(__state __mbstate_t))
+
+(cl:defconstant _G_HAVE_MMAP 1)
+
+(cl:defconstant _G_HAVE_MREMAP 1)
+
+(cl:defconstant _G_IO_IO_FILE_VERSION #x20001)
+
+(cl:defconstant _G_BUFSIZ 8192)
+
+(cl:defconstant _IO_BUFSIZ 8192)
+
+(cl:defconstant _IO_UNIFIED_JUMPTABLES 1)
+
+(cl:defconstant EOF -1)
+
+(cl:defconstant _IOS_INPUT 1)
+
+(cl:defconstant _IOS_OUTPUT 2)
+
+(cl:defconstant _IOS_ATEND 4)
+
+(cl:defconstant _IOS_APPEND 8)
+
+(cl:defconstant _IOS_TRUNC 16)
+
+(cl:defconstant _IOS_NOCREATE 32)
+
+(cl:defconstant _IOS_NOREPLACE 64)
+
+(cl:defconstant _IOS_BIN 128)
+
+(cl:defconstant _IO_MAGIC #xFBAD0000)
+
+(cl:defconstant _OLD_STDIO_MAGIC #xFABC0000)
+
+(cl:defconstant _IO_MAGIC_MASK #xFFFF0000)
+
+(cl:defconstant _IO_USER_BUF 1)
+
+(cl:defconstant _IO_UNBUFFERED 2)
+
+(cl:defconstant _IO_NO_READS 4)
+
+(cl:defconstant _IO_NO_WRITES 8)
+
+(cl:defconstant _IO_EOF_SEEN #x10)
+
+(cl:defconstant _IO_ERR_SEEN #x20)
+
+(cl:defconstant _IO_DELETE_DONT_CLOSE #x40)
+
+(cl:defconstant _IO_LINKED #x80)
+
+(cl:defconstant _IO_IN_BACKUP #x100)
+
+(cl:defconstant _IO_LINE_BUF #x200)
+
+(cl:defconstant _IO_TIED_PUT_GET #x400)
+
+(cl:defconstant _IO_CURRENTLY_PUTTING #x800)
+
+(cl:defconstant _IO_IS_APPENDING #x1000)
+
+(cl:defconstant _IO_IS_FILEBUF #x2000)
+
+(cl:defconstant _IO_BAD_SEEN #x4000)
+
+(cl:defconstant _IO_USER_LOCK #x8000)
+
+(cl:defconstant _IO_FLAGS2_MMAP 1)
+
+(cl:defconstant _IO_FLAGS2_NOTCANCEL 2)
+
+(cl:defconstant _IO_FLAGS2_USER_WBUF 8)
+
+(cl:defconstant _IO_SKIPWS #o1)
+
+(cl:defconstant _IO_LEFT #o2)
+
+(cl:defconstant _IO_RIGHT #o4)
+
+(cl:defconstant _IO_INTERNAL #o10)
+
+(cl:defconstant _IO_DEC #o20)
+
+(cl:defconstant _IO_OCT #o40)
+
+(cl:defconstant _IO_HEX #o100)
+
+(cl:defconstant _IO_SHOWBASE #o200)
+
+(cl:defconstant _IO_SHOWPOINT #o400)
+
+(cl:defconstant _IO_UPPERCASE #o1000)
+
+(cl:defconstant _IO_SHOWPOS #o2000)
+
+(cl:defconstant _IO_SCIENTIFIC #o4000)
+
+(cl:defconstant _IO_FIXED #o10000)
+
+(cl:defconstant _IO_UNITBUF #o20000)
+
+(cl:defconstant _IO_STDIO #o40000)
+
+(cl:defconstant _IO_DONT_CLOSE #o100000)
+
+(cl:defconstant _IO_BOOLALPHA #o200000)
+
+(cffi:defcstruct _IO_marker
+	(_next :pointer)
+	(_sbuf :pointer)
+	(_pos :int))
+
 (cffi:defcenum __codecvt_result
 	:__codecvt_ok
 	:__codecvt_partial
 	:__codecvt_error
 	:__codecvt_noconv)
+
+(cffi:defcstruct _IO_FILE
+	(_flags :int)
+	(_IO_read_ptr :string)
+	(_IO_read_end :string)
+	(_IO_read_base :string)
+	(_IO_write_base :string)
+	(_IO_write_ptr :string)
+	(_IO_write_end :string)
+	(_IO_buf_base :string)
+	(_IO_buf_end :string)
+	(_IO_save_base :string)
+	(_IO_backup_base :string)
+	(_IO_save_end :string)
+	(_markers :pointer)
+	(_chain :pointer)
+	(_fileno :int)
+	(_flags2 :int)
+	(_old_offset :long)
+	(_cur_column :unsigned-short)
+	(_vtable_offset :char)
+	(_shortbuf :pointer)
+	(_lock :pointer)
+	(_offset :long-long)
+	(__pad1 :pointer)
+	(__pad2 :pointer)
+	(__pad3 :pointer)
+	(__pad4 :pointer)
+	(__pad5 :unsigned-long)
+	(_mode :int)
+	(_unused2 :pointer))
+
+(cffi:defcvar ("_IO_2_1_stdin_" _IO_2_1_stdin_)
+ :pointer)
+
+(cffi:defcvar ("_IO_2_1_stdout_" _IO_2_1_stdout_)
+ :pointer)
+
+(cffi:defcvar ("_IO_2_1_stderr_" _IO_2_1_stderr_)
+ :pointer)
+
+(cffi:defcfun ("__underflow" __underflow) :int
+  (arg0 :pointer))
+
+(cffi:defcfun ("__uflow" __uflow) :int
+  (arg0 :pointer))
+
+(cffi:defcfun ("__overflow" __overflow) :int
+  (arg0 :pointer)
+  (arg1 :int))
+
+(cffi:defcfun ("_IO_getc" _IO_getc) :int
+  (__fp :pointer))
+
+(cffi:defcfun ("_IO_putc" _IO_putc) :int
+  (__c :int)
+  (__fp :pointer))
+
+(cffi:defcfun ("_IO_feof" _IO_feof) :int
+  (__fp :pointer))
+
+(cffi:defcfun ("_IO_ferror" _IO_ferror) :int
+  (__fp :pointer))
+
+(cffi:defcfun ("_IO_peekc_locked" _IO_peekc_locked) :int
+  (__fp :pointer))
+
+(cffi:defcfun ("_IO_flockfile" _IO_flockfile) :void
+  (arg0 :pointer))
+
+(cffi:defcfun ("_IO_funlockfile" _IO_funlockfile) :void
+  (arg0 :pointer))
+
+(cffi:defcfun ("_IO_ftrylockfile" _IO_ftrylockfile) :int
+  (arg0 :pointer))
+
+(cffi:defcfun ("_IO_vfscanf" _IO_vfscanf) :int
+  (arg0 :pointer)
+  (arg1 :string)
+  (arg2 :pointer)
+  (arg3 :pointer))
+
+(cffi:defcfun ("_IO_vfprintf" _IO_vfprintf) :int
+  (arg0 :pointer)
+  (arg1 :string)
+  (arg2 :pointer))
+
+(cffi:defcfun ("_IO_padn" _IO_padn) :int
+  (arg0 :pointer)
+  (arg1 :int)
+  (arg2 :int))
+
+(cffi:defcfun ("_IO_sgetn" _IO_sgetn) :unsigned-long
+  (arg0 :pointer)
+  (arg1 :pointer)
+  (arg2 :unsigned-long))
+
+(cffi:defcfun ("_IO_seekoff" _IO_seekoff) :long-long
+  (arg0 :pointer)
+  (arg1 :long-long)
+  (arg2 :int)
+  (arg3 :int))
+
+(cffi:defcfun ("_IO_seekpos" _IO_seekpos) :long-long
+  (arg0 :pointer)
+  (arg1 :long-long)
+  (arg2 :int))
+
+(cffi:defcfun ("_IO_free_backup_area" _IO_free_backup_area) :void
+  (arg0 :pointer))
 
 (cl:defconstant _IOFBF 0)
 
@@ -875,6 +1950,16 @@
 
 (cl:defconstant P_tmpdir "/tmp")
 
+(cl:defconstant L_tmpnam 20)
+
+(cl:defconstant TMP_MAX 238328)
+
+(cl:defconstant FILENAME_MAX 4096)
+
+(cl:defconstant L_ctermid 9)
+
+(cl:defconstant FOPEN_MAX 16)
+
 (cffi:defcvar ("stdin" stdin)
  :pointer)
 
@@ -884,10 +1969,10 @@
 (cffi:defcvar ("stderr" stderr)
  :pointer)
 
-(cffi:defcfun ("remove" c-remove) :int
+(cffi:defcfun ("remove" remove) :int
   (__filename :string))
 
-(cffi:defcfun ("rename" c-rename) :int
+(cffi:defcfun ("rename" rename) :int
   (__old :string)
   (__new :string))
 
@@ -961,16 +2046,16 @@
 (cffi:defcfun ("fprintf" fprintf) :int
   (__stream :pointer)
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("printf" printf) :int
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("sprintf" sprintf) :int
   (__s :string)
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("vfprintf" vfprintf) :int
   (__s :pointer)
@@ -990,7 +2075,7 @@
   (__s :string)
   (__maxlen :unsigned-long)
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("vsnprintf" vsnprintf) :int
   (__s :string)
@@ -1006,35 +2091,35 @@
 (cffi:defcfun ("dprintf" dprintf) :int
   (__fd :int)
   (__fmt :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("fscanf" fscanf) :int
   (__stream :pointer)
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("scanf" scanf) :int
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("sscanf" sscanf) :int
   (__s :string)
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("__isoc99_fscanf" __isoc99_fscanf) :int
   (__stream :pointer)
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("__isoc99_scanf" __isoc99_scanf) :int
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("__isoc99_sscanf" __isoc99_sscanf) :int
   (__s :string)
   (__format :string)
-  &rest)
+  cl:&rest)
 
 (cffi:defcfun ("vfscanf" vfscanf) :int
   (__s :pointer)
@@ -1217,6 +2302,12 @@
 (cffi:defcfun ("perror" perror) :void
   (__s :string))
 
+(cffi:defcvar ("sys_nerr" sys_nerr)
+ :int)
+
+(cffi:defcvar ("sys_errlist" sys_errlist)
+ :pointer)
+
 (cffi:defcfun ("fileno" fileno) :int
   (__stream :pointer))
 
@@ -1233,7 +2324,7 @@
 (cffi:defcfun ("ctermid" ctermid) :string
   (__s :string))
 
-(cffi:defcfun ("flockfile" flockfile) :voidk
+(cffi:defcfun ("flockfile" flockfile) :void
   (__stream :pointer))
 
 (cffi:defcfun ("ftrylockfile" ftrylockfile) :int
