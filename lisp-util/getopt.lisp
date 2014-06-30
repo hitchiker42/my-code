@@ -12,44 +12,39 @@
     (let* ((option-vals
             (mapcar
              (lambda (opt)
-               (cond
-                 ((keywordp opt)
+               (etypecase opt
+                 (keyword
                   (string-downcase (symbol-name opt)))
-                 ((stringp opt) opt)
-                 ((characterp opt) (string opt))
-                 (t (error 'type-error))))
+                 (string opt)
+                 (character (string opt))))
              options))
           (arg-val
-           (cond
-             ((numberp arg) arg)
-             ((keywordp arg)
+           (etypecase arg
+             (number arg)
+             (keyword
               (case arg
                 (:required 1)
                 (:optional 2)
                 (t 0)))
-             ((eq t arg) 1)
-             ((eq nil arg) 0)
-             (t (error 'type-error))))
+             (boolean (if arg 1 0))))
            (fun-val
-            (cond
-              ((functionp fun) fun)
-              ((symbolp fun)
+            (etypecase fun
+              (function fun)
+              (symbol
                (case arg-val
                  (0 (lambda () (setq fun t)))
                  (1 (lambda (x) (setq fun x)))
                  (2 (lambda (&optional (x t)) (setq fun x)))))
-              ((null fun) (constantly nil))
-              (t (error 'type-error)))))
+              (null (constantly nil)))))
       (dolist (opt option-vals)
         (setf (gethash opt ht) (list arg-val fun-val))))))
 
 (defun getopt (args &rest options)
   (let ((opt-table (make-hash-table))
-        (args (cond
-                ((listp args) args)
-                ((stringp args) (string-split args))
-                ((sequencep args) (concatenate 'list args))
-                (t (error 'type-error))))
+        (args (etypecase args)
+                (list args)
+                (string (string-split args))
+                (sequence (concatenate 'list args)))
         remaning-args arg match-data)
     (dolist (opt options) (parse-opt-spec opt opt-table)
             (while (not (null args))
@@ -65,5 +60,3 @@
                       (2 (funcall fun (string-match 2 match-data)))))
                   (push arg remaning-args))))
     (reverse remaning-args)))
-          
-                              

@@ -3,7 +3,8 @@
   (:export system concat el-if puthash aif
            run-shell-command string-split
            sequencep while until
-           match-string string-match)
+           match-string string-match
+           package-symbol-list)
   (:use :COMMON-LISP :SB-EXT :CL-PPCRE))
 (in-package :util)
 (defun system (program &rest args)
@@ -15,7 +16,7 @@
   (system "/bin/bash" "-c" command))
 (defun string-split (str)
   (split "\\s+" str))
-(defun package-symbol-list (package &optional all)
+(defun package-symbol-list (package); &optional all)
   (let ((symbol-list nil))    
     (do-external-symbols (sym package)
       (push sym symbol-list))
@@ -27,8 +28,8 @@ then evaluate then-form or else-form according to the result of test-form"
          (if it ,then-form ,else-form)))
 (defmacro el-if (test then &rest else)
   `(if ,test ,then (progn ,@else)))
+(declaim (inline concat))
 (defun concat (&rest args)
-  (declare 'inline)
   (apply #'concatenate 'string args))
 (defun sequencep (seq) (typep seq 'sequence))
 (defmacro puthash (key value table)
@@ -76,5 +77,3 @@ then evaluate then-form or else-form according to the result of test-form"
            (subseq (match-data-string match-data) start end)
            nil)))
     (t (error 'simple-error))))
-(let ((data (string-match "(a)|(b)" "a")))
-  (match-string 2 data))
