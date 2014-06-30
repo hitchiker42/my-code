@@ -5,6 +5,9 @@
 
    daemon started via a systemd service, user interface to the
    daemon is via the alarm (name subject to change) program
+
+   Use ip protocol rather than unix sockets so it can be used remotely
+   
    USAGE: alarm [general options] action [action options] action-args...
    actions include:
      list: list all pending alarms, or depending on options
@@ -46,11 +49,8 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
-<<<<<<< HEAD
 
-=======
 #include <errno.h>
->>>>>>> 1430394923850c3956fd6cf01244b3f09d3ee092
 #include <semaphore.h>
 #include <signal.h>
 #include <stdint.h>
@@ -59,7 +59,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/socket.h>
-#include <sys/un.h>
+#include <netinet/in.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -71,26 +71,45 @@
    as the basis for the returned time. */
 int parse_datetime(struct timespec *result, const char *P, 
                    const struct timespec *now);
+
 typedef struct alarm *alarm_ptr;
 typedef uint64_t alarm_id;
+static const int tcp_proto_number = 6;
+static const inc udp_proto_number = 17;
+#define DEFAULT_PORT 10042
+#define STRINGIFY(arg) #arg
 //global state of the daemon, kept in a struct
 //rather than having a bunch of global variables
 struct alarm_state {
   binary_heap *alarms;//priority queue of alarms
+  const char *host;
+  const char *port;
+  int sock;
 };
 enum alarm_type {
   ALARM_DEFAULT,//default action, only state is a time
   ALARM_MUSIC,//play a song, state includes song and options (and time)
   ALARM_COMMAND,//run a command, command is a string 
 };
-struct week {
-  uint8_t mon;uint8_t tues;uint8_t wed;uint8_t thurs;
-  uint8_t fri; uint8_t sat;uint8_t sun;uint8_t all;
+enum days_of_the_week {
+  Monday = 1,
+  Tuesday = (Monday << 1),
+  Wednesday = (Tuesday << 1),
+  Thursday = (Wednesday << 1),
+  Friday = (Thursday << 1),
+  Saturday = (Friday << 1),
+  Sunday = (Saturday << 1)
 };
 struct alarm {
   alarm_id id;
   time_t time;
   int alarm_type;
+  int repeat_days;
+  const char *alarm_command;
+};
+struct alarm_connection {
+  int sock;
+};
 
 #define MAX(a,b)                                \
   ({ __typeof__ (a) _a = (a);                   \
@@ -120,4 +139,9 @@ struct alarm {
 #endif
 
 #endif
-
+/*
+  int getaddrinfo(const char *hostname,
+                  const char *service, //aka port
+                  const struct addrinfo *hints,
+                  struct addrinfo **res)
+*/
