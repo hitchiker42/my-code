@@ -1,27 +1,53 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <alloca.h>
+#include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include <unistd.h>
+#include <sys/mman.h>
 typedef unsigned int uint;
 typedef unsigned long ulong;
-//generic counting sort suitable for sorting aribitary data
-//indexed by integer keys
-#define count_occurances(arr,len,max,key)       \
+
+static const radix_base = 8;
+//Key is a function to get keys from array elements
+//if array elements are the keys leave key empty
+#define count_keys(arr,len,max,key)             \
   {(ulong *count = alloca(sizeof(ulong) *max);  \
+    memset(count, '\0', sizeof(ulong)*max);     \
     int i;                                      \
     for (i=0;i<len;i++) {                       \
       count[key(arr[i])]++;                     \
     }                                           \
-    count)}
-static inline ulong *count_occurances(ulong *arr, ulong len, ulong max){
-  ulong *count = 
+    count;)}
+
+static inline void compute_indices(ulong *count, ulong len){
+  int i,total;
+  for(i=0,total=0;i<len;i++){
+    ulong temp=count[i];
+    count[i]=total;
+    total+=temp;
+  }
+}
+static inline void update_input(ulong *input, ulong *count, ulong len){
+  int i;
+  ulong *output = alloca(len * sizeof(ulong));
+  for(i=0;i<len;i++){
+    int ind = arr[i];
+    output[count[ind]]=arr[i];
+    count[ind]++;
+  }
+  memcpy(input, output, len);
+}
+//generic counting sort suitable for sorting aribitary data
+//indexed by integer keys
 void *counting_sort(void *arr,int len,int min,int max,int (*key)(void*)){
   //sort an array via integer keys, keys are obtained by calling the key
   //function on the given array
   //len is the length of the array, min and max are the minimum and maximum
   //values of the integer keys
   int *count = alloca(max-mix * sizeof(int));
+  memset(count, '\0', (max-mix * sizeof(int)));
   void *output = malloc(len * sizeof(void*));
   int i,total;
   for(i=0;i<len;i++){
@@ -30,15 +56,12 @@ void *counting_sort(void *arr,int len,int min,int max,int (*key)(void*)){
   }
   //change the values in the count array to the starting index
   //of the elements with that key in the output array
-  for(i=0,total=0;i<(max-mix);i++){
-    int temp=count[i];
-    count[i]=total;
-    total+=temp;
-  }
+  compute_indices(count,max-min);
+
   //fill the output array with the sorted elements
   for(i=0;i<len;i++){
     int ind=key(arr[i]);
-    /* 
+    /*
        because of the second loop count[ind] contains the index
        that the current element should be placed
     */
@@ -73,17 +96,16 @@ struct min_max min_max(ulong *arr, ulong n){
   struct min_max = {.min = min, .max = max};
   return min_max;
 }
-uint integer_counting_sort(ulong *arr, ulong n, ulong nbits){
+uint integer_counting_sort(ulong *arr, ulong len, ulong nbits){
   //could be more efficent, but still not bad
   //need use lists to store count or find max/min values of arr;
   struct min_max mm = min_max(arr,n);
   ulong min = mm.min, max = mm.max;
-  int *count = alloca(max-mix * sizeof(int));
+  int *count = count_keys(arr, len, max-min,)
+    //because we only have integer keys and don't need to have a stable
+    //sort we can optimize here by sorting in place and not computing
+    //indices.
   int i,j;
-  for(i=0;i<len;i++){
-    //count the number of times each integer key appears
-    count[arr[i]]++;
-  }
   for(i=0,j=0;i<max-min;){
     //count[i] is a count of the number of element in arr
     //equal to i. if it's 0 move to the next number otherwise
@@ -143,18 +165,96 @@ uint qsort(ulong *arr, ulong n, ulong nbits){
 
 ulong bytes[8]={0xff<<56,0xff<<48,0xff<<40,0xff<<32,
                 0xff<<24,0xff<<16,0xff<<8,0xff};
+
 //radix sort of base 8
+//in order to be able to use an arbitary radix
+//the line: count[arr[i]&bytes[n]]++; should be replaced by
+//count[(arr[i]/count_size)%radix_base]++;
 uint radix_sort(ulong *arr, ulong len, ulong nbits){
-  ulong buckets[256] = {0};
+  int count_size = 1<<radix_base;
+  ulong count[count_size] = {0};
   int i,n,total;
-  for(n=0;n<nbits;n+=8){
+  for(n=0;n<nbits;n+=radix_base){
+    /* Can't use the count keys macro because we can't close
+       over the value of n in C*/
     for(i=0;i<len;i++){
-      buckets[arr[i]&bytes[n]]++;
+      count[arr[i]&bytes[n]]++;
     }
-    for(i=0,total=0;i<256;i++){
-      int temp=buckets[i];
-      buckets[i]=total;
-      total+=temp;
+    compute_indices(count, count_size);
+    update_input(arr, count, len);
+  }
+}
+struct input_data {
+  ulong len;
+  ulong nbits;
+  ulong min;
+  ulong max;
+  ulong *data;
+};
+char *mmap_file(const char *input_file){
+  int fd = open(input_file, O_RDONLY);
+  const char *err_msg;
+  if(fd < 0){
+    handle_error("read");
+  }
+  //be lazy and just use mmap
+  off_t len = lseek(fd, 0, SEEK_END);
+  if(len == (off_t)-1){
+    handle_error("lseek");
+  }
+  char *mem = mmap(NULL, len+1, PROT_READ, MAP_PRIVATE, fd, 0);
+  if(mem == MAP_FAILED){
+    handle_error("mmap");
+  }
+  if(close(fd) < 0){
+    munmap(mem);
+    handle_error("close");
+  }
+}
+#define handle_error(msg)                               \
+  perror(msg);                                          \
+  return NULL;
+#define strtoul_err(val)                            \
+  ((errno == ERANGE && (val == ULONG_MAX))            \
+   || (errno != 0 && val == 0))
+
+struct input_data* read_input(char *data) {
+  int num_values = strtoul(data, &data, 0);
+  if(strtoul_err(num_values)){return NULL;}
+  int nbits = strtoul(data, &data, 0);
+  if(strtoul_err(nbits) || nbits > (CHAR_BIT * sizeof(ulong))){
+    return NULL;
+  }
+
+  struct input_data *retval=malloc(sizeof(struct input_data));
+  if(!retval){return NULL;}
+
+  retval.data = malloc(sizeof(ulong)*num_values);
+  if(!retval.data){goto CLEANUP;}
+
+  retval.len = num_values;
+  retval.nbits = nbits;
+  
+  retval.data[0] = strtoul(data, &data, 0);
+  if(strtoul_err(retval.data[i])){
+    goto CLEANUP;
+  }
+  retval.min = retval.max = retval.data[0];
+  int i;
+  for(i=1;i<num_values;i++){
+    retval.data[i] = strtoul(data, &data, 0);
+    if(strtoul_err(retval.data[i])){
+      goto CLEANUP;
+    }
+    if(retval.data[i] > retval.max){
+      retval.max = retval.data[i];
+    } else if (retval.data[i] < retval.min){
+      retval.min = retval.data[i];
     }
   }
+  return retval; 
+ CLEANUP:
+  free(retval.data);
+  free(retval);
+  return NULL;
 }

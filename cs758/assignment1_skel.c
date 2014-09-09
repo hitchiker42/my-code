@@ -130,7 +130,7 @@ static unsigned int do_insertion_sort(unsigned long ary[], unsigned long n,
  * values in the input using the 'nvalues' argument and the number of
  * bits for each number using the 'nbits' argument.
  *
- * Returns 0 on success and 1 on failure.
+p * Returns 0 on success and 1 on failure.
  */
 static unsigned int read_file_header(FILE * infile, unsigned long *nvalues,
 				     unsigned long *nbits)
