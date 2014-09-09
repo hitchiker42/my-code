@@ -26,4 +26,6 @@
 #define sl_free SL_FREE
 #define sl_realloc SL_REALLOC
 #define sl_strdup strdup
+//need include types.h after the above macro definations
+#include "types.h"
 #endif

@@ -1,9 +1,10 @@
-/* Definations of lisp types, and typechecking macros
+/*
+  Definations of lisp types, and typechecking macros.
+  Is included by common.h, so sholdn't have to be included by
+  any other file
 */
 #ifndef SL_TYPES_H
 #define SL_TYPES_H
-#include <stdint.h>
-#include "gc.h"
 /*
   The 3 least significant bits of a pointer will always be 0, because
   pointers are aligned to 8 byte boundries.
@@ -74,15 +75,17 @@ typedef float real32_t;
 */
 enum sl_type {
   /* Integers take up two tags so that they can be 62 bits instead of 61 */
-  SL_int0 = 0,
-  SL_int1 = 4,
-  SL_cons = 1, //pointer to a cons cell
-  SL_symbol = 2, //pointer to a symbol
+  SL_int0 = 2,
+  SL_int1 = 6,
+  //by having a symbol have no bits set NULL can be identicial to NIL
+  SL_symbol = 0, //pointer to a symbol   
+  SL_cons = 1, //pointer to a cons cell  
   SL_number = 3, //pointer to a number (rational, complex or large int/real)
-  SL_vector = 5, //pointer to a vectorlike object
-  SL_imm = 6, //non integer immediate
+  SL_vector = 4, //pointer to a vectorlike object
+  SL_imm = 5, //non integer immediate
   SL_misc = 7, //pointer to a struct sl_heap_obj
 };
+#define SL_int_mask 0x2
 enum sl_imm_type {
   SL_nil = 0,
   SL_T = 0xff,
@@ -98,9 +101,13 @@ enum sl_imm_type {
 #define XINT(obj) (obj >> 2)
 /* Extract the pointer from an sl_obj */
 #define XPTR(obj) (obj & (~0x7))
+#define XCONS(obj) ((sl_cons*)XPTR(obj))
+#define XVECTOR(obj) ((sl_vector*)XPTR(obj))
+#define XSYMBOL(obj) ((sl_symbol*)XPTR(obj))
+#define XNUMBER(obj) ((sl_number*)XPTR(obj))
 /* Macros to check the type of an sl_obj */
 /*the 2 least significant bits of an int must be 0*/
-#define INTP(obj) (!(obj & 0x3))
+#define INTP(obj) (obj & SL_int_mask)
 #define CONSP(obj) (sl_type_bits(obj) == SL_cons)
 #define VECTORP(obj) (sl_type_bits(obj) == SL_vector)
 #define IMMP(obj) (sl_type_bits(obj) == SL_imm)
@@ -113,6 +120,12 @@ enum sl_imm_type {
 #define NUMBERP(obj) (INTP(obj) || IND_NUMBERP(obj) || IMM_NUMBERP(obj))
 #define CHARP(obj) (IMMP(obj) && (((sl_imm)obj).tag == 1))
 #define NILP(obj) (IMMP(obj) && (((sl_imm)obj).tag == 0))
+//trivial function to make an sl_object, used because it
+//hides the internal implementation of sl_obj so it can be
+//changed without effecting other code
+SL_inline sl_obj make_sl_obj(uint64_t val, enum sl_type type){
+  return (sl_obj)(val|type);
+}
 
 struct sl_cons {
   sl_obj car;
