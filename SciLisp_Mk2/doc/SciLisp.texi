@@ -1,0 +1,90 @@
+\input texinfo
+@c %**start of header
+@set Time-stamp: <08 September 2014>
+@setfilename SciLisp.info
+@settitle SciLisp Manual
+@codequoteundirected on
+@codequotebacktick on
+@documentencoding UTF-8
+@set VERSION 0.01
+@c %**end of header
+@c @allowcodebreaks true/false; allow line breaking at _ or - in
+@c @code{}(et. all) blocks
+@copying
+This manual is for SciLisp (version @value{VERSION}, last updated on
+@value{Time-stamp:} @*
+SciLisp is free software licensed under the GNU GPL V3+@*
+Copyright @copyright{} 2013-2014 Tucker@w{ }DiNapoli
+@quotation
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.3 or
+any later version published by the Free Software Foundation; with no
+Invariant Sections, with no Front-Cover Texts, and with no Back-Cover
+Texts. A copy of the license is included in the section entitled
+``GNU Free Documentation License''.
+@end quotation
+@end copying
+@titlepage
+@title SciLisp Manual
+@subtitle for version @value{VERSION}, @value{Time-stamp:}
+@c @page
+@vskip 0pt plus 1filll @c presumably some kind of vertical break
+@author Tucker DiNapoli (@email{SciLisp@@gmail.com})
+@insertcopying
+@end titlepage
+@contents
+@c @ifnottex
+@node Top
+@top SciLisp
+@c @end ifnottex
+Manual for the SciLisp programming language
+@menu
+* Introduction::                Introduction to SciLisp and reasons for it's creation
+* Usage::                       How to call SciLisp and what the command line options do
+* The SciLisp Language::        Informal introduction to the SciLisp language
+* Grammar::
+* Concept Index::
+* Function and Macro Index::
+* Variable and Type Index::
+@end menu
+
+@node Introduction
+@chapter Introduction
+@menu
+* Design Overview::
+@end menu
+@cindex Introduction
+@cindex General Introduction
+@node Design Overview
+@section Design Overview
+@node Usage
+@chapter Usage
+@menu
+* Command Line Options::
+@end menu
+@node Command Line Options
+@section Command Line Options
+@node The SciLisp Language
+@chapter The SciLisp Language
+@menu
+* Syntax and Semantics::
+@end menu
+
+@node Grammar
+@menu
+* Syntax and Semantics::
+@end menu
+@chapter Grammar
+@node Syntax and Semantics
+@section Syntax and Semantics
+
+@node Concept Index
+@unnumbered Concept Index
+@printindex cp
+@node Function and Macro Index
+@unnumbered Function and Macro index
+@printindex fn
+@node Variable and Type Index
+@unnumbered Variable and Type Index
+@printindex vr @c also tp
+@bye

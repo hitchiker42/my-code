@@ -1,0 +1,123 @@
+
+types.h,2041
+#define SL_TYPES_H4,76
+typedef uint64_t sl_obj;52,2140
+typedef struct sl_misc sl_misc;54,2218
+typedef struct sl_vector sl_vector;57,2370
+typedef struct sl_number sl_number;59,2464
+typedef struct sl_symbol sl_symbol;61,2519
+typedef struct sl_imm sl_imm;63,2584
+typedef struct sl_cons sl_cons;65,2631
+typedef struct sl_string sl_string;67,2705
+typedef double real64_t;70,2795
+typedef float real32_t;71,2820
+enum sl_type 75,2979
+  SL_int0 77,3070
+  SL_int1 78,3085
+  SL_cons 79,3100
+  SL_symbol 80,3140
+  SL_number 81,3179
+  SL_vector 82,3256
+  SL_imm 83,3306
+  SL_misc 84,3344
+enum sl_imm_type 86,3396
+  SL_nil 87,3415
+  SL_T 88,3429
+  SL_T = 0xff,xff88,3429
+  SL_float 89,3444
+  SL_float = 0x80,x8089,3444
+  SL_int32 90,3463
+  SL_int32 = 0x81,x8190,3463
+  SL_int16 91,3482
+  SL_int16 = 0x82,x8291,3482
+  SL_int8 92,3501
+  SL_int8 = 0x83,x8392,3501
+  SL_char 93,3519
+#define sl_type_bits(96,3538
+#define XINT(98,3618
+#define XPTR(100,3688
+#define INTP(103,3818
+#define CONSP(104,3851
+#define VECTORP(105,3901
+#define IMMP(106,3955
+#define SYMBOLP(107,4003
+#define IND_NUMBERP(109,4105
+#define IMM_NUMBERP(112,4266
+#define NUMBERP(113,4333
+#define CHARP(114,4406
+#define NILP(115,4465
+struct sl_cons 117,4524
+  sl_obj car;118,4541
+  sl_obj cdr;119,4555
+struct sl_imm 121,4572
+  uint8_t tag;122,4588
+  uint16_t padding;123,4603
+    float real32;125,4676
+    uint32_t sl_char;126,4694
+    uint32_t uint32;128,4785
+    uint16_t uint16;129,4806
+    uint8_t uint8;130,4827
+  uint8_t sl_type;132,4851
+struct sl_vector 134,4911
+  uint8_t tag;135,4930
+  int padding 138,5046
+  uint32_t len;139,5065
+  sl_obj *value;value140,5081
+struct sl_string 143,5102
+  uint8_t tag;144,5121
+  uint8_t encoding;145,5136
+  uint8_t c_string;146,5156
+  uint8_t ascii;147,5210
+  uint32_t len;148,5264
+  const char *str;str149,5280
+struct sl_symbol 152,5305
+  sl_string name;153,5324
+  sl_obj val;154,5342
+  uint8_t type;155,5356
+  uint8_t sl_const;156,5401
+  uint8_t sl_special;157,5448
+
+config.h.in,673
+#undef HAVE_DLFCN_H4,126
+#undef HAVE_INTTYPES_H7,207
+#undef HAVE_LIBDL10,286
+#undef HAVE_LIBM13,358
+#undef HAVE_LIBPTHREAD16,441
+#undef HAVE_MEMORY_H19,523
+#undef HAVE_READLINE22,581
+#undef HAVE_STDINT_H25,661
+#undef HAVE_STDLIB_H28,741
+#undef HAVE_STRINGS_H31,822
+#undef HAVE_STRING_H34,903
+#undef HAVE_SYS_STAT_H37,985
+#undef HAVE_SYS_TYPES_H40,1070
+#undef HAVE_UNISTD_H43,1153
+#undef LT_OBJDIR47,1259
+#undef PACKAGE50,1299
+#undef PACKAGE_BUGREPORT53,1394
+#undef PACKAGE_NAME56,1467
+#undef PACKAGE_STRING59,1547
+#undef PACKAGE_TARNAME62,1629
+#undef PACKAGE_URL65,1701
+#undef PACKAGE_VERSION68,1766
+#undef STDC_HEADERS71,1845
+#undef VERSION74,1898
+
+frontend.c,51
+int main(2,20
+SL_INLINE char* sl_readline(13,393
+
+common.h,344
+#define _SL_COMMON_H_2,22
+#define SL_INLINE 10,184
+#define SL_LIKELY(11,216
+#define SL_UNLIKELY(12,266
+#define SL_EXPECT(13,323
+#define SL_UNREACHABLE 14,385
+#define SL_MALLOC 17,470
+#define SL_FREE 20,518
+#define SL_REALLOC 23,565
+#define sl_malloc 25,599
+#define sl_free 26,627
+#define sl_realloc 27,651
+#define sl_strdup 28,681

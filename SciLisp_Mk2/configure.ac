@@ -22,6 +22,8 @@ AC_PROG_LN_S
 AC_CHECK_LIB([dl], [dlsym])
 AC_CHECK_LIB([pthread], [pthread_create])
 AC_CHECK_LIB([m], [cos])
+AC_CHECK_LIB([gmp], [__gmpz_init])
+AC_CHECK_LIB([mpfr], [mpfr_init])
 
 AC_ARG_WITH([readline],
   [AS_HELP_STRING([--with-readline],
@@ -40,5 +42,6 @@ AS_IF([test "x$with_readline" != xno],
 
 AC_CONFIG_FILES([Makefile
                  src/Makefile
-                 tests/Makefile])
+                 tests/Makefile
+                 doc/Makefile])
 AC_OUTPUT
