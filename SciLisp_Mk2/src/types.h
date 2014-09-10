@@ -120,13 +120,17 @@ enum sl_imm_type {
 #define NUMBERP(obj) (INTP(obj) || IND_NUMBERP(obj) || IMM_NUMBERP(obj))
 #define CHARP(obj) (IMMP(obj) && (((sl_imm)obj).tag == 1))
 #define NILP(obj) (IMMP(obj) && (((sl_imm)obj).tag == 0))
+#define NIL NULL
+static const sl_obj nil = NULL;
 //trivial function to make an sl_object, used because it
 //hides the internal implementation of sl_obj so it can be
 //changed without effecting other code
 SL_inline sl_obj make_sl_obj(uint64_t val, enum sl_type type){
   return (sl_obj)(val|type);
 }
-
+SL_inline sl_obj make_int(uint64_t val){
+  return (sl_obj)((val <<2) | SL_int);
+}
 struct sl_cons {
   sl_obj car;
   sl_obj cdr;
