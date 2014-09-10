@@ -129,7 +129,7 @@ SL_inline sl_obj make_sl_obj(uint64_t val, enum sl_type type){
   return (sl_obj)(val|type);
 }
 SL_inline sl_obj make_int(uint64_t val){
-  return (sl_obj)((val <<2) | SL_int);
+  return (sl_obj)((val <<2) | SL_int0);
 }
 struct sl_cons {
   sl_obj car;

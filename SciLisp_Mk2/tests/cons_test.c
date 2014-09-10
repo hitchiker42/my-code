@@ -78,5 +78,8 @@ START_TEST(test_append){
   build_1 = Fnappend(build1, build2);
 
   ck_assert_sl_equal(build1, test_cons);
+}
+END_TEST
 
-  
+START_TEST(test_push_pop){
+}

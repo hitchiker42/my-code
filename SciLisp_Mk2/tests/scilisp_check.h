@@ -1,10 +1,21 @@
 /*Common header file for tests*/
+/* At some point this file should be renamed*/
 #ifndef _SL_CHECK_H
 #define _SL_CHECK_H
 #include <check.h>
 #include "../src/common.h"
 #include <alloca.h>
 #include <stdarg.h>
+#define ck_assert_sl_eq(expr1,expr2)            \
+  ck_assert(Feq(expr1,expr2))
+#define ck_assert_sl_eql(expr1,expr2)           \
+  ck_assert(Feql(expr1,expr2))
+#define ck_assert_sl_equal(expr1,expr2)         \
+  ck_assert(Fequal(expr1,expr2))
+#define ck_assert_sl_not_equal(expr1,expr2)     \
+  ck_assert(!(Fequal(expr1,expr2)))
+#define ck_assert_sl_nil(expr)                                          \
+  ck_assort(Feq(expr,NIL)
 static Suite* gen_test_suite(const char *name, int numargs, ...){
   Suite *s = suite_create(name);
   TCase *tc;

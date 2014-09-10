@@ -8,15 +8,6 @@
   (:use :COMMON-LISP :SB-EXT :CL-PPCRE))
 (in-package :util)
 (declaim (inline concat))
-;;system commands
-(defun system (program &rest args)
-  (let ((output-stream (make-string-output-stream)))
-    (run-program program args :output output-stream
-                        :search t :error :output :wait t)
-    (get-output-stream-string output-stream)))
-(defun run-shell-command (command)
-  (system "/bin/bash" "-c" command))
-
 (defun string-split (str)
   (split "\\s+" str))
 (defun package-symbol-list (package); &optional all)
@@ -54,7 +45,11 @@
     `(defun ,fun-name (seq)
        (concatenate ',to seq))))
 (make-seq-convert-fun array list)
-
+;;post increment/decrement
+(defmacro incq (place &optional (delta 1))
+  `(prog1 ,place (incf ,place ,delta)))
+(defmacro decq (place &optional (delta 1))
+  `(prog1 ,place (decf ,place ,delta)))
 ;;simple iteration macros
 (defmacro while (test &rest body)
   `(do () ((not ,test)) ,@body))
@@ -114,7 +109,12 @@ then evaluate then-form or else-form according to the result of test-form"
   `(do ((it ,expr ,expr))
        ((not it))
      ,@body))
-
+(defun seq (&optional start stop (step 1))
+  (if (null start)
+      (setq start 0) (setq stop 10))
+  (if (null stop)
+      (setq stop start) (setq start 0))
+  (loop for i from start upto stop by step collecting i))
 (defmacro acond (&rest clauses)
   (if (null clauses)
       nil
@@ -124,4 +124,3 @@ then evaluate then-form or else-form according to the result of test-form"
            (if ,sym
                (let ((it ,sym)) ,@(cdr cl1))
                (acond ,@(cdr clauses)))))))
-
