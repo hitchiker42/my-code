@@ -9,26 +9,20 @@
 #include <stdarg.h>
 #include <signal.h>
 #define SL_INLINE static inline
+#define SL_EXTERN_INLINE static inline __attribute__((used))
 #define SL_LIKELY(test) __builtin_expect(test, 1)
 #define SL_UNLIKELY(test,expr) __builtin_expect(test, 0)
 #define SL_EXPECT(test,expect) __builtin_expect(test, expect)
 #define SL_UNREACHABLE __builtin_unreachable()
 #define SL_NORETURN __attribute__((noreturn))
 #define SL_UNUSED __attribute__((unused))
-//Allocation Macros
-#ifndef SL_MALLOC
-#define SL_MALLOC malloc
-#endif
-#ifndef SL_FREE
-#define SL_FREE free
-#endif
-#ifndef SL_REALLOC
-#define SL_REALLOC realloc
-#endif
-#define sl_malloc SL_MALLOC
-#define sl_free SL_FREE
-#define sl_realloc SL_REALLOC
-#define sl_strdup strdup
+#define SL_CONST __attribute__((const))
+#define SL_PURE __attribute__((pure))
+#define SL_USED __attribute__((used))
+#define SL_ATTRIBUTE(args...) __attribute__((args))
+#define SL_ALIGNED(align) __attribute__((aligned(align)))
+
+
 //Any definations required by types.h/other headers should go
 //above here.
 #include "types.h"
