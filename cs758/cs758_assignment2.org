@@ -1,0 +1,79 @@
+3.
+Running slow-remove-all(l,b) calls:
+-contains once per b, plus once more
+-index once per b
+-remove once per b
+running contains(l,b) calls:
+match(l,b) 1001 times
+running index(l,b) calls:
+match(l,b) 1001 times
+running remove(l,b) calls:
+match(l,b) 1001 times
+
+so slow-remove-all calls match
+1001*1001 + 1000*1001 + 1000*1001 = 3004001 times
+
+worst case complexity is O(n^3)
+
+a better implementation
+
+find(list,x)
+if(list.data = x)
+ return list
+else 
+ find(list.next, x)
+end
+
+slow-remove-all(list,x)
+let l = find(list,x) in
+ if l == -1 then
+  return list
+ else
+  while l != null
+   if(l.data == x)
+    let l2 = l.next in
+     while(l2 != NULL && l2.data == x)
+      l2 = l2.next
+     end
+     l.data = l2.data
+     l.next = l2.next
+    end
+   end
+   l = l.next
+ end
+ return list
+end 
+4. clrs 3-2
+k>=1, \epsilon > 0, c > 1
+
+O = bound above
+o = dominated above
+\Omega = bound below
+\omega = dominated below
+\Theta = bound above and below
+
+o iff O, \omega iff \Omega, \Theta iff O and \Omega
+
+|--------+---------+-----+-----+-----+-----+-----|
+| A      | B       | O   | o   | \Omega   | \omega   | \Theta   |
+|--------+---------+-----+-----+-----+-----+-----|
+| lg^k(n) | n^\epsilon      | yes | yes | no  | no  | no  |
+|--------+---------+-----+-----+-----+-----+-----|
+| n^k     | c^n      | yes | yes | no  | no  | no  |
+|--------+---------+-----+-----+-----+-----+-----|
+| n^{0.5}   | n^{sin(n)} | no  | no  | no  | no  | no  |
+|--------+---------+-----+-----+-----+-----+-----|
+| 2^n     | 2^{n/2}    | yes | no  | yes | no  | yes |
+|--------+---------+-----+-----+-----+-----+-----|
+| n^{lg(c)} | c^{lg(n)}  | yes | yes | no  | no  | no  |
+|--------+---------+-----+-----+-----+-----+-----|
+| lg(n!) | lg(n^n)  | no  | no  | yes | yes | no  |
+|--------+---------+-----+-----+-----+-----+-----|
+
+a. A=lg^k(n), N=n^\epsilon 
+
+5. 6.1-3
+The number possible nodes of height h in a balanced binary tree is 2^h.
+The number of possible nodes at height h is equal to the total number of 
+nodes in a tree of height n^{h-1}+1
+6. 6.1-4
