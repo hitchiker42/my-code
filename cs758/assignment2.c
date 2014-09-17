@@ -12,4 +12,4 @@
 */
 
 binary_heap * read_floats_heap(FILE *input){
-  
+}

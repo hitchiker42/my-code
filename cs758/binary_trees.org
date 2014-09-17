@@ -1,0 +1,3 @@
+* Binary search trees
+** Invariant is that right child is <= node which is <= left child
+** 
