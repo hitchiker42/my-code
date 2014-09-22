@@ -20,19 +20,14 @@ uint64_t fnv_hash(const void *key,int keylen){
   }
   return hash;
 }
-int default_comp(void *a, void *b, uint64_t len){
-  return (memcmp(a,b,len) == 0 ? 1 : 0);
-}
 uint64_t default_hash
 hashtable *make_hashtable(float load_factor, int growth_factor,
-                          int(*comp)(void*,void*,int),
-                          uint32_t(*hash)(void*,int),
+                          int(*comp)(void*,void*),
+                          uint32_t(*hash)(void*),
                           uint64_t initial_length){
   //set default values for any values not given
   if(!load_factor){load_factor = 0.8;}
   if(!growth_factor){growth_factor = 2;}
-  if(!comp){comp = default_comp;}
-  if(!hash){hash = fnv_hash32;}
   if(!initial_length){initial_length = 64;}
   hashtable *retval = xmalloc(sizeof(struct hashtable));
   retval->table = xmalloc(initial_length * sizeof(void*));
@@ -44,13 +39,14 @@ hashtable *make_hashtable(float load_factor, int growth_factor,
   retval->num_entries = retval->buckets_used = 0;
   return retval;
 }
-int addhash(hashtable *ht, void *data, uint32_t len){
-  uint32_t hv=ht->hash(data,len);
+int addhash(hashtable *ht, void *data){
+  State *s = data;  
+  uint32_t hv=ht->hash(s->pref);
   int ind = hv % ht->len;
   ht_entry *temp = ht->table[ind];
   if(temp){
     do {
-      if (temp->len == len && ht->comp(temp->data,data,len)){
+      if (ht->comp(data, temp->data))
         return 0;
       }
     } while (temp->next && temp = temp->next);
@@ -72,17 +68,17 @@ int addhash(hashtable *ht, void *data, uint32_t len){
   }
   return 1;
 }
-int gethash(hashtable *ht, void *data, uint32_t len){
+void* gethash(hashtable *ht, void *data, uint32_t len){
   uint32_t hv=ht->hash(data,len);
   int ind = hv % ht->len;
   ht_entry *temp = ht->table[ind];
   while(temp){
     if(ht->comp(temp,data)){
-      return 1;
+      return temp;
     }
     temp=temp->next;
   }
-  return 0;
+  return NULL;
 }
 int remhash(hashtable *ht, void *data, uint32_t len){
   uint32_t hv=ht->hash(data,len);

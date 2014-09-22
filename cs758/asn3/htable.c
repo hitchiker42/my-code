@@ -8,12 +8,16 @@ This is primarily where you will need to add things.
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <alloca.h>
 
 #include "storer.h"
 #include "htable.h"
 #include "eprintf.h"
 #define HASH_MALLOC emalloc
 #include "hash.h"
+
+void srandom(unsigned int seed);
+long int random();
 
 static const int NHASH = 5000;
 
@@ -24,46 +28,61 @@ static void printCounts(PrefixStorer* ps);
 unsigned int badHash(char *s[NPREF]);
 unsigned int krHash(char *s[NPREF]);
 unsigned int add3Hash(char *s[NPREF]);
-unsigned int cwHash(char *s[NPREF]);
+unsigned int cwHash(char *s[NPREF]);  
 
+unsigned int my_bad_hash(void *key, unsigned int keylen);
+unsigned int my_kr_hash(void *key, unsigned int keylen);
+unsigned int my_add3_hash(void *key, unsigned int keylen);
+unsigned int my_cw_hash(void *key, unsigned int keylen);
 
-int state_cmp(
-PrefixStorer* makeHashPrefixStorer(enum hashType ht){
+uint8_t *rand_arr_256(){
+  uint8_t *retval = emalloc(256);
+  memset(retval, '\0', 256);
+  int i,j;
+  for(i=1;i<256;i++){
+    do {
+      j = random() % 256;
+    } while (retval[j]);
+    retval[j]=i;
+  }
+  return retval;
+}
+int comp_fn(void *a, void *b){
+  char **strs_1 = a;
+  char **strs_2 = b;  
+  int i;
+  for(i=0;i<NPREF;i++){
+    if(strcpm(strs_1[i],strs_2[i])){
+      return 0;
+    }
+  }
+  return 1;
+}
+
+PrefixStorer* makeHashPrefixStorer(enum hashType htype){
     int i;
     State **statetab;
 
-    PrefixStorer* p = NULL;
-    /*
-      You will have to decide exactly what you want to malloc here, as
-      it will depend on how you decide to implement your hash table.
-
-    PrefixStorer* p = emalloc(?);
-    */
-    PrefixStorer* p = emalloc(sizeof(struct PrefixStorer))
+    PrefixStorer* p = emalloc(sizeof(struct PrefixStorer));
     p->lookup = &ht_lookup;
     p->add = &ht_add;
     p->cleanup = &cleanup;
     p->printCounts = &printCounts;
-    hash_fn my_hash;
-    switch(ht){
+    switch(htype){
     case BAD:
 	p->hash = &badHash;
-        my_hash = my_bad_hash;
 	break;
     case KR:
 	p->hash = &krHash;
-        my_hash = my_kr_hash;
 	break;
     case CW:
 	p->hash = &add3Hash;
-        my_hash = my_add3_hash;
 	break;
     case ADD3:
 	p->hash = &cwHash;
-        my_hash = my_cw_hash;
 	break;
     }
-    hashtable *ht = make_hashtable(2.0, 2, NULL, my_hash, 0);
+    hashtable *ht = make_hashtable(2.0, 2, NULL, p->hash, 0);
     p->tableBase = ht;
     return p;
 }
@@ -109,7 +128,7 @@ static void cleanup(PrefixStorer* ps){
 static char* flatten(char*s[NPREF], int *len){
     int size = 0;
     char *long_string;
-    char *retval = longString;
+    char *retval = long_string;
     int i;
     int *lengths = alloca(NPREF*sizeof(int));
     for(i = 0; i < NPREF; i++){
@@ -128,14 +147,15 @@ static char* flatten(char*s[NPREF], int *len){
     return retval;
     
 }
+
+uint32_t my_bad_hash(void *key, uint32_t keylen){
+  char **strs=key;
+  return strs[0][0] %NHASH;
+}
 /* hash: compute hash value for array of NPREF strings */
 unsigned int badHash(char *s[NPREF])
 {
   return my_bad_hash(s, 0);
-}
-uint32_t my_bad_hash(void *key, uint32_t keylen){
-  char **strs=key;
-  return key[0][0] %NHASH;
 }
 #define KR_MULTIPLE 127
 uint32_t kr_hash(void *key, uint32_t keylen){
@@ -156,13 +176,10 @@ unsigned int krHash(char *s[NPREF])
   free(key);
   return hv;
 }
-uint8_t *rand_array_256(){
-  //there are a bunch of ways to do this
-  //Assume that random has already been seeded
-  int i=0;
-uint_t Pearson_hash8(const void *key, int keylen){
-  int h, i, j, k;
+uint32_t pearson_hash8(const void *key, int keylen){
+  int h, i, j, k;  
   uint8_t *x=(uint8_t*)key,ch;
+  uint8_t *lookup_table = rand_arr_256();
   union {
     char hh[4];
     uint32_t hash_val;
@@ -173,31 +190,35 @@ uint_t Pearson_hash8(const void *key, int keylen){
     h=0;
     for (i=0; i<keylen; i++) {
       k=h^x[i];
-      h=PEARSON_LOOKUP[k];
+      h=lookup_table[k];
     }
     hash.hh[j]=h; // store result
     x[0]=x[0]+1; // increment first data byte by 1
   }
   x[0]=ch; // restore first byte...why?
   // concatenate the 4 stored values of h;
-  return hash.hash_val; // output 64-bit 16 hex bytes hash
+  return hash.hash_val; // output 32-bit 8 hex bytes hash
 }
 /* hash: compute hash value for array of NPREF strings */
-unsigned int cwHash(char *s[NPREF])
-{
-    char* toHash = flatten(s);
-    
-    free(toHash);
-    return 0;
+unsigned int cwHash(char *s[NPREF]){
+  int keylen;
+  char* toHash = flatten(s,&keylen);
+  uint32_t hv = pearson_hash8(toHash, keylen);
+  free(toHash);
+  return hv;
 }
 
 /* hash: compute hash value for array of NPREF strings */
 unsigned int add3Hash(char *s[NPREF])
 {
-    char* toHash = flatten(s);
-    
-    free(toHash);
-    return 0;
+  uint32_t hv = 0;
+  int i,keylen;
+  char* toHash = flatten(s,&keylen);
+  for(i=0;i<keylen;i++){
+    hv += toHash[i]+3;
+  }
+  free(toHash);
+  return hv;
 }
 
 
@@ -206,10 +227,16 @@ unsigned int add3Hash(char *s[NPREF])
 /*  creation doesn't strdup so strings mustn't change later. */
 static State* ht_lookup(char *prefix[NPREF], int create, PrefixStorer* ps)
 {
-    /*
-      Looks up the state, and optionally creates a new node depending
-      on what create has been set to.
-     */
+  int keylen;
+  State data = {.pref = prefix};
+  
+  if(data = gethash(ps->tableBase,key)){
+    return data;
+  } else if (create){
+    data = emalloc(sizeof(State));
+    data.pref = prefix;
+    addhash(ps->tableBase, p
+  
 }
 
 

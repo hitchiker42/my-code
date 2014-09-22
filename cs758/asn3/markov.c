@@ -17,15 +17,18 @@
 #include <time.h>
 #include <stdbool.h>
 #include <ctype.h>
+#include <alloca.h>
 #include "eprintf.h"
 #include "storer.h"
 #include "htable.h"
 #include "linked.h"
 #include "stringpool.h"
 
+char *strndup(const char *s, size_t n);
+
 void build(char *prefix[], FILE*, PrefixStorer* ps);
 void generate(int nwords, PrefixStorer* ps);
-void printWord(char *c);
+int  printWord(char *c, int output);
 
 
 char NONWORD[] = "\n";  /* cannot appear as real word */
@@ -150,7 +153,7 @@ char *read_word(FILE *f){
       buf=new_buf;//no need to free;
     }
   } while(!(isspace(c=getc(f))));
-  return stdrndup(buf,i);
+  return strndup(buf,i);
 }
 /* build: read input, build prefix table */
 void build(char *prefix[NPREF], FILE *f, PrefixStorer* ps)
