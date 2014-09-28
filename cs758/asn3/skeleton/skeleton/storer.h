@@ -27,11 +27,9 @@ enum {
    that prefix.
  */
 struct State {	/* prefix + suffix list */
-  char	*pref[NPREF];	/* prefix words */
-  unsigned int hv;
-  Suffix	*suf;			/* list of suffixes */
-  State	*next;			/* next in hash table */
-
+	char	*pref[NPREF];	/* prefix words */
+	Suffix	*suf;			/* list of suffixes */
+	State	*next;			/* next in hash table */
 };
 
 /**

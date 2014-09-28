@@ -55,10 +55,8 @@ void *emalloc(size_t n)
 	void *p;
 
 	p = malloc(n);
-	if (p == NULL){
-          eprintf("malloc of %u bytes failed:", n);
-          abort();
-        }
+	if (p == NULL)
+		eprintf("malloc of %u bytes failed:", n);
 	return p;
 }
 

@@ -1,0 +1,447 @@
+* class 1
+* WFF = well formed formula, syntax and semantics
+** if A and B are wff's and have the same truth table then A \equiv B
+** if A \equiv T; then A is a tautology
+   
+* (P \land P \rightarrow Q) \rightarrow Q (if P and P implies Q then Q) 
+** To show this:
+*** Basic: write out truth table
+*** Intermediate: solve equation to show (P \land P \rightarrow Q) \rightarrow Q \equiv T
+
+* Atoms and Clauses 
+** Atoms (A,B,\not A,\not B) 
+** Clauses (A \lor B, A \land \not{}B, etc..)
+** DNF(distrubated normal form) / Full DNF (look up the defn)
+
+* Complete set of operators (can write every possible truth function)
+** (e.g \lor and \not, or just nor/nand)
+
+* Logic Systems
+** Natural Deduction (Rules)
+Not all rules are strictly necesary, but attempt to emulate how
+actual deduction works
+*** M.P: (Modus Ponens) P and P \rightarrow Q then Q
+*** M.T: (Modus Tolens) P \rightarrow Q and \not Q then \not P
+*** ADD:  A \rightarrow (A \lor B) , A \rightarrow (B \lor A)
+*** CONJ: A, B \rightarrow A \land B
+*** D.N: (double negation) \not\not{}A \rightarrow A, and reverse
+*** CONT: A \land \not{}A \rightarrow F
+*** SIMP: A \land B \rightarrow A, A \land B \rightarrow B
+*** D.S: (Disjunctive Syllogism) (A \lor B) \land (\not A) \rightarrow B and reverse
+*** C.P: (Conditional Proof) if we can derive B from A then we can say A \rightarrow B
+
+*** H.S: (hypothitical syllogism) A\rightarrow{}B, B\rightarrow{}C, then A\rightarrow{}C
+*** C.D: (constructive delema) A \lor B, A\rightarrow{}C, B\rightarrow{}D then C \lor D
+*** Cases: A \lor B, A \rightarrow C, B \rightarrow C then C
+** Incomplete logic system, has something that is a tautology which can't be proved 
+** Inconsistant logic system, can prove something that isn't a tautology 
+
+** (using C operators here)
+prove (A | B) & !A & (B -> C) -> (B & C)
+1. (A | B) & !A & (B -> C) P for C.P (premise for conditional proof)
+2. A | B, 1 by SIMP
+3. !A & B->C, 1 by SIMP
+4. !A, 3 by SIMP
+5. B->C, 1 by SIMP
+6. B, 2,4 by D.S
+7. C, 5,6 by M.P
+8. B & C, 6,7 by CONJ
+9 (A | B) & !A & (B->C) -> (B & C), 1,8 C.P
+QED
+** simplifications
+A & B & C ... & N implies A, B, C, ... N
+so still using above
+1. A | B, P
+2. !A, P
+3. B->C, P
+4. B, 1,2 D.S
+5. C, 3,4, MP
+6. B & C, 4,5 CONJ
+QED, 1,2,3,6 CP
+
+** (A | B -> C) & A  -> C
+1. A|B->C, P
+2. A, P
+3. A|B, 2, ADD
+4. C, 1,3 M.P
+QED 1,2,3,4 M.P.
+** Proof by Contradiction (I.P)
+*** From \not A derive F
+*** (A|B)&(B|C)&!C -> A
+1. A|B, P
+2. B->C, P
+3. !C, P
+4.     !A, P for I.P. //Start subproof
+5.     B, 1,4 D.S
+6.     C, 2,5 M.P
+7.     F, 3,6 CONT
+8. A, 4-7 I.P
+QED 1,2,3,8 C.P.
+
+*** (A|B -> C&D) -> (B->D)
+1. A|B -> C&D, P for CP
+2.           B, P for CP //subproof
+3.           A|B, 1,2 by ADD
+4.           C&D, by 1,3 MP
+5.           D, 4 by SIMP
+6. B->D, 2-5 CP
+QED 1,6 C.P
+
+
+# class 2
+
+* Natural Deduction (Rules)
+Not all rules are strictly necesary, but attempt to emulate how
+actual deduction works
+*** M.P: (Modus Ponens) P and P \rightarrow Q then Q
+*** M.T: (Modus Tolens) P \rightarrow Q and \not Q then \not P
+*** ADD:  A \rightarrow (A \lor B) , A \rightarrow (B \lor A)
+*** CONJ: A, B \rightarrow A \land B
+*** D.N: (double negation) \not\not{}A \rightarrow A, and reverse
+*** CONT: A \land \not{}A \rightarrow F
+*** SIMP: A \land B \rightarrow A, A \land B \rightarrow B
+*** D.S: (Disjunctive Syllogism) (A \lor B) \land (\not A) \rightarrow B and reverse
+*** C.P: (Conditional Proof) if we can derive B from A then we can say A \rightarrow B
+
+*** H.S: (hypothitical syllogism) A\rightarrow{}B, B\rightarrow{}C, then A\rightarrow{}C
+*** C.D: (constructive delema) A \lor B, A\rightarrow{}C, B\rightarrow{}D then C \lor D
+** Cases: A \lor B, A \rightarrow C, B \rightarrow C then C
+* class 2
+NOTE: Not all in class examples copied.
+* Subproofs
+** when using proofs by contradiction or a cp proof within
+another cp proof we use a subproof.
+Subproofs basically exist within a nested lexical scope in the main proof
+and `return` their last line.
+ex. (A \lor B \rightarrow C \land D) \rightarrow (B \rightarrow D)
+1. A \lor B \rightarrow C \land D, P
+ subproof starts here
+2.   B, P for CP
+3.   A \lor B, 2 ADD
+4.   C \land D, 1,3 MP
+5.   D, 4 SIMP, Only this line is visable in the main proof
+6. B \rightarrow D, 2-5 CP
+QED 1,6 CP
+* Introduce More Natural Deduction Rules 
+(also added to Natural Deduction above)
+** M.T (Modus Tolens): (P\not{}Q and \not{}Q then \not{}P)
+** H.S (hypothitical syllogism) A\rightarrow{}B, B\rightarrow{}C, then A\rightarrow{}C
+** C.D (constructive delema) A \lor B, A\rightarrow{}C, B\rightarrow{}D then C \lor D
+** Cases: A \lor B, A \rightarrow C, B \rightarrow C then C
+
+* defination of \equiv
+** if A \equiv B then
+A \rightarrow B and B \rightarrow A
+thus if
+A \rightarrow B and B \rightarrow A then A \equiv B
+
+** show A \land A \equiv A
+we don't have and identity, so this is weird
+show A \land A \rightarrow A
+1. A \land A, P for C.P
+2. A,  SIMP
+QED 1-2 CP
+show A \rightarrow A \land A
+1. A, P for CP
+2. A \lor A, 1 add
+3. A \land (A \lor A), 1,2 conj
+4. A, 3 simp
+5. A \land A, 1,4 add
+QED 5, CP
+
+* Predicates
+** No predicates in natural deduction
+so for example,
+All A can Q
+B can't Q
+B isn't A
+can't be proven with our current logic
+** for a predicate p(x) we can create propisitions in 3 ways
+** plug in a value for x, i.e p(1);
+** \forall{}x p(x), universal quantification
+** \exists{}x p(x), existential quantification
+** for this to make sense we need a Domain
+i.e where do the values of x come from
+
+* Predicates (second class)
+** p(x) is a predicate
+when x is filled in with a value it becomes a proposition
+** Commonly used symbols
+ x,y,z,... variables
+ a,b,c,... constants
+ p,q,<,>,... predicate names (p(),q() are propisitons, and are written p,q)
+ f,g,max,min,+,-.. function names
+ \exists, \forall Quantifiers
+ punctuation (), ','
+a term is a variable or constant or
+a function applied to terms
+
+atom is a predicate applied to terms
+
+** predicate wffs
+if W and V are wffs then:
+ (W),\not{}W, W \land V, W \rightarrow V, etc... are wffs
+ \exists{}xW, \forall{}xW are wffs
+ predicates, functions, etc..
+ combinations of the above
+
+** precedence rules
+1: \not \exists \forall
+2: \land
+3: \lor
+4: \rightarrow
+binary operators associate left to right
+unary operators associate right to left
+** Variable rules
+the scope of the quantifer \exists{}x \forall{}x in \forall{}xP(x) is P(x)
+
+the 'x' in \exists{}x is the variable the quantifier applies to,
+we say that the x is bound to the quantifier. if a variable is not
+bound it is free.
+
+we can also bind variables by assigning them a constant value
+
+if a wff has no free variables it is a proposition
+
+in order for \exists{}x and \forall{}x to make sense we must have a 
+domain of discourse(aka universe)
+** Interpretation/Domains
+An interpretation of a wff consists of a domain D, together with the following:
+assignment of symbols of the wff:
+1. each predicate letter is assigned a predicate over D
+2. each function lettel is assigned a function over D
+3. each constant letter and each free variable is assigned a value in D
+
+ex.
+\forall{}x(p(a,x) \rightarrow \not{}q(f(x)))
+1. D = N (natural numbers)
+   a = 0
+   p(z,w) = z < w
+   q(w) = w<=2
+   f(w) = w+1
+\forall{}x(0 < x -> \not (x+1 <= 2))
+
+if W is a wff and x is a free variable in W
+(we normally write W(x)) and t is a term
+then the wff that results from replacing x with t
+is denoted W(x/t)
+
+so the truth value of the wff \forall{}x(W(x)) with respect to the 
+domain D is:
+\forall{}xW(x) is true if W(x/d) is true for all d \epsilon D
+ditto  for \exists
+
+** Equivalence
+two wffs are equivlent if they are true with respect to every interpretation
+
+since we can't actually test every interpretation we need to prove
+that they are equivalent via Natural Deduction
+
+** Rules For quantifiers
+
+\not (\forall{}xW) \equiv \exists{}x \not W
+\not (\exists{}xW) \equiv \forall{}x \not W
+\exists{}x (p(x) \rightarrow q(x)) \equiv \forall{}x p(x) \rightarrow \exists{}x q(x)
+
+for Q in {\exists,\forall}
+QxQy W \equiv QyQx W
+Qx(p(x) \lor q(x)) \equiv Qx p(x) \lor Qx q(x)
+
+\exists{}x(p(x) \land \not{}q(x)) \equiv \not\forall{}x(p(x) \rightarrow q(x))
+
+** Quantifier Rules
+Universal Instantiation(U.I): \forall{}xW(x) then W(c)(or W(y)); if something is true for everything
+it is true for a specific thing
+
+Existential Generalization(E.G): W(c) then \exists{}xW(x)
+
+Extensional Instantiation(E.I): \exists{}xW(x) then W(c) (c is a new unbound symbol
+(variable or constant))
+
+Universal Generalization(U.G): W(c) then \forall{}xW(x) (c is an arbitrary symbol)
+i.e if something is true for an arbitrary/generalized value it is true for all
+values 
+*** Example
+\exists{}x(p(x) \land q(x)) \rightarrow \exists{}xp(x) \land \exists{}xq(x)
+1. \exists{}x(p(x) \land q(x)), P for CP
+2. p(x) \land q(x), 1 E.I
+3. p(x), 2 SIMP
+4. q(x), 2 SIMP
+5. \exists{}xp(x), 3 E.G
+6. \exists{}xq(x), 4 E.G
+7. \exists{}xp(x) \land \exists{}xq(x), 5,6 CONJ
+QED 1,7 CP
+*** Example
+\exists{}x(w(x) \rightarrow c) \rightarrow (\forall{}x W(x) \rightarrow c)
+1. \exists{}x(w(x) \rightarrow c), P for CP
+2.  \forall{}xW(x), P for CP
+#Note here, the E.I needs to come before the U.I. in order to
+#use the same symbol for both
+3.  W(y)->c, E.I. 1
+4.  W(y), U.I. 2
+5.  C, 3,4 MP
+6. \forall{}xW(x) \rightarrow c, 1,6 CP
+QED
+*** weird note on meanings of different letters
+const fun ind dim ?  pred ?     vars
+abcde fgh ijk lmn o? pqr  stuv? wxyz
+* "Truth"
+In propositional logic truth is a tautology
+
+In predicate logic "truth" is validity, a wff is valid if it is true in any
+interpretation.
+
+To improve the usefulness of predicate logic we add axioms, i.e \forall{}x = x,
+\forall{}x\forall{}y x=y -> y=x
+
+* Proof systems
+A system of axioms built on top of predicate logic,
+
+Consistent: you can only prove valid wff's
+Complete: you can prove all valid wff's
+
+Generally useful proof systems are consistent but not complete.
+
+* Correctness of Programs
+
+Add all axioms of algebra to default propositional logic.
+
+given a precondition P, a program S and a postcondition Q
+
+{P} S {Q} states that running S when P is true results in Q being true
+if S is a correct program
+  
+e.g
+{x=5} y=x; {y=5}
+
+more formally:
+if P is true and S executes and terminates then after S runs Q is true
+
+{Q(x/t)} x:=t {Q} A.A(assignment axiom) (assignment is :=, not = )
+ex: {x>0} x := 2 + x {x > 2}
+
+P->R, {R} S {Q} then {P} S {Q}; consequence rule
+
+** ex: prove the following program is correct:
+{x<5} x:=x-2 {x < 4}
+1. {(x-2)<4 } x:=x-2 {x < 4} A.A
+2.    x<5, P for CP
+3.    x-1<4, T alg
+4.    (x-2)<4, T alg
+5. x<5 -> (x-2)<4, 2-4 CP proof
+(optional)6. {x<5} x:=x-2 {x<4} 1,5 conquence
+QED
+
+** S_1;S_2 \equiv {P} S_1 {R}, {R} S_2 {Q}, then {P} S_1;S_2 {Q} Composition
+
+
+** ex: {(x>2) \land (y>3)} X:=x+1; y:= y + x {y > 6}
+1. {y+x > 6} y:=y+x {y>6} A.A
+2. {y+x+1 > 6} x:= x+1 {y+x >6}
+3. {y+x+1 > 6} x:=x+1; y = y+x {y  > 6}; 1,2 comp
+4.   x>2 \land y>3 P for CP
+5.   x+y > 2+3
+6.   y+x+1 > 6
+6. (x>2) \land (y>3) -> y+x+1 > 6, 4-6 CP
+QED 3,7 consequence
+
+** {P\land{}C} S {Q}, (P \land \not{}C) -> Q
+{P} if C then S end {Q}
+
+** ex {T} if x<0 then x:=-x end {x>=0} # i.e absolute value
+use two proofs, one for each branch
+a)1. {-x>=0} x:=-x {x>=0} A.A
+  2. T \land x<0, p for cp
+  3. x<0 2.simp
+  4. -x>0 3.T
+  5. -x>=0 4.T
+  6. T\land(x<0)-> -x >=0, x-5 cp
+  7. (T\land(x<0)) x:=-x {x>=0} 1,6 consequenc
+b)1. (T\land\not(x<0)
+  2. \not(x<=0)
+  3. x>=0
+  4. T\land\not(x<0) -> x>=0
+QED By a and b and if/then 
+** {P\land{}C} if C then S_1 else S_2 end {Q} if/then/else
+P;
+if (C) {
+ S_1;
+} else {
+ S_2;
+}
+Q;
+* Sets
+-A set is a collection of objects
+-The objects in the set are called elements
+-we write x \in A to mean x is an element of A
+-"      " x \notin A to mean x is not an element of A
+-we say a set contains it's elements
+-{} = \empty
+- \mathbb{N} = natural numbers
+- \mathbb{Z} = integers
+- \mathbb{Q} = rationals, ...
+
+-set builder notation
+{x | P(x)}, set of elements x such that P(x) is true
+i.e P(x) = x > 0, positive integers (assuming the domain is integers)
+
+-two sets A and B are equal iff they contain  (exactly) the same elements.
+i.e \forall{}x (x \in A \rightarrow x \in B) \land (x \in B \rightarrow x \in A)
+
+-sets can be arbitrarily nested.
+e.g {{\empty},{{\empty}},{{{\empty}}},\empty} is a set containing 4 unique elements.
+** Relations
+Subsets;
+if A and B are sets and \forall{}x(x \in A -> x \in B) (every element in A is also in B)
+we say A is a subset of B, A \sube B 
+\forall{}A, \empty \sube A (or A \supe \empty)
+
+proof:
+if A \sube B  and B \sube C then A \sube C 
+formally: \forall{}x (x \in A \rightarrow x \in B) \land \forall{}x(x \in B \rightarrow x \in C) \rightarrow \forall{}x(x \in A \rightarrow x \in C)
+1. \forall{}x(x \in A \rightarrow x \in B), P for CP
+2. \forall{}x(x \in B \rightarrow x \in C), P for CP
+3. x \in A \rightarrow x \in B, 1. UI
+3. x \in B \rightarrow x \in C, 2. UI
+5.   x \in A, P
+6.   x \in B, 3,5 MP
+7.   x \in C, 4,6 MP
+8. x \in A \rightarrow x \in C, 5-7 CP
+9. \forall{}x(x \in A \rightarrow x \in C), 8 UG.
+QED 1,2,9 CP
+
+As a mathmatical proof
+
+if A \sube B and B \sub C then A \sube C
+proof: suppose A \sube B and B \sube C
+suppose x \in A, since A \sube B, x \in B
+since B \sube C then x \in C
+thus A \sube C QED
+
+** Power sets
+given a set S the power set of S 
+denoted P(S) is the set of all subsets of S
+
+Given a set of n elements the power set of n will have 2^n elements
+
+ex. suppose A \sube B prove P(A) \sube P(B)
+proof: suppose A \sube B, and x \in P(A)
+so x \sube A, since x \sube A and A \sube B then x \sube B
+thus x \in P(B)
+so P(A) \sube P(B) QED
+
+If A and B are sets and
+A \sube B and B \sube A then we say the sets are equal and A = B
+
+** Set definations
+A \cup B = {x | x \in A \land x \in B}
+A \land B = {x | x \in A \lor x \in B}
+A - B = {x | x \in A \land x \notin B}
+given a domain U
+A\prime = {x | x \in U \land x \notin A} = {x | x \notin A}
+* Local Variables
+# Local Variables:
+# eval: (auto-fill-mode)
+# eval: (flyspell-mode)
+# org-pretty-entities: t
+# End:

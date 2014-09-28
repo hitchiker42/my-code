@@ -125,10 +125,10 @@ static const sl_obj nil = NULL;
 //trivial function to make an sl_object, used because it
 //hides the internal implementation of sl_obj so it can be
 //changed without effecting other code
-SL_inline sl_obj make_sl_obj(uint64_t val, enum sl_type type){
+SL_INLINE sl_obj make_sl_obj(uint64_t val, enum sl_type type){
   return (sl_obj)(val|type);
 }
-SL_inline sl_obj make_int(uint64_t val){
+SL_INLINE sl_obj make_int(uint64_t val){
   return (sl_obj)((val <<2) | SL_int0);
 }
 struct sl_cons {
