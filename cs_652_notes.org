@@ -376,10 +376,10 @@ Q;
 -we write x \in A to mean x is an element of A
 -"      " x \notin A to mean x is not an element of A
 -we say a set contains it's elements
--{} = \empty
-- \mathbb{N} = natural numbers
-- \mathbb{Z} = integers
-- \mathbb{Q} = rationals, ...
+-{} = \empty 
+- N = natural numbers
+- Z = integers
+- Q = rationals, ...
 
 -set builder notation
 {x | P(x)}, set of elements x such that P(x) is true
@@ -439,6 +439,73 @@ A \land B = {x | x \in A \lor x \in B}
 A - B = {x | x \in A \land x \notin B}
 given a domain U
 A\prime = {x | x \in U \land x \notin A} = {x | x \notin A}
+A\prime is basically the inverse of A, i.e every element in U but not in A
+* More Sets
+** More Set Properties
+A \cup \empty = \empty
+A \cap \empty = A
+A \cap B = B \cap A
+A \cup (B \cap C) = (A \cup B) \cap (A \cup C)
+(A \cup B)\prime = A\prime \cap B\prime
+(A \cap B)\prime = A\prime \cup B\prime
+** Sequences of sets
+U_{i=1}^n A_i = {x | \exists{}i x \in A_i}
+\cap_{i=1}^n A_i = {x | \forall{}i x \in A_i}
+this works for n = \infty
+** Weird Sets
+A = {A, 0, 1} is a technically correct set, but is kinda weird
+
+if P(x) = x !\in x # x isn't in itself
+
+if D = {S | P(S)}
+is D \in D ? this is something of a paradox
+This is a flaw in this set theory, which is naive set theory
+Axiomatic set theory rectifies this
+** Ordered Sets (Tuples)
+for n > 0 an N-Tuple (a_1, a_2,...a_n) is a ordered set of n objects a_1,a_2,...a_n.
+Two N-Tuples iff each corresponding value is equal. This implies that tuples
+can have the set of elements but not be equal.
+
+** Cartesian Product
+if A and B are sets the Cartesian product of A and B (written A \times B) is
+{(a,b) | a \in A \land b \in B} A \times B is not necessarily equal to B \times A.
+If A has n elements and B has k elements A \times B has n*b elements
+A \times \empty = \empty
+** Functions / Relations
+a relation from A to B is a subset of A \times B
+a relation from A to A we call a relation on A (this is not the identity)
+*** Examples
+relation on N
+{(x,y) | x \leq y} {(0,0),(0,1),(1,3),(4,8),...}
+
+let A = {a,b,c,d} and R = {(a,c),(b,c),(a,a)}
+Digraph (directed graph) (a set of vertexes/nodes/points connected by directed
+edges) 
+
+** Properties of Relations
+Suppose R is a relation on A, we say R is reflexive if for every a \in A we have
+(a,a) \in R (i.e R is a superset of the identity on A)
+
+we say R is symmetric if for every (a,b) \in R, we have (b,a) \in R
+
+we say R is transitive if for every  (a,b) \in R and (b,c) \in R we also have 
+(a,c)\in R
+
+we say R is anti-symmetric if for every (a,b) \in R and (b,a) \in R then a = b
+or if a \neq b then (a,b) \notin R \lor (b,a) \notin R
+
+anti-symmetric is not the opposite of symmetric, oddly enough 
+
+There is no relation between symmetry and anti-symmetry 
+
+Reflexive, symmetric, anti-symmetric and transitive are orthogonal
+
+** operations on relations
+various operations on sets (union, intersection...) work on relations.
+
+given a relation R from A to B and a relation S from B to C
+than S o R is a relation from A to C (composition)
+ 
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
