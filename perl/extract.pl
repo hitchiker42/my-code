@@ -49,9 +49,9 @@ if($#ARGV <= 0){
     exit 0;
 }
 for my $filename (@ARGV){
-    if(my $file_ext = get_ext($filename)){
-        given($file_ext){
-            when(/zip|7z|rar/){
+    if (my $file_ext = get_ext($filename)) {
+        given ($file_ext) {
+            when (/zip|7z|rar/) {
                 my $dirname = make_dir_name($filename);
                 if (-e $dirname) {
                     my $counter = 1;
@@ -65,15 +65,15 @@ for my $filename (@ARGV){
                 qx{mkdir $dirname; mv $filename $dirname; cd $dirname;$program $filename};
                 next;
             }
-            when(/gz|bz2|xz|lzma/){
+            when (/gz|bz2|xz|lzma/) {
                 my_system($extract{$_},$filename);
                 next;
             }
-            when(/tar|tgz|txz|tlz|tar\..+/){
+            when (/tar|tgz|txz|tlz|tar\..+/) {
                 my_system($extract{"tar"},$filename);
                 next;
             }
-            default{
+            default {
                 say("unknown file extension $file_ext");
                 exit 1;
             }

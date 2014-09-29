@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 use v5.18.0;#basically arbitary as long as it's more than 5.12
 no warnings 'experimental';
-use Math::Random::MT qw(rand irand srand);
+use Math::Random::MT qw(rand irand srand); #mersenne twister rng
+use Term::ProgressBar::Simple;
 use File::LibMagic;
 use Cwd;
 use POSIX;
@@ -48,7 +49,7 @@ sub _glob_to_regexp($) {
     qr/^$glob$/;
                     }
 my $magic = File::LibMagic->new();
-my($copy,$rand,$update,$prefix,$dir,$new_dir,$links,
+my($copy,$rand,$update,$prefix,$dir,$new_dir,
    $ext,$latest,$filename_len,$suffix,%files);
 $filename_len=24;#should be an option
 sub file_ext($){
@@ -66,7 +67,7 @@ sub rand_str($){#char * rand_str(int len){
     my $retval=substr(join('',@arr),0,$total_len);
     if($retval eq ""){die "$retval";}
     return $retval;
-}
+             }
 sub strip($){
     my $str=shift;
     $str =~ s/^\s+|\s+$//gr;
@@ -104,7 +105,7 @@ sub safe_chomp($){
     my $str=@_[0];
     chomp($str);
     return $str;
-}
+               }
 srand(int(CORE::rand(1<<32-1)));
 hash_mime2ext();
 #Major hack to use the shell version of getopt, but it works
@@ -118,23 +119,22 @@ my @opts;
 #     my $temp=strip(qx(bash -c 'getopt -u -o $opts --long $longopts -n $filename -- $args'));
 # }
 my $args = join(" ",@ARGV);
-my $shortopts = "c,h,m,u,p:,d:,n:,e,r,s:,l";
-my $longopts = "copy,help,move,update,prefix:,dir:,new_dir:,ext,suffix,links:";
+my $shortopts = "c,h,m,u,p:,d:,n:,e,r,s:";
+my $longopts = "copy,help,move,update,prefix:,dir:,new_dir:,ext,suffix:";
 my $temp=strip(qx(bash -c 'getopt -u -o $shortopts --long $longopts -n \'rand.pl\' -- $args'));
 @opts=split(/ /,$temp);
 #parse options
 while(1){
     given($opts[0]){
         when(/-c|--copy/){$copy=1; shift @opts;}
-        when(/-d|--dir/){$dir=$opts[1]; shift @opts;shift @opts;}
-        when(/-e|--ext/){$ext=1; shift @opts;}
         when(/-h|--help/){about();}
-        when(/-l|--links/){$links=1;}
-        when(/-n|--new/){$new_dir=$opts[1]; shift @opts;shift @opts;}
-        when(/-p|--prefix/){$prefix=$opts[1]; shift @opts;shift @opts;}
         when(/-r|--rand/){$rand=1; shift @opts;}
-        when(/-s|--suffix/){$suffix=$opts[1];shift @opts;shift @opts;}
         when(/-u|--update/){$update=1; shift @opts;}
+        when(/-p|--prefix/){$prefix=$opts[1]; shift @opts;shift @opts;}
+        when(/-d|--dir/){$dir=$opts[1]; shift @opts;shift @opts;}
+        when(/-n|--new/){$new_dir=$opts[1]; shift @opts;shift @opts;}
+        when(/-e|--ext/){$ext=1; shift @opts;}
+        when(/-s|--suffix/){$suffix=$opts[1];shift @opts;shift @opts;}
         when(/--/){shift @opts; goto DONE;}
         default {
             die "Internal error!, remaning args @opts";
@@ -158,7 +158,8 @@ if($opts[0]){
 
 #set default actions
 unless($copy || $update || $rand){
-    $update=1;
+  $update=1;
+  $rand=1;
 }
 if(!$dir){
     $dir=cwd();
@@ -170,8 +171,8 @@ if(!$new_dir){
 } else {
     $new_dir=join('/',$prefix,$new_dir);
 }
-say "dir = $dir";
-say "new_dir = $new_dir";
+#say "dir = $dir";
+#say "new_dir = $new_dir";
 unless(-e $new_dir){
     `mkdir $new_dir`;
 }
@@ -206,6 +207,7 @@ if($copy || $update){
     qx($command) || die $!;
 }
 
+my $progress_bar=Term::ProgressBar::Simple->new(scalar(@files));
 for my $file (@files){
     do {
         $new_filename=rand_str($filename_len);
@@ -217,5 +219,6 @@ for my $file (@files){
         $new_filename = $new_filename . $suffix;
     }
     `mv $file $new_filename`;
+    $progress_bar++;
 }
 say "rand.pl finished successfully" && exit 0;

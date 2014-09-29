@@ -19,6 +19,7 @@
 #include "disk_loc.h"
 #include "list.h"
 #include "bst.h"
+#include "rbtree.h"
 
 #if !defined(LINE_MAX)
 #if !defined(_POSIX2_LINE_MAX)
@@ -443,27 +444,37 @@ static int schedule_bst(FILE *infile, FILE *outfile)
  * unbalanced binary tree.
  ************************************************************/
 
-static int brtree_add_request(void *data, struct disk_location *loc)
-{
-	fprintf(stderr, "Unimplemented\n");
-	exit(EXIT_FAILURE);
-	return 1;
+static int __rbtree_add_request(rb_node **data, struct disk_location *loc){
+  return rb_add(data,loc);
+}
+static int rbtree_add_request(void *data, struct disk_location *loc){
+  return __rbtree_add_request(data, loc);
+}
+static int __rbtree_del_request(rb_node **data, struct disk_location *loc){
+  if(*data == NULL){
+    return 1;
+  } else {
+    return rb_del(*data, loc);
+  }
+    
+}
+static int rbtree_del_request(void *data, struct disk_location *loc){
+  return __rbtree_del_request(data, loc);
 }
 
-static int rbtree_del_request(void *data, struct disk_location *loc)
-{
-	fprintf(stderr, "Unimplemented\n");
-	exit(EXIT_FAILURE);
-	return 1;
+static int __rbtree_scan(rb_node **data, enum direction dir,
+		       struct disk_location *loc,
+		       struct disk_location **locs, unsigned int n){
+  if(*data == NULL){
+    return -1;
+  } else {
+    return rb_scan(data, dir, loc, locs, n);
+  }
 }
-
 static int rbtree_scan(void *data, enum direction dir,
 		       struct disk_location *loc,
-		       struct disk_location *locs[], unsigned int n)
-{
-	fprintf(stderr, "Unimplemented\n");
-	exit(EXIT_FAILURE);
-	return 1;
+		       struct disk_location *locs[], unsigned int n){
+  return __rbtree_scan(data,dir,loc,locs,n);
 }
 
 /*
@@ -473,7 +484,8 @@ static int schedule_rbtree(FILE *infile, FILE *outfile)
 {
 	int err;
 	del_request_t _rbtree_del_request = rbtree_del_request;;
-
+        rb_node **root = alloca(sizeof(rb_node*));
+        *root = NULL;
 	/*
 	 * Undergraduates can set this to NULL because you do not need
 	 * to implement request cancellation, however, graduate
@@ -482,18 +494,9 @@ static int schedule_rbtree(FILE *infile, FILE *outfile)
 	 */
 	_rbtree_del_request = NULL;
 
-	err = schedule(infile, outfile, brtree_add_request,
-		       _rbtree_del_request,
-		       rbtree_scan,
-
-		       /* This should be a pointer to your RB tree's
-			* root, it will be passed as the first
-			* argument to the rbtree_add_request(),
-			* rbtree_del_request() and rbtree_scan()
-			* functions. */
-		       (void*) NULL
-		);
-
+	err = schedule(infile, outfile, rbtree_add_request,
+		       _rbtree_del_request, rbtree_scan, root);
+        rb_cleanup(root);
 	return err;
 }
 
