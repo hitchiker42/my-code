@@ -1,0 +1,82 @@
+#+TITLE: Complex Analysis Test Redo
+#+OPTIONS: toc:nil
+1. Write as a+ib;
+a) z = \(\overline{i(2+i)^2}\), b = (1-\sqrt{3}i)^3
+2. Solve: x^4 + 6x^2 + 3 = 0
+3. plot x,\(\bar{z}\),-z,-\(\bar{z}\)
+Compute the modulus and argument of z for z = \sqrt{2}/2 -i\sqrt{2}/2
+4. compute \(|\frac{(1+i)^{5}}{(-2+2i)^{6}}|\)
+5. plot the points satisfying:
+a) |z+2+i| = 1
+b) |z+1| + |z-1| = 4
+6. Use the triangle inequality to show: 
+ \vert{}z-1|\leq2 for |z|\leq1
+The triangle inequality states that for a triangle with sides x z and z, then
+z \leq x + y. 
+In this case z is an imaginary number with real and imaginary components x and
+y.
+7. Draw the complex number
+   z = 3(cos(-\(\frac{72\pi}{11}\)) + isin(\(-\frac{72\pi}{11})));
+8. represent in polar form:
+a) z = -1 - \sqrt{3}i   
+   z = x + iy; x = -1, y = \sqrt{3};
+   z = r(cos(\theta)+ isin(\theta)); r = \sqrt{x^2+y^2} = 2
+   sin(\theta) = \sqrt{3}/2; cos(\theta) = 1/2;   
+b) z = \(\frac{1+i}{1-i}\)
+9. find the real and imaginary parts:
+a)z=(\(\frac{1-i}{1+i}\))^10
+b)z = (-\sqrt{3}+i)^3
+10. solve the equations and plot the solutions
+a) z^6 = 128
+b) z^7 = -30
+11. Solve z^2+2iz+2-i=0 and represent the roots in the form a+ib
+
+1.
+a) \(z = \overline{i(4+4i-1)} = \overline{4i-4+i} = \overline{3i-4} = -4-3i\)
+b) \(z = (1-\sqrt{3}i)^{3} = (1-2\sqrt{3}i-3)(1-\sqrt{3}i) = 
+1-\sqrt{3}i-2\sqrt{3}i + 2*3i-3 + 3\sqrt{3}i = -2+6i\)
+
+2.x^4 + 6x^2 + 3 = 0 
+let y = x^2, then y^2 +6y +3 = 0
+complete the square to obtain y^2+2*3y+9-9+3=0 factoring this gives 
+(y+3)^2 = 6. This equation has 2 roots in terms of y:
+ y = -3 \pm \sqrt{6}. Recalling that y is really x^2 each of these roots is really
+two roots in terms of x giving us a total of 4 roots, which are:
+x_1 = +\sqrt{-3+\sqrt{6}}
+x_2 = +\sqrt{-3-\sqrt{6}}
+x_3 = -\sqrt{-3+\sqrt{6}}
+x_4 = -\sqrt{-3-\sqrt{6}}
+
+3. See attached sheet for the plot
+z = \sqrt{2}/2 -i\sqrt{2}/2, rewritting this in polar form we obtain 
+z = cos^{-1}(\sqrt{2}/2) -isin^-1(\sqrt{2}/2) or z = \pi/4 -i\pi/4
+rewritting this in exponential notation for convience we get z = e^{-i\pi/4} =
+e^{7i\pi/4} knowing this we can eaisly write \(-z,\bar{z},-\bar{z}\) as: 
+-z = -e^{-i\pi/4} = e^{i\pi-i\pi/4} = e^{3\pi/4}
+\(\bar{z}\) = e^{i\pi/4}
+\(-\bar{z}\) = -e^{i\pi/4} = e^{i\pi + i\pi/4} = e^{5i\pi/4}
+
+Using exponential notation it is easy to see the modulus and argument of the
+four points. For all 4 points the modulus is 1 while the arguments are \pi/4,
+3\pi/4, 5\pi/4 and 7\pi/4 for \(\bar{z}\), -z, -\(\bar{z}\) and z respectively.
+
+4. This was marked as correct, but I'll type it up anyway
+\(|\frac{(1+i)^5}{(-2+2i)^6}|\)
+In order to simplify the equation we re-write (-2+2i)^6:
+(-2+2i)^6 = (2+2i)^6 = (2*(1+i))^6 = 2^6*(1+i)^6
+so we can rewrite the initial equation as: \(|\frac{1}{2^6(1+i)}|\)
+this simplifies to (2^6+2^6)^-1, taking the modulus of this we obtain
+\sqrt{(2^6+2^{6}i)^-1*(2^6-2^{6}i)^-1} = \sqrt{(2*2^6)^-1} = 2^{-13/2}
+
+5. See attached sheet for actual plot, see below for calculations
+a)|z+2+i| = 1, if we let z` = z+2+i then |z`| = 1 and the plot for z` is the
+unit circle. This implies that the plot of z will be a circle of radius 1
+centered at some unknown point. 
+if we rewrite z as x+iy we obtain |x + 2 +i + iy| or |(x+2) + i(y+1)| = 1 
+expanding the modulus and squaring both sizes we get (x+2)^2 + (y+1)^2 =1, we can
+then see that the plot is a circle centered at (-2,-1)
+
+b) |z+1| + |z-1| = 4
+As with the last problem we can rewrite z as x + iy and obtain
+\vert(x+1) + iy| + |(x-1) + iy| = 4
+expanding the left side we get \sqrt{(x+1)^2 + y^2} + \sqrt{(x-1)^2 +y^2} = 4
