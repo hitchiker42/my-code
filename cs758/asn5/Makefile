@@ -193,10 +193,10 @@ AUTOCONF = ${SHELL} /home/tucker/Repo/my-code/cs758/asn5/build-aux/missing autoc
 AUTOHEADER = ${SHELL} /home/tucker/Repo/my-code/cs758/asn5/build-aux/missing autoheader
 AUTOMAKE = ${SHELL} /home/tucker/Repo/my-code/cs758/asn5/build-aux/missing automake-1.14
 AWK = gawk
-CC = gcc -std=gnu99
+CC = ccache gcc -std=gnu99
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
-CPP = gcc -std=gnu99 -E
+CPP = ccache gcc -std=gnu99 -E
 CPPFLAGS = 
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
@@ -235,7 +235,7 @@ abs_builddir = /home/tucker/Repo/my-code/cs758/asn5
 abs_srcdir = /home/tucker/Repo/my-code/cs758/asn5
 abs_top_builddir = /home/tucker/Repo/my-code/cs758/asn5
 abs_top_srcdir = /home/tucker/Repo/my-code/cs758/asn5
-ac_ct_CC = gcc
+ac_ct_CC = ccache gcc
 am__include = include
 am__leading_dot = .
 am__quote = 
@@ -282,7 +282,7 @@ top_build_prefix =
 top_builddir = .
 top_srcdir = .
 spell_check_SOURCES = spell_check.c trie.c
-spell_check_CFLAGS = -O2 -g -Wall -Wextra -Wpedantic
+spell_check_CFLAGS = -O2 -g -Wall -std=c99 -Wextra -Wpedantic
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 

@@ -25,7 +25,14 @@
 #define LINE_MAX _POSIX2_LINE_MAX
 #endif	/* !_POSIX2_LINE_MAX */
 #endif	/* !LINE_MAX */
-
+typedef struct trie_node trie_node;
+typedef struct trie_root trie_root;
+struct trie_root {
+  trie_node *root;
+};
+unsigned int trie_check_word(trie_root *trie, char *str, int len,
+                             FILE *outfile, unsigned int num_edits);
+int trie_add(trie_root *trie, char *str, int len);
 static int add_delete = 0;
 static int next_word(FILE *infile, char w[], unsigned int n);
 static const char* tstring = "trie";
@@ -76,8 +83,21 @@ static unsigned int list_spell_check(char *dict[], unsigned int n, FILE *wfile,
  */
 static unsigned int trie_spell_check(char *dict[], unsigned int n, FILE *wfile,
 				FILE *outfile, unsigned int edits){
-	printf("Trie spell checker isn't implemented!\n");
-	return 1;
+  trie_root root = {0};
+  unsigned int i;
+  for(i=0;i<n;i++){
+    trie_add(&root,dict[i], strlen(dict[i]));
+  }
+  char word[LINE_MAX + 1];  
+  unsigned int ret = next_word(wfile, word, LINE_MAX + 1);
+  while(ret == 0){
+    unsigned int err = trie_check_word(&root, word, strlen(word), outfile, edits);
+    if(err == (unsigned int)-1){
+      return 1;
+    }
+    ret = next_word(wfile, word, LINE_MAX + 1);
+  }
+  
 }
 
 
