@@ -2,21 +2,20 @@
 #+OPTIONS: toc:nil
 1. Write as a+ib;
 a) z = \(\overline{i(2+i)^2}\), b = (1-\sqrt{3}i)^3
-2. Solve: x^4 + 6x^2 + 3 = 0
+2. solve: x^4 + 6x^2 + 3 = 0
 3. plot x,\(\bar{z}\),-z,-\(\bar{z}\)
-Compute the modulus and argument of z for z = \sqrt{2}/2 -i\sqrt{2}/2
+compute the modulus and argument of z for z = \sqrt{2}/2 -i\sqrt{2}/2
 4. compute \(|\frac{(1+i)^{5}}{(-2+2i)^{6}}|\)
 5. plot the points satisfying:
 a) |z+2+i| = 1
 b) |z+1| + |z-1| = 4
-6. Use the triangle inequality to show: 
+6. use the triangle inequality to show: 
  \vert{}z-1|\leq2 for |z|\leq1
-The triangle inequality states that for a triangle with sides x z and z, then
-z \leq x + y. 
-In this case z is an imaginary number with real and imaginary components x and
-y.
-7. Draw the complex number
-   z = 3(cos(-\(\frac{72\pi}{11}\)) + isin(\(-\frac{72\pi}{11})));
+the triangle inequality states that for a triangle with sides x y z and z, then
+z \leq x + y. this implies that for vectors x and y, |x|-|y| \leq |x+y| \leq |x| + |y|,
+in this case z = |x + y|.
+7. draw the complex number
+   z = 3(cos(-\(\frac{72\pi}{11}\)) + isin(\(-\frac{72\pi}{11}\)));
 8. represent in polar form:
 a) z = -1 - \sqrt{3}i   
    z = x + iy; x = -1, y = \sqrt{3};
@@ -24,12 +23,12 @@ a) z = -1 - \sqrt{3}i
    sin(\theta) = \sqrt{3}/2; cos(\theta) = 1/2;   
 b) z = \(\frac{1+i}{1-i}\)
 9. find the real and imaginary parts:
-a)z=(\(\frac{1-i}{1+i}\))^10
+a)z=(\(\frac{1-i}{1+i}\))^10e
 b)z = (-\sqrt{3}+i)^3
 10. solve the equations and plot the solutions
 a) z^6 = 128
 b) z^7 = -30
-11. Solve z^2+2iz+2-i=0 and represent the roots in the form a+ib
+11. solve z^2+2iz+2-i=0 and represent the roots in the form a+ib
 
 1.
 a) \(z = \overline{i(4+4i-1)} = \overline{4i-4+i} = \overline{3i-4} = -4-3i\)
@@ -39,8 +38,8 @@ b) \(z = (1-\sqrt{3}i)^{3} = (1-2\sqrt{3}i-3)(1-\sqrt{3}i) =
 2.x^4 + 6x^2 + 3 = 0 
 let y = x^2, then y^2 +6y +3 = 0
 complete the square to obtain y^2+2*3y+9-9+3=0 factoring this gives 
-(y+3)^2 = 6. This equation has 2 roots in terms of y:
- y = -3 \pm \sqrt{6}. Recalling that y is really x^2 each of these roots is really
+(y+3)^2 = 6. this equation has 2 roots in terms of y:
+\(y = -3 \pm \sqrt{6}.\) Recalling that y is really x^2 each of these roots is really
 two roots in terms of x giving us a total of 4 roots, which are:
 x_1 = +\sqrt{-3+\sqrt{6}}
 x_2 = +\sqrt{-3-\sqrt{6}}
@@ -48,13 +47,13 @@ x_3 = -\sqrt{-3+\sqrt{6}}
 x_4 = -\sqrt{-3-\sqrt{6}}
 
 3. See attached sheet for the plot
-z = \sqrt{2}/2 -i\sqrt{2}/2, rewritting this in polar form we obtain 
+\(z = \sqrt{2}/2 -i\sqrt{2}/2\), rewritting this in polar form we obtain 
 z = cos^{-1}(\sqrt{2}/2) -isin^-1(\sqrt{2}/2) or z = \pi/4 -i\pi/4
 rewritting this in exponential notation for convience we get z = e^{-i\pi/4} =
-e^{7i\pi/4} knowing this we can eaisly write \(-z,\bar{z},-\bar{z}\) as: 
+e^{7i\pi/4} knowing this we can eaisly write \(-z,\overline{z},-\overline{z}\) as: 
 -z = -e^{-i\pi/4} = e^{i\pi-i\pi/4} = e^{3\pi/4}
-\(\bar{z}\) = e^{i\pi/4}
-\(-\bar{z}\) = -e^{i\pi/4} = e^{i\pi + i\pi/4} = e^{5i\pi/4}
+\(\overline{z}\) = e^{i\pi/4}
+\(-\overline{z}\) = -e^{i\pi/4} = e^{i\pi + i\pi/4} = e^{5i\pi/4}
 
 Using exponential notation it is easy to see the modulus and argument of the
 four points. For all 4 points the modulus is 1 while the arguments are \pi/4,
@@ -80,3 +79,28 @@ b) |z+1| + |z-1| = 4
 As with the last problem we can rewrite z as x + iy and obtain
 \vert(x+1) + iy| + |(x-1) + iy| = 4
 expanding the left side we get \sqrt{(x+1)^2 + y^2} + \sqrt{(x-1)^2 +y^2} = 4
+
+9)
+a)z=(\(\frac{1-i}{1+i}\))^10
+(1-i)/(1+i) is equal to -i.
+by multiplying (1-i)/(1+i) by (1-i)/(1-i) we get (1-i)^2/2
+(1-i)^2 = 1 -2i -1 so (1-i)^2/2 = -2i/2 = -i
+
+thus the problem is equivalent to the much simpler problem
+z = (-i)^10; the answer to which is that z = -1, so Re(z) = -1 and Im(z) = 0
+
+b) z = (-\sqrt{3}+i)^3
+let c = \sqrt{3}
+z = (-c+i)^3 = (-c+i)^2(-c+i) = c^2-2ic-1(-c+i) = -c^3+2ic^2+c+ic^2+2c-i
+  = -c^3+3ic^2+3c-i = -3\sqrt{3}+9i+3\sqrt{3} -i = 9i-i = 8i
+so z = 8i; Re(z)=0; Im(z) = 8
+z 
+11.
+Solve z^2+2iz+2-i=0 and represent the roots in the form a+ib
+complete the square to obtain
+(z+i)^2 + (3-i) = 0
+so z+i = \pm\sqrt{-3+i} and z = -i \pm \sqrt{-3+i}
+
+expressed as a+ib the solutions are:
+z = Re(\sqrt{-3+i}) + Im(\sqrt{-3+i})*i and
+z = Re(-\sqrt{-3+i}) + Im(-\sqrt{-3+i})*i
