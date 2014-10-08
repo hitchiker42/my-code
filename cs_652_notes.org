@@ -503,9 +503,125 @@ Reflexive, symmetric, anti-symmetric and transitive are orthogonal
 ** operations on relations
 various operations on sets (union, intersection...) work on relations.
 
+** Compositions 
 given a relation R from A to B and a relation S from B to C
 than S o R is a relation from A to C (composition)
- 
+
+(R o S)(A)  is the relation created by applying R to the result of S on A.
+
+R o R is perfectly legal.
+
+** Relations/sets -> Matrices
+\delta{}A = {(a,a) | a \in A}
+ (also called the diagonal (i.e it's the diagonal of a matrix))
+
+If R is a relation define R_0 = \delta and R_n = R_{n-1} o R
+
+When looking at the digraph for R_n it will have all paths of length N
+that exist on the digraph of R
+
+We can also represent relations via adjency matrices,
+given the relation R on {a,b,c,d} = {(a,a),(a,b),(b,c),(c,d)} we get
+the matrix
+|   | a | b | c | d |
+| a | 1 | 1 | 0 | 0 |
+| b | 0 | 0 | 1 | 0 |
+| c | 0 | 0 | 0 | 1 |
+| d | 0 | 0 | 0 | 0 | 
+
+** closures of relations
+If R is a relation then the reflexive closure of R written r(R) is the smallest
+relation that contains R and is reflexive, this is akin to R U \delta.
+
+the symmetric closure of R, written s(R) is the smallest relation that contains
+R and is symmetric   
+
+Suppose T is a relation, define T^c = {(a,b) | (b,a) \in T} or T^t (transpose of T)
+
+The simplest way to obtain the symetric closure of R, s(R) is R U R^c.
+
+Finally the transitive closure of R, t(R), is the smallest relation that
+contains R and is transitive
+t(R) is represented as R U_i^\infty R_i, or from i=0...n if R is a finite set
+with n elements
+
+** Warshall algorithm to find the transitive closure
+Input: The adjcenty Matrix M for a relation R on 0,1,2,3,...m
+Output: The adjancey Matrix for t(R)
+given an nxn matrix R, where the i,jth element is set if there is a relation
+between i and j in R-
+#+BEGIN_SRC c
+  int* Warshall(int *R,int n){
+    int i,j,k;
+    for(k = 0;i<n;i++){
+      for(i = 0;j<n;j++){
+        for(j = 0;k<n;k++){
+          /*
+            if(R[i][k] & R[k][j]){
+            R[i][j] = 1;
+          ,*/
+          if(*(R+(i*n)+k) & *(R+(k*n)+j)){
+            ,*(R+(i*n)+j) = 1
+              }
+        }
+      }
+    }
+  }
+  /*
+    if R is weighted
+    if(R[i][j] > R[i][k] + R[k][j]){
+    R[i][j] = R[i][k] + R[k][j];
+    }
+    if(*(R+(i*n)+j ) > (*(R+(i*n)+k)+*(R+(k*n)+j))){
+    ,*(R+(i*n)+j) = (*(R+(i*n)+k)+*(R+(k*n)+j));
+  */
+#+END_SRC
+
+
+* Missed a class
+
+* Functions
+  A function f is a relation between two sets A and B where each element
+in A is mapped to one element of B.
+
+f is injective (an injection) if for every a \in A if a \neq a\prime then f(a) \neq f(a\prime)
+  i.e there is a one to one relation between elements of A and B
+
+f is surjective (not subjective) (a surjection)
+if for every a \in A there exists a b \in B such that f(a) = b
+  this is also known as onto.
+
+if f:A\rightarrow{}B is both surjective and injective that it is bijective (a bijection).
+
+The identity relation \delta:A->A is a Bijection.
+
+if R is a relation  from A to B than R^c in a relation from B to A.
+This does not necessarily hold for functions, only for functions that are
+bijective. I.e f^-1 exists iff f is bijective.
+
+if f:A->B and g:B->C are functions then g o f:A->C is a function.
+if f and g are bijective than g o f is a bijection 
+
+** related sets
+two sets are related if there is a bijection between them.
+the relation R between related sets is Reflexive, Symmetric, and Transitive
+
+** Cardinality
+if there is a bjiection f:A->B we say A and B have the same cardinally.
+
+
+Two finite sets are related iff they have the same number of elements,
+by definition they also have the same cardinality.
+
+We say a set A is finite with cardinality K if there exists a bijection
+f from A->S_k where S_k = { x | x=0...k }
+
+We say a set A is infinite but countable if there exists a bijection f:N->A
+i.e between the natural numbers and A. It has cardinality \aleph_o
+
+For instance the set of integers Z has a bijection between the natural numbers
+of f(N) = {M/2 if m is even; -(M+1)/2 if m is odd}. Thus the set of integers
+is countably infinite.
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
