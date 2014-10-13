@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS= -pedantic -Wall  -std=c99
+CFLAGS= -pedantic -Wall  -std=c99 -Wextra
 
 SRC=	align.c align_io.c dfs_solver.c
 
@@ -9,7 +9,7 @@ align: $(SRC)
 	$(CC) $(CFLAGS) -DNDEBUG -O2 $^ -o align
 
 align_debug: $(SRC)
-	$(CC) $(CFLAGS) -g $^ -o align_debug -std=gnu99
+	$(CC) -Wall   -g $^ -o align_debug -std=gnu99 -DDEBUG
 
 clean:
 	rm -f align align_debug

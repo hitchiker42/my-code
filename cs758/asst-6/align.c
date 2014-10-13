@@ -80,6 +80,9 @@ int dyn_programming_solution(char *str1, unsigned int str_len1,
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+  #ifdef NDEBUG
+  #undef DEBUG
+  #endif
   /*
 I get warnings from -Wpedantic if I use these, which is why I have
 debug code all enclosed in preprocessor conditionals
@@ -90,6 +93,9 @@ debug code all enclosed in preprocessor conditionals
 
 #endif
   */
+#ifdef DEBUG
+#define DEBUG_PRINT(fmt,...) fprintf(stderr,fmt,##__VA_ARGS__)
+#endif
   typedef struct align_result align_result;
   typedef struct grid_entry grid_entry;
   struct align_result {
@@ -102,6 +108,7 @@ debug code all enclosed in preprocessor conditionals
   };
     //make sure the first string is longer, just to simplify things
   //also so we can put it in a row instead of a column
+  int switched=0;
   if(str_len2 > str_len1){
     char *temp = str1;
     int temp2 = str_len1;
@@ -109,14 +116,15 @@ debug code all enclosed in preprocessor conditionals
     str_len1 = str_len2;
     str2 = temp;
     str_len2 = temp2;
+    switched=1;
   }
   #ifdef DEBUG
   DEBUG_PRINT("starting dynamic programming algorithm\n");
   #endif
   
   
-  uint32_t len1 = str_len1+1;
-  uint32_t len2 = str_len2+1;
+  int32_t len1 = str_len1+1;
+  int32_t len2 = str_len2+1;
   grid_entry* grid = malloc(sizeof(grid_entry)*len1*len2);
   /* I don't like using 2-d arrays (i.e a grid_entry**), so I use
      a 1-D array and use pointer arithmetic to calculate indices,
@@ -170,19 +178,19 @@ debug code all enclosed in preprocessor conditionals
       */
       int32_t match;
       if(str1[i-1]==str2[j-1]){
+        //        fprintf(stderr, "Match i==%d; j==%d\n",i,j);
         match = grid[(j-1)*len + (i-1)].score+1;
       } else {
         match = INT_MIN;
       }
-      int32_t ins = grid[(j*len)+(i-1)].score-1;
-      int32_t del = grid[((j-1)*len)+i].score-1;
-      //in the case of equally optimal solutions
-      //prefer insertions, for no particular reason
+      int32_t del = grid[(j*len)+(i-1)].score-1;
+      int32_t ins = grid[((j-1)*len)+i].score-1;
       int32_t best = match;
       grid_entry *loc = grid+((j*len)+i);
       if(del > best){best = del;}
       if(ins > best){best = ins;}
       if(best == match){
+        assert(best != INT_MIN);
         *loc = (grid_entry){best,((j-1)*len)+(i-1)};
       } else if (best == ins){
         *loc = (grid_entry){best,((j-1)*len+i)};
@@ -191,7 +199,7 @@ debug code all enclosed in preprocessor conditionals
       }
     }
   }
-#ifdef DEBUG
+#if 0
   for(j=0;j<len2;j++){
     fprintf(stderr,"\n");
     for(i=0;i<len1;i++){
@@ -215,9 +223,23 @@ debug code all enclosed in preprocessor conditionals
   *bottom_ptr--='\0';
   i=len1-1,j=len2-1;
   while(i>0 || j>0){
-    #ifdef DEBUG
-    fprintf(stderr,"i=%d j=%d\n",i,j);
-    #endif
+    /*    if(i>0 && j>0 && grid[j*len+i].score==grid[(j-1)*len+(i-1)].score+1){
+      *top_ptr--=*str1_ptr--;
+      *bottom_ptr--=*str2_ptr--;
+      i--;j--;
+    } else if (i>0 && grid[j*len+i].score==grid[j*len+(i-1)].score-1){
+      *top_ptr--=*str1_ptr--;
+      *bottom_ptr--='-';
+      i--;
+    } else if (j>0 && grid[j*len+i].score==grid[(j-1)*len+i].score-1){
+      *bottom_ptr--=*str2_ptr--;
+      *top_ptr--='-';
+      j--;
+    } else {
+      fprintf(stderr,"Unknown error, aborting\n");
+      abort();
+      }*/
+      
     grid_entry loc = grid[j*len+i];
     int32_t up = ((j-1)*len+i);
     int32_t left = (j*len+(i-1));
@@ -240,20 +262,29 @@ debug code all enclosed in preprocessor conditionals
     } else {
       fprintf(stderr,"Unknown Error, Aborting\n");
       abort();
-    }
+      }
   }
   //  assert(i==0);assert(j==0);
   *top_ptr = *str1_ptr;
   *bottom_ptr = *str2_ptr;
 #ifdef DEBUG
-  printf("Final string length = %d\n",top_end-top_ptr);
-  printf("Final string length = %d\n",bottom_end-bottom_ptr);
+  printf("Final string length = %ld\n",top_end-top_ptr);
+  printf("Final string length = %ld\n",bottom_end-bottom_ptr);
 #endif
-  top_ptr++;
-  bottom_ptr++;
+    top_ptr++;
+    bottom_ptr++;
   printf("Alignment Score: %d\n",final_score);
+  //If we switched the strings for processing switch them back for output
+  if(switched){
+    char *temp1=top_ptr;
+    char *temp2=top_end;
+    top_ptr = bottom_ptr;
+    top_end = bottom_end;
+    bottom_ptr = temp1;
+    bottom_end = temp2;
+  }
   //print lines with a maximum length of 75 + 3(for...) per line
-  int max_len = 74;
+  int max_len = 75;
   while(1){
     if((top_ptr+max_len) > top_end || (bottom_ptr+max_len) > bottom_end){
       printf("%.*s\n%.*s\n\n",max_len,top_ptr,max_len,bottom_ptr);
