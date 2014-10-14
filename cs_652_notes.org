@@ -606,7 +606,7 @@ if f and g are bijective than g o f is a bijection
 two sets are related if there is a bijection between them.
 the relation R between related sets is Reflexive, Symmetric, and Transitive
 
-** Cardinality
+* Cardinality
 if there is a bjiection f:A->B we say A and B have the same cardinally.
 
 
@@ -615,13 +615,66 @@ by definition they also have the same cardinality.
 
 We say a set A is finite with cardinality K if there exists a bijection
 f from A->S_k where S_k = { x | x=0...k }
-
+** Countably infinite sets
 We say a set A is infinite but countable if there exists a bijection f:N->A
 i.e between the natural numbers and A. It has cardinality \aleph_o
 
 For instance the set of integers Z has a bijection between the natural numbers
 of f(N) = {M/2 if m is even; -(M+1)/2 if m is odd}. Thus the set of integers
 is countably infinite.
+
+ex. integers, rational numbers, etc...
+** Un-countably infinite sets
+s:N->{0,1}
+S={s | s:N->{0,1}}; the sequence of all possible binary sequences.
+Prove S in uncountable 
+1. Assume S is countable
+2. Thus there exists a bijection b:N->S, so we can list S as the union
+of (b_i(x) for i \in N) for x \in N.
+3. define x-bar as f(x) = (x == 1 ? 0 : 1)
+4. define d:N->{0,1} by d_i=b_i-bar
+5. Since this is a binary sequence and b is subjective  have some k so that
+   b(k)=d 
+6. but d_k = b(k)_k-bar so d \neq b(k)
+7. S is not countable by contridiction.
+Essentially if we wrote out the sequences b(x) = b_0(x) b_1(x) b_2(x) ...
+in a grid and set d equal to the sequence formed by taking b_i(i) of each
+row and inverting it. So d is by definition different than any b and thus
+b can't be bijective.
+
+If we let the elements of S be the expantions of real numbers in base 2
+this shows real numbers are uncountable.
+
+** Uncountability of infinite power sets
+Suppose A is a countably infinite set, show P(A) is uncountable.
+1. Since A is countable there exists a bijection x:N->A
+2. Let S = {s | s:N->{0,1}}; binary sequences
+3. Define b:s->P(A) by b(s) = {x_i | s_i = 1} (b finds a subset of A by creating
+   a set containing elements where the corsponding digit in the given binary
+   sequenece is set)
+-show b is injective
+4. Suppose s and s' are binary sequences and s \neq s'
+   if we can show b(s) \neq b(s') then it shows P(A) is uncountable
+5. since s \neq s' then there exists some k such that s_k \neq s'_k
+6. suppose s_k = 1, thus s'_k = 0
+7. so  x_k \in b(s) and x_k \notin b(s') so b(s) \neq b(s')
+-show b is surjective
+8. suppose X \sube A
+9. define s:N->{0,1} by {s_i = 1 if x_k \in X; s_i = 0 if x_k \notin X}
+10. Thus b is a bjection between P(A) and S
+11. Suppose that P(A) is countable
+12. Thus there exists a bijection f:N->P(A)
+13. So b o f is a bijection from N to S, which is a contridiction
+14. Thus P(A) is uncountable
+
+** Pigeon hole principal
+if A and B are finite sets and |A| > |B| (more elements in A than B)
+then there is no injection from A to B.
+
+i.e if then are n pigeons and k holes and n>k then there must be
+at least 2 pigeons in one hole.
+
+
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
