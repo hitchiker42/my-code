@@ -1,100 +1,144 @@
-token_table *tokens;
-token find_add_token(token_table *table, token tok){
-  token current;
-  int ind;
-  for(ind = 0; ind < table->num_tokens; ind++){
-    current = token_table[ind];
-    if(current.len == tok.len){
-      if(!memcmp(tok.token,current.token,len)){
-        return current;
-      }
-    }
+#include "lexer.h"
+void PUSH(rule *r, rule_vector *vec){
+  if(vec->len >= vec->size){
+    realloc(vec->rules, vec->size*2);
+    vec->size *= 2;
   }
-  char *new_tok = malloc(len);
-  malloc_check(new_tok);
-  memcpy(new_tok, tok, len);
-  if(table->num_tokens >= table->size){
-    table->num_tokens = realloc(table->num_tokens, table->size*2);
-    table->size *= 2;
-  }
-  table[ind] = (token){.token = new_tok, .len = len};
-  return table[ind];
+  vec->rules[vec->len++] = r;
 }
-int token_exists_p(token_table *table, token tok){
-  token current;
-  int ind;
-  for(ind = 0; ind < table->num_tokens; ind++){
-    current = token_table[ind];
-    if(current.len == tok.len){
-      if(!memcmp(tok.token,current.token,len)){
-        return 1;
-      }
-    }
-  }
-  return 0;
-}
-token gettok(char **line){
+/*#define PUSH(obj, place)                                              \
+  obj->next = place;                                                    \
+  place = obj*/
+token *gettok(char **line){
   char *pos = *line;
   while(*pos && !isspace(*pos));
   if(!*pos){
-    return (token){0,0};
+    return NULL;
   }
-  token tok = {.token = line, .len = pos-*line};
-  tok = find_add_token(tokens, toke);
+  toknen *tok = find_add_token(*line, pos - *line);
   *line = pos;
-  return gettok;
+  return tok;
 }
-#define PUSH(obj, place)                                                \
-  obj->next = place;                                                    \
-  place = obj
-rule *make_rule(char *lhs, char *rhs1, char *rhs2, double prob){
+token* find_add_token(char *str, int len){
+  token *existent_tok = NULL;
+  HASH_FIND(hh, tokens, str, len, existent_tok);
+  if(existent_tok != NULL){
+    return existent_tok;
+  }
+  token *new_tok = xmalloc(tok->len+sizeof(token));
+  memcpy(new_tok->token, str, len);
+  new_tok->len = len;
+  HASH_ADD_KEYPTR(hh, tokens, new_tok->token, new_tok->len, new_tok);
+  return new_tok;
+}
+int token_exists_p(char *str, int len){
+  token *tok = NULL;
+  HASH_FIND(hh, tokens, str, len, tok);
+  return (tok == NULL ? 0 : 1);
+}
+rule *make_rule(token *lhs, token *rhs1, token *rhs2, double prob){
   rule *new_rule = xmalloc(sizeof(rule));
-  new_rule->lhs = lhs;
-  new_rule->rhs1 = rhs1;
-  new_rule->rhs2 = rhs2;
+  new_rule->lhs = lhs->token;
+  new_rule->rhs1 = rhs1->token;
+  new_rule->rhs2 = rhs2->token;
   new_rule->probability = prob;
   return rule;
 }
-rule* lexer(FILE* f){
+rule_vector* lex(FILE* f){
   char* line;
   size_t line_size;
-  rule *retval;
+  rule_vector *retval=malloc(sizeof(rule_vector));
+  retval->rules = malloc(32 * sizeof(rule));
+  retval->len = 0;
+  retval->size = 32;
   while (getline(line,&line_size,f)) {
     if(line == (char*)-1){
       perror("getline");
       exit(1);
     }
-    token lhs = gettok(&line);
-    token rhs1 = gettok(&line);
-    if(lhs.token == NULL || rhs1.token == NULL){
-      fprintf(stderr,"Maleformed input\n");
+    token *lhs = gettok(&line);
+    token *rhs1 = gettok(&line);
+    if(lhs == NULL || rhs1 == NULL){
+      fprintf(stderr,"Malformed input\n");
       exit(1);
     }
-    token maybe_rhs2 = gettok(&line);
-    if(maybe_rhs2.token == NULL){
+    token *maybe_rhs2 = gettok(&line);
+    if(maybe_rhs2 == NULL){
       rule *new_rule = make_rule(lhs,rhs1, NULL, 0);
       PUSH(new_rule, retval);
     } else {
       char **endptr;
-      double temp = strtod(maybe_rhs2.token, endptr);
-      if(maybe_rhs2.token != *endptr){
+      double temp = strtod(maybe_rhs2->token, endptr);
+      if(maybe_rhs2->token != *endptr){
         rule *new_rule = make_rule(lhs, rhs1, NULL, temp);
         PUSH(new_rule, retval);
       } else {
         rule *new_rule = make_rule(lhs, rhs1, rhs2, 0);
         endptr = NULL;
-        token prob = gettok(&line);
-        temp = strtod(prob.token, endptr);
-        if(*endptr != prob.token){
+        token *prob = gettok(&line);
+        temp = strtod(prob->token, endptr);
+        if(*endptr != prob->token){
           new_rule->probability = temp;
         }
         PUSH(new_rule,retval);
       }
     }
   }
-  if(!token_exists_p(tokens, (token){.token="S",.len=1})){
+  if(!token_exists_p("S",1)){
     fprintf(stderr,"Error no start symbol \"S\" found in the input grammar\n");
     exit(1);
   }
   return rules;
+}
+char * read_word(FILE *input){
+  char *word = NULL;
+  int word_size = 0;
+  int buf_size = 128;
+  char buf[128];
+  char *bufptr = buf;
+  char c;
+  while(!isspace(c = fgetc(input)) && c != EOF){
+    if(bufptr-buf >= buf_size){
+      word = realloc(word, word_size + buf_size);
+      memcpy(word + word_size, buf, buf_size);
+      word_size +=buf_size;
+      bufptr = buf;
+    }
+    *bufptr++ = c;
+  }
+  if(c == EOF){
+    free(word);
+    return NULL;
+  }
+  word = realloc(word, word_size + bufptr-buf);
+  memcpy(word+word_size,buf, bufptr-buf);
+  return word;
+}
+
+void parse(FILE *input, int algorithm, rule_vector *rules){
+  size_t input_size = 64, input_len = 0;
+  char **tokenized_input = xmalloc(input_size * sizeof(char*));
+  char c;
+  //eatup leading whitespace
+  while(isspace((c=fgetc(input))) && c != EOF);
+  if(c==EOF){
+    fprintf(stderr, "error reading input\n");
+    exit(1);
+  }
+  ungetc(c, input);
+  char *word;
+  while((word = read_word(input))){
+    if(input_len >= input_size){
+      realloc(tokenized_input, input_size*2*sizeof(char*));
+      input_size*=2;
+    }
+    tokenized_input[input_len++] = word;
+    while(isspace((c=fgetc(input))) && c != EOF);
+    if(c==EOF){break;}
+    ungetc(c, input);
+  }
+  if(algorithm == 0){//use recursive decent parser
+  } else {
+    cyk_parse(rules, tokenized_input, input_len);
+  }
 }

@@ -46,11 +46,7 @@ struct rule_header {
   struct rule_header *next;
   void *contents[];
 };
-typedef struct token token;
-struct token {
-  char *token;
-  int len;
-};
+
 typedef struct token_table token_table;
 struct token_table {  
   token *tokens;

@@ -32,11 +32,6 @@ struct parser_state {
   int num_symbols;
 };
 static void internal_parse(struct parser_state *state);
-
-static int string_equal(const char *a, const char *b){
-  return !strcmp(a,b);
-}
-
 static int find_start_index(const rule *rules){
   int i=0;
   const rule *r = rules;
@@ -73,7 +68,7 @@ void malloc_check(void* p){
       exit(1);
   }
 }
-void *xmalloc(size_t sz){
+inline void *xmalloc(size_t sz){
   void *temp = malloc(sz);
   malloc_check(temp);
   memset(temp,'\0',sz);
@@ -93,6 +88,46 @@ void *xmalloc(size_t sz){
       temp = temp->next;                        \
     }                                           \
   }
+void cyk_parse(rule_vector *rules, char **input, int input_len){
+  int num_symbols = HASH_COUNT(tokens);
+  int len1 = len2 = input_len;
+  int len3 = num_symbols;
+  int i,j,k,l;
+  struct node {
+    int32_t exists;
+    int32_t parent;
+  };
+  struct node *grid = xmalloc(len1*len2*len3*sizeof(struct node));
+  for(i=0;i<len1;i++){ 
+    for(k=0;k<;k++){
+     if(string_eq(tokens[i],term_rules[k]->rhs)){
+       grid[index_3d(i,i,k)] = (struct node){.exists =1};
+     }
+   }
+  }
+  for(i=1;i<len1;i++){
+    for(j=0;j<i+(len1-1);j++){
+      for(k=0;k<i-1;k++){
+        for(l=0;l<num_rules;l++){
+          int A = find_symbol_index(rules[l]->lhs);
+          int B = find_symbol_index(rules[l]->rhs1);
+          int C = find_symbol_index(rules[l]->rhs2);
+          if(grid[index_3d(j,k,B)].exists & grid[index_3d(j+k,i-k,C)].exits){
+            grid[index_3d(j,i,A)].exists = 1;
+            grid[index_3d(j,k,B)].parent = index_3d(j,i,A);
+            grid[index_3d(j+k,i-k,C)].parent = index_3d(j,i,A);
+          }
+        }
+      }
+    }
+  }
+  int s = find_start_index(rules_list);
+  if(grid[index_3d[0,len1-1,s].exists]){
+    //input has a valid parse
+  } else {
+    //input was invalid;
+  }
+}  
 static void internal_parse(struct parser_state *state){
   const rule *rules_list = state->nonterminals_list;
   const int num_rules = state->nonterminals_len;

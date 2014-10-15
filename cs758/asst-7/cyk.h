@@ -19,7 +19,10 @@
 
  */
 void cyk_parse(void);
-
+void *xmalloc(size_t sz);
+static inline int string_equal(const char *a, const char *b){
+  return !strcmp(a,b);
+}
 /*
  This function checks if the void* passed in is null.  If it is, then 
  it prints and error message and kills the program.
