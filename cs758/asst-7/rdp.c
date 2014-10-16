@@ -9,23 +9,6 @@
 #include "rdp.h"
 #include "cyk.h"
 
-
-
-
-/*
- pick up the globals from the parser
- */
-extern const rule* rule_list;
-extern const word_rule* word_list;
-extern int rule_count;
-extern int word_count;
-extern char* tokenized_input [MAX_INPUT];
-extern char input[MAX_CHARS];
-extern int input_length;
-extern int symbol_count;
-extern char** symbol_table;
-extern int start_index;
-
 typedef struct {
     int start_ix;
     int end_ix;

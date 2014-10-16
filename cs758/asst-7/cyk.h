@@ -20,6 +20,7 @@
  */
 void cyk_parse(void);
 void *xmalloc(size_t sz);
+#include <string.h>
 static inline int string_equal(const char *a, const char *b){
   return !strcmp(a,b);
 }

@@ -1,7 +1,9 @@
-#include "lexer.h"
+#include "my_parser.h"
+static uint32_t current_index = 0;
+token* find_add_token(char *str, int len);
 void PUSH(rule *r, rule_vector *vec){
   if(vec->len >= vec->size){
-    realloc(vec->rules, vec->size*2);
+    vec->rules=realloc(vec->rules, vec->size*2);
     vec->size *= 2;
   }
   vec->rules[vec->len++] = r;
@@ -15,7 +17,7 @@ token *gettok(char **line){
   if(!*pos){
     return NULL;
   }
-  toknen *tok = find_add_token(*line, pos - *line);
+  token *tok = find_add_token(*line, pos - *line);
   *line = pos;
   return tok;
 }
@@ -25,9 +27,10 @@ token* find_add_token(char *str, int len){
   if(existent_tok != NULL){
     return existent_tok;
   }
-  token *new_tok = xmalloc(tok->len+sizeof(token));
+  token *new_tok = xmalloc(len+sizeof(token));
   memcpy(new_tok->token, str, len);
   new_tok->len = len;
+  new_tok->index = current_index++;
   HASH_ADD_KEYPTR(hh, tokens, new_tok->token, new_tok->len, new_tok);
   return new_tok;
 }
@@ -38,20 +41,20 @@ int token_exists_p(char *str, int len){
 }
 rule *make_rule(token *lhs, token *rhs1, token *rhs2, double prob){
   rule *new_rule = xmalloc(sizeof(rule));
-  new_rule->lhs = lhs->token;
-  new_rule->rhs1 = rhs1->token;
-  new_rule->rhs2 = rhs2->token;
+  new_rule->lhs = lhs;
+  new_rule->rhs1 = rhs1;
+  new_rule->rhs2 = rhs2;
   new_rule->probability = prob;
-  return rule;
+  return new_rule;
 }
-rule_vector* lex(FILE* f){
+rule_vector* lex_rules(FILE* f){
   char* line;
   size_t line_size;
   rule_vector *retval=malloc(sizeof(rule_vector));
   retval->rules = malloc(32 * sizeof(rule));
   retval->len = 0;
   retval->size = 32;
-  while (getline(line,&line_size,f)) {
+  while (getline(&line,&line_size,f)) {
     if(line == (char*)-1){
       perror("getline");
       exit(1);
@@ -73,7 +76,7 @@ rule_vector* lex(FILE* f){
         rule *new_rule = make_rule(lhs, rhs1, NULL, temp);
         PUSH(new_rule, retval);
       } else {
-        rule *new_rule = make_rule(lhs, rhs1, rhs2, 0);
+        rule *new_rule = make_rule(lhs, rhs1, maybe_rhs2, 0);
         endptr = NULL;
         token *prob = gettok(&line);
         temp = strtod(prob->token, endptr);
@@ -88,7 +91,8 @@ rule_vector* lex(FILE* f){
     fprintf(stderr,"Error no start symbol \"S\" found in the input grammar\n");
     exit(1);
   }
-  return rules;
+  token_array = xmalloc(sizeof(token*)* HASH_COUNT(tokens));
+  return retval;
 }
 char * read_word(FILE *input){
   char *word = NULL;
@@ -129,7 +133,7 @@ void parse(FILE *input, int algorithm, rule_vector *rules){
   char *word;
   while((word = read_word(input))){
     if(input_len >= input_size){
-      realloc(tokenized_input, input_size*2*sizeof(char*));
+      tokenized_input=realloc(tokenized_input, input_size*2*sizeof(char*));
       input_size*=2;
     }
     tokenized_input[input_len++] = word;

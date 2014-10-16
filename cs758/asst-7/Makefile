@@ -76,7 +76,8 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-bin_PROGRAMS = parser$(EXEEXT) parser_debug$(EXEEXT)
+bin_PROGRAMS = parser$(EXEEXT) parser_debug$(EXEEXT) \
+	my_parser$(EXEEXT)
 subdir = .
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/configure $(am__configure_deps) \
@@ -98,6 +99,13 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
+am_my_parser_OBJECTS = my_parser-my_parser.$(OBJEXT) \
+	my_parser-lexer.$(OBJEXT) my_parser-rdp.$(OBJEXT) \
+	my_parser-cyk.$(OBJEXT)
+my_parser_OBJECTS = $(am_my_parser_OBJECTS)
+my_parser_LDADD = $(LDADD)
+my_parser_LINK = $(CCLD) $(my_parser_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
 am_parser_OBJECTS = parser-parser.$(OBJEXT) parser-cyk.$(OBJEXT) \
 	parser-rdp.$(OBJEXT)
 parser_OBJECTS = $(am_parser_OBJECTS)
@@ -142,8 +150,10 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(parser_SOURCES) $(parser_debug_SOURCES)
-DIST_SOURCES = $(parser_SOURCES) $(parser_debug_SOURCES)
+SOURCES = $(my_parser_SOURCES) $(parser_SOURCES) \
+	$(parser_debug_SOURCES)
+DIST_SOURCES = $(my_parser_SOURCES) $(parser_SOURCES) \
+	$(parser_debug_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -285,6 +295,8 @@ parser_SOURCES = parser.c cyk.c rdp.c
 parser_debug_SOURCES = parser.c cyk.c rdp.c
 parser_debug_CFLAGS = $(AM_CFLAGS) -g -Og -DDEBUG
 parser_CFLAGS = $(AM_CFLAGS) -DNDEBUG
+my_parser_SOURCES = my_parser.c lexer.c rdp.c cyk.c
+my_parser_CFLAGS = $(AM_CFLAGS) -DMY_PARSER -Og
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -382,6 +394,10 @@ uninstall-binPROGRAMS:
 clean-binPROGRAMS:
 	-test -z "$(bin_PROGRAMS)" || rm -f $(bin_PROGRAMS)
 
+my_parser$(EXEEXT): $(my_parser_OBJECTS) $(my_parser_DEPENDENCIES) $(EXTRA_my_parser_DEPENDENCIES) 
+	@rm -f my_parser$(EXEEXT)
+	$(AM_V_CCLD)$(my_parser_LINK) $(my_parser_OBJECTS) $(my_parser_LDADD) $(LIBS)
+
 parser$(EXEEXT): $(parser_OBJECTS) $(parser_DEPENDENCIES) $(EXTRA_parser_DEPENDENCIES) 
 	@rm -f parser$(EXEEXT)
 	$(AM_V_CCLD)$(parser_LINK) $(parser_OBJECTS) $(parser_LDADD) $(LIBS)
@@ -396,6 +412,10 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+include ./$(DEPDIR)/my_parser-cyk.Po
+include ./$(DEPDIR)/my_parser-lexer.Po
+include ./$(DEPDIR)/my_parser-my_parser.Po
+include ./$(DEPDIR)/my_parser-rdp.Po
 include ./$(DEPDIR)/parser-cyk.Po
 include ./$(DEPDIR)/parser-parser.Po
 include ./$(DEPDIR)/parser-rdp.Po
@@ -418,6 +438,62 @@ include ./$(DEPDIR)/parser_debug-rdp.Po
 #	$(AM_V_CC)source='$<' object='$@' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+my_parser-my_parser.o: my_parser.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -MT my_parser-my_parser.o -MD -MP -MF $(DEPDIR)/my_parser-my_parser.Tpo -c -o my_parser-my_parser.o `test -f 'my_parser.c' || echo '$(srcdir)/'`my_parser.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/my_parser-my_parser.Tpo $(DEPDIR)/my_parser-my_parser.Po
+#	$(AM_V_CC)source='my_parser.c' object='my_parser-my_parser.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -c -o my_parser-my_parser.o `test -f 'my_parser.c' || echo '$(srcdir)/'`my_parser.c
+
+my_parser-my_parser.obj: my_parser.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -MT my_parser-my_parser.obj -MD -MP -MF $(DEPDIR)/my_parser-my_parser.Tpo -c -o my_parser-my_parser.obj `if test -f 'my_parser.c'; then $(CYGPATH_W) 'my_parser.c'; else $(CYGPATH_W) '$(srcdir)/my_parser.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/my_parser-my_parser.Tpo $(DEPDIR)/my_parser-my_parser.Po
+#	$(AM_V_CC)source='my_parser.c' object='my_parser-my_parser.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -c -o my_parser-my_parser.obj `if test -f 'my_parser.c'; then $(CYGPATH_W) 'my_parser.c'; else $(CYGPATH_W) '$(srcdir)/my_parser.c'; fi`
+
+my_parser-lexer.o: lexer.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -MT my_parser-lexer.o -MD -MP -MF $(DEPDIR)/my_parser-lexer.Tpo -c -o my_parser-lexer.o `test -f 'lexer.c' || echo '$(srcdir)/'`lexer.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/my_parser-lexer.Tpo $(DEPDIR)/my_parser-lexer.Po
+#	$(AM_V_CC)source='lexer.c' object='my_parser-lexer.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -c -o my_parser-lexer.o `test -f 'lexer.c' || echo '$(srcdir)/'`lexer.c
+
+my_parser-lexer.obj: lexer.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -MT my_parser-lexer.obj -MD -MP -MF $(DEPDIR)/my_parser-lexer.Tpo -c -o my_parser-lexer.obj `if test -f 'lexer.c'; then $(CYGPATH_W) 'lexer.c'; else $(CYGPATH_W) '$(srcdir)/lexer.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/my_parser-lexer.Tpo $(DEPDIR)/my_parser-lexer.Po
+#	$(AM_V_CC)source='lexer.c' object='my_parser-lexer.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -c -o my_parser-lexer.obj `if test -f 'lexer.c'; then $(CYGPATH_W) 'lexer.c'; else $(CYGPATH_W) '$(srcdir)/lexer.c'; fi`
+
+my_parser-rdp.o: rdp.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -MT my_parser-rdp.o -MD -MP -MF $(DEPDIR)/my_parser-rdp.Tpo -c -o my_parser-rdp.o `test -f 'rdp.c' || echo '$(srcdir)/'`rdp.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/my_parser-rdp.Tpo $(DEPDIR)/my_parser-rdp.Po
+#	$(AM_V_CC)source='rdp.c' object='my_parser-rdp.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -c -o my_parser-rdp.o `test -f 'rdp.c' || echo '$(srcdir)/'`rdp.c
+
+my_parser-rdp.obj: rdp.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -MT my_parser-rdp.obj -MD -MP -MF $(DEPDIR)/my_parser-rdp.Tpo -c -o my_parser-rdp.obj `if test -f 'rdp.c'; then $(CYGPATH_W) 'rdp.c'; else $(CYGPATH_W) '$(srcdir)/rdp.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/my_parser-rdp.Tpo $(DEPDIR)/my_parser-rdp.Po
+#	$(AM_V_CC)source='rdp.c' object='my_parser-rdp.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -c -o my_parser-rdp.obj `if test -f 'rdp.c'; then $(CYGPATH_W) 'rdp.c'; else $(CYGPATH_W) '$(srcdir)/rdp.c'; fi`
+
+my_parser-cyk.o: cyk.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -MT my_parser-cyk.o -MD -MP -MF $(DEPDIR)/my_parser-cyk.Tpo -c -o my_parser-cyk.o `test -f 'cyk.c' || echo '$(srcdir)/'`cyk.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/my_parser-cyk.Tpo $(DEPDIR)/my_parser-cyk.Po
+#	$(AM_V_CC)source='cyk.c' object='my_parser-cyk.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -c -o my_parser-cyk.o `test -f 'cyk.c' || echo '$(srcdir)/'`cyk.c
+
+my_parser-cyk.obj: cyk.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -MT my_parser-cyk.obj -MD -MP -MF $(DEPDIR)/my_parser-cyk.Tpo -c -o my_parser-cyk.obj `if test -f 'cyk.c'; then $(CYGPATH_W) 'cyk.c'; else $(CYGPATH_W) '$(srcdir)/cyk.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/my_parser-cyk.Tpo $(DEPDIR)/my_parser-cyk.Po
+#	$(AM_V_CC)source='cyk.c' object='my_parser-cyk.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(my_parser_CFLAGS) $(CFLAGS) -c -o my_parser-cyk.obj `if test -f 'cyk.c'; then $(CYGPATH_W) 'cyk.c'; else $(CYGPATH_W) '$(srcdir)/cyk.c'; fi`
 
 parser-parser.o: parser.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(parser_CFLAGS) $(CFLAGS) -MT parser-parser.o -MD -MP -MF $(DEPDIR)/parser-parser.Tpo -c -o parser-parser.o `test -f 'parser.c' || echo '$(srcdir)/'`parser.c

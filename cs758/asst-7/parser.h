@@ -8,8 +8,6 @@
 #define MAX_CHARS 10000
 #define MAX_SYMBOLS 500
 
-
-
 /**
    Structure for storing a grammatical production.  This only stores
    the nonterminal productions.
@@ -46,18 +44,22 @@ struct rule_header {
   struct rule_header *next;
   void *contents[];
 };
-
-typedef struct token_table token_table;
-struct token_table {  
-  token *tokens;
-  size_t num_tokens;
-  size_t size;
-};
 /**
    non terminal symbols are stored in an array, and this function is
    used to search for the index of a particular non terminal symbol.
  */
 int find_symbol_index(const char* looking_for);
-
-
+/*
+  pick up the globals from the parser
+*/
+const rule* rule_list;
+const word_rule* word_list;
+int rule_count;
+int word_count;
+char** tokenized_input;
+char input[MAX_CHARS];
+int input_length;
+int symbol_count;
+char** symbol_table;
+int start_index;
 #endif

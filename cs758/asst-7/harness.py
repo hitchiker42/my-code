@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 
 import os
 import sys
@@ -14,8 +14,10 @@ a.add_argument("--ref", help='reference solution to use', default = './parser_re
 a.add_argument("--sentence", help='sentence to try and parse', default = 'sentence', dest="sen")
 a.add_argument("--grammar", help='grammar to use', default = 'fish.cnf', dest="grammar")
 a.add_argument("--grad", help='whether or not to use graduate student mode', default = False, action="store_true", dest="grad")
-
 arguments = a.parse_args()
+
+if not os.path.exists(arguments.bin):
+    a.print_help()
 
 #running student solution
 command = [arguments.bin, arguments.grammar, "cyk"]

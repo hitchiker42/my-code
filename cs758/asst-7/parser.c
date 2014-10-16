@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <errno.h>
 #include "parser.h"
 #include "cyk.h"
 #include "rdp.h"
@@ -45,7 +46,8 @@ int input_length = 0;
 /*
   Array of the tokens in the input sentence.
  */
-char* tokenized_input [MAX_INPUT] = {NULL};
+char* tokenized_input_mem [MAX_INPUT] = {NULL};
+char **tokenized_input = tokenized_input_mem;
 /*
   Raw data from input
  */
@@ -54,7 +56,8 @@ char input[MAX_CHARS] = {0};
 /*
   Symbol table
  */
-char* symbol_table[MAX_SYMBOLS] = {NULL};
+char* symbol_table_mem[MAX_SYMBOLS] = {NULL};
+char **symbol_table = symbol_table_mem;
 /*
   Count of all nontermial symbols in the grammar.
  */
@@ -209,6 +212,7 @@ void usage(void){
     printf("usage: ./parser grammar.cnf <alg>\n");
     printf("<alg> may be either rdp (recursive descent parser) or cyk,\n");
     printf("which is the name of the dynamic programming parsing algorithm\n");
+    exit(0);
 }
 
 /*
@@ -228,22 +232,30 @@ void cleanup_rules(void){
 	free((void*) to_free);
     }
 }
-
+static FILE *fopen_checked(const char *pathname, const char *mode){
+  FILE *f = fopen(pathname, mode);
+  if(f == NULL){
+    perror("fopen");
+    fprintf(stderr, "Failed to open file %s\n", pathname);
+    exit(1);
+  }
+  return f;
+}
 /*
  simple main function
  */
 int main(int argc, const char * argv[])
 {
     FILE* f;
-    if(argc != 3){
+    if(argc < 3){
         usage();
     }
-    f = fopen(argv[1], "r");
-
-    if(f == NULL){
-        fprintf(stderr, "Error - no such file %s", argv[1]);
-        return 1;
+    if(argv[1][0] == '-'){
+      if(string_equal(argv[1],"-h") || string_equal(argv[1],"--help")){
+        usage();
+      }
     }
+    f = fopen_checked(argv[1], "r");
     
     read_rules(f);
 /*

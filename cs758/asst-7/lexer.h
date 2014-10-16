@@ -1,7 +1,7 @@
-#include <stdlib.h>
+#include "my_parser.h"
 #include "cyk.h" //for xmalloc
 #include "uthash.h"
-#include <stdint.h>
+#include <ctype.h>
 typedef struct rule_vector rule_vector;
 typedef struct token token;
 struct token {
@@ -10,10 +10,10 @@ struct token {
   uint32_t len;
 };
 struct rule_vector {
-  rule *rules;
+  rule **rules;
   size_t len;
   size_t size;
 };
 static struct token *tokens = NULL;//hash table
-rule_vector* lex(FILE* f);
+rule_vector* lex_rules(FILE* f);
 void parse(FILE *input, int algorithm, rule_vector *rules);
