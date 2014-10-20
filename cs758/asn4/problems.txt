@@ -1,0 +1,30 @@
+13.1-7:
+Assuming we don't include empty children in the count:
+If n is a power of 2 there can be at most 2 red nodes per black node and the
+ratio is 2:1, in this case the entire bottom row is red. If n is not a power of
+2 the largest ratio depends on n. If we let l be the largest power of 2 smaller
+than n and m the smallest power of 2 greater than n we can describe the ratio
+based on l and m. If n is closer to l than m the largest ammount of red nodes
+comes from having the top l nodes in a 2:1 ratio plus n-l black nodes, for a
+ratio of (2/3)l : (1/3)l + (n - l). If n is closer to m than l the highest
+possible ratio comes from attempting to have a 2:1 ratio in a tree with m
+nodes, but lacking (m-n) red nodes. This gives a ratio of
+(2/3)m - (m-n) : (1/3)m.
+ 
+The smallest possible ratio is 0:n, that is no red nodes at all.
+
+13.3-1:
+It is possible to have a red black tree with no red nodes, in this case the
+tree would always be perfectly balanced but the fixup procedure after insertion
+would be significantly more complicated. If z was set to black at the end of
+rb-insert no red nodes would ever be inserted and the whole tree would be
+black. By inserting red nodes balancing the tree becomes eaiser, speeding up
+insertion (and deletion) at the cost of having an imperfectly balanced tree.
+
+13.3-4:
+Since we know z and z.p, and z.p.p are not T.nil, since we just inserted z as
+the child of z.p and z.p isn't the root since it's red, so its parent can't be
+nil, the only value that could possibly be T.nil is y. The color of y is only
+set when y.color is red, since T.nil.color is black we can never set the color
+of T.nil in RB-insert-fixup. Since we can't set the color of T.nil, we
+obviously can't mark it red.

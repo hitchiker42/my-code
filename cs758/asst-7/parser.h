@@ -40,10 +40,6 @@ typedef struct wr{
   const char* word;
 
 } word_rule;
-struct rule_header {
-  struct rule_header *next;
-  void *contents[];
-};
 /**
    non terminal symbols are stored in an array, and this function is
    used to search for the index of a particular non terminal symbol.

@@ -268,7 +268,7 @@ int main(int argc, const char * argv[])
     if(strcmp(argv[2], "rdp") == 0)
         rdp_parse();
     else if(strcmp(argv[2], "cyk") == 0)
-        cyk_parse();
+b        cyk_parse();
     else
         usage();
 

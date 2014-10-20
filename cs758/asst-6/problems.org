@@ -1,0 +1,52 @@
+15.3-2:
+given the array [1,3,5,7,9,11,13,15,2,4,6,8,10,12,14,16]
+
+15-10 b,c
+b:
+To a minor extent this is not true, the optimal strategy each year for the
+first two years can be different than the optimal strategy for each year
+independently. Let (m,l) and (n,k) be the first and second most optimal
+strategies for year 1 and year 2, assume m = k and l = n. Taken
+independently the most optimal strategy would be m in year 1 and n in year 2,
+by definition. The naive approach for dealing with multiple years is to take m
+in year one (since this is the optimal result for the subproblem of year 1),
+then for year two pick the maximum of (r[n][2] - f_2) and (r[k][2]
+-f_1). However if (r[n][2] -f_2) + (r[l][1]) is greater than (r[k][2] -f_1 +
+r[m][1]), than the most optimal solution is to pick l for year 1 and n for year
+2, which is different than the optimal solution for year 1 and year 2 taken
+seperately. This idea can be extrapolated to further years, such that the
+optimal solution for 3 years could be different than the optimal solution for
+two years, combined with the optmial solution for the 3rd year. Using the above
+example it might be more adventagous to take strategy k in year 2 if that
+aligned with the optimal solution for problem 3. Thus it is possible that the
+optimal overall strategy is seperate from the optimal strategy for the
+subproblems. This all depends on the ammount of money invested, if a large
+enough ammount of money were invested such that f_1 and f_2 were neglagable
+than there would be optimal substructure.
+
+c: Ignoring the problem mentioned above
+find_optimal_stratagy{
+last[1] = max_index(r[0]);
+total[0] = d * r[0][last[0]];
+
+for(i=1;i<10;i++) {
+  ind = max_index(r[i]);  
+  if(ind == last[i]){
+     last[i+1]=ind;
+     total[i] = total[i-1]*r[i][ind]-f1;
+   } else {          
+     ind2 = max_index(remove(r[i],r[i][ind]));
+     if(ind2 != last[i] ||
+       (total[i-1]*r[i][ind]-f2 > total[i-1]*r[i][ind2]-f1)){
+       last[i+1]=ind;
+       total[i] = total[i-1]*r[i][ind]-f2;
+     } else {
+       last[i+1]=ind2;
+       total[i] = total[i-1]*r[i][ind2]-f1;
+     }
+   }
+}
+return reverse(last)
+}
+
+this will run in ϴ(Ν^2) time.

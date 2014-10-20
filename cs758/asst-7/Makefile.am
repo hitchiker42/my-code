@@ -1,4 +1,4 @@
-bin_PROGRAMS = parser parser_debug my_parser
+bin_PROGRAMS = parser parser_debug
 AM_CFLAGS = -std=c99 -pedantic -Wall -Wno-unused
 parser_SOURCES = parser.c cyk.c rdp.c
 parser_debug_SOURCES = parser.c cyk.c rdp.c

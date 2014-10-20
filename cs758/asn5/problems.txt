@@ -1,0 +1,33 @@
+12-2:
+lexographic sorting, given two arrays a and b, of lengths n and m a is less
+than b if:
+1. for some integer j, j<(min(n,m)) a_i == b_i for i=0...j and a_j < b_j
+2. n<m and a_i == b_i for i=0...n
+
+use a radix tree to lexographically sort a set S of bit strings with total
+length n, in THETA(n) time.
+
+
+15.1-2
+given a rod of length 5 with values per length of 0/1in, 4/2in, 7/3in,
+the greedy algorihm will cut a 3in rod, and be left with a one inch rod for a
+total value of 7, but cutting the rod into 2 2in pieces will give a total value
+of 8.
+15.1-3
+the core algoritm is the same, so it suffices to show how to calculate the
+maximum profit, since finding the actual method is the same as the normal rod
+cutting problem.
+
+The bottom-up-cut-rod procedure should be replaced with the following, where
+the additional parameter is the cost per cut
+modified-bottom-up-cut-rod(p,n,c)
+declare r[n];
+r[0] = 0;
+for j = 1 to n
+    q = p[j] #set q to the profit without cutting the rod at all
+    for i = 1 to j-1
+      q = max(q, p[i] + r[j-i] - c);
+    end
+  r[j] = q
+end
+end
