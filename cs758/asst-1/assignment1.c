@@ -6,7 +6,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <sys/time.h>
-long int random(void);11
+long int random(void);
 /* The various sorting algorithm names */
 static const char *counting_sort_str = "counting";
 static const char *radix_sort_str = "radix";

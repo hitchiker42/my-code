@@ -579,7 +579,7 @@ between i and j in R-
 
 
 * Missed a class
-
+  Sequences I guess?
 * Functions
   A function f is a relation between two sets A and B where each element
 in A is mapped to one element of B.
@@ -675,9 +675,61 @@ i.e if then are n pigeons and k holes and n>k then there must be
 at least 2 pigeons in one hole.
 
 
+* (Mathematical) Strings  
+  Start with an alphabet \Sigma, a finite nonempty set of (simple) symbols.
+
+  If \Sigma is an alphabet then a finite sequence over \Sigma is called a string
+  
+  If X is a string over \Sigma the length of X, written |X|, is the length as a
+  sequence.
+
+  Quick note, sequences are always indexed starting at 1.
+  A sequence of length n, over \Sigma, is a function from S_n -> \Sigma
+  
+  The set of all strings over \Sigma is denoted \Sigma*
+
+  If s \in \Sigma* and |s|=0 then we write s = \Lambda (the empty string)
+
+  Suppose u \in \Sigma* and v \in \Sigma* then concatenation of u and v, written uv
+  in the string consisting of the symbols of u followed by the symbols of v.
+  uv_i = {u_i if 1 \leq i \leq |u|; v_{i-|u|} if |u|\lt i \leq |u|+|v|
+
+  concatenation identities:
+  (uv)w = u(vw)
+  \Lambda{}w = w\Lambda = w
+
+  Suppose z \in \Sigma* and z = uvm for u,v,w \in \Sigma* we call v a substring of z,
+  any of u,v,w can be \Lambda.
+
+  if z = uw for u,w \in \Sigma* then we call u a prefix, and w a suffix.
+** Mathematical Induction (M.I) 
+   In the domain N (natural numbers)
+   to show \forall{}xP(x) it suffices to show that P(0) holds and that 
+   \forall{}x(P(x)`>P(x+1))
+
+   More generally.
+   show P(c) and \forall{}x((x\ge{}c)\rightarrow(P(x)\rightarrow{}P(x+1)) then \forall{}x((x\ge{}c)\rightarrow{}P(x))
+** ex
+   if k\ge1 then \Sigma_{j=1}^k 2j-1 = k^2
+   proof by mathematical induction:
+   1. wee will induct over k\ge1
+   2. Basis: when k = 1 we have \Sigma_1^1 = 2-1 = 1 = 1^2 = k^2
+   3. IH(inductive hypothesis): Assume k\ge2 and arbitary but fixed and suppose
+      \sum_{j=1}^{k-1} 2j-1 = k^2
+   4. Show \sum_{j=1}^k = k^2, \sum_{j=1}^k =  2k-1 + \sum_{j=1}^{k-1} = 2k-1 + (k-1)^2 = 1 + 2(k-1) + (k-1)^2
+      (k+1)(k-1) + 1 = k^2 +k -k -1 + 1 = k^2
+** Inductive proof about strings
+   suppose w \in \Sigma* define w^k for all k\ge0 by:
+   w^0 = \Lambda
+   w^k = w^{k-1}w for all k\ge0
+
+   Suppose w \in \Sigma*, show for any k,j\ge0 w^{k}w^{j} = w^{k+j}
+   Proof omitted because I was busy fiddling with org sub/superscripts during
+   class  
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
 # eval: (flyspell-mode)
 # org-pretty-entities: t
+# org-enable-table-editor: nil
 # End:
