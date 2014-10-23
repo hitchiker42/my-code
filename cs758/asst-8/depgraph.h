@@ -43,7 +43,11 @@ int build_graph(const char *depfile, struct node_list **headp);
 /*
  * Outputs the node to the given file.
  */
+#ifdef DEBUG
+int output_node(FILE * f, struct node *n);
+#else
 void output_node(FILE * f, struct node *n);
+#endif
 
 /*
  * Allocate a new node for the given string.

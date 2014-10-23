@@ -17,7 +17,7 @@ int current_debug_level = 1;
 
 
 /* Debug printing. */
-void dprintf(int level, const char *format, ...)
+void debug_printf(int level, const char *format, ...)
 {
 #if !defined(NDEBUG)
     va_list ap;

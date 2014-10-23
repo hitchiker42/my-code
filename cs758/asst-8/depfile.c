@@ -85,7 +85,7 @@ static int next_token(FILE * f, char token[], int size, int *newline)
   out:
     token[i] = '\0';
     *newline = c == '\n';
-    dprintf(DEBUG_SPAM, "token: [%s], newline=%s\n", token,
+    debug_printf(DEBUG_SPAM, "token: [%s], newline=%s\n", token,
 	    *newline ? "true" : "false");
     return i;
 }

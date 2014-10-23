@@ -20,7 +20,63 @@
 #include "nodelist.h"
 #include "depfile.h"
 #include "debug.h"
+#define _GNU_SOURCE
+#include <getopt.h>
+#ifdef DEBUG
+#define DEBUG_PRINTF(fmt,args...) fprintf(stderr,fmt,##args)
+#else
+#define DEBUG_PRINTF(...)
+#endif
+typedef struct dep_node dep_node;
+typedef struct node_info node_info;
+enum state {
+  unfinished,
+  finished
+};
+static inline dep_node *pop(struct node_list *list){
+  
+  dep_node *node = (dep_node*)list->n;
+  //or *list = *list->next;
+  if(list->next){
+      list->n = list->next->n;
+      list->next = list->next->next;
+  } else {
+    list->next = NULL;
+    list->n = NULL;
+  }
+  return node;
+}
+#define pop(list)                                                       \
+  __extension__({                                                       \
+      dep_node *temp= (list == NULL ? NULL : (dep_node*)list->n);       \
+      if(temp){list = list->next;}                                      \
+      temp;})
+#define push(elt, place) node_list_add(place, (struct node*)elt)
+int t_val = 1;
+int *t = &t_val;
+struct dep_node {
+  /* The current file. */
+  const char *file;
 
+  /* Nodes that depend on this node. */
+  struct node_list *kids;
+
+  /* A unique ID number of this node.  Nodes are numbered from 0
+   * so that the ID field can safely be used as an array
+   * index. */
+  unsigned int id;
+
+  /* This field is initialized to NULL and remains unused by the
+   * rest of the code.  Feel free to store any data in here that
+   * you think that you will need. */
+  /*  node_info *info;*/
+  int *state;
+  
+};
+/*struct node_info {
+  dep_node *parent;
+  enum state state;
+  };*/
 /* The type of the sorting function. */
 typedef int (*sort_t) (struct node_list ** sorted,
 		       struct node_list * to_sort);
@@ -32,11 +88,33 @@ typedef int (*sort_t) (struct node_list ** sorted,
  * list using the node_list_add() (see nodelist.h) function with
  * 'headp' as the head pointer.
  */
+static void dfs_recur(dep_node *node, struct node_list **sorted_list){
+  dep_node *next_node;
+  struct node_list *list = node->kids;
+  while((next_node = pop(list))){
+    if(next_node->state == NULL){
+      next_node->state = t;
+      dfs_recur(next_node, sorted_list);
+    }
+  }
+  push(node, sorted_list);
+  return;
+}
+  
+  
 static int topological_sort(struct node_list **headp,
-			    struct node_list *nodes)
-{
-    fprintf(stderr, "Unimplemented\n");
-    return 1;
+			    struct node_list *nodes){
+  DEBUG_PRINTF("Calling topological_sort\n");
+  dep_node *cur_node;
+  while((cur_node = pop(nodes))){
+    if(cur_node->state == NULL){
+      cur_node->state = t;
+      dfs_recur(cur_node, headp);
+    }
+  }
+  int retval = 0;
+  return retval;
+  
 }
 
 /*
@@ -158,6 +236,20 @@ static int naive_sort(struct node_list **headp, struct node_list *nodes)
 /*
  * Outputs the list of nodes to the file 'f'.
  */
+#ifdef DEBUG
+static void output_nodes(FILE * f, struct node_list *head){
+  dep_node *n;
+  int num_chars = 0;
+  while((n = pop(head))){
+    if(num_chars > 70){
+      fputs("\n",f);
+      num_chars = 0;
+    }
+    num_chars += output_node(f, n);
+  }
+  fputs("\n",f);
+}
+#else
 static void output_nodes(FILE * f, struct node_list *head)
 {
     if (head) {
@@ -165,7 +257,7 @@ static void output_nodes(FILE * f, struct node_list *head)
 	output_nodes(f, head->next);
     }
 }
-
+#endif
 
 /* Get the time. */
 static double get_current_seconds(void)
@@ -198,10 +290,13 @@ static int do_serial(struct node_list *nodes, sort_t sort)
 
     start = get_current_seconds();
     err = sort(&head, nodes);
-    end = get_current_seconds();
+    end = get_current_seconds();    
     if (!err) {
+      fprintf(stderr,"Dependency Graph:\n");
 	output_nodes(stdout, head);
 	fprintf(stdout, "time: %f seconds\n", end - start);
+    } else {
+      fprintf(stderr,"Error in sorting nodes\n");
     }
     free_node_list(head);
 
@@ -230,6 +325,7 @@ static int do_parallel(struct node_list *nodes, sort_t sort)
     start = get_current_seconds();
     err = sorted_components(comps, &ncomps, sort, nodes);
     end = get_current_seconds();
+    fprintf(stderr,"Dependency Graph:\n");
     for (i = 0; i < ncomps; i += 1) {
 	if (!err) {
 	    if (i > 0)
@@ -252,37 +348,37 @@ static int do_parallel(struct node_list *nodes, sort_t sort)
  *
  * Return 0 on success and 1 on failure.
  */
-static int dependency_graph(int parallel, sort_t sort, const char *depfile)
-{
+static int dependency_graph(int parallel, sort_t sort, const char *depfile){
     int err, nnodes;
     struct node_list *nodes = NULL;
     struct node_list *l;
 
-    dprintf(DEBUG_MINOR, "parallel: %s\n", parallel ? "true" : "false");
-    dprintf(DEBUG_MINOR, "dependency file: %s\n", depfile);
+    debug_printf(DEBUG_MINOR, "parallel: %s\n", parallel ? "true" : "false");
+    debug_printf(DEBUG_MINOR, "dependency file: %s\n", depfile);
     nnodes = build_graph(depfile, &nodes);
-    if (nnodes < 0)
-	return 1;
-    dprintf(DEBUG_MINOR, "%d nodes in the graph\n", nnodes);
+    if (nnodes < 0) {
+      return 1;
+    }
+    debug_printf(DEBUG_MINOR, "%d nodes in the graph\n", nnodes);
 
-    if (parallel)
+    if (parallel){
 	err = do_parallel(nodes, sort);
-    else
+    } else {
 	err = do_serial(nodes, sort);
-
+    }
     for (l = nodes; l; l = l->next)
 	free_node(l->n);
     free_node_list(nodes);
 
-    return 0;
+    return err;
 }
 
 
 /* Print the usage string and exit with failure status. */
-static void usage(void)
-{
-    fprintf(stderr, "Usage:\ndepends [-p] <alg> <depfile>\n");
-    exit(EXIT_FAILURE);
+static void usage(void){
+  fprintf(stderr,
+          "Usage:\ndepends [-ph] [-a] <alg> [-i] <depfile> [-o] <outfile>\n");
+  exit(EXIT_FAILURE);
 }
 
 
@@ -300,29 +396,87 @@ static sort_t get_alg(const char *alg)
     usage();
     return NULL;
 }
+int main(int argc, char *argv[]){
+  int parallel = 0;
+  int err;
+  sort_t sort = topological_sort;
+  char *input_filename;
+  if(argc < 2){
+    usage();
+  }
+  if(!strcmp("-p",argv[optind])){
+    parallel = 1;
+    optind++;
+  }
+  sort = get_alg(argv[optind++]);
+  input_filename = argv[optind];
+  //    } 
+  err = dependency_graph(parallel, sort, input_filename);
+  if (err) {
+    return EXIT_FAILURE;
+  }
+  return EXIT_SUCCESS;
+}
 
-
-int main(int argc, const char *const argv[])
+/*
+int main(int argc, char* const argv[])
 {
     int parallel = 0;
-    int err, argind = 1;
-    sort_t sort;
-
-    if (argc < 2)
-	usage();
-
-    if (strcmp("-p", argv[1]) == 0) {
-	parallel = 1;
-	argind += 1;
+    int err;
+    sort_t sort = topological_sort;
+    char *input_filename = "/proc/self/fd/0", *output_filename;
+    FILE *input = stdin;
+    FILE *output = stdout;
+    int opt;
+    /    if(argc == 0){
+      usage();
     }
-    if (argc - argind < 2)
-	usage();
-
-    sort = get_alg(argv[argind]);
-
-    err = dependency_graph(parallel, sort, argv[argind + 1]);
-    if (err)
+    while((opt = getopt(argc, argv, "hpa:o:i:"))){
+      switch(opt) {
+        case 'h':
+          usage();
+        case 'a':
+          sort = get_alg(optarg);
+          break;
+        case 'i': {
+          input_filename = optarg;
+          input = fopen(input_filename, "r");
+          if(input == NULL){
+            perror("fopen");
+            exit(EXIT_FAILURE);
+          }
+          break;
+        }
+        case 'o': {
+          output_filename = optarg;
+          output = fopen(output_filename, "w");
+          if(output == NULL){
+            perror("fopen");
+            exit(EXIT_FAILURE);
+          }
+          break;
+        }
+        case 'p':
+          parallel = 1;
+          break;
+      }
+    }
+    if(optind == 1){ /
+      if(argc < 2){
+        usage();
+      }
+      if(!strcmp("-p",argv[optind])){
+        parallel = 1;
+        optind++;
+      }
+      sort = get_alg(argv[optind++]);
+      input_filename = argv[optind];
+      //    } 
+    err = dependency_graph(parallel, sort, input_filename);
+    if (err) {
 	return EXIT_FAILURE;
+    }
 
     return EXIT_SUCCESS;
 }
+*/

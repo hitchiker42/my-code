@@ -53,16 +53,24 @@ struct node *create_node(const char *str, unsigned int id)
     return n;
 }
 
-
-void output_node(FILE * f, struct node *n)
-{
+#ifdef DEBUG
+int output_node(FILE * f, struct node *n){
+  int len = strlen(n->file);
+  fprintf(f, "%.*s ", len, n->file);
+  return len+1;
+}
+#else
+void output_node(FILE * f, struct node *n){
     fprintf(f, "%s\n", n->file);
 }
-
+#endif
 
 void free_node(struct node *n)
 {
     struct node_list *link;
+    if(!n){
+      return;
+    }
 
     free((void *) n->file);
 
@@ -104,7 +112,7 @@ int add_dependency(struct node *n, struct node *dep)
 	return 1;
     }
 
-    dprintf(DEBUG_LOTS, "adding dependency %s -> %s\n",
+    debug_printf(DEBUG_LOTS, "adding dependency %s -> %s\n",
 	    n->file, dep->file);
 
     link->n = n;
@@ -134,7 +142,7 @@ struct node *get_node(struct trie *nodes, const char *str,
 	    return NULL;
 	}
 
-	dprintf(DEBUG_LOTS, "new node for %s\n", str);
+	debug_printf(DEBUG_LOTS, "new node for %s\n", str);
     }
 
     return n;

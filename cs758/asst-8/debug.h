@@ -18,7 +18,7 @@
 extern int current_debug_level;
 
 /* Debug printing. */
-void dprintf(int level, const char *format, ...);
+void debug_printf(int level, const char *format, ...);
 
 
 #endif				/* !_DEBUG_H_ */

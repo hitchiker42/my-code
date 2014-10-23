@@ -1,4 +1,4 @@
-/**
+ /**
  * \file depfile.h
  *
  * Reading a dependency file.
