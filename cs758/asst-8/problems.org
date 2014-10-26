@@ -1,0 +1,96 @@
+22.2-7
+given n objects and a list of r pairs relating the objects is it possible
+to designate each object as either A or B such that each relation is between
+and object labeled A and one labled B, that runs in O(n+r).
+
+The algorithm to do this task involves a slightly modified breadth first
+search. First assume the objects are nodes on an undirected graph and the pairs
+are the edges. We then add an additional lable field to each node, which is a
+boolean value. The arguments are a preinitialized graph G and a root
+node s. The state is just a boolean value which is set if a node has be visited
+or enqueued to be visited. The parent field is not relevant to the problem and
+so is not used. The initial values of state and label should be the special
+value NIL which is a unqiue value (i.e not 0 or 1). The graph that is given as
+an argument is modified, so it should either be passed by value or copied.
+
+enum {
+  visited = 1
+  A = 1
+  not-visited = 0
+  B = 0
+}
+
+Modified-BFS(G, s)
+s.state = visited
+s.label = A
+Q = NIL
+enqueue(q,s)
+while (Q != NIL)
+  v = dequeue(Q)
+  for each u in v.neighbors
+      if u.label == v.label
+        return NIL //this means we can't label the graph properly
+      end
+    if not(u.visited)
+      u.state = visited
+      u.label = bitwise_not(v.label)
+      enqueue(Q,u)
+   end
+end
+return G
+end
+
+To answer the (really silly) question, generate an undirected graph of
+wrestlers based on the wrestlers and pairs given and pass it to the above
+function. If it is possible to designate each relation as one between a
+babyface and a heel the function will return the graph with the nodes marked to
+indicate the designation of each wrestler, if it is not possible it will return
+NIL. 
+
+22.2-9
+let G=(V,E) be a connected undirected graph, given an O(V+E) time algorithm
+to compute a path in G that traverses each edge in E exactly once in each 
+direction.
+
+Despite the location of the problem in the book it seems to me like depth first
+search is the best way to do this.
+dfs(G)
+  //assume G is already initialized
+path = []
+traversed = make_hashtable()
+for v in G.V
+  if v.color = white
+    dfs_visit(G, u, path, traversed)
+  end
+end
+end
+
+dfs_vist(G,u,path)
+append(u, path);
+u.color = grey
+  for v in u.neighbors
+    if u.color == white
+      u.parent = v
+      dfs_visit(u)
+    else
+      if !(v == u.parent) || hashtable_add(traversed, (u . v))
+        hashtable_add(traversed, (v . u))
+        append(v, path)
+        append(u, path)
+      end
+    end
+  end
+u.color = black
+append(u.parent, path)
+end
+
+A path spanning all connected nodes is created by adding a node to the path at
+the start of dfs_visit and adding its parent at the end. In order to traverse
+every node we keep a hashtable of paths taken and for each already visited node
+we attempt to add a trip to that node and back to the current node to the
+table, if we can we add to the path, otherwise the edge was already traversed.
+
+To escape a maze given a large number of pennys you could employ a similar
+procedure, placing pennies from where you start untill you hit a wall, then
+adding a second penny on your way back, taking any path you find that was
+unmarked before continuing back.

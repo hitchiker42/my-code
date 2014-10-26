@@ -32,25 +32,6 @@ static const int radix_base = 8;
       count[key(arr[i])]++;                     \
     }                                           \
     count;})
-
-static inline void compute_indices(uint *count, ulong len){
-  uint i,total;
-  for(i=0,total=0;i<len;i++){
-    ulong temp=count[i];
-    count[i]=total;
-    total+=temp;
-  }
-}
-static inline void update_input(ulong *input, uint *count, ulong len){
-  uint i;
-  ulong *output = alloca(len * sizeof(ulong));
-  for(i=0;i<len;i++){
-    int ind = input[i];
-    output[count[ind]]=input[i];
-    count[ind]++;
-  }
-  memcpy(input, output, len);
-}
 struct min_max {
   ulong min;
   ulong max;
@@ -82,7 +63,7 @@ uint integer_counting_sort(ulong *arr, ulong len,
     //sort we can optimize here by sorting in place and not computing
     //indices.
   uint i,j;
-  for(i=0,j=0;i<max-min;){
+  for(i=0,j=0;i<(max-min) && (j<len);){
     //count[i] is a count of the number of element in arr
     //equal to i. if it's 0 move to the next number otherwise
     //add to the output and decrese count[i];
@@ -138,10 +119,34 @@ uint quick_sort(ulong *arr, ulong n){
   qsort_inplace(arr, 0, n, gt);
   return 0;
 }
-
 ulong bytes[8]={(ulong)0xff<<56,(ulong)0xff<<48,(ulong)0xff<<40,
                 (ulong)0xff<<32,(ulong)0xff<<24,(ulong)0xff<<16,
                 (ulong)0xff<<8,(ulong)0xff};
+#define DEBUG_PRINTF(fmt, args...) fprintf(stderr, fmt,##args)
+static inline void compute_indices(uint *count, ulong len, int nbits){
+  uint i,total;
+  for(i=0,total=0;i<len;i++){
+    ulong temp = (count[i] >> nbits);
+    count[i] = total;
+    total += temp;
+  }
+}
+
+static inline void update_input(ulong *input, uint *count, ulong len, int n){
+  uint i,j;
+  ulong *output = malloc(len * sizeof(ulong));
+  memset(output, '\0', len*sizeof(ulong));
+  for(i=0,j=0;i<len;i++){    
+    int ind = ((input[i] & bytes[n/radix_base]) >> (64-(n+8)));
+    
+    output[count[ind]]=input[i];
+    count[ind]++;
+  }
+  memcpy(input, output, len);
+
+  free(output);
+}
+
 
 //radix sort of base 8
 //in order to be able to use an arbitary radix
@@ -149,18 +154,20 @@ ulong bytes[8]={(ulong)0xff<<56,(ulong)0xff<<48,(ulong)0xff<<40,
 //count[(arr[i]/count_size)%radix_base]++;
 uint radix_sort(ulong *arr, ulong len, ulong nbits){
   int count_size = 1<<radix_base;
-  uint *count = alloca(sizeof(uint)*len);
-  memset(count, '\0',len*sizeof(uint));
+  uint *count = malloc(sizeof(uint)*len);
   uint i,n;
-  for(n=0;n<nbits;n+=radix_base){
+  for(n=0;n<=nbits;n+=radix_base){
+    memset(count, '\0',len*sizeof(uint));
+    DEBUG_PRINTF("running iteration %d\n",n);
     /* Can't use the count keys macro because we can't close
        over the value of n in C*/
     for(i=0;i<len;i++){
-      count[arr[i]&bytes[n]]++;
+      count[(arr[i]) & (bytes[n/radix_base])]++;
     }
-    compute_indices(count, count_size);
-    update_input(arr, count, len);
+    compute_indices(count, count_size, (64-(n+8)));
+    update_input(arr, count, len, n);
   }
+  free(count);
   return 0;
 }
 /************************************************************
