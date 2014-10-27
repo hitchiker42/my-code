@@ -232,7 +232,7 @@ uint32_t pearson_hash8(const void *key, int keylen){
     hash.hh[j]=h; // store result
     x[0]=x[0]+1; // increment first data byte by 1
   }
-  x[0]=ch; // restore first byte...why?
+
   // concatenate the 4 stored values of h;
   return hash.hash_val; // output 32-bit 8 hex bytes hash
 }

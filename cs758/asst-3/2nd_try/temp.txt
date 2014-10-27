@@ -1,0 +1,1000 @@
+    ensures that the access happens as expected by the programmer.
+
+  - Inline assembly code which changes memory, but which has no other
+    visible side effects, risks being deleted by GCC.  Adding the volatile
+    keyword to asm statements will prevent this removal.
+
+  - The jiffies variable is special in that it can have a different value
+    every time it is referenced, but it can be read without any special
+    locking.  So jiffies can be volatile, but the addition of other
+    variables of this type is strongly frowned upon.  Jiffies is considered
+    to be a "stupid legacy" issue (Linus's words) in this regard; fixing it
+    would be more trouble than it is worth.
+
+  - Pointers to data structures in coherent memory which might be modified
+    by I/O devices can, sometimes, legitimately be volatile.  A ring buffer
+    used by a network adapter, where that adapter changes pointers to
+    indicate which descriptors have been processed, is an example of this
+    type of situation.
+
+For most code, none of the above justifications for volatile apply.  As a
+result, the use of volatile is likely to be seen as a bug and will bring
+additional scrutiny to the code.  Developers who are tempted to use
+volatile should take a step back and think about what they are truly trying
+to accomplish.
+
+Patches to remove volatile variables are generally welcome - as long as
+they come with a justification which shows that the concurrency issues have
+been properly thought through.
+
+
+NOTES
+-----
+
+[1] http://lwn.net/Articles/233481/
+[2] http://lwn.net/Articles/233482/
+
+CREDITS
+-------
+
+Original impetus and research by Randy Dunlap
+Written by Jonathan Corbet
+Improvements via comments from Satyam Sharma, Johannes Stezenbach, Jesper
+	Juhl, Heikki Orsila, H. Peter Anvin, Philipp Hahn, and Stefan
+	Richter.
+
+Concurrency Managed Workqueue (cmwq)
+
+September, 2010		Tejun Heo <tj@kernel.org>
+			Florian Mickler <florian@mickler.org>
+
+CONTENTS
+
+1. Introduction
+2. Why cmwq?
+3. The Design
+4. Application Programming Interface (API)
+5. Example Execution Scenarios
+6. Guidelines
+7. Debugging
+
+
+1. Introduction
+
+There are many cases where an asynchronous process execution context
+is needed and the workqueue (wq) API is the most commonly used
+mechanism for such cases.
+
+When such an asynchronous execution context is needed, a work item
+describing which function to execute is put on a queue.  An
+independent thread serves as the asynchronous execution context.  The
+queue is called workqueue and the thread is called worker.
+
+While there are work items on the workqueue the worker executes the
+functions associated with the work items one after the other.  When
+there is no work item left on the workqueue the worker becomes idle.
+When a new work item gets queued, the worker begins executing again.
+
+
+2. Why cmwq?
+
+In the original wq implementation, a multi threaded (MT) wq had one
+worker thread per CPU and a single threaded (ST) wq had one worker
+thread system-wide.  A single MT wq needed to keep around the same
+number of workers as the number of CPUs.  The kernel grew a lot of MT
+wq users over the years and with the number of CPU cores continuously
+rising, some systems saturated the default 32k PID space just booting
+up.
+
+Although MT wq wasted a lot of resource, the level of concurrency
+provided was unsatisfactory.  The limitation was common to both ST and
+MT wq albeit less severe on MT.  Each wq maintained its own separate
+worker pool.  A MT wq could provide only one execution context per CPU
+while a ST wq one for the whole system.  Work items had to compete for
+those very limited execution contexts leading to various problems
+including proneness to deadlocks around the single execution context.
+
+The tension between the provided level of concurrency and resource
+usage also forced its users to make unnecessary tradeoffs like libata
+choosing to use ST wq for polling PIOs and accepting an unnecessary
+limitation that no two polling PIOs can progress at the same time.  As
+MT wq don't provide much better concurrency, users which require
+higher level of concurrency, like async or fscache, had to implement
+their own thread pool.
+
+Concurrency Managed Workqueue (cmwq) is a reimplementation of wq with
+focus on the following goals.
+
+* Maintain compatibility with the original workqueue API.
+
+* Use per-CPU unified worker pools shared by all wq to provide
+  flexible level of concurrency on demand without wasting a lot of
+  resource.
+
+* Automatically regulate worker pool and level of concurrency so that
+  the API users don't need to worry about such details.
+
+
+3. The Design
+
+In order to ease the asynchronous execution of functions a new
+abstraction, the work item, is introduced.
+
+A work item is a simple struct that holds a pointer to the function
+that is to be executed asynchronously.  Whenever a driver or subsystem
+wants a function to be executed asynchronously it has to set up a work
+item pointing to that function and queue that work item on a
+workqueue.
+
+Special purpose threads, called worker threads, execute the functions
+off of the queue, one after the other.  If no work is queued, the
+worker threads become idle.  These worker threads are managed in so
+called worker-pools.
+
+The cmwq design differentiates between the user-facing workqueues that
+subsystems and drivers queue work items on and the backend mechanism
+which manages worker-pools and processes the queued work items.
+
+There are two worker-pools, one for normal work items and the other
+for high priority ones, for each possible CPU and some extra
+worker-pools to serve work items queued on unbound workqueues - the
+number of these backing pools is dynamic.
+
+Subsystems and drivers can create and queue work items through special
+workqueue API functions as they see fit. They can influence some
+aspects of the way the work items are executed by setting flags on the
+workqueue they are putting the work item on. These flags include
+things like CPU locality, concurrency limits, priority and more.  To
+get a detailed overview refer to the API description of
+alloc_workqueue() below.
+
+When a work item is queued to a workqueue, the target worker-pool is
+determined according to the queue parameters and workqueue attributes
+and appended on the shared worklist of the worker-pool.  For example,
+unless specifically overridden, a work item of a bound workqueue will
+be queued on the worklist of either normal or highpri worker-pool that
+is associated to the CPU the issuer is running on.
+
+For any worker pool implementation, managing the concurrency level
+(how many execution contexts are active) is an important issue.  cmwq
+tries to keep the concurrency at a minimal but sufficient level.
+Minimal to save resources and sufficient in that the system is used at
+its full capacity.
+
+Each worker-pool bound to an actual CPU implements concurrency
+management by hooking into the scheduler.  The worker-pool is notified
+whenever an active worker wakes up or sleeps and keeps track of the
+number of the currently runnable workers.  Generally, work items are
+not expected to hog a CPU and consume many cycles.  That means
+maintaining just enough concurrency to prevent work processing from
+stalling should be optimal.  As long as there are one or more runnable
+workers on the CPU, the worker-pool doesn't start execution of a new
+work, but, when the last running worker goes to sleep, it immediately
+schedules a new worker so that the CPU doesn't sit idle while there
+are pending work items.  This allows using a minimal number of workers
+without losing execution bandwidth.
+
+Keeping idle workers around doesn't cost other than the memory space
+for kthreads, so cmwq holds onto idle ones for a while before killing
+them.
+
+For unbound workqueues, the number of backing pools is dynamic.
+Unbound workqueue can be assigned custom attributes using
+apply_workqueue_attrs() and workqueue will automatically create
+backing worker pools matching the attributes.  The responsibility of
+regulating concurrency level is on the users.  There is also a flag to
+mark a bound wq to ignore the concurrency management.  Please refer to
+the API section for details.
+
+Forward progress guarantee relies on that workers can be created when
+more execution contexts are necessary, which in turn is guaranteed
+through the use of rescue workers.  All work items which might be used
+on code paths that handle memory reclaim are required to be queued on
+wq's that have a rescue-worker reserved for execution under memory
+pressure.  Else it is possible that the worker-pool deadlocks waiting
+for execution contexts to free up.
+
+
+4. Application Programming Interface (API)
+
+alloc_workqueue() allocates a wq.  The original create_*workqueue()
+functions are deprecated and scheduled for removal.  alloc_workqueue()
+takes three arguments - @name, @flags and @max_active.  @name is the
+name of the wq and also used as the name of the rescuer thread if
+there is one.
+
+A wq no longer manages execution resources but serves as a domain for
+forward progress guarantee, flush and work item attributes.  @flags
+and @max_active control how work items are assigned execution
+resources, scheduled and executed.
+
+@flags:
+
+  WQ_UNBOUND
+
+	Work items queued to an unbound wq are served by the special
+	woker-pools which host workers which are not bound to any
+	specific CPU.  This makes the wq behave as a simple execution
+	context provider without concurrency management.  The unbound
+	worker-pools try to start execution of work items as soon as
+	possible.  Unbound wq sacrifices locality but is useful for
+	the following cases.
+
+	* Wide fluctuation in the concurrency level requirement is
+	  expected and using bound wq may end up creating large number
+	  of mostly unused workers across different CPUs as the issuer
+	  hops through different CPUs.
+
+	* Long running CPU intensive workloads which can be better
+	  managed by the system scheduler.
+
+  WQ_FREEZABLE
+
+	A freezable wq participates in the freeze phase of the system
+	suspend operations.  Work items on the wq are drained and no
+	new work item starts execution until thawed.
+
+  WQ_MEM_RECLAIM
+
+	All wq which might be used in the memory reclaim paths _MUST_
+	have this flag set.  The wq is guaranteed to have at least one
+	execution context regardless of memory pressure.
+
+  WQ_HIGHPRI
+
+	Work items of a highpri wq are queued to the highpri
+	worker-pool of the target cpu.  Highpri worker-pools are
+	served by worker threads with elevated nice level.
+
+	Note that normal and highpri worker-pools don't interact with
+	each other.  Each maintain its separate pool of workers and
+	implements concurrency management among its workers.
+
+  WQ_CPU_INTENSIVE
+
+	Work items of a CPU intensive wq do not contribute to the
+	concurrency level.  In other words, runnable CPU intensive
+	work items will not prevent other work items in the same
+	worker-pool from starting execution.  This is useful for bound
+	work items which are expected to hog CPU cycles so that their
+	execution is regulated by the system scheduler.
+
+	Although CPU intensive work items don't contribute to the
+	concurrency level, start of their executions is still
+	regulated by the concurrency management and runnable
+	non-CPU-intensive work items can delay execution of CPU
+	intensive work items.
+
+	This flag is meaningless for unbound wq.
+
+Note that the flag WQ_NON_REENTRANT no longer exists as all workqueues
+are now non-reentrant - any work item is guaranteed to be executed by
+at most one worker system-wide at any given time.
+
+@max_active:
+
+@max_active determines the maximum number of execution contexts per
+CPU which can be assigned to the work items of a wq.  For example,
+with @max_active of 16, at most 16 work items of the wq can be
+executing at the same time per CPU.
+
+Currently, for a bound wq, the maximum limit for @max_active is 512
+and the default value used when 0 is specified is 256.  For an unbound
+wq, the limit is higher of 512 and 4 * num_possible_cpus().  These
+values are chosen sufficiently high such that they are not the
+limiting factor while providing protection in runaway cases.
+
+The number of active work items of a wq is usually regulated by the
+users of the wq, more specifically, by how many work items the users
+may queue at the same time.  Unless there is a specific need for
+throttling the number of active work items, specifying '0' is
+recommended.
+
+Some users depend on the strict execution ordering of ST wq.  The
+combination of @max_active of 1 and WQ_UNBOUND is used to achieve this
+behavior.  Work items on such wq are always queued to the unbound
+worker-pools and only one work item can be active at any given time thus
+achieving the same ordering property as ST wq.
+
+
+5. Example Execution Scenarios
+
+The following example execution scenarios try to illustrate how cmwq
+behave under different configurations.
+
+ Work items w0, w1, w2 are queued to a bound wq q0 on the same CPU.
+ w0 burns CPU for 5ms then sleeps for 10ms then burns CPU for 5ms
+ again before finishing.  w1 and w2 burn CPU for 5ms then sleep for
+ 10ms.
+
+Ignoring all other tasks, works and processing overhead, and assuming
+simple FIFO scheduling, the following is one highly simplified version
+of possible sequences of events with the original wq.
+
+ TIME IN MSECS	EVENT
+ 0		w0 starts and burns CPU
+ 5		w0 sleeps
+ 15		w0 wakes up and burns CPU
+ 20		w0 finishes
+ 20		w1 starts and burns CPU
+ 25		w1 sleeps
+ 35		w1 wakes up and finishes
+ 35		w2 starts and burns CPU
+ 40		w2 sleeps
+ 50		w2 wakes up and finishes
+
+And with cmwq with @max_active >= 3,
+
+ TIME IN MSECS	EVENT
+ 0		w0 starts and burns CPU
+ 5		w0 sleeps
+ 5		w1 starts and burns CPU
+ 10		w1 sleeps
+ 10		w2 starts and burns CPU
+ 15		w2 sleeps
+ 15		w0 wakes up and burns CPU
+ 20		w0 finishes
+ 20		w1 wakes up and finishes
+ 25		w2 wakes up and finishes
+
+If @max_active == 2,
+
+ TIME IN MSECS	EVENT
+ 0		w0 starts and burns CPU
+ 5		w0 sleeps
+ 5		w1 starts and burns CPU
+ 10		w1 sleeps
+ 15		w0 wakes up and burns CPU
+ 20		w0 finishes
+ 20		w1 wakes up and finishes
+ 20		w2 starts and burns CPU
+ 25		w2 sleeps
+ 35		w2 wakes up and finishes
+
+Now, let's assume w1 and w2 are queued to a different wq q1 which has
+WQ_CPU_INTENSIVE set,
+
+ TIME IN MSECS	EVENT
+ 0		w0 starts and burns CPU
+ 5		w0 sleeps
+ 5		w1 and w2 start and burn CPU
+ 10		w1 sleeps
+ 15		w2 sleeps
+ 15		w0 wakes up and burns CPU
+ 20		w0 finishes
+ 20		w1 wakes up and finishes
+ 25		w2 wakes up and finishes
+
+
+6. Guidelines
+
+* Do not forget to use WQ_MEM_RECLAIM if a wq may process work items
+  which are used during memory reclaim.  Each wq with WQ_MEM_RECLAIM
+  set has an execution context reserved for it.  If there is
+  dependency among multiple work items used during memory reclaim,
+  they should be queued to separate wq each with WQ_MEM_RECLAIM.
+
+* Unless strict ordering is required, there is no need to use ST wq.
+
+* Unless there is a specific need, using 0 for @max_active is
+  recommended.  In most use cases, concurrency level usually stays
+  well under the default limit.
+
+* A wq serves as a domain for forward progress guarantee
+  (WQ_MEM_RECLAIM, flush and work item attributes.  Work items which
+  are not involved in memory reclaim and don't need to be flushed as a
+  part of a group of work items, and don't require any special
+  attribute, can use one of the system wq.  There is no difference in
+  execution characteristics between using a dedicated wq and a system
+  wq.
+
+* Unless work items are expected to consume a huge amount of CPU
+  cycles, using a bound wq is usually beneficial due to the increased
+  level of locality in wq operations and work item execution.
+
+
+7. Debugging
+
+Because the work functions are executed by generic worker threads
+there are a few tricks needed to shed some light on misbehaving
+workqueue users.
+
+Worker threads show up in the process list as:
+
+root      5671  0.0  0.0      0     0 ?        S    12:07   0:00 [kworker/0:1]
+root      5672  0.0  0.0      0     0 ?        S    12:07   0:00 [kworker/1:2]
+root      5673  0.0  0.0      0     0 ?        S    12:12   0:00 [kworker/0:0]
+root      5674  0.0  0.0      0     0 ?        S    12:13   0:00 [kworker/1:0]
+
+If kworkers are going crazy (using too much cpu), there are two types
+of possible problems:
+
+	1. Something beeing scheduled in rapid succession
+	2. A single work item that consumes lots of cpu cycles
+
+The first one can be tracked using tracing:
+
+	$ echo workqueue:workqueue_queue_work > /sys/kernel/debug/tracing/set_event
+	$ cat /sys/kernel/debug/tracing/trace_pipe > out.txt
+	(wait a few secs)
+	^C
+
+If something is busy looping on work queueing, it would be dominating
+the output and the offender can be determined with the work item
+function.
+
+For the second type of problems it should be possible to just check
+the stack trace of the offending worker thread.
+
+	$ cat /proc/THE_OFFENDING_KWORKER/stack
+
+The work item's function should be trivially visible in the stack
+trace.
+Wait/Wound Deadlock-Proof Mutex Design
+======================================
+
+Please read mutex-design.txt first, as it applies to wait/wound mutexes too.
+
+Motivation for WW-Mutexes
+-------------------------
+
+GPU's do operations that commonly involve many buffers.  Those buffers
+can be shared across contexts/processes, exist in different memory
+domains (for example VRAM vs system memory), and so on.  And with
+PRIME / dmabuf, they can even be shared across devices.  So there are
+a handful of situations where the driver needs to wait for buffers to
+become ready.  If you think about this in terms of waiting on a buffer
+mutex for it to become available, this presents a problem because
+there is no way to guarantee that buffers appear in a execbuf/batch in
+the same order in all contexts.  That is directly under control of
+userspace, and a result of the sequence of GL calls that an application
+makes.	Which results in the potential for deadlock.  The problem gets
+more complex when you consider that the kernel may need to migrate the
+buffer(s) into VRAM before the GPU operates on the buffer(s), which
+may in turn require evicting some other buffers (and you don't want to
+evict other buffers which are already queued up to the GPU), but for a
+simplified understanding of the problem you can ignore this.
+
+The algorithm that the TTM graphics subsystem came up with for dealing with
+this problem is quite simple.  For each group of buffers (execbuf) that need
+to be locked, the caller would be assigned a unique reservation id/ticket,
+from a global counter.  In case of deadlock while locking all the buffers
+associated with a execbuf, the one with the lowest reservation ticket (i.e.
+the oldest task) wins, and the one with the higher reservation id (i.e. the
+younger task) unlocks all of the buffers that it has already locked, and then
+tries again.
+
+In the RDBMS literature this deadlock handling approach is called wait/wound:
+The older tasks waits until it can acquire the contended lock. The younger tasks
+needs to back off and drop all the locks it is currently holding, i.e. the
+younger task is wounded.
+
+Concepts
+--------
+
+Compared to normal mutexes two additional concepts/objects show up in the lock
+interface for w/w mutexes:
+
+Acquire context: To ensure eventual forward progress it is important the a task
+trying to acquire locks doesn't grab a new reservation id, but keeps the one it
+acquired when starting the lock acquisition. This ticket is stored in the
+acquire context. Furthermore the acquire context keeps track of debugging state
+to catch w/w mutex interface abuse.
+
+W/w class: In contrast to normal mutexes the lock class needs to be explicit for
+w/w mutexes, since it is required to initialize the acquire context.
+
+Furthermore there are three different class of w/w lock acquire functions:
+
+* Normal lock acquisition with a context, using ww_mutex_lock.
+
+* Slowpath lock acquisition on the contending lock, used by the wounded task
+  after having dropped all already acquired locks. These functions have the
+  _slow postfix.
+
+  From a simple semantics point-of-view the _slow functions are not strictly
+  required, since simply calling the normal ww_mutex_lock functions on the
+  contending lock (after having dropped all other already acquired locks) will
+  work correctly. After all if no other ww mutex has been acquired yet there's
+  no deadlock potential and hence the ww_mutex_lock call will block and not
+  prematurely return -EDEADLK. The advantage of the _slow functions is in
+  interface safety:
+  - ww_mutex_lock has a __must_check int return type, whereas ww_mutex_lock_slow
+    has a void return type. Note that since ww mutex code needs loops/retries
+    anyway the __must_check doesn't result in spurious warnings, even though the
+    very first lock operation can never fail.
+  - When full debugging is enabled ww_mutex_lock_slow checks that all acquired
+    ww mutex have been released (preventing deadlocks) and makes sure that we
+    block on the contending lock (preventing spinning through the -EDEADLK
+    slowpath until the contended lock can be acquired).
+
+* Functions to only acquire a single w/w mutex, which results in the exact same
+  semantics as a normal mutex. This is done by calling ww_mutex_lock with a NULL
+  context.
+
+  Again this is not strictly required. But often you only want to acquire a
+  single lock in which case it's pointless to set up an acquire context (and so
+  better to avoid grabbing a deadlock avoidance ticket).
+
+Of course, all the usual variants for handling wake-ups due to signals are also
+provided.
+
+Usage
+-----
+
+Three different ways to acquire locks within the same w/w class. Common
+definitions for methods #1 and #2:
+
+static DEFINE_WW_CLASS(ww_class);
+
+struct obj {
+	struct ww_mutex lock;
+	/* obj data */
+};
+
+struct obj_entry {
+	struct list_head head;
+	struct obj *obj;
+};
+
+Method 1, using a list in execbuf->buffers that's not allowed to be reordered.
+This is useful if a list of required objects is already tracked somewhere.
+Furthermore the lock helper can use propagate the -EALREADY return code back to
+the caller as a signal that an object is twice on the list. This is useful if
+the list is constructed from userspace input and the ABI requires userspace to
+not have duplicate entries (e.g. for a gpu commandbuffer submission ioctl).
+
+int lock_objs(struct list_head *list, struct ww_acquire_ctx *ctx)
+{
+	struct obj *res_obj = NULL;
+	struct obj_entry *contended_entry = NULL;
+	struct obj_entry *entry;
+
+	ww_acquire_init(ctx, &ww_class);
+
+retry:
+	list_for_each_entry (entry, list, head) {
+		if (entry->obj == res_obj) {
+			res_obj = NULL;
+			continue;
+		}
+		ret = ww_mutex_lock(&entry->obj->lock, ctx);
+		if (ret < 0) {
+			contended_entry = entry;
+			goto err;
+		}
+	}
+
+	ww_acquire_done(ctx);
+	return 0;
+
+err:
+	list_for_each_entry_continue_reverse (entry, list, head)
+		ww_mutex_unlock(&entry->obj->lock);
+
+	if (res_obj)
+		ww_mutex_unlock(&res_obj->lock);
+
+	if (ret == -EDEADLK) {
+		/* we lost out in a seqno race, lock and retry.. */
+		ww_mutex_lock_slow(&contended_entry->obj->lock, ctx);
+		res_obj = contended_entry->obj;
+		goto retry;
+	}
+	ww_acquire_fini(ctx);
+
+	return ret;
+}
+
+Method 2, using a list in execbuf->buffers that can be reordered. Same semantics
+of duplicate entry detection using -EALREADY as method 1 above. But the
+list-reordering allows for a bit more idiomatic code.
+
+int lock_objs(struct list_head *list, struct ww_acquire_ctx *ctx)
+{
+	struct obj_entry *entry, *entry2;
+
+	ww_acquire_init(ctx, &ww_class);
+
+	list_for_each_entry (entry, list, head) {
+		ret = ww_mutex_lock(&entry->obj->lock, ctx);
+		if (ret < 0) {
+			entry2 = entry;
+
+			list_for_each_entry_continue_reverse (entry2, list, head)
+				ww_mutex_unlock(&entry2->obj->lock);
+
+			if (ret != -EDEADLK) {
+				ww_acquire_fini(ctx);
+				return ret;
+			}
+
+			/* we lost out in a seqno race, lock and retry.. */
+			ww_mutex_lock_slow(&entry->obj->lock, ctx);
+
+			/*
+			 * Move buf to head of the list, this will point
+			 * buf->next to the first unlocked entry,
+			 * restarting the for loop.
+			 */
+			list_del(&entry->head);
+			list_add(&entry->head, list);
+		}
+	}
+
+	ww_acquire_done(ctx);
+	return 0;
+}
+
+Unlocking works the same way for both methods #1 and #2:
+
+void unlock_objs(struct list_head *list, struct ww_acquire_ctx *ctx)
+{
+	struct obj_entry *entry;
+
+	list_for_each_entry (entry, list, head)
+		ww_mutex_unlock(&entry->obj->lock);
+
+	ww_acquire_fini(ctx);
+}
+
+Method 3 is useful if the list of objects is constructed ad-hoc and not upfront,
+e.g. when adjusting edges in a graph where each node has its own ww_mutex lock,
+and edges can only be changed when holding the locks of all involved nodes. w/w
+mutexes are a natural fit for such a case for two reasons:
+- They can handle lock-acquisition in any order which allows us to start walking
+  a graph from a starting point and then iteratively discovering new edges and
+  locking down the nodes those edges connect to.
+- Due to the -EALREADY return code signalling that a given objects is already
+  held there's no need for additional book-keeping to break cycles in the graph
+  or keep track off which looks are already held (when using more than one node
+  as a starting point).
+
+Note that this approach differs in two important ways from the above methods:
+- Since the list of objects is dynamically constructed (and might very well be
+  different when retrying due to hitting the -EDEADLK wound condition) there's
+  no need to keep any object on a persistent list when it's not locked. We can
+  therefore move the list_head into the object itself.
+- On the other hand the dynamic object list construction also means that the -EALREADY return
+  code can't be propagated.
+
+Note also that methods #1 and #2 and method #3 can be combined, e.g. to first lock a
+list of starting nodes (passed in from userspace) using one of the above
+methods. And then lock any additional objects affected by the operations using
+method #3 below. The backoff/retry procedure will be a bit more involved, since
+when the dynamic locking step hits -EDEADLK we also need to unlock all the
+objects acquired with the fixed list. But the w/w mutex debug checks will catch
+any interface misuse for these cases.
+
+Also, method 3 can't fail the lock acquisition step since it doesn't return
+-EALREADY. Of course this would be different when using the _interruptible
+variants, but that's outside of the scope of these examples here.
+
+struct obj {
+	struct ww_mutex ww_mutex;
+	struct list_head locked_list;
+};
+
+static DEFINE_WW_CLASS(ww_class);
+
+void __unlock_objs(struct list_head *list)
+{
+	struct obj *entry, *temp;
+
+	list_for_each_entry_safe (entry, temp, list, locked_list) {
+		/* need to do that before unlocking, since only the current lock holder is
+		allowed to use object */
+		list_del(&entry->locked_list);
+		ww_mutex_unlock(entry->ww_mutex)
+	}
+}
+
+void lock_objs(struct list_head *list, struct ww_acquire_ctx *ctx)
+{
+	struct obj *obj;
+
+	ww_acquire_init(ctx, &ww_class);
+
+retry:
+	/* re-init loop start state */
+	loop {
+		/* magic code which walks over a graph and decides which objects
+		 * to lock */
+
+		ret = ww_mutex_lock(obj->ww_mutex, ctx);
+		if (ret == -EALREADY) {
+			/* we have that one already, get to the next object */
+			continue;
+		}
+		if (ret == -EDEADLK) {
+			__unlock_objs(list);
+
+			ww_mutex_lock_slow(obj, ctx);
+			list_add(&entry->locked_list, list);
+			goto retry;
+		}
+
+		/* locked a new object, add it to the list */
+		list_add_tail(&entry->locked_list, list);
+	}
+
+	ww_acquire_done(ctx);
+	return 0;
+}
+
+void unlock_objs(struct list_head *list, struct ww_acquire_ctx *ctx)
+{
+	__unlock_objs(list);
+	ww_acquire_fini(ctx);
+}
+
+Method 4: Only lock one single objects. In that case deadlock detection and
+prevention is obviously overkill, since with grabbing just one lock you can't
+produce a deadlock within just one class. To simplify this case the w/w mutex
+api can be used with a NULL context.
+
+Implementation Details
+----------------------
+
+Design:
+  ww_mutex currently encapsulates a struct mutex, this means no extra overhead for
+  normal mutex locks, which are far more common. As such there is only a small
+  increase in code size if wait/wound mutexes are not used.
+
+  In general, not much contention is expected. The locks are typically used to
+  serialize access to resources for devices. The only way to make wakeups
+  smarter would be at the cost of adding a field to struct mutex_waiter. This
+  would add overhead to all cases where normal mutexes are used, and
+  ww_mutexes are generally less performance sensitive.
+
+Lockdep:
+  Special care has been taken to warn for as many cases of api abuse
+  as possible. Some common api abuses will be caught with
+  CONFIG_DEBUG_MUTEXES, but CONFIG_PROVE_LOCKING is recommended.
+
+  Some of the errors which will be warned about:
+   - Forgetting to call ww_acquire_fini or ww_acquire_init.
+   - Attempting to lock more mutexes after ww_acquire_done.
+   - Attempting to lock the wrong mutex after -EDEADLK and
+     unlocking all mutexes.
+   - Attempting to lock the right mutex after -EDEADLK,
+     before unlocking all mutexes.
+
+   - Calling ww_mutex_lock_slow before -EDEADLK was returned.
+
+   - Unlocking mutexes with the wrong unlock function.
+   - Calling one of the ww_acquire_* twice on the same context.
+   - Using a different ww_class for the mutex than for the ww_acquire_ctx.
+   - Normal lockdep errors that can result in deadlocks.
+
+  Some of the lockdep errors that can result in deadlocks:
+   - Calling ww_acquire_init to initialize a second ww_acquire_ctx before
+     having called ww_acquire_fini on the first.
+   - 'normal' deadlocks that can occur.
+
+FIXME: Update this section once we have the TASK_DEADLOCK task state flag magic
+implemented.
+
+XZ data compression in Linux
+============================
+
+Introduction
+
+    XZ is a general purpose data compression format with high compression
+    ratio and relatively fast decompression. The primary compression
+    algorithm (filter) is LZMA2. Additional filters can be used to improve
+    compression ratio even further. E.g. Branch/Call/Jump (BCJ) filters
+    improve compression ratio of executable data.
+
+    The XZ decompressor in Linux is called XZ Embedded. It supports
+    the LZMA2 filter and optionally also BCJ filters. CRC32 is supported
+    for integrity checking. The home page of XZ Embedded is at
+    <http://tukaani.org/xz/embedded.html>, where you can find the
+    latest version and also information about using the code outside
+    the Linux kernel.
+
+    For userspace, XZ Utils provide a zlib-like compression library
+    and a gzip-like command line tool. XZ Utils can be downloaded from
+    <http://tukaani.org/xz/>.
+
+XZ related components in the kernel
+
+    The xz_dec module provides XZ decompressor with single-call (buffer
+    to buffer) and multi-call (stateful) APIs. The usage of the xz_dec
+    module is documented in include/linux/xz.h.
+
+    The xz_dec_test module is for testing xz_dec. xz_dec_test is not
+    useful unless you are hacking the XZ decompressor. xz_dec_test
+    allocates a char device major dynamically to which one can write
+    .xz files from userspace. The decompressed output is thrown away.
+    Keep an eye on dmesg to see diagnostics printed by xz_dec_test.
+    See the xz_dec_test source code for the details.
+
+    For decompressing the kernel image, initramfs, and initrd, there
+    is a wrapper function in lib/decompress_unxz.c. Its API is the
+    same as in other decompress_*.c files, which is defined in
+    include/linux/decompress/generic.h.
+
+    scripts/xz_wrap.sh is a wrapper for the xz command line tool found
+    from XZ Utils. The wrapper sets compression options to values suitable
+    for compressing the kernel image.
+
+    For kernel makefiles, two commands are provided for use with
+    $(call if_needed). The kernel image should be compressed with
+    $(call if_needed,xzkern) which will use a BCJ filter and a big LZMA2
+    dictionary. It will also append a four-byte trailer containing the
+    uncompressed size of the file, which is needed by the boot code.
+    Other things should be compressed with $(call if_needed,xzmisc)
+    which will use no BCJ filter and 1 MiB LZMA2 dictionary.
+
+Notes on compression options
+
+    Since the XZ Embedded supports only streams with no integrity check or
+    CRC32, make sure that you don't use some other integrity check type
+    when encoding files that are supposed to be decoded by the kernel. With
+    liblzma, you need to use either LZMA_CHECK_NONE or LZMA_CHECK_CRC32
+    when encoding. With the xz command line tool, use --check=none or
+    --check=crc32.
+
+    Using CRC32 is strongly recommended unless there is some other layer
+    which will verify the integrity of the uncompressed data anyway.
+    Double checking the integrity would probably be waste of CPU cycles.
+    Note that the headers will always have a CRC32 which will be validated
+    by the decoder; you can only change the integrity check type (or
+    disable it) for the actual uncompressed data.
+
+    In userspace, LZMA2 is typically used with dictionary sizes of several
+    megabytes. The decoder needs to have the dictionary in RAM, thus big
+    dictionaries cannot be used for files that are intended to be decoded
+    by the kernel. 1 MiB is probably the maximum reasonable dictionary
+    size for in-kernel use (maybe more is OK for initramfs). The presets
+    in XZ Utils may not be optimal when creating files for the kernel,
+    so don't hesitate to use custom settings. Example:
+
+        xz --check=crc32 --lzma2=dict=512KiB inputfile
+
+    An exception to above dictionary size limitation is when the decoder
+    is used in single-call mode. Decompressing the kernel itself is an
+    example of this situation. In single-call mode, the memory usage
+    doesn't depend on the dictionary size, and it is perfectly fine to
+    use a big dictionary: for maximum compression, the dictionary should
+    be at least as big as the uncompressed data itself.
+
+Future plans
+
+    Creating a limited XZ encoder may be considered if people think it is
+    useful. LZMA2 is slower to compress than e.g. Deflate or LZO even at
+    the fastest settings, so it isn't clear if LZMA2 encoder is wanted
+    into the kernel.
+
+    Support for limited random-access reading is planned for the
+    decompression code. I don't know if it could have any use in the
+    kernel, but I know that it would be useful in some embedded projects
+    outside the Linux kernel.
+
+Conformance to the .xz file format specification
+
+    There are a couple of corner cases where things have been simplified
+    at expense of detecting errors as early as possible. These should not
+    matter in practice all, since they don't cause security issues. But
+    it is good to know this if testing the code e.g. with the test files
+    from XZ Utils.
+
+Reporting bugs
+
+    Before reporting a bug, please check that it's not fixed already
+    at upstream. See <http://tukaani.org/xz/embedded.html> to get the
+    latest code.
+
+    Report bugs to <lasse.collin@tukaani.org> or visit #tukaani on
+    Freenode and talk to Larhzu. I don't actively read LKML or other
+    kernel-related mailing lists, so if there's something I should know,
+    you should email to me personally or use IRC.
+
+    Don't bother Igor Pavlov with questions about the XZ implementation
+    in the kernel or about XZ Utils. While these two implementations
+    include essential code that is directly based on Igor Pavlov's code,
+    these implementations aren't maintained nor supported by him.
+		Writing Device Drivers for Zorro Devices
+		----------------------------------------
+
+Written by Geert Uytterhoeven <geert@linux-m68k.org>
+Last revised: September 5, 2003
+
+
+1. Introduction
+---------------
+
+The Zorro bus is the bus used in the Amiga family of computers. Thanks to
+AutoConfig(tm), it's 100% Plug-and-Play.
+
+There are two types of Zorro busses, Zorro II and Zorro III:
+
+  - The Zorro II address space is 24-bit and lies within the first 16 MB of the
+    Amiga's address map.
+
+  - Zorro III is a 32-bit extension of Zorro II, which is backwards compatible
+    with Zorro II. The Zorro III address space lies outside the first 16 MB.
+
+
+2. Probing for Zorro Devices
+----------------------------
+
+Zorro devices are found by calling `zorro_find_device()', which returns a
+pointer to the `next' Zorro device with the specified Zorro ID. A probe loop
+for the board with Zorro ID `ZORRO_PROD_xxx' looks like:
+
+    struct zorro_dev *z = NULL;
+
+    while ((z = zorro_find_device(ZORRO_PROD_xxx, z))) {
+	if (!zorro_request_region(z->resource.start+MY_START, MY_SIZE,
+				  "My explanation"))
+	...
+    }
+
+`ZORRO_WILDCARD' acts as a wildcard and finds any Zorro device. If your driver
+supports different types of boards, you can use a construct like:
+
+    struct zorro_dev *z = NULL;
+
+    while ((z = zorro_find_device(ZORRO_WILDCARD, z))) {
+	if (z->id != ZORRO_PROD_xxx1 && z->id != ZORRO_PROD_xxx2 && ...)
+	    continue;
+	if (!zorro_request_region(z->resource.start+MY_START, MY_SIZE,
+				  "My explanation"))
+	...
+    }
+
+
+3. Zorro Resources
+------------------
+
+Before you can access a Zorro device's registers, you have to make sure it's
+not yet in use. This is done using the I/O memory space resource management
+functions:
+
+    request_mem_region()
+    release_mem_region()
+
+Shortcuts to claim the whole device's address space are provided as well:
+
+    zorro_request_device
+    zorro_release_device
+
+
+4. Accessing the Zorro Address Space
+------------------------------------
+
+The address regions in the Zorro device resources are Zorro bus address
+regions. Due to the identity bus-physical address mapping on the Zorro bus,
+they are CPU physical addresses as well.
+
+The treatment of these regions depends on the type of Zorro space:
+
+  - Zorro II address space is always mapped and does not have to be mapped
+    explicitly using z_ioremap().
+    
+    Conversion from bus/physical Zorro II addresses to kernel virtual addresses
+    and vice versa is done using:
+
+	virt_addr = ZTWO_VADDR(bus_addr);
+	bus_addr = ZTWO_PADDR(virt_addr);
+
+  - Zorro III address space must be mapped explicitly using z_ioremap() first
+    before it can be accessed:
+ 
+	virt_addr = z_ioremap(bus_addr, size);
+	...
+	z_iounmap(virt_addr);
+
+
+5. References
+-------------
+
+linux/include/linux/zorro.h
+linux/include/uapi/linux/zorro.h
+linux/include/uapi/linux/zorro_ids.h
+linux/arch/m68k/include/asm/zorro.h
+linux/drivers/zorro
+/proc/bus/zorro
+
