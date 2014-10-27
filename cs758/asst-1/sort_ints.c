@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 #include <sys/time.h>
 
@@ -26,28 +27,173 @@ static const unsigned long ulong_bits = 8 * sizeof(unsigned long);
 /************************************************************
  * Functions that you must implement
  ************************************************************/
-
-/*
- * Radix sort
- * Return 0 on success and 1 on failure.
- */
-static unsigned int do_radix_sort(unsigned long ary[],
-                                  unsigned long n, unsigned long nbits){
-  exit(EXIT_FAILURE);
+typedef unsigned long ulong;
+typedef unsigned int uint;
+typedef struct min_max min_max;
+struct min_max {
+  ulong min;
+  ulong max;
+};
+static inline void* xmalloc(size_t sz){
+  void *temp = calloc(sz,1);
+  if(!temp && sz){
+    perror("malloc");
+    exit(1);
+  }
+  return temp;
 }
-
-
+min_max find_min_max(ulong *arr, ulong n){
+  ulong i;
+  ulong min = arr[0], max = arr[0];
+  for(i=1;i<n;i++){
+    if(arr[i] > max){
+      max = arr[i];
+    } else if(arr[i] < min){
+      min = arr[i];
+    }
+  }
+  min_max retval = {.min = min-1, .max = max+1};
+  return retval;
+}
+#define DEBUG_PRINTF(fmt,args...) fprintf(stderr, fmt,##args)
+typedef uint(*key_fxn)(ulong);
+static ulong* counting_sort_generic(ulong *arr, ulong *output,
+                                    ulong n, ulong nbits, key_fxn key){
+  ulong max = (1 << nbits)-1;
+  uint *count = xmalloc(sizeof(uint)*max);
+  DEBUG_PRINTF(
+    "running counting sort on %lu items each %ld bits long, max = %lu\n",
+      n, nbits, max);
+  if(!output){
+    output = xmalloc(sizeof(ulong)*n);
+  }
+  uint i;
+  for(i=0;i<n;i++){
+    count[key(arr[i])]++;
+  }
+  //compute in indices
+  int total = 0;
+  for(i=0;i<max;i++){
+    uint temp = count[i];
+    count[i] = total;
+    total += temp;
+  }
+  for(i=0;i<n;i++){
+    output[count[key(arr[i])]] = arr[i];
+    //this step insures values with identical keys get placed correctly
+    count[key(arr[i])]++;
+  }
+  free(count);
+  return output;
+}
 /*
  * Counting sort
  * Return 0 on success and 1 on failure.
  */
-static unsigned int do_counting_sort(unsigned long ary[],
-                                     unsigned long n, unsigned long nbits){
+static uint counting_sort_inplace(ulong *arr, ulong len, ulong nbits){
   if (nbits > 20) {
     exit(EXIT_FAILURE);
   }
-
-  exit(EXIT_FAILURE);
+  min_max mm = find_min_max(arr, len);
+  ulong max = mm.max, min = mm.min, size = max - min;
+  uint *count = xmalloc(sizeof(uint)*size);
+  uint i,j;
+  for(i=0;i<len;i++){
+    count[arr[i]]++;
+  }
+  i = (j = 0);
+  //optimized for inplace sort
+  while(i<size && j<len){
+    if(count[i]){
+      arr[j++]=i;
+      count[i]--;
+    } else {
+      i++;
+    }
+  }
+  return 0;
+}
+uint identity(ulong x){
+  return x;
+}
+static unsigned int do_counting_sort(unsigned long *arr,
+                                     unsigned long len, unsigned long nbits){
+  ulong *output = counting_sort_generic(arr, NULL, len, nbits, identity);
+  memcpy(arr, output, len*sizeof(ulong));
+  free(output);
+  return 0;
+}
+/*#define gen_mask_fxn(byte_num)                                        \
+  static uint extract_byte_##byte_num(ulong num){                       \
+    ulong mask = 0xffUL << (1 * (byte_num *CHAR_BIT));                  \
+    return ((ulong)(num & byte_num) % 255)
+    }*/
+#define gen_mask_fxn(byte_num)                                        \
+  static uint extract_byte_##byte_num(ulong num){                       \
+    return (num / ((255*(byte_num)))  % 255);                         \
+  }
+static uint extract_byte_0(ulong num){
+  return (num %255);
+}
+static uint extract_byte_1(ulong num){
+  return ((num/255) %255);
+}
+static uint extract_byte_2(ulong num){
+  return ((num/(255UL*255)) %255);
+}
+static uint extract_byte_3(ulong num){
+  return ((num/(255UL*255*255)) %255);
+}
+static uint extract_byte_4(ulong num){
+  return ((num/(255UL*255*255*255)) %255);
+}
+static uint extract_byte_5(ulong num){
+  return ((num/(255UL*255*255*255*255)) %255);
+}
+static uint extract_byte_6(ulong num){
+  return ((num/(255UL*255*255*255*255*255)) %255);
+}
+static uint extract_byte_7(ulong num){
+  return ((num/(255UL*255*255*255*255*255*255)) %255);
+}
+static const key_fxn extract_bytes[8] =
+  {extract_byte_0,extract_byte_1,extract_byte_2,extract_byte_3,
+      extract_byte_4,extract_byte_5,extract_byte_6,extract_byte_7};
+/*  {extract_byte_7,extract_byte_6,extract_byte_5,extract_byte_4,
+    extract_byte_3,extract_byte_2,extract_byte_1,extract_byte_0};*/
+/*
+ * Radix sort
+ * Return 0 on success and 1 on failure.
+ */
+static unsigned int do_radix_sort(unsigned long *arr,
+                                  unsigned long len, unsigned long nbits){
+  DEBUG_PRINTF("Running radix sort on %lu items each %lu bits long\n",
+               len,nbits);
+  uint i,n, nbytes = (nbits / CHAR_BIT) + (nbits % CHAR_BIT ? 1 : 0);
+  ulong *output = NULL;
+  for(n=0;n<8;n++){
+    output = counting_sort_generic(arr, output, len,
+                                   CHAR_BIT, extract_bytes[n]);
+    memcpy(arr, output, len*sizeof(ulong));
+  }
+  /*  output = counting_sort_generic(arr, output, len, 8, extract_byte_0);
+  memcpy(arr, output, len*sizeof(ulong));
+  output = counting_sort_generic(arr, output, len, 8, extract_byte_1);
+  memcpy(arr, output, len*sizeof(ulong));
+  output = counting_sort_generic(arr, output, len, 8, extract_byte_2);
+  memcpy(arr, output, len*sizeof(ulong));
+  output = counting_sort_generic(arr, output, len, 8, extract_byte_3);
+  memcpy(arr, output, len*sizeof(ulong));
+  output = counting_sort_generic(arr, output, len, 8, extract_byte_4);
+  memcpy(arr, output, len*sizeof(ulong));
+  output = counting_sort_generic(arr, output, len, 8, extract_byte_5);
+  memcpy(arr, output, len*sizeof(ulong));
+  output = counting_sort_generic(arr, output, len, 8, extract_byte_6);
+  memcpy(arr, output, len*sizeof(ulong));
+  output = counting_sort_generic(arr, output, len, 8, extract_byte_7);
+  memcpy(arr, output, len*sizeof(ulong));*/
+  free(output);
+  return 0;
 }
 
 
@@ -346,12 +492,11 @@ int main(int argc, char *const argv[]){
   unsigned int err;
   FILE *infile = stdin, *outfile = stdout;
 
-  if (argc < 4 || (strcmp(argv[1], counting_sort_str) {!= 0
-          && strcmp(argv[1], radix_sort_str) != 0
-          }
-      && strcmp(argv[1], quick_sort_str) != 0
-      && strcmp(argv[1], insertion_sort_str) != 0
-      && strcmp(argv[1], system_quick_sort_str) != 0)) {
+  if (argc < 4 || (strcmp(argv[1], counting_sort_str) != 0
+                   && strcmp(argv[1], radix_sort_str) != 0
+                   && strcmp(argv[1], quick_sort_str) != 0
+                   && strcmp(argv[1], insertion_sort_str) != 0
+                   && strcmp(argv[1], system_quick_sort_str) != 0)) {
     usage();
     return EXIT_FAILURE;
   }

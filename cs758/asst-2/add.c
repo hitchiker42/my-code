@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include <sys/time.h>
 
@@ -20,6 +21,70 @@ const char *const seq_str = "seq";
 const char *const sort_str = "sort";
 const char *const min2_scan_str = "min2_scan";
 const char *const heap_str = "heap";
+#define heap_left_child(i) (2*i+1)
+#define heap_right_child(i) (2*i+2)
+#define heap_parent(i) ((i-1)/2)
+#define ARR_SWAP(arr,i,j)                                       \
+  { __typeof__(arr[i]) __temp = arr[i];                         \
+    arr[i] = arr[j];                                            \
+    arr[j] = __temp;                                            \
+  }
+static void heap_sift_down(double *heap, int root, int size){
+  int left,right,swap;
+  while ((left = heap_left_child(root)) < size){
+    right = heap_right_child(root);
+    swap = root;
+    if(heap[left] < heap[swap]){
+      swap = left;
+    }
+    if(right < size && (heap[right] < heap[swap])){
+      swap = right;
+    }
+    if(swap == root){
+      return;
+    } else {
+      ARR_SWAP(heap, root, swap);
+      root = swap;
+    }
+  }
+}
+/*
+static void heap_sift_up(double *heap, int index, int size){
+  int parent = heap_parent(index);
+  //this will terminate at the root since heap_parent(0) = 0
+  while(heap[index] < heap[parent]){
+    ARR_SWAP(heap, index, parent);
+    index = parent;
+    parent = heap_parent(index);
+  }
+  }*/
+//turns an array of doubles into a min heap
+static void heapify(double *heap, int size){
+  int i = size/2;
+  while (i >= 0) {
+    heap_sift_down(heap, i--, size);
+  }
+}
+/*//this assumes the space allocated for heap is > size
+static void heap_add(double *heap, int size, double val){
+  heap[size] = val;
+  heap_sift_up(heap, size, size+1);
+  }*/
+static double heap_pop(double *heap, int size){
+  double retval = heap[0];
+  heap[0] = heap[size-1];
+  heap_sift_down(heap, 0, size-1);
+  return retval;
+}
+double *heap_sort(double *heap, int size){
+  heapify(heap, size);
+  int i = size-1;
+  while(i > 0){
+    ARR_SWAP(heap,i,0);
+    heap_sift_down(heap, 0, i--);
+  }
+  return heap;
+}
 
 /*
  * You need to implement this function.  It should insert the numbers
@@ -31,9 +96,19 @@ const char *const heap_str = "heap";
  *
  * Returns 0 on success and 1 on failure.
  */
-static unsigned int do_heap_sum(double ary[], unsigned int n,
+static unsigned int do_heap_sum(double *arr, unsigned int n,
                                 double *result){
-  exit(EXIT_FAILURE);
+  double temp;
+  int size = n;
+  heapify(arr, n);
+  while(size > 1){
+    temp = heap_pop(arr, size);    
+    size--;
+    arr[0] += temp;
+    heap_sift_down(arr, 0, size);
+  }
+  *result = heap_pop(arr, size);
+  return 0;
 }
 
 /************************************************************

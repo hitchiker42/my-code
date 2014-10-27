@@ -754,7 +754,94 @@ at least 2 pigeons in one hole.
    define the order < on \Sigma* by: for u,v \in \Sigma* u<v if
    1. |u|<|v|
    2. |u| == |v| and u <_D v
+* Language
+  Suppose \Sigma is a language, \Sigma* is the set of all strings over \Sigma
+  A Language L is a set of strings.
+  L \sube \Sigma*
+  P(\Sigma*) the power set of \Sigma* is the set of all languages
 
+  The C programming language in an infinite set of strings
+  A C compiler is a finite string which can determine if another
+    finite string is part of the C programming language
+  Thus the finite C compiler can represent the infinite C language
+
+  Since \Sigma* has is countably infinite but P(\Sigma*) is uncountably infinite
+  the majority of languages can not be represented by finite strings
+** Operations on languages
+   Given two languages L and M
+   L \cup M, L \cap M, L-M, L^c  all have the standard meanings
+   L^c = \Sigma* - L, just for reference
+
+   Define the reversal of L, L^R as L^R = {w | w\prime \in L}
+   
+   Define L o M, or just LM as L o M = {uv | u \in L and v \in M}
+
+   So A\empty = \empty (\empty is {} NOT {\Lambda}) (akin to A * 0)
+   And A{\Lambda} = A  (akin to A * 1)
+
+   Association (AB)C = A(BC) = ABC
+   
+   If A \sube B and C \sube D then AC \sube BC
+   A(B \cup C) = AB \cup AC
+
+   Define L^n where n\ge0 as:
+   L^0 = {\Lambda} for n = 0
+   L^n = L^{n-1}L for n>0
+
+   This implies that \empty^0 = {\Lambda} and \empty^n, n > 0 = \empty
+** Powers of languages
+   Prove A^m o A^n = A^{m+n} where A is a Language and n,m \in N
+   1. induct on n\ge0
+   2. when n=0 we have A^n o A^0 = A^n o {\Lambda} = A^n = A^{n+0}
+   3. let n be arbitrary but fixed and assume A^{n-1} o A^m = A^{n-1+m}
+   4. so A^n o A^m = AA^{n-1} o A^m = AA^{n-1+m} = A^{n+m}
+      QED
+* Regex
+  A is a language
+  kleene star closure of A, denoted A^* = {w | w \in A^n for n \ge 0}
+  or A^* = U_0^{\infty} L^n
+  
+  Properties (currently unproven) for languages A and B
+  Let A^{**} = (A^*)^*
+  1. A \sube AB^* (trivial proof, \Lambda \in B, A{\Lambda} = A, QED)
+  2. A \sube B \rightarrow A^* \sube B^*
+  3. A^*A^* = A^*
+  4. A^* \sube A^{**}  (true from defn of kleene star)
+  5. (A^*)^n \sube A^*
+  6. A^{**} \sube A^* ((A^*)^n \sube A^{**} by defn and (A^*)^n \sube A^* so A^{**} \sube A^*)
+  7. {\Lambda} \cup AA^* = A^*
+     
+  To prove things about kleene stars change A^* to A^k for arbitrary k \ge 0
+  2.
+  Show A \sube B \rightarrow A^* \sube B^*
+  Suppose w \in A^*
+  We have k\ge0 with w \in A^k
+  Since A \sube B we know A^k \sube B^k
+  so w \in B^k and thus w \in B^* QED
+  
+  3.
+  Show A^*A^* = A^*
+    show A^*A^* \sube A^*
+    suppose w \in A^*A^*, so w = vu where v \in A^* and u \in A^*
+    so we have k,l such that v \in A^k and u \in A^l
+    so w = vu \in (A^k A^l = A^{k+l} so w \in A^* QED
+  now
+    show A^* \sube A^*A^*
+    from property #1 this is true.
+  so A^*A^* \sube A^* and A^* \sube A^*A^*, thus A^*A^* = A^* QED
+    
+  5.
+  show (A^*)^n \sube A^*
+  induct on n
+  (A^*)^0 = {\Lambda} \sube A^*
+  Assume (A^*)^{n-1} \sube A^*
+  Show (A^*)^n \sube A^*; (A^*)^n = (A^*)^{n+1-1} = A^*A^{n-1}
+  Since A^{n-1} \sube A^* then A^n = A^*A^{n-1} \sube A^*A^* = A^* so A^n \sube A^*
+
+  7.
+  Show {\Lambda} \cup AA^* = A^*
+  A^0 = {\Lambda}
+  AA^* = AU_0^{\infty} A^n = U_1^{\infty} 
 
 * Local Variables
 # Local Variables:
