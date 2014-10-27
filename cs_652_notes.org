@@ -2,14 +2,14 @@
 * WFF = well formed formula, syntax and semantics
 ** if A and B are wff's and have the same truth table then A \equiv B
 ** if A \equiv T; then A is a tautology
-   
-* (P \land P \rightarrow Q) \rightarrow Q (if P and P implies Q then Q) 
+
+* (P \land P \rightarrow Q) \rightarrow Q (if P and P implies Q then Q)
 ** To show this:
 *** Basic: write out truth table
 *** Intermediate: solve equation to show (P \land P \rightarrow Q) \rightarrow Q \equiv T
 
-* Atoms and Clauses 
-** Atoms (A,B,\not A,\not B) 
+* Atoms and Clauses
+** Atoms (A,B,\not A,\not B)
 ** Clauses (A \lor B, A \land \not{}B, etc..)
 ** DNF(distrubated normal form) / Full DNF (look up the defn)
 
@@ -33,8 +33,8 @@ actual deduction works
 *** H.S: (hypothitical syllogism) A\rightarrow{}B, B\rightarrow{}C, then A\rightarrow{}C
 *** C.D: (constructive delema) A \lor B, A\rightarrow{}C, B\rightarrow{}D then C \lor D
 *** Cases: A \lor B, A \rightarrow C, B \rightarrow C then C
-** Incomplete logic system, has something that is a tautology which can't be proved 
-** Inconsistant logic system, can prove something that isn't a tautology 
+** Incomplete logic system, has something that is a tautology which can't be proved
+** Inconsistant logic system, can prove something that isn't a tautology
 
 ** (using C operators here)
 prove (A | B) & !A & (B -> C) -> (B & C)
@@ -122,7 +122,7 @@ ex. (A \lor B \rightarrow C \land D) \rightarrow (B \rightarrow D)
 5.   D, 4 SIMP, Only this line is visable in the main proof
 6. B \rightarrow D, 2-5 CP
 QED 1,6 CP
-* Introduce More Natural Deduction Rules 
+* Introduce More Natural Deduction Rules
 (also added to Natural Deduction above)
 ** M.T (Modus Tolens): (P\not{}Q and \not{}Q then \not{}P)
 ** H.S (hypothitical syllogism) A\rightarrow{}B, B\rightarrow{}C, then A\rightarrow{}C
@@ -203,7 +203,7 @@ we can also bind variables by assigning them a constant value
 
 if a wff has no free variables it is a proposition
 
-in order for \exists{}x and \forall{}x to make sense we must have a 
+in order for \exists{}x and \forall{}x to make sense we must have a
 domain of discourse(aka universe)
 ** Interpretation/Domains
 An interpretation of a wff consists of a domain D, together with the following:
@@ -226,7 +226,7 @@ if W is a wff and x is a free variable in W
 then the wff that results from replacing x with t
 is denoted W(x/t)
 
-so the truth value of the wff \forall{}x(W(x)) with respect to the 
+so the truth value of the wff \forall{}x(W(x)) with respect to the
 domain D is:
 \forall{}xW(x) is true if W(x/d) is true for all d \epsilon D
 ditto  for \exists
@@ -260,7 +260,7 @@ Extensional Instantiation(E.I): \exists{}xW(x) then W(c) (c is a new unbound sym
 
 Universal Generalization(U.G): W(c) then \forall{}xW(x) (c is an arbitrary symbol)
 i.e if something is true for an arbitrary/generalized value it is true for all
-values 
+values
 *** Example
 \exists{}x(p(x) \land q(x)) \rightarrow \exists{}xp(x) \land \exists{}xq(x)
 1. \exists{}x(p(x) \land q(x)), P for CP
@@ -310,7 +310,7 @@ given a precondition P, a program S and a postcondition Q
 
 {P} S {Q} states that running S when P is true results in Q being true
 if S is a correct program
-  
+
 e.g
 {x=5} y=x; {y=5}
 
@@ -361,7 +361,7 @@ b)1. (T\land\not(x<0)
   2. \not(x<=0)
   3. x>=0
   4. T\land\not(x<0) -> x>=0
-QED By a and b and if/then 
+QED By a and b and if/then
 ** {P\land{}C} if C then S_1 else S_2 end {Q} if/then/else
 P;
 if (C) {
@@ -376,7 +376,7 @@ Q;
 -we write x \in A to mean x is an element of A
 -"      " x \notin A to mean x is not an element of A
 -we say a set contains it's elements
--{} = \empty 
+-{} = \empty
 - N = natural numbers
 - Z = integers
 - Q = rationals, ...
@@ -393,11 +393,11 @@ e.g {{\empty},{{\empty}},{{{\empty}}},\empty} is a set containing 4 unique eleme
 ** Relations
 Subsets;
 if A and B are sets and \forall{}x(x \in A -> x \in B) (every element in A is also in B)
-we say A is a subset of B, A \sube B 
+we say A is a subset of B, A \sube B
 \forall{}A, \empty \sube A (or A \supe \empty)
 
 proof:
-if A \sube B  and B \sube C then A \sube C 
+if A \sube B  and B \sube C then A \sube C
 formally: \forall{}x (x \in A \rightarrow x \in B) \land \forall{}x(x \in B \rightarrow x \in C) \rightarrow \forall{}x(x \in A \rightarrow x \in C)
 1. \forall{}x(x \in A \rightarrow x \in B), P for CP
 2. \forall{}x(x \in B \rightarrow x \in C), P for CP
@@ -419,7 +419,7 @@ since B \sube C then x \in C
 thus A \sube C QED
 
 ** Power sets
-given a set S the power set of S 
+given a set S the power set of S
 denoted P(S) is the set of all subsets of S
 
 Given a set of n elements the power set of n will have 2^n elements
@@ -480,7 +480,7 @@ relation on N
 
 let A = {a,b,c,d} and R = {(a,c),(b,c),(a,a)}
 Digraph (directed graph) (a set of vertexes/nodes/points connected by directed
-edges) 
+edges)
 
 ** Properties of Relations
 Suppose R is a relation on A, we say R is reflexive if for every a \in A we have
@@ -488,22 +488,22 @@ Suppose R is a relation on A, we say R is reflexive if for every a \in A we have
 
 we say R is symmetric if for every (a,b) \in R, we have (b,a) \in R
 
-we say R is transitive if for every  (a,b) \in R and (b,c) \in R we also have 
+we say R is transitive if for every  (a,b) \in R and (b,c) \in R we also have
 (a,c)\in R
 
 we say R is anti-symmetric if for every (a,b) \in R and (b,a) \in R then a = b
 or if a \neq b then (a,b) \notin R \lor (b,a) \notin R
 
-anti-symmetric is not the opposite of symmetric, oddly enough 
+anti-symmetric is not the opposite of symmetric, oddly enough
 
-There is no relation between symmetry and anti-symmetry 
+There is no relation between symmetry and anti-symmetry
 
 Reflexive, symmetric, anti-symmetric and transitive are orthogonal
 
 ** operations on relations
 various operations on sets (union, intersection...) work on relations.
 
-** Compositions 
+** Compositions
 given a relation R from A to B and a relation S from B to C
 than S o R is a relation from A to C (composition)
 
@@ -527,14 +527,14 @@ the matrix
 | a | 1 | 1 | 0 | 0 |
 | b | 0 | 0 | 1 | 0 |
 | c | 0 | 0 | 0 | 1 |
-| d | 0 | 0 | 0 | 0 | 
+| d | 0 | 0 | 0 | 0 |
 
 ** closures of relations
 If R is a relation then the reflexive closure of R written r(R) is the smallest
 relation that contains R and is reflexive, this is akin to R U \delta.
 
 the symmetric closure of R, written s(R) is the smallest relation that contains
-R and is symmetric   
+R and is symmetric
 
 Suppose T is a relation, define T^c = {(a,b) | (b,a) \in T} or T^t (transpose of T)
 
@@ -600,7 +600,7 @@ This does not necessarily hold for functions, only for functions that are
 bijective. I.e f^-1 exists iff f is bijective.
 
 if f:A->B and g:B->C are functions then g o f:A->C is a function.
-if f and g are bijective than g o f is a bijection 
+if f and g are bijective than g o f is a bijection
 
 ** related sets
 two sets are related if there is a bijection between them.
@@ -627,14 +627,14 @@ ex. integers, rational numbers, etc...
 ** Un-countably infinite sets
 s:N->{0,1}
 S={s | s:N->{0,1}}; the sequence of all possible binary sequences.
-Prove S in uncountable 
+Prove S in uncountable
 1. Assume S is countable
 2. Thus there exists a bijection b:N->S, so we can list S as the union
 of (b_i(x) for i \in N) for x \in N.
 3. define x-bar as f(x) = (x == 1 ? 0 : 1)
 4. define d:N->{0,1} by d_i=b_i-bar
 5. Since this is a binary sequence and b is subjective  have some k so that
-   b(k)=d 
+   b(k)=d
 6. but d_k = b(k)_k-bar so d \neq b(k)
 7. S is not countable by contridiction.
 Essentially if we wrote out the sequences b(x) = b_0(x) b_1(x) b_2(x) ...
@@ -675,17 +675,17 @@ i.e if then are n pigeons and k holes and n>k then there must be
 at least 2 pigeons in one hole.
 
 
-* (Mathematical) Strings  
+* (Mathematical) Strings
   Start with an alphabet \Sigma, a finite nonempty set of (simple) symbols.
 
   If \Sigma is an alphabet then a finite sequence over \Sigma is called a string
-  
+
   If X is a string over \Sigma the length of X, written |X|, is the length as a
   sequence.
 
   Quick note, sequences are always indexed starting at 1.
   A sequence of length n, over \Sigma, is a function from S_n -> \Sigma
-  
+
   The set of all strings over \Sigma is denoted \Sigma*
 
   If s \in \Sigma* and |s|=0 then we write s = \Lambda (the empty string)
@@ -702,9 +702,9 @@ at least 2 pigeons in one hole.
   any of u,v,w can be \Lambda.
 
   if z = uw for u,w \in \Sigma* then we call u a prefix, and w a suffix.
-** Mathematical Induction (M.I) 
+** Mathematical Induction (M.I)
    In the domain N (natural numbers)
-   to show \forall{}xP(x) it suffices to show that P(0) holds and that 
+   to show \forall{}xP(x) it suffices to show that P(0) holds and that
    \forall{}x(P(x)`>P(x+1))
 
    More generally.
@@ -725,11 +725,42 @@ at least 2 pigeons in one hole.
 
    Suppose w \in \Sigma*, show for any k,j\ge0 w^{k}w^{j} = w^{k+j}
    Proof omitted because I was busy fiddling with org sub/superscripts during
-   class  
+   class
+** Reversal
+   suppose w \in \Sigma*, define w\prime, the reversal of w by:
+   w\prime = w iff w = \Lambda
+   if |w|>0 Then let w = ua where u \in \Sigma* and a \in \Sigma and then w\prime = au\prime
+*** ex
+   Prove (uv)\prime = v\prime{}u\prime
+   Proof:
+   1. variable: will induct on k=|v|\ge0
+   2. basis: when k=0 then |v|=0 and (uv)\prime = (u\Lambda)\prime= (u)\prime = \Lambda{}u\prime =
+      \Lambda\prime{}u\prime = v\prime{}u\prime
+   3. I.H: suppose k\ge0 is arbitrary but fixed and for any string v
+      where |v|=k-1 we know (uv)\prime = v\prime{}u\prime
+   4. If w is any string and |w| = k, show (uw)\prime=w\prime{}u\prime
+   5. Suppose |w|=k then we can write w as va where |v| = k-1 and a \in \Sigma
+      We know (uv)\prime = v\prime{}u\prime and w\prime = av\prime, so we can write (uw)\prime as
+      (uva)\prime = a(uv)\prime = av\prime{}u\prime = w\prime{}u\prime QED
+
+* Ordering of strings
+** dictionary order
+  Suppose \Sigma is an alphabet with order <_\Sigma we define the simple
+  dictionary order on  \Sigma* as follows:
+  for any u,v \in \Sigma* u<v if u\ne{}v and
+  1. u is a prefix of v, i.e |u|<|v| and u_i = v_i for i=0...|u|
+  2. u = zw and v = zx, x \ne \Lambda where u_i = v_i for i= 0 ... |z| and w_1 < x_1
+** Enumeration order
+   define the order < on \Sigma* by: for u,v \in \Sigma* u<v if
+   1. |u|<|v|
+   2. |u| == |v| and u <_D v
+
+
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
 # eval: (flyspell-mode)
+# eval: (org-cdlatex-mode)
 # org-pretty-entities: t
 # org-enable-table-editor: nil
 # End:
