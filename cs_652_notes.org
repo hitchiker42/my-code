@@ -796,7 +796,7 @@ at least 2 pigeons in one hole.
    3. let n be arbitrary but fixed and assume A^{n-1} o A^m = A^{n-1+m}
    4. so A^n o A^m = AA^{n-1} o A^m = AA^{n-1+m} = A^{n+m}
       QED
-* Regex
+** kleene star
   A is a language
   kleene star closure of A, denoted A^* = {w | w \in A^n for n \ge 0}
   or A^* = U_0^{\infty} L^n
@@ -841,8 +841,57 @@ at least 2 pigeons in one hole.
   7.
   Show {\Lambda} \cup AA^* = A^*
   A^0 = {\Lambda}
-  AA^* = AU_0^{\infty} A^n = U_1^{\infty} 
+  AA^* = AU_0^{\infty} A^n = U_1^{\infty} A^n
+  {\Lambda} \cup AA* = A_0 \cup U_i^{\infty} A^n = U_0^{\infty} A^n = A*
+* Regex
+  Suppose \Sigma is an alphabet
+  the superscript ^'s should really go over the symbols, they have ^'s to
+  differentate them from normal symbols
+  
+  Define \Sigma_{reg} = \Sigma \cup {\empty^{^}, \Lambda^{^}, (,),\cdot,*^{^},+^{^}}
+  where \Sigma \cap {\empty^{^}, \Lambda^{^},(,),\cdot,*^{^},+^{^}}^{} = \empty
+  
+  A regular expression will be a string over \Sigma_reg
+** Syntax
+  For an alphabet \Sigma the set of regular expressions over \Sigma is
+  the set of strings over \Sigma_reg defined inductively by:
+  1.(Basis) \empty^{^},\Lambda^{^}^{}, and every a \in \Sigma
+  2.(Induction) if R and S are R.E then so are:
+     1.(R+S), 2.(R\cdot{}S), and 3. R*
+  That's it apparently
 
+** Semantics
+   Suppose \Sigma is an alphabet, for a regex R over \Sigma The Language
+   of R, denoted L(R) is defined inductively by:
+   1.(Basis) L(\empty^{^}) = \empty, L(\Lambda^{^}) = {\Lambda}, L(a) = {a} \forall{}a a \in{} \Sigma
+   2.(Induction) Suppose R and S are regexs and we know L(R) and L(S) then:
+     L((R\cdot{}S)) = L(R)L(S), L(R^*) = (L(R))^*, L((R+S)) = L(R)\cup{}L(S)
+
+   So + is akin to brackets, i.e A+B+C = [A,B,C]
+      \cdot is not actually anything
+** Examples (re->language)
+   for \Sigma={0,1}
+   L(((0+1)\cdot1)) = L((0+1))L(1) = (L(0)\cup{}L(1))L(1) = {0,1}{1} = {01,11}
+   or [01]1
+   
+   L((O+1)*1) = [01]*1 
+   
+   L((0\cdot1)*1) = (01)*1
+** Examples (language->re)
+   all strings that contain 001
+   .*001.* -> (0+1)*001(0+1)*
+   
+   all strings that don't contain 001
+   (0?1)*0* -> (01+1)*0*
+** Regular Languages
+   A language L is called Regular if L = L(R) for some R.E. R.
+   For some string s in a regular language where r = xyz, and |y|\ne0
+   xy*z is also a string in the language (pumping lemma)
+** Simplifications
+   r(s+t) = rs+rt
+   r+s = s+r
+   \Lambda + rr* = r*
+   rr* = r*r
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
