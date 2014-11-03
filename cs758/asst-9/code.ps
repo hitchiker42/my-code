@@ -1,0 +1,1979 @@
+%!PS-Adobe-3.0
+%%Title: graph.h, graph.c, heap.c, spanning_tree.c
+%%For: 
+%%Creator: a2ps version 4.14
+%%CreationDate: Mon Nov  3 09:54:33 2014
+%%BoundingBox: 24 24 588 768
+%%DocumentData: Clean7Bit
+%%Orientation: Landscape
+%%Pages: 5
+%%PageOrder: Ascend
+%%DocumentMedia: Letter 612 792 0 () ()
+%%DocumentNeededResources: font Courier
+%%+ font Courier-Bold
+%%+ font Courier-BoldOblique
+%%+ font Courier-Oblique
+%%+ font Helvetica
+%%+ font Helvetica-Bold
+%%+ font Symbol
+%%+ font Times-Bold
+%%+ font Times-Roman
+%%DocumentProcessColors: Black 
+%%DocumentSuppliedResources: procset a2ps-a2ps-hdr
+%%+ procset a2ps-black+white-Prolog
+%%+ encoding ISO-8859-1Encoding
+%%EndComments
+/a2psdict 200 dict def
+a2psdict begin
+%%BeginProlog
+%%Copyright: (c) 1988, 89, 90, 91, 92, 93 Miguel Santana
+%%Copyright: (c) 1995, 96, 97, 98 Akim Demaille, Miguel Santana
+% Check PostScript language level.
+/languagelevel where {
+  pop /gs_languagelevel languagelevel def
+} {
+  /gs_languagelevel 1 def
+} ifelse
+
+% EPSF import as in the Red Book
+/BeginInclude {
+  /b4_Inc_state save def    		% Save state for cleanup
+  /dict_count countdictstack def	% Count objects on dict stack
+  /op_count count 1 sub def		% Count objects on operand stack 
+  userdict begin
+    0 setgray 0 setlinecap
+    1 setlinewidth 0 setlinejoin
+    10 setmiterlimit [ ] 0 setdash newpath
+    gs_languagelevel 1 ne {
+      false setstrokeadjust false setoverprint 
+    } if
+} bind def
+
+/EndInclude {
+  count op_count sub { pos } repeat	% Clean up stacks
+  countdictstack dict_count sub { end } repeat
+  b4_Inc_state restore
+} bind def
+
+/BeginEPSF {
+  BeginInclude
+  /showpage { } def
+} bind def
+
+/EndEPSF {
+  EndInclude
+} bind def
+
+% Page prefeed
+/page_prefeed {         % bool -> -
+  statusdict /prefeed known {
+    statusdict exch /prefeed exch put
+  } {
+    pop
+  } ifelse
+} bind def
+
+/deffont {
+  findfont exch scalefont def
+} bind def
+
+/reencode_font {
+  findfont reencode 2 copy definefont pop def
+} bind def
+
+% Function c-show (str => -)
+% centers text only according to x axis.
+/c-show { 
+  dup stringwidth pop
+  2 div neg 0 rmoveto
+  show
+} bind def
+
+% Function l-show (str => -)
+% prints texts so that it ends at currentpoint
+/l-show {
+  dup stringwidth pop neg 
+  0 
+  rmoveto show
+} bind def
+
+% center-fit show (str w => -)
+% show centered, and scale currentfont so that the width is less than w
+/cfshow {
+  exch dup stringwidth pop
+  % If the title is too big, try to make it smaller
+  3 2 roll 2 copy
+  gt
+  { % if, i.e. too big
+    exch div
+    currentfont exch scalefont setfont
+  } { % ifelse
+    pop pop 
+  }
+  ifelse
+  c-show			% center title
+} bind def
+
+% Return the y size of the current font
+% - => fontsize
+/currentfontsize {
+  currentfont /FontMatrix get 3 get 1000 mul
+} bind def
+
+% reencode the font
+% <encoding-vector> <fontdict> -> <newfontdict>
+/reencode { %def
+  dup length 5 add dict begin
+    { %forall
+      % <vector> <key> <val>
+      1 index /FID ne 
+      { def }{ pop pop } ifelse
+    } forall
+    /Encoding exch def % -
+
+    % Use the font's bounding box to determine the ascent, descent,
+    % and overall height; don't forget that these values have to be
+    % transformed using the font's matrix.
+    % We use `load' because sometimes BBox is executable, sometimes not.
+    % Since we need 4 numbers an not an array avoid BBox from being executed
+    /FontBBox load aload pop
+    FontMatrix transform /Ascent exch def pop
+    FontMatrix transform /Descent exch def pop
+    /FontHeight Ascent Descent sub def
+
+    % Get the underline position and thickness if they're defined.
+    % Use 1 if they are not defined.
+    currentdict /FontInfo 2 copy known
+    { get
+      /UnderlinePosition 2 copy % <FontInfo> /UP <FontInfo> /UP
+      2 copy known
+      { get }{ pop pop 1 } ifelse
+      0 exch FontMatrix transform exch pop
+      def % <FontInfo>
+
+      /UnderlineThickness 2 copy % <FontInfo> /UT <FontInfo> /UT
+      2 copy known
+      { get }{ pop pop 1 } ifelse
+      0 exch FontMatrix transform exch pop
+      def % <FontInfo>
+      pop % -
+    }{ pop pop
+    } ifelse
+
+    currentdict
+  end 
+} bind def
+
+% Function print line number (<string> # -)
+/# {
+  gsave
+    sx cw mul neg 2 div 0 rmoveto
+    f# setfont
+    c-show
+  grestore
+} bind def
+
+% -------- Some routines to enlight plain b/w printings ---------
+
+% Underline
+% width --
+/dounderline {
+  currentpoint
+  gsave
+    moveto
+    0 currentfont /Descent get currentfontsize mul rmoveto
+    0 rlineto
+    stroke
+  grestore
+} bind def
+
+% Underline a string
+% string --
+/dounderlinestring {
+  stringwidth pop
+  dounderline
+} bind def
+
+/UL {
+  /ul exch store
+} bind def
+
+% Draw a box of WIDTH wrt current font
+% width --
+/dobox {
+  currentpoint
+  gsave
+    newpath
+    moveto
+    0 currentfont /Descent get currentfontsize mul rmoveto
+    dup 0 rlineto
+    0 currentfont /FontHeight get currentfontsize mul rlineto
+    neg 0 rlineto
+    closepath
+    stroke
+  grestore
+} bind def
+
+/BX {
+  /bx exch store
+} bind def
+
+% Box a string
+% string --
+/doboxstring {
+  stringwidth pop
+  dobox
+} bind def
+
+%
+% ------------- Color routines ---------------
+%
+/FG /setrgbcolor load def
+
+% Draw the background
+% width --
+/dobackground {
+  currentpoint
+  gsave
+    newpath
+    moveto
+    0 currentfont /Descent get currentfontsize mul rmoveto
+    dup 0 rlineto
+    0 currentfont /FontHeight get currentfontsize mul rlineto
+    neg 0 rlineto
+    closepath
+    bgcolor aload pop setrgbcolor
+    fill
+  grestore
+} bind def
+
+% Draw bg for a string
+% string --
+/dobackgroundstring {
+  stringwidth pop
+  dobackground
+} bind def
+
+
+/BG {
+  dup /bg exch store
+  { mark 4 1 roll ] /bgcolor exch store } if
+} bind def
+
+
+/Show {
+  bg { dup dobackgroundstring } if
+  ul { dup dounderlinestring } if
+  bx { dup doboxstring } if
+  show
+} bind def
+
+% Function T(ab), jumps to the n-th tabulation in the current line
+/T {
+  cw mul x0 add
+  bg { dup currentpoint pop sub dobackground } if
+  ul { dup currentpoint pop sub dounderline } if
+  bx { dup currentpoint pop sub dobox } if
+  y0 moveto
+} bind def
+
+% Function n: move to the next line
+/n {
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+} bind def
+
+% Function N: show and move to the next line
+/N {
+  Show
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+} bind def
+
+/S {
+  Show
+} bind def
+
+%%BeginResource: procset a2ps-a2ps-hdr 2.0 2
+%%Copyright: (c) 1988, 89, 90, 91, 92, 93 Miguel Santana
+%%Copyright: (c) 1995, 96, 97, 98 Akim Demaille, Miguel Santana
+% Function title: prints page header.
+% <ct> <rt> <lt> are passed as argument
+/title { 
+  % 1. Draw the background
+  x v get y v get moveto
+  gsave
+    0 th 2 div neg rmoveto 
+    th setlinewidth
+    0.95 setgray
+    pw 0 rlineto stroke
+  grestore
+  % 2. Border it
+  gsave
+    0.7 setlinewidth
+    pw 0 rlineto
+    0 th neg rlineto
+    pw neg 0 rlineto
+    closepath stroke
+  grestore
+  % stk: ct rt lt
+  x v get y v get th sub 1 add moveto
+%%IncludeResource: font Helvetica
+  fHelvetica fnfs 0.8 mul scalefont setfont
+  % 3. The left title
+  gsave
+    dup stringwidth pop fnfs 0.8 mul add exch % leave space took on stack
+    fnfs 0.8 mul hm rmoveto
+    show			% left title
+  grestore
+  exch
+  % stk: ct ltw rt
+  % 4. the right title
+  gsave
+    dup stringwidth pop fnfs 0.8 mul add exch % leave space took on stack
+    dup
+    pw exch stringwidth pop fnfs 0.8 mul add sub
+    hm
+    rmoveto
+    show			% right title
+  grestore
+  % stk: ct ltw rtw
+  % 5. the center title
+  gsave
+    pw 3 1 roll
+    % stk: ct pw ltw rtw
+    3 copy 
+    % Move to the center of the left room
+    sub add 2 div hm rmoveto
+    % What is the available space in here?
+    add sub fnfs 0.8 mul sub fnfs 0.8 mul sub
+    % stk: ct space_left
+%%IncludeResource: font Helvetica-Bold
+  fHelvetica-Bold fnfs scalefont setfont
+    cfshow
+  grestore
+} bind def
+
+% Function border: prints virtual page border
+/border { %def
+  gsave				% print four sides
+    0 setgray
+    x v get y v get moveto
+    0.7 setlinewidth		% of the square
+    pw 0 rlineto
+    0 ph neg rlineto
+    pw neg 0 rlineto
+    closepath stroke
+  grestore
+} bind def
+
+% Function water: prints a water mark in background
+/water { %def
+  gsave
+    scx scy moveto rotate
+%%IncludeResource: font Times-Bold
+  fTimes-Bold 100 scalefont setfont
+    .97 setgray
+    dup stringwidth pop 2 div neg -50 rmoveto
+    show
+  grestore
+} bind def
+
+% Function rhead: prints the right header
+/rhead {  %def
+  lx ly moveto
+  fHelvetica fnfs 0.8 mul scalefont setfont
+  l-show
+} bind def
+
+% Function footer (cf rf lf -> -)
+/footer {
+  fHelvetica fnfs 0.8 mul scalefont setfont
+  dx dy moveto
+  show
+
+  snx sny moveto
+  l-show
+  
+  fnx fny moveto
+  c-show
+} bind def
+%%EndResource
+%%BeginResource: procset a2ps-black+white-Prolog 2.0 1
+
+% Function T(ab), jumps to the n-th tabulation in the current line
+/T { 
+  cw mul x0 add y0 moveto
+} bind def
+
+% Function n: move to the next line
+/n { %def
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+} bind def
+
+% Function N: show and move to the next line
+/N {
+  Show
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+}  bind def
+
+/S {
+  Show
+} bind def
+
+/p {
+  false UL
+  false BX
+  fCourier bfs scalefont setfont
+  Show
+} bind def
+
+/sy {
+  false UL
+  false BX
+  fSymbol bfs scalefont setfont
+  Show
+} bind def
+
+/k {
+  false UL
+  false BX
+  fCourier-Oblique bfs scalefont setfont
+  Show
+} bind def
+
+/K {
+  false UL
+  false BX
+  fCourier-Bold bfs scalefont setfont
+  Show
+} bind def
+
+/c {
+  false UL
+  false BX
+  fCourier-Oblique bfs scalefont setfont
+  Show
+} bind def
+
+/C {
+  false UL
+  false BX
+  fCourier-BoldOblique bfs scalefont setfont
+  Show 
+} bind def
+
+/l {
+  false UL
+  false BX
+  fHelvetica bfs scalefont setfont
+  Show
+} bind def
+
+/L {
+  false UL
+  false BX
+  fHelvetica-Bold bfs scalefont setfont
+  Show 
+} bind def
+
+/str{
+  false UL
+  false BX
+  fTimes-Roman bfs scalefont setfont
+  Show
+} bind def
+
+/e{
+  false UL
+  true BX
+  fHelvetica-Bold bfs scalefont setfont
+  Show
+} bind def
+
+%%EndResource
+%%EndProlog
+%%BeginSetup
+%%IncludeResource: font Courier
+%%IncludeResource: font Courier-Oblique
+%%IncludeResource: font Courier-Bold
+%%IncludeResource: font Times-Roman
+%%IncludeResource: font Symbol
+%%IncludeResource: font Courier-BoldOblique
+%%BeginResource: encoding ISO-8859-1Encoding
+/ISO-8859-1Encoding [
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/space /exclam /quotedbl /numbersign /dollar /percent /ampersand /quoteright 
+/parenleft /parenright /asterisk /plus /comma /minus /period /slash 
+/zero /one /two /three /four /five /six /seven 
+/eight /nine /colon /semicolon /less /equal /greater /question 
+/at /A /B /C /D /E /F /G 
+/H /I /J /K /L /M /N /O 
+/P /Q /R /S /T /U /V /W 
+/X /Y /Z /bracketleft /backslash /bracketright /asciicircum /underscore 
+/quoteleft /a /b /c /d /e /f /g 
+/h /i /j /k /l /m /n /o 
+/p /q /r /s /t /u /v /w 
+/x /y /z /braceleft /bar /braceright /asciitilde /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/space /exclamdown /cent /sterling /currency /yen /brokenbar /section 
+/dieresis /copyright /ordfeminine /guillemotleft /logicalnot /hyphen /registered /macron 
+/degree /plusminus /twosuperior /threesuperior /acute /mu /paragraph /bullet 
+/cedilla /onesuperior /ordmasculine /guillemotright /onequarter /onehalf /threequarters /questiondown 
+/Agrave /Aacute /Acircumflex /Atilde /Adieresis /Aring /AE /Ccedilla 
+/Egrave /Eacute /Ecircumflex /Edieresis /Igrave /Iacute /Icircumflex /Idieresis 
+/Eth /Ntilde /Ograve /Oacute /Ocircumflex /Otilde /Odieresis /multiply 
+/Oslash /Ugrave /Uacute /Ucircumflex /Udieresis /Yacute /Thorn /germandbls 
+/agrave /aacute /acircumflex /atilde /adieresis /aring /ae /ccedilla 
+/egrave /eacute /ecircumflex /edieresis /igrave /iacute /icircumflex /idieresis 
+/eth /ntilde /ograve /oacute /ocircumflex /otilde /odieresis /divide 
+/oslash /ugrave /uacute /ucircumflex /udieresis /yacute /thorn /ydieresis 
+] def
+%%EndResource
+% Initialize page description variables.
+/sh 612 def
+/sw 792 def
+/llx 24 def
+/urx 768 def
+/ury 588 def
+/lly 24 def
+/#copies 1 def
+/th 15.000000 def
+/fnfs 11 def
+/bfs 7.493857 def
+/cw 4.496314 def
+
+% Dictionary for ISO-8859-1 support
+/iso1dict 8 dict begin
+  /fCourier ISO-8859-1Encoding /Courier reencode_font
+  /fCourier-Bold ISO-8859-1Encoding /Courier-Bold reencode_font
+  /fCourier-BoldOblique ISO-8859-1Encoding /Courier-BoldOblique reencode_font
+  /fCourier-Oblique ISO-8859-1Encoding /Courier-Oblique reencode_font
+  /fHelvetica ISO-8859-1Encoding /Helvetica reencode_font
+  /fHelvetica-Bold ISO-8859-1Encoding /Helvetica-Bold reencode_font
+  /fTimes-Bold ISO-8859-1Encoding /Times-Bold reencode_font
+  /fTimes-Roman ISO-8859-1Encoding /Times-Roman reencode_font
+currentdict end def
+/bgcolor [ 0 0 0 ] def
+/bg false def
+/ul false def
+/bx false def
+% The font for line numbering
+/f# /Helvetica findfont bfs .6 mul scalefont def
+/fSymbol /Symbol findfont def
+/hm fnfs 0.25 mul def
+/pw
+   cw 81.400000 mul
+def
+/ph
+   522.321860 th add
+def
+/pmw urx llx sub pw 2 mul sub 1 div def
+/pmh 0 def
+/v 0 def
+/x [
+  0
+  dup pmw add pw add
+] def
+/y [
+  pmh ph add 0 mul ph add
+  dup
+] def
+/scx sw 2 div def
+/scy sh 2 div def
+/snx urx def
+/sny lly 2 add def
+/dx llx def
+/dy sny def
+/fnx scx def
+/fny dy def
+/lx snx def
+/ly ury fnfs 0.8 mul sub def
+/sx 0 def
+/tab 8 def
+/x0 0 def
+/y0 0 def
+%%EndSetup
+
+%%Page: (1-2) 1
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(/**) c n
+( * \\file graph.h) N
+( 1 *) N
+( *) N
+( *) N
+( * \\author jtd7,) N
+( * \\date 20-10-2011) N
+( */) N
+() p n
+(#ifndef) K
+( GRAPH_H) p n
+(#define) K
+( GRAPH_H) p n
+() N
+(#include) K
+( <stdlib.h>) p n
+(#include) K
+( <string.h>) p n
+(#include) K
+( <stdio.h>) p n
+(#include) K
+( <errno.h>) p n
+(#include) K
+( <math.h>) p n
+(#ifdef) K
+( DEBUG) p n
+(#define) K
+( DEBUG_PRINTF\(fmt,args...\) fprintf\(stderr,fmt,##args\)) p n
+(#else) K n
+(#define) S
+( DEBUG_PRINTF\(...\)) p n
+(#endif) K n
+(typedef) S
+( ) p
+(struct) k
+( vertex vertex;) p n
+(struct) k
+( vertex {) p n
+(  ) S
+(float) k
+( x;) p n
+(  ) S
+(float) k
+( y;) p n
+(  ) S
+(int) k
+( index;) p n
+(  vertex *parent;) N
+(};) N
+(typedef) K
+( ) p
+(struct) k
+( edge graph_edge;) p n
+(struct) k
+( heap {) p n
+(  graph_edge *edges;) N
+(  size_t size;) N
+(  size_t len;) N
+(  size_t max_size;) N
+(};) N
+(//x86_64 has 2 return registers so we can use this by value) c n
+(//and have it be pretty fast) N
+(struct) k
+( edge {) p n
+(  ) S
+(int) k
+( start;) p n
+(  ) S
+(int) k
+( end;) p n
+(  ) S
+(double) k
+( weight;) p n
+(};) N
+(graph_edge heap_pop\() S
+(struct) k
+( heap *heap\);) p n
+(void) k
+( heap_add\() p
+(struct) k
+( heap *heap, graph_edge edge\);) p n
+(graph_edge* heapsort_heap\() S
+(struct) k
+( heap *heap\);) p n
+(struct) k
+( heap *make_heap\(size_t initial_size, size_t max_size\);) p n
+(//void edge_qsort\(graph_edge *edges, size_t len\);) c n
+(void) k
+( free_heap\() p
+(struct) k
+( heap *\);) p n
+(static) K
+( __attribute__\(\(unused\)\)  ) p
+(void) k
+( *xmalloc\(size_t sz\){) p n
+(  ) S
+(void) k
+( *temp = calloc\(sz,1\);) p n
+(  ) S
+(if) K
+(\(!temp && sz\){) p n
+(    fprintf\(stderr,") S
+(Error, out of memory\\n) str
+("\);) p n
+(    exit\(1\);) N
+(  }) N
+(  ) S
+(return) K
+( temp;) p n
+(}) N
+(static) K
+(  __attribute__\(\(unused\)\) ) p
+(void) k
+( *xmalloc_atomic\(size_t sz\){) p n
+(  ) S
+(void) k
+( *temp = malloc\(sz\);) p n
+(  ) S
+(if) K
+(\(!temp && sz\){) p n
+(    fprintf\(stderr,") S
+(Error, out of memory\\n) str
+("\);) p n
+(    exit\(1\);) N
+(  }) N
+(  ) S
+(return) K
+( temp;) p n
+(}) N
+(static) K
+( __attribute__\(\(unused\)\)  ) p
+(void) k
+( *xrealloc\() p
+(void) k
+( *ptr, size_t sz\){) p n
+(  ) S
+(void) k
+( *temp = realloc\(ptr, sz\);) p n
+(  ) S
+(if) K
+(\(!temp && sz\){) p n
+(    fprintf\(stderr,") S
+(Error, out of memory\\n) str
+("\);) p n
+(graph.h) (Page 1/2) (Nov 03, 14 9:24) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(    exit\(1\);) p n
+(  }) N
+(  ) S
+(return) K
+( temp;) p n
+(}) N
+(static) K
+( __attribute__\(\(unused\)\)  ) p
+(int) k
+( string_eq\() p
+(const) K
+( ) p
+(char) k
+( *x, ) p
+(const) K
+( ) p
+(char) k
+( *y\){) p n
+(  ) S
+(return) K
+( !strcmp\(x,y\);) p n
+(}) N
+(double) k
+( make_spanning_tree\(graph_edge *tree,vertex *vertices,) p n
+(                       ) S
+(int) k
+( num_vertices,) p
+(double) k
+( max_distance\);) p n
+(#endif) K n
+(graph.h) (Page 2/2) (Nov 03, 14 9:24) title
+border
+grestore
+(Printed by ) rhead
+(graph.h) (1/5) (Monday November 03, 2014) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (1-2) 2
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(/**) c n
+( * \\file graph.c) N
+( *) N
+( *) N
+( *) N
+( * \\author tucker dinapoli) N
+( * \\date 29-10-2014) N
+( */) N
+(#define) K
+( _GNU_SOURCE) p n
+() N
+(#include) K
+( ") p
+(graph.h) str
+(") p n
+(#include) K
+( <math.h>) p n
+(#include) K
+( <stdio.h>) p n
+(#define) K
+( pow2\(x\) __extension__ \({__typeof\(x\) __x = x; \(__x*__x\);}\)) p n
+(static) K
+( ) p
+(inline) K
+( ) p
+(float) k
+( dist4\() p
+(float) k
+( x1, ) p
+(float) k
+( x2, ) p
+(float) k
+( y1, ) p
+(float) k
+( y2\){) p n
+(  ) S
+(float) k
+( dist = sqrt\(pow2\(x2-x1\)+pow2\(y2-y1\)\);) p n
+(  DEBUG_PRINTF\(") S
+(Distance between \(%f,%f\) and \(%f,%f\) is %f\\n) str
+(",) p n
+(               x1,y1,x2,y2,dist\);) N
+(  ) S
+(return) K
+( dist;) p n
+(}) N
+(static) K
+( ) p
+(inline) K
+( ) p
+(float) k
+( dist\(vertex v1, vertex v2\){) p n
+(  ) S
+(float) k
+( dist = sqrt\(pow2\(v2.x-v1.x\)+pow2\(v2.y-v1.y\)\);) p n
+(  DEBUG_PRINTF\(") S
+(Distance between \(%f,%f\) and \(%f,%f\) is %f\\n) str
+(",) p n
+(               v1.x,v1.y,v2.x,v2.y,dist\);) N
+(  ) S
+(return) K
+( dist;) p n
+(}) N
+(typedef) K
+( ) p
+(struct) k
+( vector vector;) p n
+(struct) k
+( vector {) p n
+(  vertex **elems;) N
+(  ) S
+(int) k
+( len;) p n
+(  ) S
+(int) k
+( size;) p n
+(};) N
+(//add an element to a vector, the vector may or may not have been initialized, b) c n
+(ut) N
+(//if not initialized it needs to have been zeroed, also it's not really push, bu) N
+(t eh) N
+(void) k
+( push\() p
+(void) k
+( *elt, vector *place\){) p n
+(  ) S
+(if) K
+(\(place->len >= place->size\){) p n
+(    ) S
+(if) K
+(\(place->size == 0\){) p n
+(      place->size = 32;) S
+(//this is a arbitary default size) c n
+(    } ) p
+(else) K
+( {) p n
+(      place->size *=2;) N
+(    }) N
+(    place->elems = xrealloc\(place->elems, place->size*) S
+(sizeof) K
+(\() p
+(void) k
+(*\)\);) p n
+(  }) N
+(  place->elems[place->len++] = elt;) N
+(}) N
+(vector *make_grid\(vertex *vertices, ) S
+(int) k
+( num_vertices, ) p
+(double) k
+( max_dist\){) p n
+(  ) S
+(//only called if ceil\(1/max_dist\) > 2) c n
+(  ) p
+(int) k
+( num_sectors = ceil\(1/max_dist\);) p n
+(  vector *retval = xmalloc\() S
+(sizeof) K
+(\(vector\)*pow2\(num_sectors\)\);) p n
+(  ) S
+(int) k
+( i;) p n
+(  ) S
+(for) K
+(\(i=0;i<num_vertices;i++\){) p n
+(    vertex *v = vertices+i;) N
+(    ) S
+(int) k
+( x = v->x;) p n
+(    ) S
+(int) k
+( y = v->y;) p n
+(    push\(v, retval\);) N
+(  }) N
+(  ) S
+(return) K
+( retval;) p n
+(}) N
+(static) K
+( size_t max_edges\(vector *grid, ) p
+(int) k
+( N\){) p n
+(  ) S
+(int) k
+( i,j,k,l;) p n
+(  size_t num_edges = 0;) N
+(  ) S
+(int) k
+( s1_elems, s2_elems;) p n
+(  ) S
+(for) K
+(\(i=0;i<N;i++\){) p n
+(    ) S
+(for) K
+(\(j=0;j<N;j++\){) p n
+(      s1_elems = grid[i*N+j].len;      ) N
+(      ) S
+(for) K
+(\(k=i;k<i+2 && k<N;k++\){) p n
+(        ) S
+(for) K
+(\(l=j;l<j+2 && l<N;l++\){) p n
+(graph.c) (Page 1/4) (Nov 03, 14 9:46) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(          s2_elems = grid[k*N+l].len;) p n
+(          num_edges += s1_elems*s2_elems;) N
+(        }) N
+(      }) N
+(    }) N
+(  }) N
+(  ) S
+(return) K
+( num_edges;) p n
+(}) N
+(struct) k
+( edges {) p n
+(  graph_edge *edges;) N
+(  size_t len;) N
+(};) N
+(struct) k
+( heap *make_edges_grid\(vector *grid, vertex *vertices,) p n
+(                                    size_t num_vertices, ) S
+(double) k
+( max_dist\){) p n
+(  ) S
+(struct) k
+( heap* retval = make_heap\(num_vertices, num_vertices*num_vertices\);) p n
+(  ) S
+(int) k
+( i,j,k,l,m,n;) p n
+(  vertex *v1,*v2;) N
+(  vector sector1,sector2;) N
+(  ) S
+(int) k
+( N = \(1/max_dist\);) p n
+(  ) S
+(for) K
+(\(i=0;i<N;i++\){) p n
+(    ) S
+(for) K
+(\(j=0;j<N;j++\){) p
+(/*for each grid section*/) c n
+(      sector1 = grid[i*N+j];) p n
+(      ) S
+(for) K
+(\(k=i;k<i+2 && k<N;k++\){) p
+(/*for the negihbors/the section itself*/) c n
+(        ) p
+(for) K
+(\(l=j;l<j+2 && l<N;l++\){) p n
+(          sector2 = grid[k*N+l];) N
+(//          int sector2_max = \(\(i==k\) && \(j==l\) ? sector1.len/2 : sector2.len\);) c n
+(          ) p
+(for) K
+(\(n=0;n<sector1.len;n++\){) p
+(/*For the points in the section*/) c n
+(            ) p
+(for) K
+(\(m=0;m<sector2.len;m++\){) p
+(/*For the points in the other section*/) c n
+(              v1 = sector1.elems[n];) p n
+(              v2 = sector2.elems[m];) N
+(              ) S
+(float) k
+( distance = dist4\(v1->x,v2->x,v1->y,v2->y\);) p n
+(              ) S
+(if) K
+(\(distance <= max_dist\){) p n
+(                ) S
+(struct) k
+( edge e = {.start = n, .end = m, .weight = distance};) p n
+(                DEBUG_PRINTF\(") S
+(Adding Edge from %d to %d\\n) str
+(",n,m\);) p n
+(                heap_add\(retval,e\);) N
+(              }) N
+(            }) N
+(          }) N
+(        }) N
+(      }) N
+(    }) N
+(  }) N
+(  ) S
+(return) K
+( retval;) p n
+(//  graph_edge *sorted_edges = heapsort_heap\(retval\);) c n
+(//  edge_qsort\(retval->edges, retval->len\);) N
+(//  return \(struct edges\){.edges = retval->edges, .len = retval->len};) N
+(}) p n
+(#if) K
+( 0) p n
+(/*) c n
+(  This creates the edges in parallel, but after doing some) N
+(  profiling I realized that the sorting took up far more time) N
+(  so I switched to using a heap so I didn't need to sort all the edges) N
+(*/) N
+(#define) K
+( atomic_inc\(x\)  __atomic_add_fetch\(x,1, __ATOMIC_SEQ_CST\)) p n
+(static) K
+( ) p
+(struct) k
+( edges make_edges_parallel\(vector *grid, vertex *vertices,) p n
+(                                       ) S
+(double) k
+( max_dist\){) p n
+(  ) S
+(int) k
+( N = ceil\(1/max_dist\);) p n
+(  size_t num_edges = max_edges\(grid,N\);) S
+(//upper bound on number of edges) c n
+(  ) p
+(volatile) K
+( size_t edge_index = -1;) p
+(//start at -1 since we use an ) c n
+(  ) p
+(//atomic operation akin to ++edge_index) c n
+(  graph_edge *edges = xmalloc_atomic\() p
+(sizeof) K
+(\(graph_edge\)*num_edges\);) p n
+(  ) S
+(int) k
+( h,i,j,k,l,m,n;) p n
+(  vertex *v1,*v2;) N
+(  vector sector1,sector2;) N
+(  ) S
+(//break the top loop into as many iterations as possible to maximize) c n
+(  ) p
+(//the gains from doing things in parallel) c n
+(//#pragma omp parallel for) N
+(  ) p
+(for) K
+(\(h=0;h<\(N*N\);h++\){) p n
+(    i = h/N;) N
+(graph.c) (Page 2/4) (Nov 03, 14 9:46) title
+border
+grestore
+(Printed by ) rhead
+(graph.c) (2/5) (Monday November 03, 2014) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (3-4) 3
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(    j = h%N;) p n
+(    sector1 = grid[i*N+j];) N
+(    ) S
+(for) K
+(\(k=i;k<i+2 && k<N;k++\){) p n
+(      ) S
+(for) K
+(\(l=j;l<j+2 && l<N;l++\){) p n
+(        sector2 = grid[k*N+l];) N
+(        ) S
+(for) K
+(\(n=0;n<sector1.len;n++\){) p n
+(          ) S
+(for) K
+(\(m=0;m<sector2.len;m++\){) p n
+(            v1 = sector1.elems[n];) N
+(            v2 = sector2.elems[m];) N
+(            ) S
+(float) k
+( distance = dist4\(v1->x,v2->x,v1->y,v2->y\);) p n
+(            ) S
+(if) K
+(\(distance <= max_dist\){) p n
+(              ) S
+(struct) k
+( edge e = {.start = n, .end = m, .weight = distance};) p n
+(              size_t index = atomic_inc\(&edge_index\);) N
+(              DEBUG_PRINTF\(") S
+(Adding Edge from %d to %d\\n) str
+(",n,m\);) p n
+(              edges[index] = e;) N
+(            }) N
+(          }) N
+(        }) N
+(      }) N
+(    }) N
+(  }) N
+(  edge_qsort\(edges, edge_index+1\);) N
+(  ) S
+(return) K
+( \() p
+(struct) k
+( edges\){.edges = edges, .len = edge_index};) p n
+(}) N
+(#endif) K
+(   ) p n
+(static) K
+( ) p
+(struct) k
+( heap *make_edges_naieve\(vertex *v, ) p
+(int) k
+( num_vertices,) p n
+(                                     ) S
+(double) k
+( max_dist\){) p n
+(  ) S
+(//make an initial guess that we have no more edges than vertices) c n
+(  DEBUG_PRINTF\(") p
+(Constructing edges\\n) str
+("\);) p n
+(  ) S
+(struct) k
+( heap* retval = make_heap\(num_vertices, num_vertices*num_vertices\);) p n
+(  ) S
+(int) k
+( i,j; ) p n
+(  ) S
+(for) K
+(\(i=0;i<num_vertices;i++\){) p n
+(    ) S
+(for) K
+(\(j=0;j<num_vertices;j++\){) p n
+(      ) S
+(if) K
+(\(j>=i\){) p
+(continue) K
+(;}) p n
+(      ) S
+(double) k
+( d = dist\(v[i],v[j]\);) p n
+(      ) S
+(if) K
+(\(d <= max_dist\){) p n
+(        ) S
+(struct) k
+( edge e = {.start = i, .end = j, .weight = d};) p n
+(        DEBUG_PRINTF\(") S
+(adding edge from %d to %d with weight %f to heap\\n) str
+(",) p n
+(                     e.start,e.end,e.weight\);) N
+(        heap_add\(retval, e\);) N
+(      }) N
+(    }) N
+(  }) N
+(  ) S
+(return) K
+( retval;) p n
+(  ) S
+(//  graph_edge *sorted_edges = heapsort_heap\(retval\);) c n
+(  ) p
+(//  return \(struct edges\){.edges = sorted_edges, .len = retval->len};) c n
+(}) p n
+(/*) c n
+(  Instead of implementing a seperate structure for use with) N
+(  union find I just have a parent pointer in the vertex struct) N
+(  that I use will union/find ) N
+(*/) N
+(static) K
+( vertex *find_set\(vertex *v\){) p n
+(  vertex *p = v;) N
+(  ) S
+(while) K
+(\(p->parent != p\){) p n
+(    p = p->parent;) N
+(  }) N
+(  v->parent = p;) N
+(  ) S
+(return) K
+( p;) p n
+(}) N
+(static) K
+( vertex *union_sets\(vertex *v1, vertex *v2\){) p n
+(  v1 = find_set\(v1\);) N
+(  v2 = find_set\(v2\);) N
+(  ) S
+(//meh, ignore rank) c n
+(  v2->parent = v1;) p n
+(  ) S
+(return) K
+( v1;) p n
+(}) N
+(/*tree T;) c n
+(for v in vector) N
+(graph.c) (Page 3/4) (Nov 03, 14 9:46) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(make_set\(v\)) c n
+(     for e in edges) N
+(     if\(find_set\(e.start\) != find_set\(e.end\)\){) N
+(       add_to_tree\(e\);) N
+(       union\(u,v\);) N
+(*/) N
+(struct) k
+( node {) p n
+(  graph_edge e;) N
+(  ) S
+(struct) k
+( node *next;) p n
+(};) N
+(double) k
+( create_spanning_tree\() p
+(struct) k
+( heap *edges, graph_edge *tree,) p n
+(                         vertex *vertices, ) S
+(int) k
+( num_vertices\){) p n
+(  DEBUG_PRINTF\(") S
+(Creating spanning tree\\n) str
+("\);) p n
+(  ) S
+(int) k
+( tree_index = 0;) p n
+(  graph_edge e;) N
+(  ) S
+(int) k
+( i;) p n
+(  ) S
+(double) k
+( weight = 0;) p n
+(  ) S
+(for) K
+(\(i=0;i<edges->len;i++\){) p n
+(    e = heap_pop\(edges\);) N
+(    ) S
+(if) K
+(\(find_set\(vertices+e.start\) != find_set\(vertices+e.end\)\){) p n
+(      DEBUG_PRINTF\(") S
+(adding edge from %d to %d with weight %f\\n) str
+(",) p n
+(                   e.start,e.end,e.weight\);) N
+(      tree[tree_index++] = e;) N
+(      weight += e.weight;) N
+(      ) S
+(if) K
+(\(tree_index >= num_vertices-1\){) p n
+(        ) S
+(break) K
+(;) p n
+(      }) N
+(      union_sets\(vertices+e.start,vertices+e.end\);) N
+(    }) N
+(  }) N
+(  ) S
+(return) K
+( weight;) p n
+(}) N
+(#define) K
+( GRID_MIN_VERTICES 0) p n
+(#define) K
+( GRID_MIN_SECTORS 0) p n
+(static) K
+( ) p
+(struct) k
+( heap* make_edges\(vertex *vertices, size_t num_vertices, ) p
+(double) k
+( max) p n
+(_dist\){) N
+(/*the functions which subdivide the grid are only asymptotically faster) c n
+(  than the naive functions for a max distance < 0.5, if the max distance is >= 0) N
+(.5 ) N
+(  they are O\(n^2\), the same as the naive ones. I'm not sure \(and I'm too) N
+(  lazy to figure out\) the actual running time of these functions. Also since the) N
+(y) N
+(  have a non trival startup time compared to the naive functions they really onl) N
+(y ) N
+(  have an advantage for a sizable number of vertices */) N
+( ) p
+(int) k
+( num_sectors = ceil\(1/max_dist\);) p n
+( ) S
+(if) K
+(\(num_sectors < GRID_MIN_SECTORS || num_vertices < GRID_MIN_VERTICES\){) p n
+(   ) S
+(return) K
+( make_edges_naieve\(vertices, num_vertices, max_dist\);) p n
+( }) N
+( vector *grid = make_grid\(vertices, num_vertices, max_dist\);) N
+( ) S
+(struct) k
+( heap *retval = make_edges_grid\(grid, vertices, num_vertices, max_dist\);) p n
+( free\(grid\);) N
+( ) S
+(return) K
+( retval;) p n
+(}) N
+(double) k
+( make_spanning_tree\(graph_edge *tree, vertex *vertices,) p n
+(                       ) S
+(int) k
+( num_vertices, ) p
+(double) k
+( max_distance\){) p n
+(  ) S
+(struct) k
+( heap *heap = make_edges\(vertices, num_vertices, max_distance\);) p n
+(  ) S
+(double) k
+( weight = create_spanning_tree\(heap, tree, vertices, num_vertices\);) p n
+(  free_heap\(heap\);) N
+(  ) S
+(return) K
+( weight;) p n
+(}) N
+(graph.c) (Page 4/4) (Nov 03, 14 9:46) title
+border
+grestore
+(Printed by ) rhead
+(graph.c) (3/5) (Monday November 03, 2014) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (1-2) 4
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(#include) K
+( ") p
+(graph.h) str
+(") p n
+(#define) K
+( heap_left_child\(i\) \(2*i+1\)) p n
+(#define) K
+( heap_right_child\(i\) \(2*i+2\)) p n
+(#define) K
+( heap_parent\(i\) \(\(i-1\)/2\)) p n
+(#define) K
+( ARR_SWAP\(arr,i,j\)                                       \\) p n
+(  __extension__\({ __typeof__\(arr[i]\) __temp = arr[i];           \\) N
+(    arr[i] = arr[j];                                            \\) N
+(    arr[j] = __temp;                                            \\) N
+(    ;}\)) N
+(#define) K
+( MAX\(x,y\)                                                 \\) p n
+(  __extension__\({ __typeof\(x\) __x = x;                           \\) N
+(      __typeof\(y\) __y = y;                                       \\) N
+(      \(__x > __y ? __x : __y\);}\)) N
+(#define) K
+( MIN\(x,y\)                                                 \\) p n
+(  __extension__\({ __typeof\(x\) __x = x;                           \\) N
+(      __typeof\(y\) __y = y;                                       \\) N
+(      \(__x < __y ? __x : __y\);}\)) N
+(static) K
+( ) p
+(void) k
+( heap_sift_down\() p
+(struct) k
+( heap *heap, ) p
+(int) k
+( root\){) p n
+(  ) S
+(int) k
+( left,right,swap;) p n
+(  left = right = swap = 0;  ) N
+(  ) S
+(while) K
+( \(\(left = heap_left_child\(root\)\) < heap->len\){) p n
+(    right = heap_right_child\(root\);) N
+(    swap = root;) N
+(    ) S
+(if) K
+(\(heap->edges[left].weight < heap->edges[swap].weight\){) p n
+(      swap = left;) N
+(    }) N
+(    ) S
+(if) K
+(\(right < heap->len &&) p n
+(       \(heap->edges[right].weight < heap->edges[swap].weight\)\){) N
+(      swap = right;) N
+(    }) N
+(    ) S
+(if) K
+(\(swap == root\){) p n
+(      ) S
+(return) K
+(;) p n
+(    } ) S
+(else) K
+( {) p n
+(      ARR_SWAP\(heap->edges, root, swap\);) N
+(      root = swap;) N
+(    }) N
+(  }) N
+(}) N
+() N
+(static) K
+( ) p
+(void) k
+( heap_sift_up\() p
+(struct) k
+( heap *heap, ) p
+(int) k
+( index\){) p n
+(  ) S
+(int) k
+( parent = heap_parent\(index\);) p n
+(  ) S
+(//this will terminate at the root since heap_parent\(0\) = 0) c n
+(  ) p
+(while) K
+(\(heap->edges[index].weight < heap->edges[parent].weight\){) p n
+(    ARR_SWAP\(heap->edges, index, parent\);) N
+(    index = parent;) N
+(    parent = heap_parent\(index\);) N
+(  }) N
+(}) N
+(//turns an array of doubles into a min heap) c n
+(static) K
+( ) p
+(void) k
+( heapify\() p
+(struct) k
+( heap *heap\){) p n
+(  ) S
+(int) k
+( i = heap->len/2;) p n
+(  ) S
+(while) K
+( \(i >= 0\) {) p n
+(    heap_sift_down\(heap, i--\);) N
+(  }) N
+(}) N
+() N
+(void) k
+( heap_add\() p
+(struct) k
+( heap *heap, graph_edge edge\){) p n
+(  ) S
+(if) K
+(\(heap->len >= heap->size\){) p n
+(    heap->size = MIN\(heap->size*2,heap->max_size\);) N
+(    heap->edges = xrealloc\(heap->edges, heap->size*) S
+(sizeof) K
+(\(graph_edge\)\);) p n
+(  }) N
+(  heap->edges[heap->len] = edge;) N
+(  heap_sift_up\(heap, heap->len\);) N
+(  heap->len++;) N
+(}) N
+(graph_edge heap_pop\() S
+(struct) k
+( heap *heap\){) p n
+(  graph_edge retval = heap->edges[0];) N
+(  heap->edges[0] = heap->edges[--heap->len];) N
+(  heap_sift_down\(heap, 0\);) N
+(heap.c) (Page 1/2) (Nov 03, 14 9:19) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(  ) p
+(return) K
+( retval;) p n
+(}) N
+(graph_edge* heapsort_heap\() S
+(struct) k
+( heap *heap\){) p n
+(  ) S
+(int) k
+( i;) p n
+(  ) S
+(for) K
+(\(i=heap->len-1;i>0;i--\){) p n
+(    ARR_SWAP\(heap->edges,i,0\);) N
+(    heap_sift_down\(heap, 0\);) N
+(  }) N
+(  ) S
+(return) K
+( heap->edges;) p n
+(}) N
+(struct) k
+( heap *make_heap\(size_t initial_size, size_t max_size\){) p n
+(  ) S
+(if) K
+(\(initial_size == 0\){) p n
+(    initial_size = 128;) N
+(  }) N
+(  DEBUG_PRINTF\(") S
+(Creating heap with size %lu, and max size %lu\\n) str
+(",) p n
+(               initial_size, max_size\);) N
+(  ) S
+(struct) k
+( heap *heap = xmalloc\() p
+(sizeof) K
+(\() p
+(struct) k
+( heap\)\);) p n
+(  heap->size = initial_size;) N
+(  heap->len = 0;) N
+(  heap->edges = xmalloc_atomic\(initial_size*) S
+(sizeof) K
+(\(graph_edge\)\);) p n
+(  ) S
+(if) K
+(\(max_size == 0\){) p n
+(    heap->max_size = -1;) N
+(  } ) S
+(else) K
+( {) p n
+(    heap->max_size = max_size;) N
+(  }) N
+(  ) S
+(return) K
+( heap;) p n
+(}) N
+(    ) N
+(void) k
+( free_heap\() p
+(struct) k
+( heap *heap\){) p n
+(  free\(heap->edges\);) N
+(  free\(heap\);) N
+(}) N
+(heap.c) (Page 2/2) (Nov 03, 14 9:19) title
+border
+grestore
+(Printed by ) rhead
+(heap.c) (4/5) (Monday November 03, 2014) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (1-2) 5
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(/**) c n
+( * \\file spanning_tree.c) N
+( *) N
+( *) N
+( *) N
+( * \\author tucker dinapoli) N
+( * \\date 29-10-2013) N
+( */) N
+() p n
+(#define) K
+( _GNU_SOURCE) p n
+(#include) K
+( <assert.h>) p n
+(#include) K
+( <sys/time.h>) p n
+(#include) K
+( <stdlib.h>) p n
+(#include) K
+( <stdio.h>) p n
+(#include) K
+( ") p
+(graph.h) str
+(") p n
+(#include) K
+( <ctype.h>) p n
+() N
+(void) k
+( usage\(\){) p n
+(  fprintf\(stderr, ") S
+(Usage:\\ntree <infile> <max_distance>\\n) str
+("\);) p n
+(  exit\(EXIT_FAILURE\);) N
+(}) N
+(//this could be a bit better if it took an optional buffer ala getline) c n
+(double) k
+( read_double\() p
+(FILE) k
+( *infile\){) p n
+(  ) S
+(//this doesn't need to be thread safe) c n
+(  ) p
+(static) K
+( size_t buf_size = 256;) p n
+(  ) S
+(//this buffer will never get freed, oh well) c n
+(  ) p
+(static) K
+( ) p
+(char) k
+( *buf = ) p
+(NULL) K
+(;) p n
+(  ) S
+(if) K
+(\(!buf\){) p n
+(    buf = xmalloc_atomic\(buf_size*) S
+(sizeof) K
+(\() p
+(char) k
+(\)\);) p n
+(  }) N
+(  ) S
+(char) k
+( c;) p n
+(  ) S
+(while) K
+(\(isspace\(c=fgetc\(infile\)\)\); ) p
+(//do nothing) c n
+(  ) p
+(if) K
+(\(c == EOF\){) p n
+(    errno = ERANGE;) N
+(    ) S
+(return) K
+( 0.0;) p n
+(  }) N
+(  ) S
+(unsigned) k
+( ) p
+(int) k
+( buf_ind = 0;) p n
+(  ) S
+(do) K
+( {) p n
+(    ) S
+(if) K
+(\(buf_ind >= \(buf_size-1\)\){) p
+(//buf_size-1 for trailing null byte) c n
+(      buf = xrealloc\(buf, buf_size*2\);) p n
+(      buf_size *=2;) N
+(    }) N
+(    buf[buf_ind++] = c;) N
+(  } ) S
+(while) K
+( \(!\(isspace\(c = fgetc\(infile\)\)\)\);) p n
+(  buf[buf_ind] = ') S
+(\\0) str
+(';) p n
+(  errno = 0;) N
+(  ) S
+(char) k
+( *endptr = ) p
+(NULL) K
+(;) p n
+(  ) S
+(double) k
+( d = strtod\(buf, &endptr\);) p n
+(  ) S
+(if) K
+(\(*endptr != ') p
+(\\0) str
+('\){) p n
+(    fprintf\(stderr, ") S
+(invalid number: %s\\n) str
+(", buf\);) p n
+(    errno = EILSEQ;) N
+(    ) S
+(return) K
+( 0.0;) p n
+(  } ) S
+(else) K
+( ) p
+(if) K
+(\(errno == ERANGE\){) p n
+(    fprintf\(stderr, ") S
+(Number out of range: %s\\n) str
+(",buf\);) p n
+(    errno = EILSEQ;) N
+(    ) S
+(return) K
+( 0.0;) p n
+(  } ) S
+(else) K
+( {) p n
+(    errno = 0;) N
+(    ) S
+(return) K
+( d;) p n
+(  }) N
+(}) N
+() N
+(int) k
+( determine_decimal_digits\() p
+(unsigned) k
+( ) p
+(long) k
+( x\){) p n
+(  ) S
+(int) k
+( binary_digits = 64 - __builtin_clzl\(x\);) p n
+(  ) S
+(//0.30102999566 is roughly equal to log\(2\)/log\(10\)) c n
+(  ) p
+(int) k
+( decimal_digits = ceil\(0.30102999566 * binary_digits\);) p n
+(  ) S
+(return) K
+( decimal_digits;) p n
+(}) N
+(int) k
+( find_spanning_tree\() p
+(FILE) k
+( *infile, ) p
+(double) k
+( max_dist\){) p n
+(spanning_tree.c) (Page 1/2) (Nov 03, 14 9:24) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(  DEBUG_PRINTF\(") p
+(Begining Program\\n) str
+("\);) p n
+(  ) S
+(char) k
+( *line = ) p
+(NULL) K
+(;) p n
+(  size_t line_size = 0;) N
+(  ) S
+(int) k
+( err = getline\(&line, &line_size , infile\);) p n
+(  ) S
+(if) K
+(\(errno == -1\){) p n
+(    fprintf\(stderr, ") S
+(Unable to read from file\\n) str
+("\);) p n
+(    ) S
+(return) K
+( 1;) p n
+(  }) N
+(  errno = 0;) N
+(  ) S
+(long) k
+( num_points = strtol\(line, ) p
+(NULL) K
+(, 0\);) p n
+(  ) S
+(if) K
+(\(num_points <= 0 || errno == ERANGE\){) p n
+(    fprintf\(stderr,") S
+(invalid number of points%s\\n) str
+(",line\);) p n
+(    free\(line\);) N
+(    ) S
+(return) K
+( 1;) p n
+(  }) N
+(  free\(line\);) N
+(  vertex *points = xmalloc_atomic\() S
+(sizeof) K
+(\(vertex\)*num_points\);) p n
+(  ) S
+(int) k
+( i;) p n
+(  DEBUG_PRINTF\(") S
+(Expecting %ld number of points with max distance %f\\n) str
+(",) p n
+(               num_points, max_dist\);) N
+(  ) S
+(for) K
+(\(i=0;i<num_points;i++\){) p n
+(    ) S
+(double) k
+( x = read_double\(infile\);) p n
+(    ) S
+(if) K
+(\(errno == EILSEQ\){) p
+(return) K
+( 1;}) p n
+(    ) S
+(double) k
+( y = read_double\(infile\);) p n
+(    ) S
+(if) K
+(\(errno == EILSEQ\){) p
+(return) K
+( 1;}) p n
+(    ) S
+(if) K
+(\(errno == ERANGE\){) p n
+(      fprintf\(stderr,") S
+(Unexpected end of file\\n) str
+("\);) p n
+(      ) S
+(return) K
+( 1;) p n
+(    }) N
+(    points[i] = \(vertex\){.x = x,.y = y, .index = i, .parent = points+i};) N
+(  }) N
+(  graph_edge *edges = xmalloc_atomic\() S
+(sizeof) K
+(\(graph_edge\) * num_points\);) p n
+(  ) S
+(double) k
+( weight = make_spanning_tree\(edges, points, num_points, max_dist\);) p n
+(  ) S
+(int) k
+( decimal_digits = determine_decimal_digits\(num_points\);) p n
+(  ) S
+(for) K
+(\(i=0;i<num_points-1;i++\){) p n
+(    __extension__ printf\(") S
+(%2$*1$u %3$*1$u\\n) str
+(", decimal_digits,) p n
+(                         edges[i].start,edges[i].end\);) N
+(  }) N
+(  printf\(") S
+(%lf\\n) str
+(", weight\);) p n
+(  fclose\(infile\);) N
+(  free\(edges\);) N
+(  free\(points\);) N
+(  ) S
+(return) K
+( 0;) p n
+(}) N
+(int) k
+( main\() p
+(int) k
+( argc, ) p
+(const) K
+( ) p
+(char) k
+( *argv[]\){) p n
+(  ) S
+(if) K
+( \(argc != 3\){) p n
+(    usage\(\);) N
+(  }  ) N
+(  ) S
+(if) K
+( \(string_eq\(argv[1],") p
+(--help) str
+("\) || string_eq\(argv[1],") p
+(-h) str
+("\)\){) p n
+(    usage\(\);) N
+(  }) N
+(  ) S
+(double) k
+( d = strtod\(argv[2],) p
+(NULL) K
+(\);) p n
+(  ) S
+(if) K
+(\(d > 1.5\){) p n
+(    fprintf\(stderr,") S
+(Invalid maximum distance %f\\n ) str
+(") p n
+(            ") S
+(maximum distance must be between 0 and 1.5\\n) str
+(",d\);) p n
+(    ) S
+(return) K
+( 1;) p n
+(  }) N
+(  ) S
+(FILE) k
+( *infile = fopen\(argv[1],") p
+(r) str
+("\);) p n
+(  ) S
+(if) K
+(\(!infile\){) p n
+(    perror\(") S
+(fopen) str
+("\);) p n
+(    ) S
+(return) K
+( 1;) p n
+(  }) N
+(  ) S
+(return) K
+( find_spanning_tree\(infile, d\);) p n
+(}) N
+(spanning_tree.c) (Page 2/2) (Nov 03, 14 9:24) title
+border
+grestore
+(Printed by ) rhead
+(spanning_tree.c) (5/5) (Monday November 03, 2014) footer
+end % of iso1dict
+pagesave restore
+showpage
+
+%%Trailer
+end
+%%EOF

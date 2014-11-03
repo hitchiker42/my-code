@@ -1,0 +1,60 @@
+Notes on my program:
+I rewrote the entire program from scratch, I used the algorithm for generating
+edges from the skeleton code, but the skeleton code was very poorly written, no
+library calls were checked (which in the case of memory allocation functions is
+a pretty big oversight given the sizes of possible input), a fixed size buffer
+was used to read in input of arbitrary length leading to a possible buffer
+overflow, and the code itself was poorly formatted. 
+I feel the lack of memory checking deserves special note since I actually ran
+out of memory for some of the larger inputs, my program exits with a message 
+"Error: Out of memory" while the reference implementation just segfaults.
+
+Since my code is completely different from the reference implementation I've
+noticed some slight differences in total weight for some of the larger inputs,
+which I imagine can be blamed on floating point rounding errors, given that
+single floats are used instead of doubles (mostly for memory) this is (I think)
+a reasonable assumption. This should be taken info account when comaring my
+output to the reference implemention for large inputs.
+
+23.1-2:
+Let G = (V,E) be an undirected graph with weights given by a function w:E->R,
+where R is the set of real numbers. Let A be a subset of E that is part of a
+minimum spanning tree for G, (S, V - S) be any cut of G that respects A and
+(u,v) be a safe edge for A crossing (S, V - S).
+Show (u,v) is not necessarily a light edge for the cut.
+
+let w = \lambda{}E->E.start+E.end, and G be the graph:
+1 - 2 - 3 - 4 - 5 - 6 (where 1-6 are the vertexes)
+
+let A be the set {(3,4)} and S be the set {2,3,4,5}
+the edge (2,3) is the light edge of the cut and a safe edge for crossing,
+however the edge (4,5) is also a safe edge for crossing and is clearly
+not a light edge.
+
+23.1-9
+Let T be a minimum spanning tree of the graph G=(V,E).
+Let V' be a subset of V, T' a subgraph of T given by V',
+and G' be a subgraph of G again given by V'. 
+Show that if T' is connected than it is a minimum spanning tree for G'.
+
+This can be show using mathematical induction on |V'|.
+If |V'|<2 then T' can not be connected.
+
+If |V'| = 2 and V' = {u,v} then G' = ({u,v},(u,v)) and assuming (u,v) is part
+of T, T' = G', so T' is a minimum spanning tree of G', if (u,v) is not a part
+of T then T' is not connected.x 
+
+Now assume |V'| = n and T' is a minimum spanning tree of G'.
+Let V* = V' U v, such that |V*| = |V'| + 1, let G* and T* be defined based on
+V* in the same way G' and T' are defined by V'.
+If \exists u \in V' such that (u,v) \in T* then T* spans G*.
+Since (u,v) \in T* and T* \sube T,  (u,v) \in T which means T* is a minimum spanning
+tree for G*. If T* was not a minimum spanning tree for G* than that would mean
+there was an edge (u,v') that had a weight less than (u,v). We could then
+replace (u,v) in T with (u,v') to create a tree spanning G with a weight less
+than the minimum spanning tree, which is impossible. 
+
+If \nexist u \in V' such that (u,v) \in T* then T* is not connected.
+
+Since this property holds for |V'| = 2 and for |V'| = n+1 if it also holds
+for |V'|=n it holds for any size |V'|, assuming |V'| \le |V|. QED.

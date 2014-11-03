@@ -76,7 +76,7 @@ POST_INSTALL = :
 NORMAL_UNINSTALL = :
 PRE_UNINSTALL = :
 POST_UNINSTALL = :
-bin_PROGRAMS = tree$(EXEEXT) tree_debug$(EXEEXT)
+bin_PROGRAMS = tree$(EXEEXT) tree_debug$(EXEEXT) tree_prof$(EXEEXT)
 subdir = .
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/configure $(am__configure_deps) \
@@ -110,6 +110,12 @@ tree_debug_OBJECTS = $(am_tree_debug_OBJECTS)
 tree_debug_LDADD = $(LDADD)
 tree_debug_LINK = $(CCLD) $(tree_debug_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
+am_tree_prof_OBJECTS = tree_prof-graph.$(OBJEXT) \
+	tree_prof-heap.$(OBJEXT) tree_prof-spanning_tree.$(OBJEXT)
+tree_prof_OBJECTS = $(am_tree_prof_OBJECTS)
+tree_prof_LDADD = $(LDADD)
+tree_prof_LINK = $(CCLD) $(tree_prof_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
+	$(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_$(V))
 am__v_P_ = $(am__v_P_$(AM_DEFAULT_VERBOSITY))
 am__v_P_0 = false
@@ -142,8 +148,9 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(tree_SOURCES) $(tree_debug_SOURCES)
-DIST_SOURCES = $(tree_SOURCES) $(tree_debug_SOURCES)
+SOURCES = $(tree_SOURCES) $(tree_debug_SOURCES) $(tree_prof_SOURCES)
+DIST_SOURCES = $(tree_SOURCES) $(tree_debug_SOURCES) \
+	$(tree_prof_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -196,13 +203,13 @@ AUTOCONF = ${SHELL} /home/tucker/Repo/my-code/cs758/asst-9/build_aux/missing aut
 AUTOHEADER = ${SHELL} /home/tucker/Repo/my-code/cs758/asst-9/build_aux/missing autoheader
 AUTOMAKE = ${SHELL} /home/tucker/Repo/my-code/cs758/asst-9/build_aux/missing automake-1.14
 AWK = gawk
-CC = gcc -std=gnu99
-CCAS = gcc
+CC = ccache gcc -std=gnu99
+CCAS = ccache gcc
 CCASDEPMODE = depmode=gcc3
 CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
-CPP = gcc -std=gnu99 -E
+CPP = ccache gcc -std=gnu99 -E
 CPPFLAGS = 
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
@@ -243,7 +250,7 @@ abs_srcdir = /home/tucker/Repo/my-code/cs758/asst-9
 abs_top_builddir = /home/tucker/Repo/my-code/cs758/asst-9
 abs_top_srcdir = /home/tucker/Repo/my-code/cs758/asst-9
 ac_ct_AR = ar
-ac_ct_CC = gcc
+ac_ct_CC = ccache gcc
 am__include = include
 am__leading_dot = .
 am__quote = 
@@ -283,8 +290,10 @@ top_builddir = .
 top_srcdir = .
 tree_SOURCES = graph.c heap.c spanning_tree.c
 tree_debug_SOURCES = graph.c heap.c spanning_tree.c
-tree_debug_CFLAGS = -g -O2 -std=c99 -Wall -Wno-unused -DDEBUG
-tree_CFLAGS = -O3 -std=c99 -mtune=native -Wall -Wno-unused -DNDEBUG
+tree_prof_SOURCES = graph.c heap.c spanning_tree.c
+tree_debug_CFLAGS = -g -Og -std=c99 -Wall -Wno-unused -DDEBUG
+tree_CFLAGS = -O3 -std=c99 -mtune=native -Wall -Wno-unused -DNDEBUG  -pedantic  -ffast-math
+tree_prof_CFLAGS = -g -O3 -fopenmp -std=c99 -mtune=native -Wall -Wno-unused -DNDEBUG -ffast-math -pg
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -390,6 +399,10 @@ tree_debug$(EXEEXT): $(tree_debug_OBJECTS) $(tree_debug_DEPENDENCIES) $(EXTRA_tr
 	@rm -f tree_debug$(EXEEXT)
 	$(AM_V_CCLD)$(tree_debug_LINK) $(tree_debug_OBJECTS) $(tree_debug_LDADD) $(LIBS)
 
+tree_prof$(EXEEXT): $(tree_prof_OBJECTS) $(tree_prof_DEPENDENCIES) $(EXTRA_tree_prof_DEPENDENCIES) 
+	@rm -f tree_prof$(EXEEXT)
+	$(AM_V_CCLD)$(tree_prof_LINK) $(tree_prof_OBJECTS) $(tree_prof_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
 
@@ -402,6 +415,9 @@ include ./$(DEPDIR)/tree-spanning_tree.Po
 include ./$(DEPDIR)/tree_debug-graph.Po
 include ./$(DEPDIR)/tree_debug-heap.Po
 include ./$(DEPDIR)/tree_debug-spanning_tree.Po
+include ./$(DEPDIR)/tree_prof-graph.Po
+include ./$(DEPDIR)/tree_prof-heap.Po
+include ./$(DEPDIR)/tree_prof-spanning_tree.Po
 
 .c.o:
 	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -502,6 +518,48 @@ tree_debug-spanning_tree.obj: spanning_tree.c
 #	$(AM_V_CC)source='spanning_tree.c' object='tree_debug-spanning_tree.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_debug_CFLAGS) $(CFLAGS) -c -o tree_debug-spanning_tree.obj `if test -f 'spanning_tree.c'; then $(CYGPATH_W) 'spanning_tree.c'; else $(CYGPATH_W) '$(srcdir)/spanning_tree.c'; fi`
+
+tree_prof-graph.o: graph.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -MT tree_prof-graph.o -MD -MP -MF $(DEPDIR)/tree_prof-graph.Tpo -c -o tree_prof-graph.o `test -f 'graph.c' || echo '$(srcdir)/'`graph.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tree_prof-graph.Tpo $(DEPDIR)/tree_prof-graph.Po
+#	$(AM_V_CC)source='graph.c' object='tree_prof-graph.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -c -o tree_prof-graph.o `test -f 'graph.c' || echo '$(srcdir)/'`graph.c
+
+tree_prof-graph.obj: graph.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -MT tree_prof-graph.obj -MD -MP -MF $(DEPDIR)/tree_prof-graph.Tpo -c -o tree_prof-graph.obj `if test -f 'graph.c'; then $(CYGPATH_W) 'graph.c'; else $(CYGPATH_W) '$(srcdir)/graph.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tree_prof-graph.Tpo $(DEPDIR)/tree_prof-graph.Po
+#	$(AM_V_CC)source='graph.c' object='tree_prof-graph.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -c -o tree_prof-graph.obj `if test -f 'graph.c'; then $(CYGPATH_W) 'graph.c'; else $(CYGPATH_W) '$(srcdir)/graph.c'; fi`
+
+tree_prof-heap.o: heap.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -MT tree_prof-heap.o -MD -MP -MF $(DEPDIR)/tree_prof-heap.Tpo -c -o tree_prof-heap.o `test -f 'heap.c' || echo '$(srcdir)/'`heap.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tree_prof-heap.Tpo $(DEPDIR)/tree_prof-heap.Po
+#	$(AM_V_CC)source='heap.c' object='tree_prof-heap.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -c -o tree_prof-heap.o `test -f 'heap.c' || echo '$(srcdir)/'`heap.c
+
+tree_prof-heap.obj: heap.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -MT tree_prof-heap.obj -MD -MP -MF $(DEPDIR)/tree_prof-heap.Tpo -c -o tree_prof-heap.obj `if test -f 'heap.c'; then $(CYGPATH_W) 'heap.c'; else $(CYGPATH_W) '$(srcdir)/heap.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tree_prof-heap.Tpo $(DEPDIR)/tree_prof-heap.Po
+#	$(AM_V_CC)source='heap.c' object='tree_prof-heap.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -c -o tree_prof-heap.obj `if test -f 'heap.c'; then $(CYGPATH_W) 'heap.c'; else $(CYGPATH_W) '$(srcdir)/heap.c'; fi`
+
+tree_prof-spanning_tree.o: spanning_tree.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -MT tree_prof-spanning_tree.o -MD -MP -MF $(DEPDIR)/tree_prof-spanning_tree.Tpo -c -o tree_prof-spanning_tree.o `test -f 'spanning_tree.c' || echo '$(srcdir)/'`spanning_tree.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tree_prof-spanning_tree.Tpo $(DEPDIR)/tree_prof-spanning_tree.Po
+#	$(AM_V_CC)source='spanning_tree.c' object='tree_prof-spanning_tree.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -c -o tree_prof-spanning_tree.o `test -f 'spanning_tree.c' || echo '$(srcdir)/'`spanning_tree.c
+
+tree_prof-spanning_tree.obj: spanning_tree.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -MT tree_prof-spanning_tree.obj -MD -MP -MF $(DEPDIR)/tree_prof-spanning_tree.Tpo -c -o tree_prof-spanning_tree.obj `if test -f 'spanning_tree.c'; then $(CYGPATH_W) 'spanning_tree.c'; else $(CYGPATH_W) '$(srcdir)/spanning_tree.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tree_prof-spanning_tree.Tpo $(DEPDIR)/tree_prof-spanning_tree.Po
+#	$(AM_V_CC)source='spanning_tree.c' object='tree_prof-spanning_tree.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(tree_prof_CFLAGS) $(CFLAGS) -c -o tree_prof-spanning_tree.obj `if test -f 'spanning_tree.c'; then $(CYGPATH_W) 'spanning_tree.c'; else $(CYGPATH_W) '$(srcdir)/spanning_tree.c'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique

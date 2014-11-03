@@ -39,13 +39,14 @@ struct heap {
 struct edge {
   int start;
   int end;
-  double weight;  
+  double weight;
 };
 graph_edge heap_pop(struct heap *heap);
 void heap_add(struct heap *heap, graph_edge edge);
-graph_edge* heap_sort_heap(struct heap *heap);
+graph_edge* heapsort_heap(struct heap *heap);
 struct heap *make_heap(size_t initial_size, size_t max_size);
-void edge_qsort(graph_edge *edges, size_t len);
+//void edge_qsort(graph_edge *edges, size_t len);
+void free_heap(struct heap *);
 static __attribute__((unused))  void *xmalloc(size_t sz){
   void *temp = calloc(sz,1);
   if(!temp && sz){
@@ -73,6 +74,6 @@ static __attribute__((unused))  void *xrealloc(void *ptr, size_t sz){
 static __attribute__((unused))  int string_eq(const char *x, const char *y){
   return !strcmp(x,y);
 }
-int make_spanning_tree(graph_edge *tree,vertex *vertices,
+double make_spanning_tree(graph_edge *tree,vertex *vertices,
                        int num_vertices,double max_distance);
 #endif

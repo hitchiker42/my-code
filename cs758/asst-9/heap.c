@@ -69,7 +69,7 @@ graph_edge heap_pop(struct heap *heap){
   heap_sift_down(heap, 0);
   return retval;
 }
-graph_edge* heap_sort_heap(struct heap *heap){
+graph_edge* heapsort_heap(struct heap *heap){
   int i;
   for(i=heap->len-1;i>0;i--){
     ARR_SWAP(heap->edges,i,0);
@@ -95,3 +95,7 @@ struct heap *make_heap(size_t initial_size, size_t max_size){
   return heap;
 }
     
+void free_heap(struct heap *heap){
+  free(heap->edges);
+  free(heap);
+}

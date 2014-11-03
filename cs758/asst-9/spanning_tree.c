@@ -62,8 +62,8 @@ double read_double(FILE *infile){
 
 int determine_decimal_digits(unsigned long x){
   int binary_digits = 64 - __builtin_clzl(x);
-  //0.30103 is roughly equal to log(2)/log(10)
-  int decimal_digits = ceil(0.30103 * binary_digits);
+  //0.30102999566 is roughly equal to log(2)/log(10)
+  int decimal_digits = ceil(0.30102999566 * binary_digits);
   return decimal_digits;
 }
 int find_spanning_tree(FILE *infile, double max_dist){
@@ -99,12 +99,10 @@ int find_spanning_tree(FILE *infile, double max_dist){
     points[i] = (vertex){.x = x,.y = y, .index = i, .parent = points+i};
   }
   graph_edge *edges = xmalloc_atomic(sizeof(graph_edge) * num_points);
-  int tree_size = make_spanning_tree(edges, points, num_points, max_dist);
-  double weight = 0.0;
+  double weight = make_spanning_tree(edges, points, num_points, max_dist);
   int decimal_digits = determine_decimal_digits(num_points);
-  for(i=0;i<tree_size;i++){
-    weight += edges[i].weight;
-    __extension__ printf("%2$0*1$u %3$0*1$u\n", decimal_digits,
+  for(i=0;i<num_points-1;i++){
+    __extension__ printf("%2$*1$u %3$*1$u\n", decimal_digits,
                          edges[i].start,edges[i].end);
   }
   printf("%lf\n", weight);
