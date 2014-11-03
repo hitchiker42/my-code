@@ -892,6 +892,58 @@ at least 2 pigeons in one hole.
    r+s = s+r
    \Lambda + rr* = r*
    rr* = r*r
+* Finite State Machine
+  A machine with a finite number of states.
+  represented by a function that given a state and an input returns a state
+  i.e. f:(state x inputs) -> states
+  f is the transition function
+
+  Can also be reprenented by a directed graph (a transition diagram)
+
+  Has initial and final states
+
+** Determininstic finite automation
+   Represented by a 5-Tuple (Q, \Sigma, \delta, q_{0}, F)
+   1. Q is a finite set (the set of states)
+   2. \Sigma is an alphabet
+   3. \delta:Qx\Sigma -> Q (transition function);
+   4. q_o \in Q (start state)
+   5. F \in Q (set of final states)
+
+   ex. M = {Q,\Sigma,\delta,q_{o},F}
+   Q={q_0,q_1,q_2}
+   \Sigma={a,b}
+   \delta = (q_n , b)->q_1, (q_1, a)->q_2,(q_0, a)->q_0, (q_2,a)->q_1
+   q_o = q_o
+   F={q_1}
+   (I can't really draw the diagram)
+Finite state algorithm:
+input w \in \Sigma*
+current-state = q_0;
+foreach i from 0 upto |W| //loop over the string
+current-state = \delta(current-state,w_i)
+end
+if current-state \in F
+return "ACCEPT"
+else
+return "REJECT"
+end
+end
+
+Suppose M=(Q,\Sigma,\delta,q_0,F) is a DFA
+and w \in \Sigma* where |w|= n
+we say M accpets w if there exists a sequence of states r_0,r_1,r_2,...r_n so that:
+r_0 = q_0
+r_n \in F
+\delta(r_i,w_{i})=r_{i+1} for 0\le{}i<n
+
+suppose M is a DFA the language of M, denoted L(M) is the set 
+{w | M accepts w}. 
+
+if A is a language we say M accepts A if A=L(M); (this is a different
+defination of accepts then for strings)
+
+** Nondeterministic finite state automaton 
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)

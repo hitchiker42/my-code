@@ -46,8 +46,7 @@ static void heap_sift_up(struct heap *heap, int index){
     parent = heap_parent(index);
   }
 }
-//turns an array of doubles into a min heap
-static void heapify(struct heap *heap){
+void heapify(struct heap *heap){
   int i = heap->len/2;
   while (i >= 0) {
     heap_sift_down(heap, i--);

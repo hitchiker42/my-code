@@ -18,7 +18,7 @@ tree-heap.o: heap.c /usr/include/stdc-predef.h graph.h \
  /usr/include/bits/huge_valf.h /usr/include/bits/huge_vall.h \
  /usr/include/bits/inf.h /usr/include/bits/nan.h \
  /usr/include/bits/mathdef.h /usr/include/bits/mathcalls.h \
- /usr/include/bits/mathinline.h
+ /usr/include/bits/mathinline.h /usr/include/bits/math-finite.h
 
 /usr/include/stdc-predef.h:
 
@@ -101,3 +101,5 @@ graph.h:
 /usr/include/bits/mathcalls.h:
 
 /usr/include/bits/mathinline.h:
+
+/usr/include/bits/math-finite.h:

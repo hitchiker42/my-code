@@ -25,6 +25,7 @@ struct vertex {
   float x;
   float y;
   int index;
+  int rank;
   vertex *parent;
 };
 typedef struct edge graph_edge;
@@ -45,6 +46,7 @@ graph_edge heap_pop(struct heap *heap);
 void heap_add(struct heap *heap, graph_edge edge);
 graph_edge* heapsort_heap(struct heap *heap);
 struct heap *make_heap(size_t initial_size, size_t max_size);
+void heapify(struct heap *heap);
 //void edge_qsort(graph_edge *edges, size_t len);
 void free_heap(struct heap *);
 static __attribute__((unused))  void *xmalloc(size_t sz){

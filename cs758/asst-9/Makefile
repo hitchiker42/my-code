@@ -203,13 +203,13 @@ AUTOCONF = ${SHELL} /home/tucker/Repo/my-code/cs758/asst-9/build_aux/missing aut
 AUTOHEADER = ${SHELL} /home/tucker/Repo/my-code/cs758/asst-9/build_aux/missing autoheader
 AUTOMAKE = ${SHELL} /home/tucker/Repo/my-code/cs758/asst-9/build_aux/missing automake-1.14
 AWK = gawk
-CC = ccache gcc -std=gnu99
-CCAS = ccache gcc
+CC = gcc -std=gnu99
+CCAS = gcc
 CCASDEPMODE = depmode=gcc3
 CCASFLAGS = -g -O2
 CCDEPMODE = depmode=gcc3
 CFLAGS = -g -O2
-CPP = ccache gcc -std=gnu99 -E
+CPP = gcc -std=gnu99 -E
 CPPFLAGS = 
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
@@ -250,7 +250,7 @@ abs_srcdir = /home/tucker/Repo/my-code/cs758/asst-9
 abs_top_builddir = /home/tucker/Repo/my-code/cs758/asst-9
 abs_top_srcdir = /home/tucker/Repo/my-code/cs758/asst-9
 ac_ct_AR = ar
-ac_ct_CC = ccache gcc
+ac_ct_CC = gcc
 am__include = include
 am__leading_dot = .
 am__quote = 

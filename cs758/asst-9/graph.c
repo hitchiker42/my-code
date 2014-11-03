@@ -77,37 +77,61 @@ struct edges {
   graph_edge *edges;
   size_t len;
 };
+/*
+  Running this in parallel is actually slower, presumably because
+  the startup and atomic operations slow things down more than
+  running things in parallel speeds things up.
+*/
+#ifdef _OPENMP
+#define atomic_inc(x)  __atomic_add_fetch(x,1, __ATOMIC_SEQ_CST)
+#else
+#define atomic_inc(x) (++(*x));
+#endif
 struct heap *make_edges_grid(vector *grid, vertex *vertices,
                                     size_t num_vertices, double max_dist){
-  struct heap* retval = make_heap(num_vertices, num_vertices*num_vertices);
-  int i,j,k,l,m,n;
+//  struct edge* retval = make_heap(num_vertices, num_vertices*num_vertices);
+  int N = ceil(1/max_dist);
+  struct heap* heap = xmalloc(sizeof(struct heap));
+  size_t num_edges = max_edges(grid,N);//upper bound on number of edges
+  graph_edge *retval = xmalloc_atomic(sizeof(graph_edge)*num_edges);
+  int h,i,j,k,l,m,n;
   vertex *v1,*v2;
   vector sector1,sector2;
-  int N = (1/max_dist);
-  for(i=0;i<N;i++){
-    for(j=0;j<N;j++){/*for each grid section*/
-      sector1 = grid[i*N+j];
-      for(k=i;k<i+2 && k<N;k++){/*for the negihbors/the section itself*/
-        for(l=j;l<j+2 && l<N;l++){
-          sector2 = grid[k*N+l];
-//          int sector2_max = ((i==k) && (j==l) ? sector1.len/2 : sector2.len);
-          for(n=0;n<sector1.len;n++){/*For the points in the section*/
-            for(m=0;m<sector2.len;m++){/*For the points in the other section*/
-              v1 = sector1.elems[n];
-              v2 = sector2.elems[m];
-              float distance = dist4(v1->x,v2->x,v1->y,v2->y);
-              if(distance <= max_dist){
-                struct edge e = {.start = n, .end = m, .weight = distance};
-                DEBUG_PRINTF("Adding Edge from %d to %d\n",n,m);
-                heap_add(retval,e);
-              }
+  volatile size_t edge_index = -1;//start at -1 since we use an c
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+  for(h=0;h<(N*N);h++){/*for each grid section*/
+    i = h/N;
+    j = h%N;
+    sector1 = grid[i*N+j];
+    for(k=i;k<i+2 && k<N;k++){/*for the negihbors/the section itself*/
+      for(l=j;l<j+2 && l<N;l++){
+        sector2 = grid[k*N+l];
+        //          int sector2_max = ((i==k) && (j==l) ? sector1.len/2 : sector2.len);
+        for(n=0;n<sector1.len;n++){/*For the points in the section*/
+          for(m=0;m<sector2.len;m++){/*For the points in the other section*/
+            if((i==k) && (j==l) && m>n){break;}
+            v1 = sector1.elems[n];
+            v2 = sector2.elems[m];
+            float distance = dist4(v1->x,v2->x,v1->y,v2->y);
+            if(distance <= max_dist){
+              struct edge e = {.start = n, .end = m, .weight = distance};
+              size_t index = atomic_inc(&edge_index);
+              retval[index] = e;
+              DEBUG_PRINTF("Adding Edge from %d to %d\n",n,m);
+//              heap_add(retval,e);
             }
           }
         }
       }
     }
   }
-  return retval;
+  heap->edges = retval;
+  heap->len = edge_index;
+  heap->size = num_edges;
+  heapify(heap);
+  return heap;
 //  graph_edge *sorted_edges = heapsort_heap(retval);
 //  edge_qsort(retval->edges, retval->len);
 //  return (struct edges){.edges = retval->edges, .len = retval->len};
@@ -197,8 +221,16 @@ static vertex *find_set(vertex *v){
 static vertex *union_sets(vertex *v1, vertex *v2){
   v1 = find_set(v1);
   v2 = find_set(v2);
+  if(v1->rank >= v2->rank){
+    v2->parent = v1;
+    if(v1->rank == v2->rank){
+      v1->rank++;
+    }
+  } else {
+    v1->parent = v2;
+  }
   //meh, ignore rank
-  v2->parent = v1;
+  //v2->parent = v1;
   return v1;
 }
 /*tree T;
@@ -209,10 +241,6 @@ make_set(v)
        add_to_tree(e);
        union(u,v);
 */
-struct node {
-  graph_edge e;
-  struct node *next;
-};
 double create_spanning_tree(struct heap *edges, graph_edge *tree,
                          vertex *vertices, int num_vertices){
   DEBUG_PRINTF("Creating spanning tree\n");
