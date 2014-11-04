@@ -944,6 +944,19 @@ if A is a language we say M accepts A if A=L(M); (this is a different
 defination of accepts then for strings)
 
 ** Nondeterministic finite state automaton 
+   No longer require an arrow for every symbol   
+
+   states can emit multiple arrows for a single symbol
+
+   allow states to emit arrows labled with \Lambda
+
+   Don't reject a correct input
+
+   Basically just a theorical device
+*** Formal defination
+    a 5-tuple (Q,\Sigma,\delta,q_o,F)
+    same as a DFA except \delta is \delta:Qx(\Sigma{}U{\Lambda}) -> P(Q) (power set of Q)
+
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
