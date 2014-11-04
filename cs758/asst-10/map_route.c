@@ -65,6 +65,7 @@ int djikstra(FILE * outfile, struct node *nodes, unsigned int num_nodes,
   //this just creates the heap struct, since all the nodes but the first
   //have an infinite distance it already obeys the heap property
   struct heap *heap = build_heap(nodes_location, num_nodes);
+  heap_sift_up(heap, start->heap_index);
   while(--num_nodes){//loop |nodes| times
     struct node *n = heap_pop(heap);
     for(i=0;i<n->narcs;i++){
@@ -77,11 +78,21 @@ int djikstra(FILE * outfile, struct node *nodes, unsigned int num_nodes,
       }
     }
   }
-  free_heap(heap);
   if(last->dist == INFINITY){
     fprintf(stderr,"Error target node is not connected to start node\n");
+    free_heap(heap);
     return 1;
   }
+  i = 0;
+  while(last->parent != start){
+    //reuse the space from the heap to store the nodes on the shortest path
+    nodes_location[i++] = last;
+    last = last->parent;
+  }
+  while(i-->0){
+    fprintf(stdout, "%d\n", nodes_location[i]->num);
+  }
+  free_heap(heap);
   *costp = (int)last->dist;
   return 0;
 }
