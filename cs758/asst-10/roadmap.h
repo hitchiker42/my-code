@@ -43,7 +43,7 @@ struct node {
 
 struct heap {
   struct node **nodes;
-  unsigned int len;
+  int len;//len may be negitive if there are no elements in the heap
   unsigned int size;
 };
 /* Gets the square distance between two points. */

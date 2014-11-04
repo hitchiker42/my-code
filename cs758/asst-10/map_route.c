@@ -46,11 +46,18 @@ struct node {
  *
  * Return 0 on success and 1 on failure.
  */
-int djikstra(FILE * outfile, struct node *nodes, unsigned int num_nodes,
+int djikstra(FILE * outfile, struct node *nodes_orig, unsigned int num_nodes,
 	     unsigned int source, unsigned int target, unsigned int *costp){
   /* Find the shortest path and output it.  Return the cost via
    * 'costp'. */
   int i;
+  /*
+    This whole thing is probably a massive waste of memory (i.e copying 
+    the nodes and then allocating another array to hold pointer to the nodes
+    but it works and I spent enough time optimizing my last assignment, so
+    I'll just let it be.    
+   */
+  struct node *nodes = memdup(nodes_orig, num_nodes *sizeof(struct node));
   /* The heap is composeed of pointers to the actual nodes which are
    in the nodes array. Each node has a field which keeps track of it's 
    index in the heap so that it can be sifted up the heap if it's distance
@@ -66,8 +73,8 @@ int djikstra(FILE * outfile, struct node *nodes, unsigned int num_nodes,
   //have an infinite distance it already obeys the heap property
   struct heap *heap = build_heap(nodes_location, num_nodes);
   heap_sift_up(heap, start->heap_index);
-  while(--num_nodes){//loop |nodes| times
-    struct node *n = heap_pop(heap);
+  struct node *n;
+  while((n=heap_pop(heap)) != NULL){//loop |nodes| times
     for(i=0;i<n->narcs;i++){
       struct arc a = n->arcv[i];
       struct node *m = nodes + a.target;
@@ -77,12 +84,20 @@ int djikstra(FILE * outfile, struct node *nodes, unsigned int num_nodes,
         heap_sift_up(heap, m->heap_index);
       }
     }
+    //this speads things up a lot (about 50x for the usa file)
+    //but it doesn't change the asymptotic behavior at all,
+    //just goes to show that asymptotic behavior isn't everything
+    if(n == last){
+      break;
+    }
   }
   if(last->dist == INFINITY){
     fprintf(stderr,"Error target node is not connected to start node\n");
     free_heap(heap);
+    free(nodes);
     return 1;
   }
+  *costp = (int)last->dist;
   i = 0;
   while(last->parent != start){
     //reuse the space from the heap to store the nodes on the shortest path
@@ -93,7 +108,7 @@ int djikstra(FILE * outfile, struct node *nodes, unsigned int num_nodes,
     fprintf(stdout, "%d\n", nodes_location[i]->num);
   }
   free_heap(heap);
-  *costp = (int)last->dist;
+  free(nodes);
   return 0;
 }
 

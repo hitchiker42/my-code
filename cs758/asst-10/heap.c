@@ -55,6 +55,9 @@ void heap_add(struct heap *heap, struct node *edge){
   heap->len++;
 }
 struct node *heap_pop(struct heap *heap){
+  if(heap->len < 0){
+    return NULL;
+  }
   struct node *retval = heap->nodes[0];
   heap->nodes[0] = heap->nodes[--heap->len];
   heap_sift_down(heap, 0);
