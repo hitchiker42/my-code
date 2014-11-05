@@ -942,21 +942,37 @@ suppose M is a DFA the language of M, denoted L(M) is the set
 
 if A is a language we say M accepts A if A=L(M); (this is a different
 defination of accepts then for strings)
-
+** A DFA language is a language accepted by some DFA
 ** Nondeterministic finite state automaton 
+*** Formal defination
+      a 5-tuple (Q,\Sigma,\delta,q_o,F)
+      same as a DFA except \delta is \delta:Qx(\Sigma{}U{\Lambda}) -> P(Q) (power set of Q)
+*** NFA stuff
+      
    No longer require an arrow for every symbol   
 
    states can emit multiple arrows for a single symbol
 
-   allow states to emit arrows labled with \Lambda
+   allow states to emit arrows labled with \Lambda, this \Lambda is the same
+   as the \sigma in shift/reduce parsers
 
    Don't reject a correct input
 
-   Basically just a theorical device
-*** Formal defination
-    a 5-tuple (Q,\Sigma,\delta,q_o,F)
-    same as a DFA except \delta is \delta:Qx(\Sigma{}U{\Lambda}) -> P(Q) (power set of Q)
+   Basically just a theorical device, but useful since any NFA can
+   be transformed into a DFA
 
+   Suppose N is an NFA and w \in \Sigma* we say that N accepts w. if we can
+   write w=y_{0}y_{1}y_{2}y_{3}...y_{m} where each y_{i}\in{}\Sigma{}U{\Lambda} and a sequence of
+   states r_{0}r_{1}...r_{m}_{} so that:
+   1. r_0 = q_0
+   2. r_m \in F
+   3. r_{i+1} \in \delta(r_i,y_{i}) for i = 0,1,2,...m-1
+      
+** NFA vs DFA
+   All DFAs are by defination NFAs, but obviously the reverse isn't true.
+   However any NFA can be converted into a DFA
+   by defination DFA-languages \sube NFA-languages.
+   we need to show NFA-languages \sube DFA-languages
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)

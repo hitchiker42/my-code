@@ -38,6 +38,10 @@ void heap_sift_up(struct heap *heap, int index){
     parent = heap_parent(index);
   }
 }
+/*void heap_sift_up_element(struct heap *heap, struct node *element){
+  int heap_index = (element - heap->nodes)>>3;//divite by sizeof struct node*
+  heap_sift_up(heap, heap_index);
+}*/
 void heapify(struct heap *heap){
   int i = heap->len/2;
   while (i >= 0) {

@@ -21,7 +21,7 @@ struct arc {
   unsigned int target;
 
   /* The weight of the arc. */
-  unsigned int weight;
+  float weight;
 };
 
 struct node {
@@ -33,21 +33,28 @@ struct node {
   int y;
 
   /* Number of arcs. */
-  unsigned int narcs;
+  unsigned int num_arcs;
 
   /* Pointer to the arc array for this node. */
   struct arc *arcv;
   struct node *parent;
   double dist;
 };
-
+struct roadmap {
+  struct node *nodes;
+  struct arc *arcs;
+  size_t num_nodes;
+  size_t num_arcs;
+};
 struct heap {
   struct node **nodes;
   int len;//len may be negitive if there are no elements in the heap
   unsigned int size;
 };
+struct roadmap *read_input(char *input_filename);
+void free_roadmap(struct roadmap *map);
 /* Gets the square distance between two points. */
-double sq_dist(int x, int y, int u, int v);
+//double sq_dist(int x, int y, int u, int v);
 
 
 /*
@@ -70,4 +77,5 @@ struct heap *build_heap(struct node **nodes, size_t sz);
 struct node *heap_pop(struct heap *heap);
 void free_heap(struct heap *heap);
 void heap_sift_up(struct heap *heap, int index);
+void heap_sift_up_element(struct heap *heap, struct node *element);
 #endif				/* !_ROADMAP_H_ */

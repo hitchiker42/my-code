@@ -1,0 +1,9 @@
+A greedy way to produce a path between points is to repeatedly move from the
+current point to the point closest to the destination, ignoring path weights.
+How much faster does this run than dikstra and how much slower are the routes
+it produces
+
+24.2-4
+15.3-6 (show optimal substructure for C_k = 0 case)
+part a of 24-3
+25.2-4

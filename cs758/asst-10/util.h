@@ -26,8 +26,11 @@
       (__x < __y ? __x : __y);})
 #ifdef DEBUG
 #define DEBUG_PRINTF(fmt, args...) fprintf(stderr, fmt, ##args)
+#define HERE() fprintf("here in %s at line %d in function %s\n",        \
+                       __FILE__,__LINE__,__func__)
 #else
 #define DEBUG_PRINTF(...)
+#define HERE()
 #endif
 typedef unsigned int uint;
 typedef unsigned long ulong;
@@ -63,6 +66,30 @@ static __attribute__((unused)) void *memdup(const void *src, size_t sz){
   memcpy(dest,src,sz);
   return dest;
 }
+typedef struct svector svector;
+__extension__ struct svector {
+  union {
+    double *doubles;
+    uint64_t *quadwords;
+    uint32_t *doublewords;
+    uint16_t *words;
+    uint8_t *bytes;
+    void *pointers;
+  };
+  size_t offset;
+  size_t len;
+  size_t size;
+};
+struct buffer {
+  void *mem;
+  size_t size;
+};
+off_t file_len_by_fd(int fd);
+off_t file_len_by_name(const char *filename);
+off_t FILE_len(FILE *file);
+struct buffer mmap_file(int fd, int shared);
+void *mmap_anon(size_t sz);
+static struct buffer null_buffer = {NULL,0};
 #define index_2d(x,y,N) (y*N + x)
 #define index_3d(x,y,z,N,M) ((z * (M+N)) + y*N + x)
 #endif
