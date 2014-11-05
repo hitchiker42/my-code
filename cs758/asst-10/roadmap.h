@@ -51,7 +51,7 @@ struct heap {
   int len;//len may be negitive if there are no elements in the heap
   unsigned int size;
 };
-struct roadmap *read_input(char *input_filename);
+struct roadmap *read_input(const char *input_filename);
 void free_roadmap(struct roadmap *map);
 /* Gets the square distance between two points. */
 //double sq_dist(int x, int y, int u, int v);

@@ -50,9 +50,9 @@ static const size_t header_size = 9;
 static uint32_t read_int(svector *input);
 static inline void _read_arc(svector *input, struct roadmap *map);
 static void _read_node(svector *input, struct roadmap *map);
-static struct buffer read_input_into_buffer(char *filename);
+static struct buffer read_input_into_buffer(const char *filename);
 struct roadmap *read_graph(struct buffer file_buf);
-struct roadmap *read_input(char *input_filename){
+struct roadmap *read_input(const char *input_filename){
   struct buffer file_buf = read_input_into_buffer(input_filename);
   if(file_buf.mem == NULL){
     return NULL;
@@ -68,14 +68,14 @@ static uint32_t read_int(svector *input){
 }
 static inline void _read_arc(svector *input, struct roadmap *map){
   struct arc *a = map->arcs + map->num_arcs++;
-  a->target = read_int(input);
+  a->target = read_int(input)-1;
   a->weight = (float)read_int(input);
   return;
 }
 static void _read_node(svector *input, struct roadmap *map){
 
-  int node_num = read_int(input);
-  struct node *n = map->nodes+node_num-1;
+  int node_num = read_int(input)-1;
+  struct node *n = map->nodes+node_num;
   map->num_nodes++;
   n->num = node_num;
   n->x = read_int(input);
@@ -90,7 +90,7 @@ static void _read_node(svector *input, struct roadmap *map){
   }
   return;
 }
-static struct buffer read_input_into_buffer(char *filename){
+static struct buffer read_input_into_buffer(const char *filename){
   int fd = open(filename, O_RDONLY);
   if(fd == -1){
     perror("open");
@@ -144,6 +144,7 @@ struct roadmap *read_graph(struct buffer file_buf){
   while(retval->num_nodes < num_nodes){
     _read_node(input, retval);
   }
+  munmap(input->bytes,input->size);
   return retval;
 
  error:

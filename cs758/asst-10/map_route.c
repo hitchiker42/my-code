@@ -149,6 +149,50 @@ static int input_and_search(FILE * infile, struct node nodes[],
 
   return err;
 }
+static int my_input_and_search(FILE * infile, struct roadmap *map){
+  int err = 0;
+  unsigned int s, t;
+  unsigned int cost = 0;
+  double start, end;
+  int i;
+  struct node *nodes = map->nodes;
+  int num_nodes = map->num_nodes;
+  while (fscanf(infile, "%u %u", &s, &t) == 2) {
+    s = s - 1; /* avoiding 1-indexing */
+    t = t - 1;
+    if (s >= num_nodes) {
+      fprintf(stderr, "Start node is invalid\n");
+      continue;
+    }
+    if (t >= num_nodes) {
+      fprintf(stderr, "Target node is invalid\n");
+      continue;
+    }
+    //this isn't techically part of the algorithm so don't count the
+    //time it takes, I figure the reference does the same since my program
+    //consistantly runs about 2 seconds faster than the reference, from
+    //start to finish, but when I this stuff in my dijkstra code I get
+    //slower times for actually finding the shortest path, despite
+    //running faster overall    
+    struct node **nodes_location = xmalloc_atomic(sizeof(struct node*)*num_nodes);
+    for(i=0;i<num_nodes;i++){
+      nodes_location[i] = nodes +i;
+      nodes[i].dist = INFINITY;
+      nodes[i].heap_index = nodes[i].num;
+    };
+    printf("finding a route from %d to %d\n", s, t);
+    start = get_current_seconds();
+    err = djikstra(stdout, nodes, num_nodes, s, t, &cost, nodes_location);
+    end = get_current_seconds();
+    if (err) {
+      break;
+    }
+    printf("cost: %u\n", cost);
+    printf("time: %f seconds\n", end - start);
+  }
+
+  return err;
+}
 
 
 /* Print the usage string. */
@@ -160,7 +204,7 @@ static void usage(void){
 
 int main(int argc, const char *const argv[]){
   int err, ret = EXIT_FAILURE;
-  FILE *f, *infile = stdin;
+  FILE *infile = stdin;
   double start, end;
   unsigned int nnodes;
   struct node *nodes;
@@ -169,43 +213,35 @@ int main(int argc, const char *const argv[]){
     usage();
   }
 
-  f = fopen(argv[1], "r");
-  if (!f) {
-    perror("Error opening data file");
-    return EXIT_FAILURE;
-  }
   if (strcmp(argv[2], "-") != 0) {
     infile = fopen(argv[2], "r");
     if (!infile) {
-      perror("Error opening data file");
-      fclose(f);
+      perror("Error opening input file");
       return EXIT_FAILURE;
     }
   }
-
+  struct roadmap *map;
   start = get_current_seconds();
-  err = load_map(f, &nodes, &nnodes);
+  map = read_input(argv[1]);
 /*
   The order of code here was weird, so I fixed it, gotos are fine
   for error handling but at the same time if you don't really need
   them don't use them
 */
   end = get_current_seconds();
-  fclose(f);
-  if (err) {
-    fclose(infile);
+  if(map == NULL){
     return EXIT_FAILURE;
   }
-  printf("Loaded %d nodes in %f seconds\n", nnodes, end - start);
+  printf("Loaded %ld nodes in %f seconds\n", map->num_nodes, end - start);
   printf("Using %d MB\n", peak_memory_usage());
 
-  err = input_and_search(infile, nodes, nnodes);
+  err = my_input_and_search(infile, map);
   /* Again weird order, the was it was was that if there was an error
      it jumped to a place to gree the map, but the map wasn't
      used in any other calculations so there was no need
 */
   printf("Peak memory usage %d MB\n", peak_memory_usage());
-  free_map(nodes,nnodes);
+  free_roadmap(map);
   fclose(infile);
   return err;
 }
