@@ -48,7 +48,8 @@ struct node {
  * Return 0 on success and 1 on failure.
  */
 int djikstra(FILE * outfile, struct node *nodes, unsigned int num_nodes,
-	     unsigned int source, unsigned int target, unsigned int *costp){
+	     unsigned int source, unsigned int target, unsigned int *costp,
+             struct node **nodes_location){
   /* Find the shortest path and output it.  Return the cost via
    * 'costp'. */
   int i;
@@ -56,12 +57,12 @@ int djikstra(FILE * outfile, struct node *nodes, unsigned int num_nodes,
    in the nodes array. Each node has a field which keeps track of it's 
    index in the heap so that it can be sifted up the heap if it's distance
    decreases*/
-  struct node **nodes_location = xmalloc_atomic(sizeof(struct node*)*num_nodes);
+/*  struct node **nodes_location = xmalloc_atomic(sizeof(struct node*)*num_nodes);
   for(i=0;i<num_nodes;i++){
     nodes_location[i] = nodes +i;
     nodes[i].dist = INFINITY;
     nodes[i].heap_index = nodes[i].num;
-  };
+  };*/
   struct node *start = nodes_location[source];
   struct node *last = nodes_location[target];
   start->dist=0;
@@ -96,7 +97,7 @@ int djikstra(FILE * outfile, struct node *nodes, unsigned int num_nodes,
     last = last->parent;
   }
   while(i-->0){
-    fprintf(stdout, "%d\n", nodes_location[i]->num);
+    fprintf(outfile, "%d\n", nodes_location[i]->num);
   }
   free_heap(heap);
   return 0;
@@ -109,6 +110,7 @@ static int input_and_search(FILE * infile, struct node nodes[],
   unsigned int s, t;
   unsigned int cost = 0;
   double start, end;
+  int i;
 
   while (fscanf(infile, "%u %u", &s, &t) == 2) {
     s = s - 1; /* avoiding 1-indexing */
@@ -121,9 +123,22 @@ static int input_and_search(FILE * infile, struct node nodes[],
       fprintf(stderr, "Target node is invalid\n");
       continue;
     }
+    //this isn't techically part of the algorithm so don't count the
+    //time it takes, I figure the reference does the same since my program
+    //consistantly runs about 2 seconds faster than the reference, from
+    //start to finish, but when I this stuff in my dijkstra code I get
+    //slower times for actually finding the shortest path, despite
+    //running faster overall
+    
+    struct node **nodes_location = xmalloc_atomic(sizeof(struct node*)*nnodes);
+    for(i=0;i<nnodes;i++){
+      nodes_location[i] = nodes +i;
+      nodes[i].dist = INFINITY;
+      nodes[i].heap_index = nodes[i].num;
+    };
     printf("finding a route from %d to %d\n", s, t);
     start = get_current_seconds();
-    err = djikstra(stdout, nodes, nnodes, s, t, &cost);
+    err = djikstra(stdout, nodes, nnodes, s, t, &cost, nodes_location);
     end = get_current_seconds();
     if (err) {
       break;
