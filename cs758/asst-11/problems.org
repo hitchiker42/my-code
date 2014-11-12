@@ -1,0 +1,23 @@
+26.1-6:
+Given a graph, a start vertex and an end vertex is it possible to find two 
+paths from the start to the end, given by the sets of edges P1 and P2 such
+that P1 \cap P2 = \empty. Show how to formulate this problem as a maximum flow problem
+
+
+26.2-6:
+Suppose each source s[i] in a flow network with multiple sources and sinks
+produces exactly  p[i] units of flow so that 
+p[i] = sum(f(s[i],v) for each v in V). Suppose also each sink t[j] consumes
+exactly q[j] units so that q[j] = sum(f(v,t[j]) foreach v in V) and
+sum(p[i]) = sum(q[j]). Show how to convert the problem of finding a flow f
+that obeys these constraints into a problem of finding a maximum flow in
+a single-source,single-sink flow network.
+
+
+26-1 part a:
+Given an NxN matrix M let a graph G(V,E) be formed such that V=M[i][j] for
+i,j=0...N and E = M[i][j] - M[i+/-1][j+/-1], other than the edges.
+
+given m starting points, such that m <= n^2, (x1,y1),(x2,y2)...(xm,ym) on the
+grid the escape problem is to determine whether or not there are m 
+

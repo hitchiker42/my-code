@@ -283,6 +283,9 @@ static struct heap* make_edges(vertex *vertices, size_t num_vertices, double max
 }
 double make_spanning_tree(graph_edge *tree, vertex *vertices,
                        int num_vertices, double max_distance){
+  if(tree == NULL){
+    return 0.0;
+  }
   struct heap *heap = make_edges(vertices, num_vertices, max_distance);
   double weight = create_spanning_tree(heap, tree, vertices, num_vertices);
   free_heap(heap);

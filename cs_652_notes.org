@@ -973,6 +973,125 @@ defination of accepts then for strings)
    However any NFA can be converted into a DFA
    by defination DFA-languages \sube NFA-languages.
    we need to show NFA-languages \sube DFA-languages
+** NFA-to-DFA
+   Subset Construction.
+   Given an NFA M create a DFA N (ignoring lambdas):
+   
+   The states of M are composed of subsets of the states in N,
+   formally N.Q = P(M.Q), the states of N are composed of the elments
+   in the power set of the states of M.
+   
+   The end states of M are the set of states in M which contain
+   an end state of N
+
+   \delta\prime(S,a) = U_{x=S}\delta(x,a) 
+   essentially for a state s in M where s = {q_i,q_{i+1},...,q_{j-1},q_j}
+   the transition function goes to the state consisting of the union
+   of all states in N reachable from some q_k \in s by the input a.
+   ex. if s = q_0 and \Sigma = {0,1} and \delta(q_0,0) = q_0, q_1 (i.e a 0 in state 0 can go
+   to state 1 or state 0) then \delta\prime(q_0,0) =  {q_0,q_1}.
+   if \delta(q_1,0) = q_0 then \delta\prime({q_0,q_1},0) = {q_0,q_1} and \delta\prime(q_1,0) = q_0.
+   Its complicated, and as an algorithm runs in exponential time.
+
+   Now with lambdas
+
+   Suppose N = (Q,\Sigma,\delta,q_{0},F) is an NFA and there is a sequence of states
+   in Q, q_0,q_1,...,q_k with each q_{i+1} \in(q_i,\Lambda), we say q_k is \Lambda
+   reachable from q_0. If S \sube Q then the \Lambda-closure of S denoted \Lambda(S)
+   is the set of states \Lambda-reachable from any state in S.
+
+   Using lambdas the transition function of M is:
+   \delta\prime(S,a) = U_{x\in{}S}\Lambda(\delta(x,a))
+   
+   The start state of M is then \Lambda(N.q_0) (i.e the set of all states reachable
+   from the start state of N by \Lambda).
+
+   In computing the DFA we never consider \Lambda as an input (since it can't be).
+   If the set of states reachable from some state q in M = {q_i,...,q_j}
+   to take lambdas into account we re-compute q by doing: 
+   q' = q; do{q=q'; foreach(s \in q){q' = q' U \delta(s,\Lambda)}}while(q!=q');
+   which is really inefficent, but so is the whole algorithm
+
+   Since we can create a DFA from any NFA we can just call the
+   set of NFA/DFA languages FA Languages.
+** Closed operations on FA languages
+   Given two NFA's N_1 and N_2 which accept languages L and M.
+*** union
+    Is L U M a FA language:
+    Create a new NFA N\prime with a start state q_0 that has two lambda transitions
+    one to N_1 and one to N_2. Then N\prime is a NFA which accepts L U M
+*** concatenation
+    Is L o M a FA language:
+    Add lambda transitions to the end states of N_1 which go to the
+    start states of N_2, this new NFA accepts L o M
+*** Kleene star
+    Concatenable the NFA for {\Lambda} to N, then connect the end states of 
+    N to the start states of N with lambdas.
+* Equality of regular expressions and NFAs
+  Proof using incudtion on regular language L
+  Basis: if L=L(\Lambda), L=L(\empty), L=L(a) a\in\Sigma. L is regular and can be represented
+  by an NFA
+  
+  Induction: Assume L_1 and L_2 are regular languages and can be represented
+  by NFAs
+  
+  Goal: Show L_1 U L_2, L_{1}L_{2}, and L_1* have NFAs.
+  Since FA languages are closed under union, concatenation and *
+  L_1 U L_2, L_{1}L_{2} and L_1* are FA languages and so have NFAs
+** NFA -> regex
+   Define special form for NFAs (generalized NFAs or GNFAs):
+   -Only one final state (if there are multiple final states create a new
+     state and create \Lambda transitions from the final states to the new
+     state, now let the new state be the final state)
+   -The initial state is not the final state
+   -The transition lables are regular expressions.
+   -Strings (matching the regular expression transitions) are consumed
+     during translation
+   -There is exactly one arrow out of every state to every other state
+   (including itself) except there are no arrows out of the final state
+   -There is exactly one arrow into every state from every other state
+   except for the start state
+*** Algorithm (NFA to GNFA)
+    Given an NFA M create a GNFA G:
+    1. Create a new end state and connect all old start states to it via
+       lambda transitons
+    2. Create a new start state and connect it to the old start state
+       via a lambda transation
+    3. combine multiple arrows from one state to a second state by
+       creating a regex composed an alternation of all symbols on the
+       orignial arrows
+    4. Create transitions labeled with the empty state in order to
+       satisify the conditon that each state must have arrows to every
+       state and from every state.
+*** Algorithm (GNFA to regular expression) 
+    RIP Algorithm:
+    explaination of the line  \delta\prime(q_i,q_j) = \delta(q_i,q_r)\delta(q_r,q_r)*\delta(q_r,q_j)|\delta(q_i,q_j)
+    Given three states, i,r,j where r is not a start state or end state,
+    i is not an end state and j is not a start state, with transitons
+    i->j, i->r, r->r and r->j. Remove j by changing the transiton i->k 
+    into the regular expression (i->j | i->r r->r* r->j), so \delta(i,j) changes
+    from i->j into (i->j | i->r r->r* r->j)
+    Main algorithm:
+    Given a GNFA G = (Q, \Sigma, \delta, q_0, q_f)
+    while(\exists{}q_r \in (Q - {q_0, q_f}))
+      Q\prime = Q - {q_r}
+      for each q_i \in Q\prime-{q_f}, q_j \in Q\prime-{q_0}
+        \delta\prime(q_i,q_j) = \delta(q_i,q_r)\delta(q_r,q_r)*\delta(q_r,q_j)|\delta(q_i,q_j)
+      end
+    end
+    return (Q\prime,\Sigma, \delta\prime, q_0, q_f)
+    end
+
+    Convert alg(gnfa to regex)
+    convert(G)
+    if(size(G.Q) == 2)
+      return \delta(d_0,d_f)
+    else
+      return convert(rip(G))
+
+    
+    
+
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
