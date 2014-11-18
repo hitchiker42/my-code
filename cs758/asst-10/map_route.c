@@ -3,8 +3,8 @@
  *
  * Plans a route in a roadmap.
  *
- * \author eaburns
- * \date 18-08-2010
+ * \author Tucker DiNapoli (with some code by eaburns)
+ * \date 10-11-2014
  */
 #include "roadmap.h"
 #include <stdio.h>
@@ -14,30 +14,6 @@
 
 
 #include "system.h"
-/*
-struct arc {
-  //Target of the arc.
-  unsigned int target;
-
-  //The weight of the arc.
-  unsigned int wt;
-};
-
-struct node {
-  //Node's ID number. 
-  unsigned int num;
-
-  //The x and y coordinate of the given node. 
-  int x;
-  int y;
-
-  //Number of arcs. 
-  unsigned int narcs;
-
-//Pointer to the arc array for this node. 
-  struct arc *arcv;
-};
-*/
 /*
  * Single source shortest path solver using Djikstra's algorithm.
  * 'source' is the ID value of the source node (its node structure can

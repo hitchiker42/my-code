@@ -106,7 +106,7 @@ int main(int argc, char** argv){
     if (num_scanned != 3) {
       break;
     }
-    int ret = net_add_arc(f_net, 0, edgeStart, edgeEnd, edgeWeight);
+    int ret = net_add_arc(f_net, edgeStart, edgeEnd, edgeWeight);
     if (ret != 0) {
       fprintf(stderr, "error readng graph\n");
       return 1;
