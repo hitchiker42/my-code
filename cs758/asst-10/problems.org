@@ -1,9 +1,135 @@
+Tucker DiNapoli
+
+Implementation notes:
+I rewrote much of the skeleton code, so if there are minor discrepancies
+between my code and the reference (there were not any in my testing) it's
+likely because of that. Performance wise my code reads the map significantly
+faster than the reference implemention. For paths on smaller graphs (up to
+paths which take ~1sec for the reference implementation) my code runs faster
+than the reference. As the paths/graphs get larger the reference starts to
+outperform my implementation, I assume the reference uses a version of djikstra
+with a O(|E| + |V|lg(|V|)) upper bound, while I use a version with a
+O((|E|+|V|)lg(|V|)) upper bound. If I could look at the reference
+implementation code I imagine I could combine it with my code to get optimal
+performance for any size.
+
+Greedy Algorithm:
 A greedy way to produce a path between points is to repeatedly move from the
 current point to the point closest to the destination, ignoring path weights.
 How much faster does this run than dikstra and how much slower are the routes
-it produces
+it produces.
+
+In running the greedy version of the reference implementation I was generally
+unable to find a correct path, the code just failed. It ran very fast, but
+since it didn't find a correct result that doesn't matter, since the result
+isn't correct.
 
 24.2-4
+Give an algorithm to count the total number of paths in a directed acyclic graph.
+This question is a little ambiguous so I'll interpretet it as follows:
+Given a directed acyclic graph G = (V,E), a starting point s and a destination
+point d find the number of unique sets of edges that connect s and d.
+
+The way I would do this would be to use a modified depth first search:
+find_num_paths(G, s, d)
+  num_paths = 0
+  dfs_recur(u)
+    u.visited = true;
+    u.num_paths = 0;
+    foreach v in u.neighbors
+      if v == d
+        num_paths += 1
+        u.num_paths += 1
+        continue
+      end
+      if v.visited == true
+        num_paths += v.num_paths
+        continue
+      end
+      dfs_recur(v)
+    end
+  end
+  dfs_recur(s)
+  return num_paths
+end
+
+This will touch each edge and vertex the same number of times as a depth first
+search so the running times will be the same as well, namely Θ(V+E)
+
+A naive version of dfs_recur(u) would be:
+dfs_recur(u)
+foreach v in u.neighbors
+  if v == d 
+    num_paths +=1
+  end
+  dfs_recur(v)
+end
+
+Since there are no cycles in a directed acyclic graph this version will still
+finish and get the correct answer, but the upper bound on the running time will
+be higher. I'm not 100% sure but I believe the upper bound of the naive version
+would be O(V*E)
+      
 15.3-6 (show optimal substructure for C_k = 0 case)
+This problem can be viewed as finding the longest path between two points on a
+weighted graph. Each type of currency constutites a vertex and the exchange
+rate between currency i and j, r_ij is the weight of the edge from i to j.
+This is equivlent to finding the shortest path on a graph where the weight of
+the edge bewteen i and j is -r_ij. Since the problem of finding a shortest path
+exhibits optimal substructure so does this problem.
+
 part a of 24-3
+This is very similar to a shortest path problem, however instead of minimizing
+the sum of edge weights connecting a start vertex s and destination vertex d we
+want to maximize the product of edge weights between s and d. Another
+difference is that if the graph has the equivlent of a negitive weight cycle,
+i.e a path from some vertex u back to itself with a product of edge weights
+greater than 1, indicates that a solution exists rather than indicating no
+solution exists. This is because we are not attempting to find an absolute
+maximum but just a path with a total product greater than 1. The equivlent
+problem for shortest paths would be something along the lines of 'show if there
+exists a path from vertex u to vertex v with a weight less than 0'.
+
+The algorithm I would use would be a modified version of belman-ford:
+maximize-rate(G, s, d, R)//graph, start, destinaion, rate matrix, matrix size
+  changed = 0
+  relax(u,v)
+    if v.d < u.d * R[u.index, v.index]
+      changed = 1
+      v.d = u.d * R[u.index, v.index]
+      v.parent = u
+    end
+  end
+  for v in G.v
+    v.d = R[s.index, v.index]
+  end
+  s.d = 1
+  repeat |G| times
+    changed = 0
+    if d.d > 1 || s.d > 1
+      return true
+    end
+    for each edge (u,v) in G.E
+      relax(u,v)
+    end
+    if changed == 0
+      return false
+    end
+  end
+  for each edge (u,v) in G.E
+    if v.d < u.d * R[u.index, v.index]
+      return true
+    end
+  end
+  return false
+end
+  
+The worst case running time is O(VE) the same as bellman ford, while the best
+case running time is O(V), in the case that R[s.index,d.index] > 1. In the case
+no path exists it will take O(V+E) time. On average it should take O(VN),
+1<N<E, time. I feel like there should be a faster solution, but I can't think
+of one.
+
 25.2-4
+yes.
+The question doesn't ask for an explaination.

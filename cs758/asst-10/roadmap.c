@@ -5,10 +5,10 @@
  * roadmap are stored in an array where the index in the array is the
  * number of the node minus 1.
  *
- * \author eaburns
- * \date 18-08-2010
+ * \author Tucker DiNapoli (with original code by eaburns)
+ * \date 10-11-2014
  */
-
+#include "roadmap.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,7 +17,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include "roadmap.h"
 #include <errno.h>
 
 static const size_t int_field_size = 4; /* bytes */

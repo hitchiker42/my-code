@@ -1,8 +1,22 @@
+Implementation Notes:
+My code will find the correct maximum flow, but it doesn't print the correct
+flow network that gets that flow. I have tried several ways to create that flow
+network, but we never discussed in class how to get the flow network and not
+just the maximum flow, nor is this adressed in the book.
+
 26.1-6:
 Given a graph, a start vertex and an end vertex is it possible to find two 
 paths from the start to the end, given by the sets of edges P1 and P2 such
-that P1 \cap P2 = \empty. Show how to formulate this problem as a maximum flow problem
+that P1 intersect P2 = \empty. Show how to formulate this problem as a maximum
+flow problem
 
+First give each edge a unit capacity, this allows using and edge to be
+represented by flow. Next create a second end node which is identical to the
+orignial end node (i.e has all the same edges). Since we can't deal with
+multiple sinks in a maximum flow problem create a new end node with two edges,
+one to each of the previous end nodes. If the maximum flow between the start
+and this new end is 2 that means two unique paths to the end point exist, if
+the maximum flow is 1 or 0 it means that there are not two unique paths.
 
 26.2-6:
 Suppose each source s[i] in a flow network with multiple sources and sinks
@@ -13,11 +27,30 @@ sum(p[i]) = sum(q[j]). Show how to convert the problem of finding a flow f
 that obeys these constraints into a problem of finding a maximum flow in
 a single-source,single-sink flow network.
 
+I see no reason we can't use the same method as for converting other multiple
+source/sink networks into single-source single-sink networks. That is create a
+new source which supplies all of the previous sources and a new sink that is
+supplied by the previous sinks. If the maximum flow into the new sink is equal
+to sum of the capacities of the old sinks than the constraint is satisified,
+otherwise it isn't.
+
 
 26-1 part a:
 Given an NxN matrix M let a graph G(V,E) be formed such that V=M[i][j] for
 i,j=0...N and E = M[i][j] - M[i+/-1][j+/-1], other than the edges.
 
 given m starting points, such that m <= n^2, (x1,y1),(x2,y2)...(xm,ym) on the
-grid the escape problem is to determine whether or not there are m 
+grid the escape problem is to determine whether or not is a path from each
+starting vertex to an edge such that no intermediate vertex is used in more
+that one path.
 
+I'm not sure what the point of the escape problem stuff was.
+
+a. Reduce a problem where both vertices and edges have capacities into one with
+   only edges having capacites.
+
+   Replace each vertex x, with capacity c with a pair of vertices u,v such that
+   all of the edges which have input to x now go to u and all edges which are
+   output from x now come from v. Now create an edge between u and v with
+   capacity c. If the original graph had V vertices and E edges this new graph
+   will have 2V vertices and E+V edges, which I think is a comperable ammount.

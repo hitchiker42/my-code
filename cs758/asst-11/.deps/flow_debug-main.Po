@@ -2,7 +2,7 @@ flow_debug-main.o: main.c /usr/include/stdc-predef.h \
  /usr/include/stdlib.h /usr/include/features.h /usr/include/sys/cdefs.h \
  /usr/include/bits/wordsize.h /usr/include/gnu/stubs.h \
  /usr/include/gnu/stubs-64.h \
- /usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.1/include/stddef.h \
+ /usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include/stddef.h \
  /usr/include/bits/waitflags.h /usr/include/bits/waitstatus.h \
  /usr/include/endian.h /usr/include/bits/endian.h \
  /usr/include/bits/byteswap.h /usr/include/bits/types.h \
@@ -14,10 +14,10 @@ flow_debug-main.o: main.c /usr/include/stdc-predef.h \
  /usr/include/alloca.h /usr/include/bits/stdlib-bsearch.h \
  /usr/include/bits/stdlib-float.h /usr/include/stdio.h \
  /usr/include/libio.h /usr/include/_G_config.h /usr/include/wchar.h \
- /usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.1/include/stdarg.h \
+ /usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include/stdarg.h \
  /usr/include/bits/stdio_lim.h /usr/include/bits/sys_errlist.h \
  /usr/include/bits/stdio.h flow_net.h util.h \
- /usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.1/include/stdint.h \
+ /usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include/stdint.h \
  /usr/include/stdint.h /usr/include/bits/wchar.h /usr/include/string.h \
  /usr/include/bits/string.h /usr/include/bits/string2.h \
  /usr/include/errno.h /usr/include/bits/errno.h \
@@ -38,7 +38,7 @@ flow_debug-main.o: main.c /usr/include/stdc-predef.h \
 
 /usr/include/gnu/stubs-64.h:
 
-/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.1/include/stddef.h:
+/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include/stddef.h:
 
 /usr/include/bits/waitflags.h:
 
@@ -88,7 +88,7 @@ flow_debug-main.o: main.c /usr/include/stdc-predef.h \
 
 /usr/include/wchar.h:
 
-/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.1/include/stdarg.h:
+/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include/stdarg.h:
 
 /usr/include/bits/stdio_lim.h:
 
@@ -100,7 +100,7 @@ flow_net.h:
 
 util.h:
 
-/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.1/include/stdint.h:
+/usr/lib/gcc/x86_64-unknown-linux-gnu/4.9.2/include/stdint.h:
 
 /usr/include/stdint.h:
 

@@ -36,7 +36,7 @@
 
 #ifdef DEBUG
 #define DEBUG_PRINTF(fmt, args...) fprintf(stderr, fmt, ##args)
-#define HERE() fprintf("here in %s at line %d in function %s\n",        \
+#define HERE() fprintf(stderr,"here in %s at line %d in function %s\n", \
                        __FILE__,__LINE__,__func__)
 #else
 #define DEBUG_PRINTF(...)
@@ -84,7 +84,7 @@ __extension__ struct svector {
     uint32_t *doublewords;
     uint16_t *words;
     uint8_t *bytes;
-    void *pointers;
+    void **pointers;
   };
   size_t len;
   size_t size;
@@ -93,6 +93,39 @@ struct buffer {
   void *mem;
   size_t size;
 };
+typedef struct Cons Cons;
+struct Cons {
+  void *car;
+  void *cdr;
+};
+//get the car/cdr from a cons cell, the argument doesn't need to be an explicit
+//cons cell (i.e XCAR(XCDR(x)) will work, even though the type of XCDR(x) is void*)
+#define XCAR(x) (((Cons*)x)->car)
+#define XCDR(x) (((Cons*)x)->cdr)
+//allocate a cons cell on the stack, has to be a macro for obvious reasons
+#define ACONS(x,y)                              \
+  __extension__({                               \
+      Cons *new = alloca(sizeof(Cons)); \
+      new->car = x;                             \
+      new->cdr = y;                             \
+      new;})
+static inline Cons* cons(void *x, void *y){
+  Cons *new = xmalloc_atomic(sizeof(Cons));
+  new->car = x;
+  new->cdr = y;
+  return new;
+}
+void mapc(Cons *list, void(*fp)(void*));
+Cons *mapcar(Cons *list, void*(*fp)(void*));
+#define dolist(list, varname, code)             \
+  __extension__({                               \
+      Cons *__var = list;                       \
+      while(__var != NULL){                     \
+        varname = XCAR(__var);                  \
+        code;                                   \
+        __var = XCDR(__var);                    \
+      }                                         \
+      ;})
 
 //macros for using an svector as an fifo queue
 /*
