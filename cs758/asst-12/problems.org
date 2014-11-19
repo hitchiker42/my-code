@@ -1,0 +1,27 @@
+34.1-1:
+define the decision problem longest-path = {(G,u,v,k) : G = (V,E), u,v are
+vertices and k >= 0 is an integer, show that there exists a path of at least k
+edges between u and v}.
+
+Show that finding the actual longest path between two vertices (an optimization
+problem) can be solved in polynomial time iff longest-path \in P.
+
+34.2-1:
+Graphs G and H are isomorphic iff there exists a function f:V(G)->V(H)
+such two verticies u and v are adjacent iff f(u) and f(v) are adjacent.
+
+Show that determining if two graphs are isomorphic is in NP by showing
+a polynomial time verification algorithm.
+
+34.2-3:
+Show that if hamiltonial-cycle is in P then the problem of listing the
+vertices of a hamiltonian cycle in order is polynomial-time solvable 
+34.5-5:
+The set partition problem asks if a set S can be split into two subsets A and
+A' such that the sum off all elements of A is equal to the sum of all elements
+of A'. Show that this problem is NP complete.
+34.5-7:
+The longest simple cycle problem is the problem of determining a simple cycle
+(no repeated vertices) of maximum length in a graph (basically the reverse of
+the traviling salesman problem). Formulate a related decision problem and show
+it is NP-complete.

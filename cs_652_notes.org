@@ -1091,6 +1091,65 @@ defination of accepts then for strings)
 
     
     
+* Missed a class (not sure on what)
+** Pumping lemma 
+   For a regular language you can take any string uvw where
+   u,v,w \in \Sigma* and duplicate v any number of times and 
+* Context free languages
+  I know this stuff quite well
+** Lexical analysis
+   Get tokens using regular expressions
+** Context Free Gramar(CFG)
+   Push down automaton 
+*** Example (Palindromes)
+    Define L_{pal} = {w | w = w'}, and let \Sigma = {a,b}
+    The following strings are in L_{pal}:
+    1. \Lambda,a,b
+    2. if w \in L_{pal} then so are awa and bwb
+    
+    For L_{pal} the grammar contains:
+    Terminals: a,b
+    Nonterminal: P
+    P = a | b | \Lambda | aPa | bPb
+
+** CFG Formal definition
+   A CFS is a 4-tuple:
+   G = (V,\Sigma,R,S)
+   V is a finite non-empty set of the non-terminals of the grammar
+   \Sigma is a finite non-empty set disjoint from V, i.e non-terminals
+   R \sube V x (\Sigma U V)*, the production rules
+   S is the start variable
+
+   A string in \Sigma* is called a sentence 
+   A string in (\Sigma U V)* is called a form
+*** More definitions
+    For the following assume G = (V,\Sigma,R,S) is a CFG
+
+    1. If u,v,w are forms and A->W is a production then we say
+       uAv yields uwv and write uAv \Rightarrow uwv
+
+    2. If u and v are forms then we can say u derives v (u \Rightarrow v)
+       if there exists a sequence of forms u_1,u_2,...u_n so that
+       u \Rightarrow{} u_{1 }\Rightarrow{} u_{2 }\Rightarrow{} u_{n }\Rightarrow{} v    
+    3. If v is a sentence and S \Rightarrow V then we call
+       S \Rightarrow u_1 \Rightarrow u_2 \Rightarrow ... \Rightarrow u_n \Rightarrow v a derivation of V and we say
+       G generates v
+    4. The language of G, denoted L(G) is {w | w \in \Sigma* and S \Rightarrow w}
+    5. A Language L is called context free if L = L(G) for some
+       CFG G
+*** Some examples
+
+    a. S = OS1 | \Lambda, the set of strings 0{n}1{n}
+    b. S = < S > | SS | \Lambda, the set of nested <>
+    c. S = U1U1U1U, the set of all binary strings with at least 3 1s
+       U = 0 | 1 | \Lambda
+    d. {w | |w| = 2n+1, n \in N, w[n] = 1 (assuming w is indexed from 0)}
+       S = 1S0 | 0S1 | 0S0 | 1S1 | 1
+     
+
+
+
+     
 
 * Local Variables
 # Local Variables:
