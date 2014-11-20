@@ -1,0 +1,11 @@
+startx_arguments="2bwm awesome dswm dwm i3 lxde notion openbox qtile sawfish \
+spectrwm subtle xfce xmonad stumpwm bspwm"
+_startx(){
+    local cur=${COMP_WORDS[COMP_CWORD]}
+    COMPREPLY=( $(compgen -W "$startx_arguments" -- $cur))
+}
+complete -F _startx startx
+
+# Local Variables:
+# mode: sh
+# End:
