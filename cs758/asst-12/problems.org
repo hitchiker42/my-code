@@ -1,27 +1,136 @@
+#+toc: nil
+Tucker DiNapoli
+
 34.1-1:
 define the decision problem longest-path = {(G,u,v,k) : G = (V,E), u,v are
 vertices and k >= 0 is an integer, show that there exists a path of at least k
 edges between u and v}.
 
-Show that finding the actual longest path between two vertices (an optimization
-problem) can be solved in polynomial time iff longest-path \in P.
+Show that the problem of finding the actual longest path between two vertices,
+an optimization problem we'll call longest-path-length, can be solved in
+polynomial time iff longest-path \in P. 
+
+If we solve longest-path-length for some graph G and vertices u,v and get a
+result of length n, the longest-path problem can then be solved for any k
+simply by comparing k to n. This shows that longest-path is no harder than
+longest path length. 
+
+On the other hand we can write longest-path-length in terms of longest-path as
+follows: 
+
+longest-path-length(G,u,v)
+for k from |V| downto 0
+  if(longest-path(G,u,v,k))
+    return k
+  end
+end
+return 0
+end
+
+This algorithm runs longest-path at most |V| times so it has a running time of
+O(|V|) * O(longest-path), which is polynomial if and only if longest path is
+polynomial. Since we already know longest-path-length is at least as hard as
+longest path this shows that longest-path-length is polynomial time only if
+longest-path is.
 
 34.2-1:
 Graphs G and H are isomorphic iff there exists a function f:V(G)->V(H)
-such two verticies u and v are adjacent iff f(u) and f(v) are adjacent.
+such that two verticies u and v are adjacent iff f(u) and f(v) are adjacent.
 
 Show that determining if two graphs are isomorphic is in NP by showing
 a polynomial time verification algorithm.
 
+verify-isomorphism(G,H,f)
+foreach u in G.V
+  for each v such that (u,v) \in G.E //i.e for all vertices v neighboring u
+    if not((f(u),f(v)) \in H.E)
+      return false
+    end
+  end
+end
+return true
+end
+
 34.2-3:
-Show that if hamiltonial-cycle is in P then the problem of listing the
-vertices of a hamiltonian cycle in order is polynomial-time solvable 
+Show that if hamiltonian-cycle is in P then the problem of listing the
+vertices of a hamiltonian cycle in order is polynomial-time solvable.
+If hamiltonian-cycle is \in P we can use it to find what the hamiltonian cycle is
+by process of elimination. We remove each edge from the graph and call
+hamiltonian-cycle if it returns false we add that edge back in, eventually the
+only edges left will be the ones that are a part of the hamiltonian cycle, this
+will run in time O(E * O(hamiltonian-cycle)), here is psuedo-code for it:
+find-hamiltonian-cycle(G)
+let G' = G
+for each e in G.E
+  remove e from G'
+  if(not(hamiltonian-cycle(G')))
+    add e to G'
+  end
+end
+return G'
+end
+
 34.5-5:
 The set partition problem asks if a set S can be split into two subsets A and
-A' such that the sum off all elements of A is equal to the sum of all elements
+A' such that the sum of all elements of A is equal to the sum of all elements
 of A'. Show that this problem is NP complete.
+
+First we show set-partition is verifable in polynomial time, given a set S the
+certificate is a tuple (S,A,A') where A and A' are subsets of S with equal sums
+and S = A U A'.
+
+verify-set-partition(S,A,A')\\
+assert(sum(A) == sum(A')) //O(max(|A|,|A'))\\
+assert(A \sube S)//O(|S|)\\
+let S' = S - A //O(|S|)\\
+assert(A' == S') //O(|A'|)\\
+end\\
+
+To show that the set partiton problem is NP-hard we can show a reduction from
+the subset sum problem to the set partition problem. 
+
+let (S,t) be an instance of the subset sum problem and k = \sum{} S.
+Assume that t \leq k (otherwise we can just return no, which is certainly
+polynomial time). Let S' = S U {k+t, 2k-t}, We will show that S' \in
+set-partition if and only if (S,t) \in subset-sum.
+
+First we show that if S \in subset-sum than S' \in set-partition:
+If there is some B \sube S which sums to t than S' can be partitioned into two
+subsets A and A' such that A = B U {2k-t} and A' = S-B U {k+t}, since B sums to
+t the sum of A is t+2k-t, or 2k, since S-B must sum to k-t the sum of A' is
+k+t + k-t = 2t.
+
+Now we show if S' \in set-partition than S \in subset-sum:
+If S' can be partitioned into two equal subsets than a subset of S must sum
+to t. The sum of S' will be k + k+t + 2k-t = 4k, and since (k+t) + (2k-t) sums
+to 3k (k+t) and (k-t) must be in different subsets, this means that S must be
+able to be divided into two sets B,B' where \sum B = t and \sum B' = k-t, otherwise
+S' couldn't be partitioned.
+
 34.5-7:
 The longest simple cycle problem is the problem of determining a simple cycle
 (no repeated vertices) of maximum length in a graph (basically the reverse of
 the traviling salesman problem). Formulate a related decision problem and show
 it is NP-complete.
+
+simple-cycle = {(G,c,k) : G = (V,E), c is a function V x V -> Z, k \in Z, and
+there is a simple cycle in G with a length of at least k}
+
+To verify some (G,c,k) \in simple-cycle we take as a certificate a sequence
+of n vertices, first we verify G \in hamiltoian-path (which we know we can do in
+polynomial time) then we sum the edge costs and show it is at least k, which is
+easily done in polynomial time.
+
+We can show simple-cycle is NP-hard in much the same way as the traveling
+salesman problem was shown to be NP-hard.
+
+Given an instance G = (V,E) of a hamiltonian cycle problem we construct an
+instance of simple-cycle as follows. Let G' = (V,E') where E' = {(i,j) : i,j
+\in V and i \neq j} and define c(i,j) = ((i,j) \in E ? 1 : 0). Now G has a hamiltonian
+cycle if and only if G' has a simple cycle with cost at least |V|-1. If G has a
+hamiltonian cycle h, h must contain |V|-1 edges each of which are in E,
+since each edge \in E has a cost of 1 the total cost is |V|-1. If G' has a simple
+cycle h' with a cost of |V|-1, since each vertex is only touched once there
+must be |V|-1 edges in h', since only edges which are in E has a value of 1,
+and all other edges have a value of 0 all edges in h' must be in E. Thus h' is
+a hamiltonian cycle in G.
