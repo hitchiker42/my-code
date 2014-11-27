@@ -1095,6 +1095,7 @@ defination of accepts then for strings)
 ** Pumping lemma 
    For a regular language you can take any string uvw where
    u,v,w \in \Sigma* and duplicate v any number of times and 
+
 * Context free languages
   I know this stuff quite well
 ** Lexical analysis
@@ -1150,6 +1151,95 @@ defination of accepts then for strings)
 
 
      
+* Closure of CFL's
+  Proofs ommited
+** Union
+   I don't totally get what we did here
+   L = {O^{m}1^{n} | m \neq n} = L_1 U L_2
+   S = S_1 | S_2
+   S_1 = 0 | 0S_1 | 0S_{1}1
+   S_2 = 1 | S_2 | 0S_{2}1
+   
+** Concatenation
+   (O+1)*.(O+1)* == [01]*\.[01]
+   S = S_{1}S_{2}S_{1}
+   S_1 = 0S_1 | 1S_3 | \Lambda
+   S_2 = '.'
+** Kleene star
+   L = a{m}b{m}
+   S_1 = aS_{1}b | \Lambda
+   S = SS_1 | S_1 | \Lambda
+* NFA/DFA to CFG
+  given an NFA (Q,\Sigma,\delta,q_0,F) construct a CFG to generate the language
+  Make a variable V_i for each state q_i \in Q
+  add a production V_i -> aV_j for every transition \delta(q_i,a) = q_j
+  if q_f is a finite state add the production V_f -> \Lambda
+
+  This implies all regular languages are context free languages as well as
+  the converse, that any CFG where all rules have the form 
+  V = aV_n | bV_m ... describes a regular language
+* leftmost/rightmost derivations
+  let L be the language of properly nested parenthesis
+  S = (S) | SS | \Lambda
+  The parse tree for '('')' is (S (S '(' (S \Lambda) ')) (S \Lambda))
+  
+  There are multiple ways of deriving this tree
+
+  A yield uAv -> uwv is called a leftmost derivation if u \in \Sigma*
+  Put more simply in a leftmost derivation the next nonterminal to resolve is
+  always the leftmost nonterminal
+  The oppisite is known as rightmost derivation 
+
+** Ambiguous grammar
+  We call grammars with more than one possible parse tree (via leftmost
+  derivation) ambigous grammars
+  
+  for example:
+  given the language defined by E = a | b | E - E
+  a - b - a can parse to (E (E a) - (E (E b) - (E a))) 
+  or (E (E (E a) - (E b)) - (E a))
+
+  we can modify this to make an unambigous grammar,
+  E = E - T | T
+  T = a | b
+  then the only parse tree is (a - b) - a (simplified parse tree)
+  We call T a term
+
+  Now we'll add to E to make a slightly more complex grammar
+  initial ambigous form E = E + E | E * E | [a-z]
+  Now add terms
+  E = E + T | E * T | T
+  T = [a-z]
+  Now add precidence (via factors)
+  E = E + T  | T
+  T = T * F | F
+  F = [a-z]
+  repeat this process for more levels of precidence
+
+* Chomsky normal form (CNF)
+  Every production rule has the form:
+  A -> BC or
+  A -> t
+  no \epsilon transitions, the start variable is only on the left hand side
+
+** Conversion to CNF
+   any context free language can be converted into CNF form, by eliminating
+   the following
+   1. Start variable (i.e start symbol on RHS)
+   2. \epsilon productions
+   3. unit productions (A -> B)
+   4. non-binary productions (A -> BCD...N)
+
+   Method:
+   1. Add new start symbol (to elimnate start variable)
+   2. Elimnate all \epsilon transitions, for each rule A -> \epsilon
+      replace all instances of A on the RHS of rules with all possible
+      combinations of A/\epsilon aka AbA  becomes Ab | AbA | bA | b
+
+
+
+
+
 
 * Local Variables
 # Local Variables:

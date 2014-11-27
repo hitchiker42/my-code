@@ -1,0 +1,46 @@
+34.5-3:
+The 0-1 integer programming problem is:
+Given an m x n matrix A and a vector b, of length n does there exist a vector x
+with length n with elements in {0,1} such that Ax \leq b.
+
+The integer linear programming problem is the same as the 0-1 integer linear
+programming problem, except x can contain any integers
+
+Assuming the 0-1 version is NP-hard show that the integer version is
+NP-complete 
+34.5-8:
+The half 3-CNF satisfiability problem is as follows:
+we are given a 3-CNF formula \Phi with n variables and m clauses, where m is even,
+Can we determine if there is a variable assignment so that m/2 clauses are true
+and m/2 clauses are false. 
+
+Show this is NP complete.
+
+34-1, part a:
+Given a graph G = (V,E) an independent set of G is a subset V' of V such that
+each edge in E is incident on at most one vertex in V. The independent set
+problem in to find the maximum size independent set in G.
+
+Formulate a related decision problem for the independent-set problem and prove
+that it is NP-complete (reduce from clique)
+
+
+34-2, parts a,b,c:
+given a set of n items each of which has some value give a polynomial time
+algorithm for, or show the NP-completeness of the following:
+
+a. Evenly divide a set of n items, where each item has one of two 
+   values x and y 
+   
+   Let k be the number of items with value x and h be the number of
+   items with value y, such that h + k = n.
+   let C_1,C_2,C_3,C_4 be non-negitive integers such that C_1+C_2+C_3+C_4 = n,
+   C_{1}x + C_{2}y = C_{3}x + C_{4}y, C_1+C_3 = h and C_2+C_4 = k.
+   
+   C_3 = h - C_1, C_4 = k - C_2
+   C_{1}x + C_{2}y = 
+
+b. Evenly divide a set of n items, where each item has a value which is
+   a non-negative power of 2
+
+c. Evenly divide a set of n items, where each item has a arbitrary value
