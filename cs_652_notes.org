@@ -1235,11 +1235,83 @@ defination of accepts then for strings)
    2. Elimnate all \epsilon transitions, for each rule A -> \epsilon
       replace all instances of A on the RHS of rules with all possible
       combinations of A/\epsilon aka AbA  becomes Ab | AbA | bA | b
+   3. Eliminate unit productions:
+        1. For any production A -> ... | A | ..., remove A 
+           (i.e remove any productions from something to itself)
+        2. For any production A -> ... | B | ..., replace B
+           with the left hand side of the rule for B.
+   4. Elimnate non binary productions:
+        1. Translate A -> BCD to A->BE, E->CD, or simlar for
+           A -> BCDE...
+        2. Translate A -> aB into V_a -> a, A->V_{a}B
 
+** CNF parse trees
+   CNF lets us build a parse tree which is a full binary tree (i.e every node
+   has two children or no children), with the exception of the terminal
+   production rules.
 
+   if G is in CNF, w \in ?(G) and |w| = m, m > 1
+   there are 2m-1 steps in the derivation of w
+   we need m unit productions, and m-1 binary productions to get
+   the length m, thus 2m-1
 
+   For a full binary tree with depth d the number of leaves n obeys the
+   following, d+1 \leq n \leq 2^d
 
+   For the CNF parse tree, t with depth d, we have an extra layer of terminals, so the
+   length of a sentence p, that is accepted by t is:
+   d \leq |p| \leq 2^{d-1} (i.e the number of leaves in a full binary tree with depth
+   d-1), and ceil(lg(p))+1 \leq d 
+* Pumping context free languages
+  Suppose A is a context free grammar, with G = (V,\Sigma,R,S) in CNF and
+  suppose |V| = m.
+  Suppose w \in A |w| = p = 2^m
+  Thus the height of the parse tree must be at least m+1
+  Then let d be a derivation with length at least m+1
 
+  There must a repitition in d, i.e the production rule R appears twice in
+  d. let w,v,x,y,z be the sentence split by the leaves of the two R's (this is
+     really hard to represent without drawing)
+          S
+         / \
+        / R \
+       / / \ \
+      / / R \ \
+     / / / \ \ \
+    /u/v/ x \y\z\
+   
+   Formally, if L is context free there exists a p>0 such that if s \in L
+   with |s|\ge p s can be decomposed into s=u,v,x,y,z where
+   1. or every i\ge0 wv^{i}xy^{i}z \in L
+   2. |xy| >0
+   3. |Vxy| \leq p
+
+ex. let L = {a^{m}b^{m}c^{m} | m \ge 0}, show L is not context free
+  1. let p\ge0 be the pumping length
+  2. concider w = a^{p}b^{p}c^{p}
+  3. |w| \ge p
+  4. w \in L
+  5. let uvxyz = w be a pumping decomposition of w, so |xy|>0 and |vxy| \le p
+  6. Claim s = uv^{2}xy^{2}z is not in L
+     case 1. both v and y contain the same type of symbol, than
+     s will have too many of that symbol
+     case 2. v and y contain more than one type of symbol then
+     s will have the wrong order
+
+Note: a language being pumpable does not mean it is context free, i.e
+context-free -> pumpable, but not(pumpable -> context-free), the same
+applies to the pumping lemma for regular languages
+* Push down automaton
+  A 6 tuple (Q,\Sigma,\Gamma,\delta,q_0,F)
+  \Sigma_{\Lambda} = \Sigma U {\Lambda} 
+  \delta(Qx\Sigma_{\Lambda}x\Gamma_{\Lambda}) ->P(Qx\Gamma_{\Lambda})
+  
+  \delta(q,a,\Lambda) -> (p,x) (push(x))
+  \delta(q,a,x) -> (p,\Lambda) (pop(x))
+  \delta(q,a,\Lambda) -> (p,\Lambda) (noop)
+  \delta(q,a,x) -> (p,y) (replace(x,y))
+     
+  
 
 * Local Variables
 # Local Variables:

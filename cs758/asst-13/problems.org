@@ -3,11 +3,15 @@ The 0-1 integer programming problem is:
 Given an m x n matrix A and a vector b, of length n does there exist a vector x
 with length n with elements in {0,1} such that Ax \leq b.
 
+So b[i] = sum(A[0-m][i]) | 0
+
 The integer linear programming problem is the same as the 0-1 integer linear
-programming problem, except x can contain any integers
+programming problem, except x can contain any integers.
+
 
 Assuming the 0-1 version is NP-hard show that the integer version is
-NP-complete 
+NP-complete
+
 34.5-8:
 The half 3-CNF satisfiability problem is as follows:
 we are given a 3-CNF formula \Phi with n variables and m clauses, where m is even,
