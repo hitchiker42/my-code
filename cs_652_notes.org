@@ -1303,13 +1303,22 @@ context-free -> pumpable, but not(pumpable -> context-free), the same
 applies to the pumping lemma for regular languages
 * Push down automaton
   A 6 tuple (Q,\Sigma,\Gamma,\delta,q_0,F)
-  \Sigma_{\Lambda} = \Sigma U {\Lambda} 
+  Q is a finite set of states
+  \Sigma is an alphabet (the alphabet of the input), \Sigma_{\Lambda} = \Sigma U {\Lambda}
+  \Gamma is another alphabet (the things we can put on the stack)
+    Formally \Gamma = \Sigma U T, where T is a possibly empty alphabet 
+    of auxiliary symbols needed for computation
   \delta(Qx\Sigma_{\Lambda}x\Gamma_{\Lambda}) ->P(Qx\Gamma_{\Lambda})
-  
-  \delta(q,a,\Lambda) -> (p,x) (push(x))
-  \delta(q,a,x) -> (p,\Lambda) (pop(x))
-  \delta(q,a,\Lambda) -> (p,\Lambda) (noop)
-  \delta(q,a,x) -> (p,y) (replace(x,y))
+  \delta(state, input, top-of-stack) -> Power-Set(state, top-of-stack)
+  q_0 \in Q Start state
+  F \sube Q End states
+
+  A push down automaton has a tuple for state which is (state, stack)
+  Examples of \delta
+  \delta(q,a,\Lambda) -> (p,x) (push(x))(aka. \Lambda->x)
+  \delta(q,a,x) -> (p,\Lambda) (pop(x))(aka. x->\Lambda)
+  \delta(q,a,\Lambda) -> (p,\Lambda) (noop)(aka. \Lambda->\Lambda)
+  \delta(q,a,x) -> (p,y) (replace(x,y))(aka. x->y)
      
   
 
