@@ -1,12 +1,25 @@
+Tucker DiNapoli
 1. You have 'n' balconies, each of which can seat an arbitrary number of people;
    'n' people to seat and a list of 'm' pairs of the form (i,j). Devise an
    algorithms to seat people such that 'i' is not in the same balcony, or the
    balcony above 'j' for all m pairs (i,j), or decides if this is impossible in
    time O(m+n).
+Graph coloring problem (though we never did algorithms for graph coloring)
 
-Try either dynamic programming, or something to do with graphs, probably graphs
+Not O(m+n) but should work:
+Make a graph with edges between all people (i.e n^2 edges)
+remove all edges (i,j) such that (i,j) is in the set of given pairs
+find a path of length 'n' which connects all people
+return true if path found, otherwise false
 
-int** seat(int n, int m, struct {i,j} *rules);
+
+seat(n, m, pairs)
+make n element graph G//O(n)
+for (i,j) in pairs
+  add edge from i to j in G
+end
+magic
+end
 
 2. Given a set of 'n' points representing wifi demand and a set of 'm'
 points representing sources, each of the m points has a radius 'R' and a
@@ -37,6 +50,7 @@ supply all 'n' points with bandwith.
     //so that the flow algorithm will work
     location start = {.x = 0, .y = 0};
     location end = {.x = 1, .y = 1};
+   //O(mn)
     for(i=0;i<m;i++){
       source src = sources[i];
       for(j=0;j<n;j++){
@@ -46,10 +60,11 @@ supply all 'n' points with bandwith.
         }
       }
     }
-    for(i=0;i<n;i++){
+    for(i=0;i<n;i++){//O(n)
       add_vertex(G, destinations[i]);
       add_edge(G,{destinations[i],end,1});
     }
+    //O(mn) (at most)
     for(i=0;i<m;i++){
       source src = sources[i];
       add_vertex(G,src.l);
@@ -59,15 +74,18 @@ supply all 'n' points with bandwith.
       }
     }
 
-    int flow = find_max_flow(g);
+    int flow = find_max_flow(g);//O((mn)(mn)^4) at most
     return flow < n;
+    //not sure of the exact time complexity but it is at most
+    //O((mn)^4) which, while slow is polynomial time
   }
 #+END_SRC C
 
 Flow problem, connent all destinations to a  new sigular destination, and all
 sources to a new sources, connect each source to each possible destination with
 a flow of 1, calclulate the max flow, if it's less than the number of
-destinations than we can't if it's equal we can
+destinations than we can't if it's equal we can. This algorithm is correct 
+because min flow is correct.
 
 3. Given a set of houses with known locations on a line determine the minimum
    number of cell towers such that each house is with 4 miles of a tower
@@ -83,7 +101,7 @@ destinations than we can't if it's equal we can
     int max_covered = house_locations[0]+8;
     int num_towers = 1;
     int i;
-    for(i=1;i<num_houses;i++){
+    for(i=1;i<num_houses;i++){ //O(num_houses)
       if(house_locations[i] > max_covered){
         num_towers++;
         max_covered = house_locations[i]+8;
@@ -95,7 +113,11 @@ destinations than we can't if it's equal we can
 #+END_SRC
 
 Be greedy, place a new tower four miles to the last of the uncovered house,
-repeat
+repeat.
+
+Each tower placed covers the maximum number of uncovered houses that includes
+the leftmost uncovered house. Since the placement of each tower is optimal the
+entire solution is also optimal.
 
 4. Given two databases with n values each determine the median of the
    2n values, You can only query the databases by asking for the kth smallest
@@ -103,73 +125,111 @@ repeat
 
 int find_median(int n, int *db1, int *db2){
 #+BEGIN_SRC C
-  int query(int *db, int k);
-  int find_median(int n, int *db1, int *db2){
-    int db1_median, db2_median;
-    int k = n/2;
-    /*
-      I'm assuming the median of an even number of things is the mean
-      of the two middle items. In theory what we want to do is merge
-      the two databases, sort that and average the middle two items.
-      Obviously that isn't lg(n) time, we just need to get the same
-      result as doing that would.
-     ,*/
-    if(is_even(n)){
-      db1_median = (query(db1,k) + query(db1,k+1))/2;
-      db2_median = (query(db2,k) + query(db2,k+1))/2;
-    } else {
-      db1_median = query(db1,k);
-      db2_median = query(db2,k);
-    }
-    //insure that the first database has a lower median
-    if(db1_median > db2_median){
-      swap(db1,db2);
-    }
-    //max of the first data base is less than the min of the second
-    //averaging the two will give the median
-    int db1_max = query(db1,n-1);
-    int db2_min = query(db2,0);
-    if(db2_min > db1_max){
-      return ((db1_max + db2_min)/2);
-    }
-    //Use a binary search to find the 2 locations in the
-    //databases that are the closest to equidistant from
-    //the two medians, start with the first database
-    int cur_index = n;
-    int *db = db1;
-    int i, median, last_index, cur;
-//Needs to be revised to take into acount both values being in 1 database
-    for(i=0;i<2;i++){
-      int score,old_score;
-      int move_dist = k/2;
-      score = old_score = INT_MAX;
-      while(move_dist > 0) {
-        cur = query(db, cur_index);
-        old_score = score;
-        int dist1 = abs(cur - db1_median);
-        int dist2 = abs(cur - db2_median);
-        score = abs(dist1-dist2);
-        if(score >= old_score){
-          cur = query(db, old_index);
+    int query(int *db, int k);
+  //return the index of the first value in arr less than val
+    int binary_search(int *arr, int val, int len, int(*get)(int*,int)){
+      int step = len/4;
+      int ind = len/2;
+      int n = get(arr, ind);
+      while(step > 0){
+        if(val > n){
+          ind += step;
+        } else if (val > n){
+          ind -= step;
+        } else {
           break;
         }
-        old_index = cur_index;
-        if(dist1 > dist2){
-          cur_index -= move_dist;
-        } else {
-          cur_index += move_dist;
-        }
-        if(cur_index > n || cur_index < 0){
-          raise_error();
-        }
-        move_dist/=2;
+        n = get(arr,ind);
+        step/=2;
       }
-      median += cur;
-      cur_index = 0;
-      db = db2;
+      return ind;
     }
-    return median/2;
-  }
+    int find_median(int n, int *db1, int *db2){
+      int db1_median, db2_median;
+      int k = n/2;
+      /*
+        I'm assuming the median of an even number of things is the mean
+        of the two middle items. In theory what we want to do is merge
+        the two databases, sort that and average the middle two items.
+        Obviously that isn't lg(n) time, we just need to get the same
+        result as doing that would.
+       ,*/
+      if(is_even(n)){
+        db1_median = (query(db1,k) + query(db1,k+1))/2;
+        db2_median = (query(db2,k) + query(db2,k+1))/2;
+      } else {
+        db1_median = query(db1,k);
+        db2_median = query(db2,k);
+      }
+      //insure that the first database has a lower median
+      if(db1_median > db2_median){
+        swap(db1,db2);
+      }
+      //max of the first data base is less than the min of the second
+      //averaging the two will give the median
+      int db1_max = query(db1,n-1);
+      int db2_min = query(db2,0);
+      if(db2_min > db1_max){
+        return ((db1_max + db2_min)/2);
+      }
+      //Use a binary search to find the 2 locations in the
+      //databases that are the closest to equidistant from
+      //the two medians, start with the first database
+/*
+      int db1_ind = binary_search(db1 + n/2, db2_median, (n/2 + n%2),query);
+      int db2_ind = binary_search(db1 + n/2, db2_median, (n/2 + n%2),query);
+      int medians[4] = {query(db1,db1_ind),query(db1,db1_ind+1),
+                        query(db2,db2_ind),query(db2,db2_ind+1)};
+      int scores[4];
+      for(i=0;i<4;i++){
+        scores[i] = abs(abs(medians[i]-db1_median)-abs(medians[i]-db2_median));
+      }
+      int med_ind1 = min_ind(scores);//index of minimum value
+      int med_1 = medians[med_ind1];
+      scores[med_1] = int_max;
+      int med_ind2 = min_ind(scores);
+      int med_2 = medians[med_ind2];
+      return (med_1+med2)/2;
+    }
+*/
+      int cur_index = n;
+      int *db = db1;
+      int i, median, last_index, cur, save, save_score;
+  //This assumes the two best values are in different databases
+  //To account for them both being in one database just save the 
+  //two best values in both databases and use the best out of these 4,
+  //Implementing this is left as a exercise for the reader
+      for(i=0;i<2;i++){
+        int score,old_score;
+        int move_dist = k/2;
+        score = old_score = INT_MAX;
+        //this loop is O(lg(n)), everything else is constant time
+        while(move_dist > 0) {
+          cur = query(db, cur_index);
+          old_score = score;
+          int dist1 = abs(cur - db1_median);
+          int dist2 = abs(cur - db2_median);
+          score = abs(dist1-dist2);
+          if(score >= old_score){
+            cur = query(db, old_index);
+            break;
+          }
+          old_index = cur_index;
+          if(dist1 > dist2){
+            cur_index -= move_dist;
+          } else {
+            cur_index += move_dist;
+          }
+          if(cur_index > n || cur_index < 0){
+            raise_error();
+          }
+          move_dist/=2;
+        }
+        cur_index = 0;
+        db = db2;
+      }
+      return median/2;*/
+    }
 #+END_SRC
 
 If we think of the two databases as numberlines, where the first database
@@ -181,3 +241,8 @@ In this case the median is just (A_n + B_0)/2, since those are the two middle
 values. the more complicated case is when they do overlap, i.e:
 1. A_0-A_1--A_{n/2}--A_n
 2         B_0-B_1--B_{n/2}--B_n
+In this case the median is the average of the two values with the smallest
+difference between the two medians. This is done by finding the two values with
+the smallest difference in A and the two with the smallest in B and averaging
+the two with the smallest difference out of these 4. Since this is exactly what
+the algorithm does(well mostly) it is correct.

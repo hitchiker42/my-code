@@ -1321,7 +1321,87 @@ applies to the pumping lemma for regular languages
   \delta(q,a,x) -> (p,y) (replace(x,y))(aka. x->y)
      
   
+* Shift/Reduce parser
+  Push start variable onto stack
+  while stack is not empty
+    if top is a variable
+      non-deterministicly choose a rule and push it onto stack
+    end
+    if top is a terminal
+      match it with input
+    end
+  end
+  if input is empty
+    accept
+  else
+    reject
+  end
 
+Formally:
+
+Given a CFG G=(V,\Sigma,R,S)
+Define PDA M=(Q,\Sigma,\Gamma,\delta,q_0,{q_f})
+Q = {q_0,q_f} U {states needed for string pushing}
+\Gamma = V U \Sigma
+\delta = \delta(q_0,\Lambda,\Lambda) = {(q_f,S)}
+    \delta(q_f,\Lambda,A) = {(q_f,w)} where A->w \in R
+    \delta(q_f,a,a) = {(q_f,\Lambda)} for a \in \Sigma
+    \delta(q_n,\Lambda,\Lambda) = \delta(q_f,X_i) for X_i = X_0,X_1...X_n where X is a
+                                          string to push
+
+This can generate a two state NFA q_0 -> (q_f)
+where the transition from q_o->q_f is \delta(q_0,\Lambda,\Lambda)->(q_f,S) and all
+\delta(q_f,_,_)->(q_f,_) are transitions from q_f to itself. All other transitions
+from some q_n (where q_n is Q - {q_s}) are a 'hack' to allow pushing multiple
+values onto the stack at once.
+
+* Turing Machines
+  Notes omitted because I already know this stuff
+* Review
+** CNF
+*** dealing with terminal-Non-terminal-terminal
+
+T -> aTb | ab 
+changes to
+U -> aT
+T -> Ub | ab
+then
+A -> a
+B -> b
+T-> UB | AB
+U -> AT
+** PDA
+*** Simplifying
+Multiple rules can go on one loop,
+ie  all rules for matching input can be on the same loop
+*** Format
+a,b -> c
+input, pop -> push
+so the above means, if the input is a pop a b from the top of the stack and
+push a c
+*** Rules
+Matching terminals:
+a,a -> \Lambda, matches the terminal a
+
+Push multiple values:
+given \Lambda,T -> aTb we transform it into
+(q_f) \Lambda,T -> b (q_1)
+(q_1) \Lambda,\Lambda -> T (q_2)
+(q_2) \Lambda,\Lambda -> a (q_f)
+
+q_1,q_2 are arbitrary states that don't really need to be named,
+make sure to rember to push things in reverse order
+*** From a language
+for eg ab^{n}cd^{2n}
+-read a, do nothing, move to state 2
+-read n b's, push 2 b's onto the stack for each read
+-read c, do nothing, move to state 3
+-read 2n d's, pop 2b's for each d
+** Warshall's algorithm
+Array is NxN, each index ij states than state j can be reached from state i,
+if ij is true and jk is true then set ik to true, since we can get to k from i
+via j. Do this via triple loop or inductively based on looking at the array
+* Final Wednesday at 8
 * Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
