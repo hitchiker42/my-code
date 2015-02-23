@@ -1,0 +1,49 @@
+\documentclass[11pt]{article}
+% \usepackage[utf8]{inputenc}
+% \usepackage[T1]{fontenc}
+\usepackage{fullpage,amsmath,amsthm,enumitem}
+\usepackage{fontspec}
+\setmainfont{DejaVu Serif}
+\title{Math 679: Project n}
+\author{Tucker DiNapoli}
+\date{\today}
+\newenvironment{my_proof}
+{\begin{proof}\mbox{}\\*}
+{\end{proof}}
+\newcommand{\inf}\infty
+\begin{document}
+\begin{enumerate} %problem number
+\item
+  \begin{my_proof}
+    Prove \(\left\{\frac{n^2-1}{2n^3+1}\right\}_{n=1}^{\inf} = 0\).\\
+    We need to find an \(N\) such that \(|a_n - 0| < \epsilon, \forall ε
+    > 0, n \gte N\). Since \(\frac{n^2-1}{2n^3+1} < \frac{n^2}{2n^3+1} <
+    \frac{n^2}{2n^3} = \frac{1}{on}\) it suffices to show \(\exists N s.t
+    |\frac{1}{2n} - 0| < ε, \forall ε > 0, n \gte N\), substuting
+    N for n and simplifying gives \(N = \frac{1}{2ε}\). So
+    \(\left{\frac{n^2-1}{2n^3+1}\right}_{n=1}^{\inf}\) is 0.    
+  \end{my_proof}
+\item
+  \begin{my_proof}
+    Prove that if \(\{a_n\}_{n=1}^{\inf}\) converges to some \(a > 0\) for
+    \(a_n \geq 0\) that \(\{\sqrt[3]{a_n}\}_{n=1}^{\inf}\) converges to
+    \(\sqrt[3]{a}\).\\ 
+  \end{my_proof}
+\item
+  \begin{my_proof}
+    Let \(x\) be any positive real number, and define a sequence
+    \(\{a_n\}_{n=1}^{\inf}\}\) by \(a_n = \frac{\lfloor x \rfloor + \lfloor 2x
+    \rfloor + \cdots + \lfloor nx \rfloor}{n^2}\). Prove
+  \(\{a_n\}_{n=1}^{\inf}\) converges to \(\frac{x}{2}\).\\
+  Since \(x-1 < x \leq \floor{x}, \Sum_{n=1}^{\inf} x-1 < \Sum_{n=1}^{\inf} x <
+  \Sum_{n=1}^{\inf} \floor{x}\)
+  \end{my_proof}
+\item
+  \begin{my_proof}
+    Let \(a_1 = 1\) and \(a_n = \frac{2a_{n-1} + 1}{9}\). Prove
+    \(\{a_n\}_{n=1}^{\inf}\) is a convergent series, and give its limit.
+\end{document}
+%%% Local Variables:
+%%% mode: latex
+%%% TeX-master: t
+%%% End:

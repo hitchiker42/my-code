@@ -1,0 +1,80 @@
+* Factorial Powers
+ x^{<n>} = \prod_{m=o}^{n-1} (x - m) when n > 0
+ x^{<n>} = 1/(\prod_{m=1}^{n} (x + m)) when n < 0
+ x^{<n>} = 1 when n = 0
+ or recursively
+ x^{<0>} = 1
+ x^{<n+1>} = x^{<n>}(x - n)
+
+
+ given the
+ For n > 0 these are the falling factorial powers
+ if n < 0 these are x*1/rising factorial powers
+
+We define these so that \Delta{}x^{<n>} = (x^n)'
+i.e \Delta{}x^{<n>} = n*x^{<n-1>} \forall{}n \in N
+* Deltas of trig functions
+  d/dx sin(ax)  = a*cos(ax)
+  \Delta sin(ax) = sin(a(x+1)) - sin(ax)
+            = sin(ax+a) - sin(ax)
+            = sin(ax)cos(a) + cos(ax)sin(a) - sin(ax)
+            = sin(ax)(cos(a) - 1) + cos(ax)sin(a)
+  \Delta cos(ax) = cos(a(x+1)) - cos(ax)
+            = cos(ax+a) - cos(ax)
+            = cos(ax)cos(a) - sin(ax)sin(a) - cos(ax)
+            = cos(ax)(cos(a) - 1) - sin(ax)sin(a)
+  \Delta \Delta cos(ax) = (cos(ax)(cos(a) - 1) - sin(ax)sin(a))(cos(a)-1) -
+                (sin(ax)(cos(a) - 1) + cos(ax)sin(a))(sin(a))
+* Mathematical induction
+  I know this stuff
+* HW review
+  induction stuff
+* Solving inequalities 
+let f:Z^{+}->R 
+f is increasing at x iff f(x) < f(x+1) iff \Delta{}f(x) > 0
+f is decreasing ax x iff f(x) > f(x+1) iff \Delta{}f(x) < 0
+f is constant at x iff f(x) = f(x) iff \Delta{}f(x) = 0
+This isn't so simple with calculus (we need the mean value theorem)
+
+define \Delta^{2}f = \Delta\Delta{}f and \Delta^{n}f = \Delta(\Delta^{n-1}f)
+
+We can use this to solve inequalities:
+ex: show x^2 \leq 2^x
+let f = 2^x-x^2, find all x such that f(x) \ge 0
+# the second and third delta's are probably extranous for this
+# but that's not always the case
+at \Delta{}f = 2^x - 2x + 1( and \Delta^{2}f = 2^x -2 and \Delta^{3}f = 2^x = \Delta^{n}f)
+\Delta{}f > 0 \forall{}x>2, and f > 0 \forall{}x\ge{}4
+
+from now on let dx == \Delta{}x unless otherwise specifiex
+
+solve x^3 + 5x^2 + 7 < 3^x for x\in{}N
+lim x -> \infty 3^x > x^3
+
+* solving inequalities for rational functions
+let p(x) be a polynomial of degree n with real number coefficents
+p(r) = 0 iff \exists{}q s.t. p(x) = (x-r)q(x) (factor theorem)
+More generally p(x)/(x-a) = q(x) + p(a)
+
+We can write any polynomial of degree n as 
+p(x) = C_n \prod_{i=0}^{m}(x-r_i) * g(x), where r_i is the i'th real root of p, m is
+the number of real roots of p and g(x) is a polynomial of degree n with no real
+roots. g(x) > 0 \forall{}x, x\in R
+sign(p(x)) == sign(C_N*\prod_{i=0}^m(x-r_i))
+
+* Sign picture
+Simply a graph indicating the sign of a function over it's domain.
+
+Fairly easy to write down for a polynomial, assuming you can factor it 
+
+ex: given f(x) = (x-1)^2(x-2)^3(x-3)^10(x-4)^5
+sign:  - | + | - | - | +
+x:       1   2   3   4 
+
+# Local Variables:
+# eval: (auto-fill-mode)
+# eval: (flyspell-mode)
+# eval: (org-cdlatex-mode)
+# org-pretty-entities: t
+# org-enable-table-editor: nil
+# End:
