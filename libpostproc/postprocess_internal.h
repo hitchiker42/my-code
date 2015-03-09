@@ -203,5 +203,6 @@ static inline void linecpy(void *dest, const void *src, int lines, int stride) {
         memcpy((uint8_t*)dest+(lines-1)*stride, (const uint8_t*)src+(lines-1)*stride, -lines*stride);
     }
 }
-
+#define BLOCK_SIZE 8
+DECLARE_ASM_CONST(8, int, deringThreshold)= 20;
 #endif /* POSTPROC_POSTPROCESS_INTERNAL_H */

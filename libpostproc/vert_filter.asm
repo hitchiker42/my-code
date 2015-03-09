@@ -20,10 +20,7 @@
 ;* License along with FFmpeg; if not, write to the Free Software
 ;* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 ;******************************************************************************
-
-%include "config.asm"
-%include "libavutil/x86/x86util.asm"
-%include "PPContext.asm" ;layout of the PPContext struct
+%include "PPutil.asm"
 
 ;; This function can be extented into 128/256 bytes in one of two ways,
 ;; either classify 2/4 8x8 blocks at once, or classify one 8x16/32 block

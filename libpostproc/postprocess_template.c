@@ -64,6 +64,7 @@
 #   define TEMPLATE_PP_3DNOW 0
 #endif
 
+//currently the SSE2 versions don't actually use xmm registers
 #ifdef TEMPLATE_PP_SSE2
 #   undef  TEMPLATE_PP_MMX
 #   define TEMPLATE_PP_MMX 1
@@ -73,7 +74,17 @@
 #else
 #   define TEMPLATE_PP_SSE2 0
 #endif
-
+//temporary until AVX versions are unimplemented
+#ifdef TEMPLATE_PP_AVX2
+#   undef  TEMPLATE_PP_MMX
+#   define TEMPLATE_PP_MMX 1
+#   undef  TEMPLATE_PP_MMXEXT
+#   define TEMPLATE_PP_MMXEXT 1
+#   undef  TEMPLATE_PP_SSE2
+#   define RENAME(a) a ## _AVX2
+#else
+#   define TEMPLATE_PP_AVX2 0
+#endif
 #undef REAL_PAVGB
 #undef PAVGB
 #undef PMINUB

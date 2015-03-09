@@ -25,8 +25,7 @@
 ;; really looked at the build system close yet.
 ;; I personally had to set these to relative paths in order to assemble this
 ;; since it's not build by the makefile or anything
-%include "config.asm"
-%include "libavutil/x86/x86util.asm"
+%include "PPutil.asm"
 ;; I tried to use named parameters in function definations (rather than just rN)
 ;; but I couldn't get the code to assemble. I'm not sure if there's anything I
 ;; need to do other than include them in the argument list to the cglobal call.

@@ -24,27 +24,23 @@
 #include "config.h"
 #include "libavutil/avutil.h"
 #include "libavutil/avassert.h"
+#include "libavutil/x86/asm.h"
 #include <inttypes.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include "postprocess.h"
 #include "postprocess_internal.h"
 #include "libavutil/avstring.h"
-
-#include "libavutil/ffversion.h"
-
 /**
  * Check if the given Nx8 Block is mostly "flat"
  */
-static inline int is_horiz_DC_C(const uint8_t *src, int stride, const PPContext *c)
+static inline int isHorizDCC(const uint8_t *src, int stride, const PPContext *c)
 {
     int numEq = 0;
     int y;
     const int dcOffset = ((c->nonBQP*c->ppMode.baseDcDiff)>>8) + 1;
     const int dcThreshold = dcOffset*2 + 1;
 
-    for(y = 0; y<width; y++){
+    for(y = 0; y<BLOCK_SIZE; y++){
         numEq += ((unsigned)(src[0] - src[1] + dcOffset)) < dcThreshold;
         numEq += ((unsigned)(src[1] - src[2] + dcOffset)) < dcThreshold;
         numEq += ((unsigned)(src[2] - src[3] + dcOffset)) < dcThreshold;
@@ -60,7 +56,7 @@ static inline int is_horiz_DC_C(const uint8_t *src, int stride, const PPContext 
 /**
  * Check if the middle Nx8 Block in the given 8x2N block is flat
  */
-static inline int is_vert_DC_C(const uint8_t *src, int stride, const PPContext *c)
+static inline int isVertDC_C(const uint8_t *src, int stride, const PPContext *c)
 {
     int numEq = 0;
     int y;
@@ -82,7 +78,7 @@ static inline int is_vert_DC_C(const uint8_t *src, int stride, const PPContext *
     return numEq > c->ppMode.flatnessThreshold;
 }
 
-static inline int is_horiz_min_max_ok_C(const uint8_t *src, int stride, int QP)
+static inline int isHorizMinMaxOk_C(const uint8_t *src, int stride, int QP)
 {
     int i;
     for(i = 0; i<2; i++){
@@ -110,7 +106,7 @@ static inline int is_vert_min_max_ok_C(const uint8_t *src, int stride, int QP)
     }
     return 1;
 }
-static inline int horiz_classify_C(const uint8_t *src, int stride, const PPContext *c)
+static inline int horizClassify_C(const uint8_t *src, int stride, const PPContext *c)
 {
     if(is_horiz_DC_C(src, stride, c)){
         return is_horiz_min_max_Ok_C(src, stride, c->QP);
@@ -119,7 +115,7 @@ static inline int horiz_classify_C(const uint8_t *src, int stride, const PPConte
     }
 }
 
-static inline int vert_classify_C(const uint8_t *src, int stride, const PPContext *c)
+static inline int vertClassify_C(const uint8_t *src, int stride, const PPContext *c)
 {
     if(is_vert_DC_C(src, stride, c)){
         return is_vert_min_max_ok_C(src, stride, c->QP);
@@ -128,7 +124,7 @@ static inline int vert_classify_C(const uint8_t *src, int stride, const PPContex
     }
 }
 
-static inline void do_horiz_def_filter_C(uint8_t *dst, int stride, const PPContext *c)
+static inline void doHorizDefFilter_C(uint8_t *dst, int stride, const PPContext *c)
 {
     int y;
     for(y = 0; y<BLOCK_SIZE; y++){
@@ -167,7 +163,7 @@ static inline void do_horiz_def_filter_C(uint8_t *dst, int stride, const PPConte
  * Do a horizontal low pass filter on the 10x8 block (dst points to middle 8x8 Block)
  * using the 9-Tap Filter (1,1,2,2,4,2,2,1,1)/16 (C version)
  */
-static inline void do_horiz_low_pass_C(uint8_t *dst, int stride, const PPContext *c)
+static inline void doHorizLowPass_C(uint8_t *dst, int stride, const PPContext *c)
 {
     int y;
     for(y = 0; y<BLOCK_SIZE; y++){
@@ -207,7 +203,7 @@ static inline void do_horiz_low_pass_C(uint8_t *dst, int stride, const PPContext
  * MMX2 version does correct clipping C version does not
  * not identical with the vertical one
  */
-static inline void horiz_X1_Filter(uint8_t *src, int stride, int QP)
+static inline void horizX1Filter_C(uint8_t *src, int stride, int QP)
 {
     int y;
     static uint64_t lut[256];
@@ -682,6 +678,7 @@ static inline void dering_C(uint8_t *src, int stride, PPContext *c)
         }
 //        src[0] = src[7] = src[stride*7] = src[stride*7 + 7] = 255;
     }
+#endif
 }
 
 /**
@@ -716,7 +713,7 @@ static inline void deInterlaceInterpolateLinear_C(uint8_t *src, int stride)
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 3-15 and write 7-13
  */
-static inline void de_interlace_interpolate_cubic_c(uint8_t *src, int stride)
+static inline void deInterlaceInterpolateCubic_C(uint8_t *src, int stride)
 {
     int x;
     src+= stride*3;
@@ -740,7 +737,7 @@ static inline void de_interlace_interpolate_cubic_c(uint8_t *src, int stride)
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 4-13 and write 5-11
  */
-static inline void deinterlace_FF_C(uint8_t *src, int stride, uint8_t *tmp)
+static inline void deInterlaceFF_C(uint8_t *src, int stride, uint8_t *tmp)
 {
     int x;
     src+= stride*4;
@@ -768,7 +765,7 @@ static inline void deinterlace_FF_C(uint8_t *src, int stride, uint8_t *tmp)
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 4-13 and write 4-11
  */
-static inline void deinterlace_L5_C(uint8_t *src, int stride, uint8_t *tmp, uint8_t *tmp2)
+static inline void deInterlaceL5_C(uint8_t *src, int stride, uint8_t *tmp, uint8_t *tmp2)
 {
     int x;
     src+= stride*4;
@@ -1038,7 +1035,7 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
     //const int mbWidth = isColor ? (width+7)>>3 : (width+15)>>4;
 
     if (mode & VISUALIZE){
-        if(!(mode & (V_A_DEBLOCK | H_A_DEBLOCK)) || TEMPLATE_PP_MMX) {
+        if(!(mode & (V_A_DEBLOCK | H_A_DEBLOCK))) {
             av_log(c2, AV_LOG_WARNING, "Visualization is currently only supported with the accurate deblock filter without SIMD\n");
         }
     }
@@ -1205,7 +1202,7 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
                         srcBlock + srcStride*copyAhead, srcStride, mode & LEVEL_FIX, &c.packedYOffset);
 
             if(mode & LINEAR_IPOL_DEINT_FILTER)
-                de_interlace_interpolate_linear_C(dstBlock, dstStride);
+                deInterlaceInterpolateLinear_C(dstBlock, dstStride);
             else if(mode & LINEAR_BLEND_DEINT_FILTER)
                 deInterlaceBlendLinear_C(dstBlock, dstStride, c.deintTemp + x);
             else if(mode & MEDIAN_DEINT_FILTER)
@@ -1240,7 +1237,7 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
             if(x - 8 >= 0){
 
                 if(mode & H_X1_FILTER)
-                    horizX1Filter(dstBlock-4, stride, QP);
+                    horizX1Filter_C(dstBlock-4, stride, QP);
                 else if(mode & H_DEBLOCK){
                     const int t = horizClassify_C(dstBlock-4, stride, &c);
 
