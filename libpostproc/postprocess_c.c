@@ -1,5 +1,5 @@
 /******************************************************************************
-* DeInterlacing filters written in C
+* C implementation of postprocessing routines
 * Copyright (C) 2001-2002 Michael Niedermayer (michaelni@gmx.at)
 * Copyright (c) 2015 Tucker DiNapoli
 *
@@ -20,26 +20,22 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 ******************************************************************************/
 
-/*not sure which of these headers are really necessary*/
 #include "config.h"
 #include "libavutil/avutil.h"
-#include "libavutil/avassert.h"
-#include "libavutil/x86/asm.h"
 #include <inttypes.h>
 #include <stdlib.h>
 #include "postprocess.h"
 #include "postprocess_internal.h"
-#include "libavutil/avstring.h"
+
 /**
  * Check if the given Nx8 Block is mostly "flat"
  */
-static inline int isHorizDCC(const uint8_t *src, int stride, const PPContext *c)
+static inline int is_horiz_DC_C(const uint8_t *src, int stride, const PPContext *c)
 {
     int numEq = 0;
     int y;
     const int dcOffset = ((c->nonBQP*c->ppMode.baseDcDiff)>>8) + 1;
     const int dcThreshold = dcOffset*2 + 1;
-
     for(y = 0; y<BLOCK_SIZE; y++){
         numEq += ((unsigned)(src[0] - src[1] + dcOffset)) < dcThreshold;
         numEq += ((unsigned)(src[1] - src[2] + dcOffset)) < dcThreshold;
@@ -54,16 +50,16 @@ static inline int isHorizDCC(const uint8_t *src, int stride, const PPContext *c)
 }
 
 /**
- * Check if the middle Nx8 Block in the given 8x2N block is flat
+ * Check if the middle Nx8 Block in the given 2Nx8 block is flat
  */
-static inline int isVertDC_C(const uint8_t *src, int stride, const PPContext *c)
+static inline int is_vert_DC_C(const uint8_t *src, int stride, const PPContext *c)
 {
     int numEq = 0;
     int y;
     const int dcOffset = ((c->nonBQP*c->ppMode.baseDcDiff)>>8) + 1;
     const int dcThreshold = dcOffset*2 + 1;
 
-    src+= stride*4; // src points to begin of the 8x8 Block
+    src+= stride*4; // src points to beging of the Nx8 Block
     for(y = 0; y<BLOCK_SIZE-1; y++){
         numEq += ((unsigned)(src[0] - src[0+stride] + dcOffset)) < dcThreshold;
         numEq += ((unsigned)(src[1] - src[1+stride] + dcOffset)) < dcThreshold;
@@ -78,7 +74,7 @@ static inline int isVertDC_C(const uint8_t *src, int stride, const PPContext *c)
     return numEq > c->ppMode.flatnessThreshold;
 }
 
-static inline int isHorizMinMaxOk_C(const uint8_t *src, int stride, int QP)
+static inline int is_horiz_min_max_ok_C(const uint8_t *src, int stride, int QP)
 {
     int i;
     for(i = 0; i<2; i++){
@@ -106,16 +102,16 @@ static inline int is_vert_min_max_ok_C(const uint8_t *src, int stride, int QP)
     }
     return 1;
 }
-static inline int horizClassify_C(const uint8_t *src, int stride, const PPContext *c)
+static inline int horiz_classify_C(const uint8_t *src, int stride, const PPContext *c)
 {
     if(is_horiz_DC_C(src, stride, c)){
-        return is_horiz_min_max_Ok_C(src, stride, c->QP);
+        return is_horiz_min_max_ok_C(src, stride, c->QP);
     } else {
         return 2;
     }
 }
 
-static inline int vertClassify_C(const uint8_t *src, int stride, const PPContext *c)
+static inline int vert_classify_C(const uint8_t *src, int stride, const PPContext *c)
 {
     if(is_vert_DC_C(src, stride, c)){
         return is_vert_min_max_ok_C(src, stride, c->QP);
@@ -124,7 +120,7 @@ static inline int vertClassify_C(const uint8_t *src, int stride, const PPContext
     }
 }
 
-static inline void doHorizDefFilter_C(uint8_t *dst, int stride, const PPContext *c)
+static inline void do_horiz_def_filter_C(uint8_t *dst, int stride, const PPContext *c)
 {
     int y;
     for(y = 0; y<BLOCK_SIZE; y++){
@@ -163,7 +159,7 @@ static inline void doHorizDefFilter_C(uint8_t *dst, int stride, const PPContext 
  * Do a horizontal low pass filter on the 10x8 block (dst points to middle 8x8 Block)
  * using the 9-Tap Filter (1,1,2,2,4,2,2,1,1)/16 (C version)
  */
-static inline void doHorizLowPass_C(uint8_t *dst, int stride, const PPContext *c)
+static inline void do_horiz_low_pass_C(uint8_t *dst, int stride, const PPContext *c)
 {
     int y;
     for(y = 0; y<BLOCK_SIZE; y++){
@@ -203,7 +199,7 @@ static inline void doHorizLowPass_C(uint8_t *dst, int stride, const PPContext *c
  * MMX2 version does correct clipping C version does not
  * not identical with the vertical one
  */
-static inline void horizX1Filter_C(uint8_t *src, int stride, int QP)
+static inline void horiz_X1_filter_C(uint8_t *src, int stride, int QP)
 {
     int y;
     static uint64_t lut[256];
@@ -379,7 +375,7 @@ static av_always_inline void do_a_deblock_C(uint8_t *src, int step,
  * Do a vertical low pass filter on the 8x16 block (only write to the 8x8 block in the middle)
  * using the 9-Tap Filter (1,1,2,2,4,2,2,1,1)/16
  */
-static inline void doVertLowPass_C(uint8_t *src, int stride, PPContext *c)
+static inline void do_vert_low_pass_C(uint8_t *src, int stride, PPContext *c)
 {
     const int l1 = stride;
     const int l2 = stride + l1;
@@ -428,7 +424,7 @@ static inline void doVertLowPass_C(uint8_t *src, int stride, PPContext *c)
  * can only smooth blocks at the expected locations (it cannot smooth them if they did move)
  * MMX2 version does correct clipping C version does not
  */
-static inline void vertX1Filter_C(uint8_t *src, int stride, PPContext *co)
+static inline void vert_X1_filter_C(uint8_t *src, int stride, PPContext *co)
 {
     const int l1 = stride;
     const int l2 = stride + l1;
@@ -464,7 +460,7 @@ static inline void vertX1Filter_C(uint8_t *src, int stride, PPContext *co)
     }
 }
 
-static inline void doVertDefFilter_C(uint8_t *src, int stride, PPContext *c)
+static inline void do_vert_def_filter_C(uint8_t *src, int stride, PPContext *c)
 {
 /*
     {
@@ -687,7 +683,7 @@ static inline void dering_C(uint8_t *src, int stride, PPContext *c)
  * lines 0-3 have been passed through the deblock / dering filters already, but can be read, too.
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  */
-static inline void deInterlaceInterpolateLinear_C(uint8_t *src, int stride)
+static inline void deinterlace_interpolate_linear_C(uint8_t *src, int stride)
 {
     int a, b, x;
     src+= 4*stride;
@@ -713,18 +709,18 @@ static inline void deInterlaceInterpolateLinear_C(uint8_t *src, int stride)
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 3-15 and write 7-13
  */
-static inline void deInterlaceInterpolateCubic_C(uint8_t *src, int stride)
+static inline void deinterlace_interpolate_cubic_C(uint8_t *src, int stride)
 {
     int x;
     src+= stride*3;
     for(x = 0; x<8; x++){
-        src[stride*3] = av_Clip_uint8((-src[0]        + 9*src[stride*2] +
+        src[stride*3] = av_clip_uint8((-src[0]        + 9*src[stride*2] +
                                        9*src[stride*4] - src[stride*6])>>4);
-        src[stride*5] = av_Clip_uint8((-src[stride*2] + 9*src[stride*4] +
+        src[stride*5] = av_clip_uint8((-src[stride*2] + 9*src[stride*4] +
                                        9*src[stride*6] - src[stride*8])>>4);
-        src[stride*7] = av_Clip_uint8((-src[stride*4] + 9*src[stride*6] +
+        src[stride*7] = av_clip_uint8((-src[stride*4] + 9*src[stride*6] +
                                        9*src[stride*8] - src[stride*10])>>4);
-        src[stride*9] = av_Clip_uint8((-src[stride*6] + 9*src[stride*8] +
+        src[stride*9] = av_clip_uint8((-src[stride*6] + 9*src[stride*8] +
                                        9*src[stride*10] - src[stride*12])>>4);
         src++;
     }
@@ -737,7 +733,7 @@ static inline void deInterlaceInterpolateCubic_C(uint8_t *src, int stride)
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 4-13 and write 5-11
  */
-static inline void deInterlaceFF_C(uint8_t *src, int stride, uint8_t *tmp)
+static inline void deinterlace_FF_C(uint8_t *src, int stride, uint8_t *tmp)
 {
     int x;
     src+= stride*4;
@@ -745,13 +741,13 @@ static inline void deInterlaceFF_C(uint8_t *src, int stride, uint8_t *tmp)
         int t1 = tmp[x];
         int t2 = src[stride*1];
 
-        src[stride*1] = av_Clip_uint8((-t1 + 4*src[stride*0] + 2*t2 + 4*src[stride*2] - src[stride*3] + 4)>>3);
+        src[stride*1] = av_clip_uint8((-t1 + 4*src[stride*0] + 2*t2 + 4*src[stride*2] - src[stride*3] + 4)>>3);
         t1 = src[stride*4];
-        src[stride*3] = av_Clip_uint8((-t2 + 4*src[stride*2] + 2*t1 + 4*src[stride*4] - src[stride*5] + 4)>>3);
+        src[stride*3] = av_clip_uint8((-t2 + 4*src[stride*2] + 2*t1 + 4*src[stride*4] - src[stride*5] + 4)>>3);
         t2 = src[stride*6];
-        src[stride*5] = av_Clip_uint8((-t1 + 4*src[stride*4] + 2*t2 + 4*src[stride*6] - src[stride*7] + 4)>>3);
+        src[stride*5] = av_clip_uint8((-t1 + 4*src[stride*4] + 2*t2 + 4*src[stride*6] - src[stride*7] + 4)>>3);
         t1 = src[stride*8];
-        src[stride*7] = av_Clip_uint8((-t2 + 4*src[stride*6] + 2*t1 + 4*src[stride*8] - src[stride*9] + 4)>>3);
+        src[stride*7] = av_clip_uint8((-t2 + 4*src[stride*6] + 2*t1 + 4*src[stride*8] - src[stride*9] + 4)>>3);
         tmp[x] = t1;
 
         src++;
@@ -765,7 +761,7 @@ static inline void deInterlaceFF_C(uint8_t *src, int stride, uint8_t *tmp)
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 4-13 and write 4-11
  */
-static inline void deInterlaceL5_C(uint8_t *src, int stride, uint8_t *tmp, uint8_t *tmp2)
+static inline void deinterlace_L5_C(uint8_t *src, int stride, uint8_t *tmp, uint8_t *tmp2)
 {
     int x;
     src+= stride*4;
@@ -774,21 +770,21 @@ static inline void deInterlaceL5_C(uint8_t *src, int stride, uint8_t *tmp, uint8
         int t2 = tmp2[x];
         int t3 = src[0];
 
-        src[stride*0] = av_Clip_uint8((-(t1 + src[stride*2]) + 2*(t2 + src[stride*1]) + 6*t3 + 4)>>3);
+        src[stride*0] = av_clip_uint8((-(t1 + src[stride*2]) + 2*(t2 + src[stride*1]) + 6*t3 + 4)>>3);
         t1 = src[stride*1];
-        src[stride*1] = av_Clip_uint8((-(t2 + src[stride*3]) + 2*(t3 + src[stride*2]) + 6*t1 + 4)>>3);
+        src[stride*1] = av_clip_uint8((-(t2 + src[stride*3]) + 2*(t3 + src[stride*2]) + 6*t1 + 4)>>3);
         t2 = src[stride*2];
-        src[stride*2] = av_Clip_uint8((-(t3 + src[stride*4]) + 2*(t1 + src[stride*3]) + 6*t2 + 4)>>3);
+        src[stride*2] = av_clip_uint8((-(t3 + src[stride*4]) + 2*(t1 + src[stride*3]) + 6*t2 + 4)>>3);
         t3 = src[stride*3];
-        src[stride*3] = av_Clip_uint8((-(t1 + src[stride*5]) + 2*(t2 + src[stride*4]) + 6*t3 + 4)>>3);
+        src[stride*3] = av_clip_uint8((-(t1 + src[stride*5]) + 2*(t2 + src[stride*4]) + 6*t3 + 4)>>3);
         t1 = src[stride*4];
-        src[stride*4] = av_Clip_uint8((-(t2 + src[stride*6]) + 2*(t3 + src[stride*5]) + 6*t1 + 4)>>3);
+        src[stride*4] = av_clip_uint8((-(t2 + src[stride*6]) + 2*(t3 + src[stride*5]) + 6*t1 + 4)>>3);
         t2 = src[stride*5];
-        src[stride*5] = av_Clip_uint8((-(t3 + src[stride*7]) + 2*(t1 + src[stride*6]) + 6*t2 + 4)>>3);
+        src[stride*5] = av_clip_uint8((-(t3 + src[stride*7]) + 2*(t1 + src[stride*6]) + 6*t2 + 4)>>3);
         t3 = src[stride*6];
-        src[stride*6] = av_Clip_uint8((-(t1 + src[stride*8]) + 2*(t2 + src[stride*7]) + 6*t3 + 4)>>3);
+        src[stride*6] = av_clip_uint8((-(t1 + src[stride*8]) + 2*(t2 + src[stride*7]) + 6*t3 + 4)>>3);
         t1 = src[stride*7];
-        src[stride*7] = av_Clip_uint8((-(t2 + src[stride*9]) + 2*(t3 + src[stride*8]) + 6*t1 + 4)>>3);
+        src[stride*7] = av_clip_uint8((-(t2 + src[stride*9]) + 2*(t3 + src[stride*8]) + 6*t1 + 4)>>3);
 
         tmp[x] = t3;
         tmp2[x] = t1;
@@ -804,7 +800,7 @@ static inline void deInterlaceL5_C(uint8_t *src, int stride, uint8_t *tmp, uint8
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 4-13 and write 4-11
  */
-static inline void deInterlaceBlendLinear_C(uint8_t *src, int stride, uint8_t *tmp)
+static inline void deinterlace_blend_linear_C(uint8_t *src, int stride, uint8_t *tmp)
 {
     int a, b, c, x;
     src+= 4*stride;
@@ -856,7 +852,7 @@ static inline void deInterlaceBlendLinear_C(uint8_t *src, int stride, uint8_t *t
  * lines 0-3 have been passed through the deblock / dering filters already, but can be read, too.
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  */
-static inline void deInterlaceMedian_C(uint8_t *src, int stride)
+static inline void deinterlace_median_C(uint8_t *src, int stride)
 {
     int x, y;
     src+= 4*stride;
@@ -878,7 +874,7 @@ static inline void deInterlaceMedian_C(uint8_t *src, int stride)
     }
 }
 
-static inline void tempNoiseReducer_C(uint8_t *src, int stride,
+static inline void temp_noise_reducer_C(uint8_t *src, int stride,
                                     uint8_t *tempBlurred, uint32_t *tempBlurredPast, const int *maxNoise)
 {
     int y;
@@ -967,7 +963,7 @@ Switch between
     }
 }
 
-static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int dstStride, int width, int height,
+static void post_process_C(const uint8_t *src, int srcStride, uint8_t *dst, int dstStride, int width, int height,
                                 const QP_STORE_T *QPs, int QPStride, int isColor, PPContext *c);
 
 /**
@@ -977,7 +973,7 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
 #undef REAL_SCALED_CPY
 #undef SCALED_CPY
 
-static inline void blockCopy_C(uint8_t *dst, int dstStride, const uint8_t *src, int srcStride,
+static inline void block_copy_C(uint8_t *dst, int dstStride, const uint8_t *src, int srcStride,
                                      int levelFix, int64_t *packedOffsetAndScale)
 {
     int i;
@@ -1010,7 +1006,7 @@ static inline void duplicate_C(uint8_t *src, int stride)
 /**
  * Filter array of bytes (Y or U or V values)
  */
-static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int dstStride, int width, int height,
+static void post_process_C(const uint8_t *src, int srcStride, uint8_t *dst, int dstStride, int width, int height,
                           const QP_STORE_T *QPs, int QPStride, int isColor, PPContext *c2)
 {
     DECLARE_ALIGNED(8, PPContext, c)= *c2; //copy to stack for faster access
@@ -1115,23 +1111,23 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
         // with the L1 Cache of the P4 ... or only a few blocks at a time or something
         for(x = 0; x<width; x+= BLOCK_SIZE){
 
-            blockCopy_C(dstBlock + dstStride*8, dstStride,
+            block_copy_C(dstBlock + dstStride*8, dstStride,
                         srcBlock + srcStride*8, srcStride, mode & LEVEL_FIX, &c.packedYOffset);
 
             duplicate_C(dstBlock + dstStride*8, dstStride);
 
             if(mode & LINEAR_IPOL_DEINT_FILTER){
-                deInterlaceInterpolateLinear_C(dstBlock, dstStride);
+                deinterlace_interpolate_linear_C(dstBlock, dstStride);
             } else if(mode & LINEAR_BLEND_DEINT_FILTER){
-                deInterlaceBlendLinear_C(dstBlock, dstStride, c.deintTemp + x);
+                deinterlace_blend_linear_C(dstBlock, dstStride, c.deintTemp + x);
             } else if(mode & MEDIAN_DEINT_FILTER){
-                deInterlaceMedian_C(dstBlock, dstStride);
+                deinterlace_median_C(dstBlock, dstStride);
             } else if(mode & CUBIC_IPOL_DEINT_FILTER){
-                deInterlaceInterpolateCubic_C(dstBlock, dstStride);
+                deinterlace_interpolate_cubic_C(dstBlock, dstStride);
             } else if(mode & FFMPEG_DEINT_FILTER){
-                deInterlaceFF_C(dstBlock, dstStride, c.deintTemp + x);
+                deinterlace_FF_C(dstBlock, dstStride, c.deintTemp + x);
             } else if(mode & LOWPASS5_DEINT_FILTER){
-                deInterlaceL5_C(dstBlock, dstStride, c.deintTemp + x, c.deintTemp + width + x);
+                deinterlace_L5_C(dstBlock, dstStride, c.deintTemp + x, c.deintTemp + width + x);
             }
             /*          else if(mode & CUBIC_BLEND_DEINT_FILTER)
                         deInterlaceBlendCubic_C(dstBlock, dstStride);
@@ -1198,21 +1194,21 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
                 yHistogram[ srcBlock[srcStride*12 + 4] ]++;
             }
             c.QP = QP;
-            blockCopy_C(dstBlock + dstStride*copyAhead, dstStride,
+            block_copy_C(dstBlock + dstStride*copyAhead, dstStride,
                         srcBlock + srcStride*copyAhead, srcStride, mode & LEVEL_FIX, &c.packedYOffset);
 
             if(mode & LINEAR_IPOL_DEINT_FILTER)
-                deInterlaceInterpolateLinear_C(dstBlock, dstStride);
+                deinterlace_interpolate_linear_C(dstBlock, dstStride);
             else if(mode & LINEAR_BLEND_DEINT_FILTER)
-                deInterlaceBlendLinear_C(dstBlock, dstStride, c.deintTemp + x);
+                deinterlace_blend_linear_C(dstBlock, dstStride, c.deintTemp + x);
             else if(mode & MEDIAN_DEINT_FILTER)
-                deInterlaceMedian_C(dstBlock, dstStride);
+                deinterlace_median_C(dstBlock, dstStride);
             else if(mode & CUBIC_IPOL_DEINT_FILTER)
-                deInterlaceInterpolateCubic_C(dstBlock, dstStride);
+                deinterlace_interpolate_cubic_C(dstBlock, dstStride);
             else if(mode & FFMPEG_DEINT_FILTER)
-                deInterlaceFF_C(dstBlock, dstStride, c.deintTemp + x);
+                deinterlace_FF_C(dstBlock, dstStride, c.deintTemp + x);
             else if(mode & LOWPASS5_DEINT_FILTER)
-                deInterlaceL5_C(dstBlock, dstStride, c.deintTemp + x, c.deintTemp + width + x);
+                deinterlace_L5_C(dstBlock, dstStride, c.deintTemp + x, c.deintTemp + width + x);
             /*          else if(mode & CUBIC_BLEND_DEINT_FILTER)
                         deInterlaceBlendCubic_C(dstBlock, dstStride);
             */
@@ -1220,14 +1216,14 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
             /* only deblock if we have 2 blocks */
             if(y + 8 < height){
                 if(mode & V_X1_FILTER)
-                    vertX1Filter_C(dstBlock, stride, &c);
+                    vert_X1_filter_C(dstBlock, stride, &c);
                 else if(mode & V_DEBLOCK){
-                    const int t = vertClassify_C(dstBlock, stride, &c);
+                    const int t = vert_classify_C(dstBlock, stride, &c);
 
                     if(t == 1)
-                        doVertLowPass_C(dstBlock, stride, &c);
+                        do_vert_low_pass_C(dstBlock, stride, &c);
                     else if(t == 2)
-                        doVertDefFilter_C(dstBlock, stride, &c);
+                        do_vert_def_filter_C(dstBlock, stride, &c);
                 }else if(mode & V_A_DEBLOCK){
                     do_a_deblock_C(dstBlock, stride, 1, &c, mode);
                 }
@@ -1237,14 +1233,14 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
             if(x - 8 >= 0){
 
                 if(mode & H_X1_FILTER)
-                    horizX1Filter_C(dstBlock-4, stride, QP);
+                    horiz_X1_filter_C(dstBlock-4, stride, QP);
                 else if(mode & H_DEBLOCK){
-                    const int t = horizClassify_C(dstBlock-4, stride, &c);
+                    const int t = horiz_classify_C(dstBlock-4, stride, &c);
 
                     if(t == 1)
-                        doHorizLowPass_C(dstBlock-4, stride, &c);
+                        do_horiz_low_pass_C(dstBlock-4, stride, &c);
                     else if(t == 2)
-                        doHorizDefFilter_C(dstBlock-4, stride, &c);
+                        do_horiz_def_filter_C(dstBlock-4, stride, &c);
 
                 }else if(mode & H_A_DEBLOCK){
                     do_a_deblock_C(dstBlock-8, 1, stride, &c, mode);
@@ -1257,7 +1253,7 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
 
                 if(mode & TEMP_NOISE_FILTER)
                     {
-                        tempNoiseReducer_C(dstBlock-8, stride,
+                        temp_noise_reducer_C(dstBlock-8, stride,
                                            c.tempBlurred[isColor] + y*dstStride + x,
                                            c.tempBlurredPast[isColor] + (y>>3)*256 + (x>>3) + 256,
                                            c.ppMode.maxTmpNoise);
@@ -1275,7 +1271,7 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
         }
 
         if((mode & TEMP_NOISE_FILTER)){
-            tempNoiseReducer_C(dstBlock-8, dstStride,
+            temp_noise_reducer_C(dstBlock-8, dstStride,
                                c.tempBlurred[isColor] + y*dstStride + x,
                                c.tempBlurredPast[isColor] + (y>>3)*256 + (x>>3) + 256,
                                c.ppMode.maxTmpNoise);
@@ -1330,8 +1326,3 @@ static void postProcess_C(const uint8_t *src, int srcStride, uint8_t *dst, int d
     *c2 = c; //copy local context back
 
 }
-
-/* Local Variables: */
-/* c-file-style: "gnu" */
-/* c-basic-offset: 4 */
-/* End: */

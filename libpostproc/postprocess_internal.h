@@ -76,32 +76,6 @@
 //obviously the -pp option on the command line has no effect except turning the here selected
 //filters on
 //#define COMPILE_TIME_MODE 0x77
-/*
-  Explaination of terms:
-  luma (luminance)(Y): Represents the black and white part of an image, think rods in the human eye
-  chroma (chrominance)(U,V): Represenets the color portion of an image in terms of color differences,
-    there are two chroma channels U and V, U is blue difference (blue - luma) and V is red difference
-    (red -luma), think cones in the human eye.
-  Because the human eye is much more sensitive to luma than chroma (we have ~90 million rods and 
-    ~5 million cones) the chroma portion is often compressed more than the luma.
-
-  QP (quantization paramater): Exactly what it sounds like, it defines the resolution of some value,
-    by turning any value into some range into a single value (i.e anything from 0.01-0.03 -> 0.02) 
-    thus quantizing that value.
-  There are two types of quantization which are revelent, color quantization and frequency quantization.
-
-  Color quantization is about reducing the number of colors available to use (think 16bit vs 24bit color)
-  
-  Frequency quantization is a bit more complicated, the human eye is bad at detecting the differences
-  between high frequency signals (i.e the difference between say 10 and 12 is much more noticable than 
-  the difference between 100 and 102). So to compress images/video it makes sense to quantize high
-  frequency signals. This can be done in a somewhat complex way by using a discrete cosine transform
-  to calculate the frequencies of a block of pixels and multiplying it by a quantization matrix in order
-  to reduce the resolution of heigher frequencies, allowing heigher compression.
-
-  I'm not sure which of these forms of quantization is used, or if both are.
-
-*/
 
 /**
  * Postprocessing filter.
@@ -137,9 +111,9 @@ typedef struct PPMode{
 
 /**
  * postprocess context.
- * Assembly code dependes on the layout of this structure, if any fields
- * are removed/changed or added (anywhere but the end) the code in PPContext.asm
- * needs to be modified to reflect these changes.
+ * If any changes are made to this struct the corresponding assembly
+ * structure in PPutil.asm needs to be changed as well.
+ * The same applies to the PPMode struct
  */
 typedef struct PPContext{
     /**
@@ -178,8 +152,7 @@ typedef struct PPContext{
     QP_STORE_T *stdQPTable;       ///< used to fix MPEG2 style qscale
     QP_STORE_T *nonBQPTable;
     QP_STORE_T *forcedQPTable;
-    /* Quantization Paramater*/
-    int QP;
+    int QP; ///< Quantization Parameter
     int nonBQP;
 
     int frameNum;
@@ -203,6 +176,27 @@ static inline void linecpy(void *dest, const void *src, int lines, int stride) {
         memcpy((uint8_t*)dest+(lines-1)*stride, (const uint8_t*)src+(lines-1)*stride, -lines*stride);
     }
 }
-#define BLOCK_SIZE 8
+/*
+  Currently the block size is always 8, but it will need to be changed to 16
+  for SSE2 code and 32 for AVX2 code.
+
+*/
+#if ARCH_X86 && HAVE_INLINE_ASM
+#    if CONFIG_RUNTIME_CPUDETECT
+static int BLOCK_SIZE; //determined at runtime based on cpu features
+#    else
+#        if HAVE_AVX2_INLINE
+static const int BLOCK_SIZE = 8;
+#        elif HAVE_SSE2_INLINE
+static const int BLOCK_SIZE = 8;
+#        else
+static const int BLOCK_SIZE = 8;
+#        endif
+#    endif
+#else
+static const int BLOCK_SIZE = 8;
+#endif
+
 DECLARE_ASM_CONST(8, int, deringThreshold)= 20;
+
 #endif /* POSTPROC_POSTPROCESS_INTERNAL_H */

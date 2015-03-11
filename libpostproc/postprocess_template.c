@@ -74,17 +74,19 @@
 #else
 #   define TEMPLATE_PP_SSE2 0
 #endif
-//temporary until AVX versions are unimplemented
+//There isn't any AVX code yet, so all this does is change function names
 #ifdef TEMPLATE_PP_AVX2
 #   undef  TEMPLATE_PP_MMX
 #   define TEMPLATE_PP_MMX 1
 #   undef  TEMPLATE_PP_MMXEXT
 #   define TEMPLATE_PP_MMXEXT 1
 #   undef  TEMPLATE_PP_SSE2
+#   define TEMPLATE_PP_SSE2 1
 #   define RENAME(a) a ## _AVX2
 #else
 #   define TEMPLATE_PP_AVX2 0
 #endif
+
 #undef REAL_PAVGB
 #undef PAVGB
 #undef PMINUB
@@ -119,7 +121,7 @@
 /**
  * Check if the middle 8x8 Block in the given 8x16 block is flat
  */
-static inline int RENAME(vertClassify)(const uint8_t src[], int stride, PPContext *c){
+static inline int RENAME(vert_classify)(const uint8_t src[], int stride, PPContext *c){
     int numEq= 0, dcOk;
     src+= stride*4; // src points to begin of the 8x8 Block
     __asm__ volatile(
@@ -236,7 +238,7 @@ static inline int RENAME(vertClassify)(const uint8_t src[], int stride, PPContex
  * using the 9-Tap Filter (1,1,2,2,4,2,2,1,1)/16
  */
 #if !TEMPLATE_PP_ALTIVEC
-static inline void RENAME(doVertLowPass)(uint8_t *src, int stride, PPContext *c)
+static inline void RENAME(do_vert_low_pass)(uint8_t *src, int stride, PPContext *c)
 {
 #if TEMPLATE_PP_MMXEXT || TEMPLATE_PP_3DNOW
     src+= stride*3;
@@ -415,7 +417,7 @@ static inline void RENAME(doVertLowPass)(uint8_t *src, int stride, PPContext *c)
  * can only smooth blocks at the expected locations (it cannot smooth them if they did move)
  * MMX2 version does correct clipping C version does not
  */
-static inline void RENAME(vertX1Filter)(uint8_t *src, int stride, PPContext *co)
+static inline void RENAME(vert_X1_filter)(uint8_t *src, int stride, PPContext *co)
 {
 #if TEMPLATE_PP_MMXEXT || TEMPLATE_PP_3DNOW
     src+= stride*3;
@@ -542,7 +544,7 @@ static inline void RENAME(vertX1Filter)(uint8_t *src, int stride, PPContext *co)
 }
 
 #if !TEMPLATE_PP_ALTIVEC
-static inline void RENAME(doVertDefFilter)(uint8_t src[], int stride, PPContext *c)
+static inline void RENAME(do_vert_def_filter)(uint8_t src[], int stride, PPContext *c)
 {
 #if TEMPLATE_PP_MMXEXT || TEMPLATE_PP_3DNOW
 /*
@@ -1458,7 +1460,7 @@ DERING_CORE((%0, %1, 8)    ,(%%REGd, %1, 4),%%mm2,%%mm4,%%mm0,%%mm3,%%mm5,%%mm1,
  * lines 0-3 have been passed through the deblock / dering filters already, but can be read, too.
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  */
-static inline void RENAME(deInterlaceInterpolateLinear)(uint8_t src[], int stride)
+static inline void RENAME(deinterlace_interpolate_linear)(uint8_t src[], int stride)
 {
 #if TEMPLATE_PP_MMXEXT || TEMPLATE_PP_3DNOW
     src+= 4*stride;
@@ -1511,7 +1513,7 @@ static inline void RENAME(deInterlaceInterpolateLinear)(uint8_t src[], int strid
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 3-15 and write 7-13
  */
-static inline void RENAME(deInterlaceInterpolateCubic)(uint8_t src[], int stride)
+static inline void RENAME(deinterlace_interpolate_cubic)(uint8_t src[], int stride)
 {
 #if TEMPLATE_PP_SSE2 || TEMPLATE_PP_MMXEXT || TEMPLATE_PP_3DNOW
     src+= stride*3;
@@ -1598,7 +1600,7 @@ DEINT_CUBIC((%%REGd, %1), (%0, %1, 8) , (%%REGd, %1, 4), (%%REGc)    , (%%REGc, 
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 4-13 and write 5-11
  */
-static inline void RENAME(deInterlaceFF)(uint8_t src[], int stride, uint8_t *tmp)
+static inline void RENAME(deinterlace_FF)(uint8_t src[], int stride, uint8_t *tmp)
 {
 #if TEMPLATE_PP_MMXEXT || TEMPLATE_PP_3DNOW
     src+= stride*4;
@@ -1677,7 +1679,7 @@ DEINT_FF((%%REGd, %1), (%%REGd, %1, 2), (%0, %1, 8) , (%%REGd, %1, 4))
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 4-13 and write 4-11
  */
-static inline void RENAME(deInterlaceL5)(uint8_t src[], int stride, uint8_t *tmp, uint8_t *tmp2)
+static inline void RENAME(deinterlace_L5)(uint8_t src[], int stride, uint8_t *tmp, uint8_t *tmp2)
 {
 #if (TEMPLATE_PP_MMXEXT || TEMPLATE_PP_3DNOW) && HAVE_6REGS
     src+= stride*4;
@@ -1778,7 +1780,7 @@ DEINT_L5(%%mm1, %%mm0, (%%REGd, %1, 2), (%0, %1, 8)    , (%%REGd, %1, 4))
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  * this filter will read lines 4-13 and write 4-11
  */
-static inline void RENAME(deInterlaceBlendLinear)(uint8_t src[], int stride, uint8_t *tmp)
+static inline void RENAME(deinterlace_blend_linear)(uint8_t src[], int stride, uint8_t *tmp)
 {
 #if TEMPLATE_PP_MMXEXT || TEMPLATE_PP_3DNOW
     src+= 4*stride;
@@ -1879,7 +1881,7 @@ static inline void RENAME(deInterlaceBlendLinear)(uint8_t src[], int stride, uin
  * lines 0-3 have been passed through the deblock / dering filters already, but can be read, too.
  * lines 4-12 will be read into the deblocking filter and should be deinterlaced
  */
-static inline void RENAME(deInterlaceMedian)(uint8_t src[], int stride)
+static inline void RENAME(deinterlace_median)(uint8_t src[], int stride)
 {
 #if TEMPLATE_PP_MMX
     src+= 4*stride;
@@ -2165,7 +2167,7 @@ static inline void RENAME(transpose2)(uint8_t *dst, int dstStride, const uint8_t
 //static long test=0;
 
 #if !TEMPLATE_PP_ALTIVEC
-static inline void RENAME(tempNoiseReducer)(uint8_t *src, int stride,
+static inline void RENAME(temp_noise_reducer)(uint8_t *src, int stride,
                                     uint8_t *tempBlurred, uint32_t *tempBlurredPast, const int *maxNoise)
 {
     // to save a register (FIXME do this outside of the loops)
@@ -3091,7 +3093,7 @@ static av_always_inline void RENAME(do_a_deblock)(uint8_t *src, int step, int st
 }
 #endif //TEMPLATE_PP_MMX
 
-static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[], int dstStride, int width, int height,
+static void RENAME(post_process)(const uint8_t src[], int srcStride, uint8_t dst[], int dstStride, int width, int height,
                                 const QP_STORE_T QPs[], int QPStride, int isColor, PPContext *c);
 
 /**
@@ -3101,7 +3103,7 @@ static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[
 #undef REAL_SCALED_CPY
 #undef SCALED_CPY
 
-static inline void RENAME(blockCopy)(uint8_t dst[], int dstStride, const uint8_t src[], int srcStride,
+static inline void RENAME(block_copy)(uint8_t dst[], int dstStride, const uint8_t src[], int srcStride,
                                      int levelFix, int64_t *packedOffsetAndScale)
 {
 #if !TEMPLATE_PP_MMX || !HAVE_6REGS
@@ -3256,7 +3258,7 @@ static inline void RENAME(duplicate)(uint8_t src[], int stride)
 /**
  * Filter array of bytes (Y or U or V values)
  */
-static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[], int dstStride, int width, int height,
+static void RENAME(post_process)(const uint8_t src[], int srcStride, uint8_t dst[], int dstStride, int width, int height,
                                 const QP_STORE_T QPs[], int QPStride, int isColor, PPContext *c2)
 {
     DECLARE_ALIGNED(8, PPContext, c)= *c2; //copy to stack for faster access
@@ -3348,25 +3350,25 @@ static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[
         scale= (double)(c.ppMode.maxAllowedY - c.ppMode.minAllowedY) / (double)(white-black);
 
 #if TEMPLATE_PP_MMXEXT
-        c.packedYScale= (uint16_t)(scale*256.0 + 0.5);
-        c.packedYOffset= (((black*c.packedYScale)>>8) - c.ppMode.minAllowedY) & 0xFFFF;
+        c.packedYScale = (uint16_t)(scale*256.0 + 0.5);
+        c.packedYOffset = (((black*c.packedYScale)>>8) - c.ppMode.minAllowedY) & 0xFFFF;
 #else
-        c.packedYScale= (uint16_t)(scale*1024.0 + 0.5);
-        c.packedYOffset= (black - c.ppMode.minAllowedY) & 0xFFFF;
+        c.packedYScale = (uint16_t)(scale*1024.0 + 0.5);
+        c.packedYOffset = (black - c.ppMode.minAllowedY) & 0xFFFF;
 #endif
 
-        c.packedYOffset|= c.packedYOffset<<32;
-        c.packedYOffset|= c.packedYOffset<<16;
+        c.packedYOffset |= c.packedYOffset<<32;
+        c.packedYOffset |= c.packedYOffset<<16;
 
-        c.packedYScale|= c.packedYScale<<32;
-        c.packedYScale|= c.packedYScale<<16;
+        c.packedYScale |= c.packedYScale<<32;
+        c.packedYScale |= c.packedYScale<<16;
 
         if(mode & LEVEL_FIX)        QPCorrecture= (int)(scale*256*256 + 0.5);
         else                        QPCorrecture= 256*256;
-    }else{
-        c.packedYScale= 0x0100010001000100LL;
-        c.packedYOffset= 0;
-        QPCorrecture= 256*256;
+    } else {
+        c.packedYScale = 0x0100010001000100LL;
+        c.packedYOffset = 0;
+        QPCorrecture = 256*256;
     }
 
     /* copy & deinterlace first row of blocks */
@@ -3416,25 +3418,25 @@ static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[
 */
 #endif
 
-            RENAME(blockCopy)(dstBlock + dstStride*8, dstStride,
+            RENAME(block_copy)(dstBlock + dstStride*8, dstStride,
                               srcBlock + srcStride*8, srcStride, mode & LEVEL_FIX, &c.packedYOffset);
 
             RENAME(duplicate)(dstBlock + dstStride*8, dstStride);
 
             if(mode & LINEAR_IPOL_DEINT_FILTER)
-                RENAME(deInterlaceInterpolateLinear)(dstBlock, dstStride);
+                RENAME(deinterlace_interpolate_linear)(dstBlock, dstStride);
             else if(mode & LINEAR_BLEND_DEINT_FILTER)
-                RENAME(deInterlaceBlendLinear)(dstBlock, dstStride, c.deintTemp + x);
+                RENAME(deinterlace_blend_linear)(dstBlock, dstStride, c.deintTemp + x);
             else if(mode & MEDIAN_DEINT_FILTER)
-                RENAME(deInterlaceMedian)(dstBlock, dstStride);
+                RENAME(deinterlace_median)(dstBlock, dstStride);
             else if(mode & CUBIC_IPOL_DEINT_FILTER)
-                RENAME(deInterlaceInterpolateCubic)(dstBlock, dstStride);
+                RENAME(deinterlace_interpolate_cubic)(dstBlock, dstStride);
             else if(mode & FFMPEG_DEINT_FILTER)
-                RENAME(deInterlaceFF)(dstBlock, dstStride, c.deintTemp + x);
+                RENAME(deinterlace_FF)(dstBlock, dstStride, c.deintTemp + x);
             else if(mode & LOWPASS5_DEINT_FILTER)
-                RENAME(deInterlaceL5)(dstBlock, dstStride, c.deintTemp + x, c.deintTemp + width + x);
+                RENAME(deinterlace_L5)(dstBlock, dstStride, c.deintTemp + x, c.deintTemp + width + x);
 /*          else if(mode & CUBIC_BLEND_DEINT_FILTER)
-                RENAME(deInterlaceBlendCubic)(dstBlock, dstStride);
+                RENAME(deinterlace_blend_cubic)(dstBlock, dstStride);
 */
             dstBlock+=8;
             srcBlock+=8;
@@ -3552,36 +3554,36 @@ static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[
 */
 #endif
 
-            RENAME(blockCopy)(dstBlock + dstStride*copyAhead, dstStride,
+            RENAME(block_copy)(dstBlock + dstStride*copyAhead, dstStride,
                               srcBlock + srcStride*copyAhead, srcStride, mode & LEVEL_FIX, &c.packedYOffset);
 
             if(mode & LINEAR_IPOL_DEINT_FILTER)
-                RENAME(deInterlaceInterpolateLinear)(dstBlock, dstStride);
+                RENAME(deinterlace_interpolate_linear)(dstBlock, dstStride);
             else if(mode & LINEAR_BLEND_DEINT_FILTER)
-                RENAME(deInterlaceBlendLinear)(dstBlock, dstStride, c.deintTemp + x);
+                RENAME(deinterlace_blend_linear)(dstBlock, dstStride, c.deintTemp + x);
             else if(mode & MEDIAN_DEINT_FILTER)
-                RENAME(deInterlaceMedian)(dstBlock, dstStride);
+                RENAME(deinterlace_median)(dstBlock, dstStride);
             else if(mode & CUBIC_IPOL_DEINT_FILTER)
-                RENAME(deInterlaceInterpolateCubic)(dstBlock, dstStride);
+                RENAME(deinterlace_interpolate_cubic)(dstBlock, dstStride);
             else if(mode & FFMPEG_DEINT_FILTER)
-                RENAME(deInterlaceFF)(dstBlock, dstStride, c.deintTemp + x);
+                RENAME(deinterlace_FF)(dstBlock, dstStride, c.deintTemp + x);
             else if(mode & LOWPASS5_DEINT_FILTER)
-                RENAME(deInterlaceL5)(dstBlock, dstStride, c.deintTemp + x, c.deintTemp + width + x);
+                RENAME(deinterlace_L5)(dstBlock, dstStride, c.deintTemp + x, c.deintTemp + width + x);
 /*          else if(mode & CUBIC_BLEND_DEINT_FILTER)
-                RENAME(deInterlaceBlendCubic)(dstBlock, dstStride);
+                RENAME(deinterlaceBlendCubic)(dstBlock, dstStride);
 */
 
             /* only deblock if we have 2 blocks */
             if(y + 8 < height){
                 if(mode & V_X1_FILTER)
-                    RENAME(vertX1Filter)(dstBlock, stride, &c);
+                    RENAME(vert_X1_filter)(dstBlock, stride, &c);
                 else if(mode & V_DEBLOCK){
-                    const int t= RENAME(vertClassify)(dstBlock, stride, &c);
+                    const int t= RENAME(vert_classify)(dstBlock, stride, &c);
 
                     if(t==1)
-                        RENAME(doVertLowPass)(dstBlock, stride, &c);
+                        RENAME(do_vert_low_pass)(dstBlock, stride, &c);
                     else if(t==2)
-                        RENAME(doVertDefFilter)(dstBlock, stride, &c);
+                        RENAME(do_vert_def_filter)(dstBlock, stride, &c);
                 }else if(mode & V_A_DEBLOCK){
                     RENAME(do_a_deblock)(dstBlock, stride, 1, &c, mode);
                 }
@@ -3594,15 +3596,15 @@ static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[
             if(x - 8 >= 0){
 #if TEMPLATE_PP_MMX
                 if(mode & H_X1_FILTER)
-                        RENAME(vertX1Filter)(tempBlock1, 16, &c);
+                        RENAME(vert_X1_filter)(tempBlock1, 16, &c);
                 else if(mode & H_DEBLOCK){
 //START_TIMER
-                    const int t= RENAME(vertClassify)(tempBlock1, 16, &c);
+                    const int t= RENAME(vert_classify)(tempBlock1, 16, &c);
 //STOP_TIMER("dc & minmax")
                     if(t==1)
-                        RENAME(doVertLowPass)(tempBlock1, 16, &c);
+                        RENAME(do_vert_low_pass)(tempBlock1, 16, &c);
                     else if(t==2)
-                        RENAME(doVertDefFilter)(tempBlock1, 16, &c);
+                        RENAME(do_vert_def_filter)(tempBlock1, 16, &c);
                 }else if(mode & H_A_DEBLOCK){
                         RENAME(do_a_deblock)(tempBlock1, 16, 1, &c, mode);
                 }
@@ -3628,12 +3630,12 @@ static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[
                         transpose_8x16_char_fromPackedAlign_altivec(dstBlock - (4 + 1), tempBlock, stride);
                     }
 #else
-                    const int t= RENAME(horizClassify)(dstBlock-4, stride, &c);
+                    const int t= RENAME(horiz_classify)(dstBlock-4, stride, &c);
 
                     if(t==1)
-                        RENAME(doHorizLowPass)(dstBlock-4, stride, &c);
+                        RENAME(do_horiz_low_pass)(dstBlock-4, stride, &c);
                     else if(t==2)
-                        RENAME(doHorizDefFilter)(dstBlock-4, stride, &c);
+                        RENAME(do_horiz_def_filter)(dstBlock-4, stride, &c);
 #endif
                 }else if(mode & H_A_DEBLOCK){
                     RENAME(do_a_deblock)(dstBlock-8, 1, stride, &c, mode);
@@ -3646,7 +3648,7 @@ static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[
 
                 if(mode & TEMP_NOISE_FILTER)
                 {
-                    RENAME(tempNoiseReducer)(dstBlock-8, stride,
+                    RENAME(temp_noise_reducer)(dstBlock-8, stride,
                             c.tempBlurred[isColor] + y*dstStride + x,
                             c.tempBlurredPast[isColor] + (y>>3)*256 + (x>>3) + 256,
                             c.ppMode.maxTmpNoise);
@@ -3668,7 +3670,7 @@ static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[
         }
 
         if((mode & TEMP_NOISE_FILTER)){
-            RENAME(tempNoiseReducer)(dstBlock-8, dstStride,
+            RENAME(temp_noise_reducer)(dstBlock-8, dstStride,
                     c.tempBlurred[isColor] + y*dstStride + x,
                     c.tempBlurredPast[isColor] + (y>>3)*256 + (x>>3) + 256,
                     c.ppMode.maxTmpNoise);
@@ -3736,3 +3738,4 @@ static void RENAME(postProcess)(const uint8_t src[], int srcStride, uint8_t dst[
 #undef TEMPLATE_PP_MMXEXT
 #undef TEMPLATE_PP_3DNOW
 #undef TEMPLATE_PP_SSE2
+#undef TEMPLATE_PP_AVX2
