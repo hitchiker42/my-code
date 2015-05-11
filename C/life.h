@@ -34,6 +34,7 @@ typedef struct point {
   int y;
 } point;
 void step_world(world *w);
+world *init_world(int rows, int cols);
 //function for generating random numbers, set by application
 int life_rand(int max);
 //initialize the world by setting each point in pts as alive

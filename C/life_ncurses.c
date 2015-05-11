@@ -10,6 +10,8 @@ static int running_life;
 static struct timespec wait_time = {.tv_sec = 0, .tv_nsec = (time_t)0.5*10e9};
 static struct sigaction default_act = {.sa_handler = SIG_DFL};
 static struct sigaction cleanup_act = {.sa_handler = catch_interupt};
+int term_rows;
+int term_cols;
 //^C stops the current simulation, if no simulation is running it kills the program
 void catch_interupt(int signo){
   if(running_life){
@@ -30,6 +32,15 @@ void ncurses_init(){
   cbreak();//disable line buffering, pass ^C,^Z,etc to terminal
   //raw();//disable line buffering, don't pass ctrl chars to terminal
   noecho();//don't echo keyboard input;
+  term_rows = LINES;
+  term_cols = COLS;
+}
+static inline void* xmalloc(size_t sz){
+  void *mem = malloc(sz);
+  if(mem == NULL && sz){
+    raise(SIGSEGV);
+  }
+  return mem;
 }
 void write_grid(world *w, WINDOW *win){
   int i;
@@ -74,10 +85,16 @@ void setup_initial_conditons(world *w, WINDOW *win){
         w->grid[point_to_offset(make_point(x,y),w->cols)] = 1;
         break;
       case ' ':
-        return;//run life
+
     }
     wmove(win, y ,x);
   }
 }
+/*
+  Pointless Idea, it'd be cool to run a '###' across the grid, in such a way
+  that it moved one block at a time, or something.
+*/  
 int main(int argc, char **argv){
+  //add options later
+  
 }
