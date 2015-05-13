@@ -35,8 +35,6 @@ typedef struct world {
 } world;
 void step_world(world *w);
 world *init_world(int rows, int cols);
-//function for generating random numbers, set by application
-int life_rand(int max);
 //initialize the world by setting each point in pts as alive
 void init_world_from_points(world *w, int *x, int *y, int num_pts);
 //initialize the world by setting the grid according to a character array
@@ -46,7 +44,7 @@ void init_world_from_array(world *w, char *arr, char alive, char dead);
 void reset_world(world *w);
 #define reset_grid(w) reset_world(w);
 void randomize_grid(world *w);
-void dump_world_to_file(world *w, char *filename);
+void write_world_to_file(world *w, char *filename);
 void run_life_debug(world *w);
 /*
   Convert between x,y coordinates and memory offsets, the number of

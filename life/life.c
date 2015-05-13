@@ -1,4 +1,6 @@
+#define _GNU_SOURCE
 #include <stdlib.h>
+#include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -15,6 +17,10 @@ static inline void* xmalloc(size_t sz){
   }
   return mem;
 }
+int life_rand(int max){
+  return random() % max;
+}
+/*
 static uint32_t compute_edge(world *w, int x, int y){
   if(w->edge_rule == Edge_Dead || w->edge_rule == Edge_Grow){
     return 0;
@@ -125,26 +131,59 @@ void step_world(world *w){
       fputc(w->grid_step[i*w->rows + j] ? '#' : ' ',f);
     }
     fprintf(f,"\n");
-  } 
+  }
   fclose(f);
   if(w->edge_rule == Edge_Grow){
     //code to grow array
   }
   SWAP(w->grid, w->grid_step);
   //  dump_world_to_file(w, "dump");
-}
+}*/
 void reset_world(world *w){
   memset(w->grid, 0, w->grid_size);
   memset(w->grid_step, 0, w->grid_size);
 }
 void randomize_grid(world *w){
-  int i;
-  for(i=0;i<w->grid_size;i++){
-    if(life_rand(10) > 7){
-      w->grid[i] = 1;
+  int i,j;
+  memset(w->grid, 0, w->grid_size);
+  memset(w->grid_step, 0, w->grid_size);
+  for(i=1;i<w->rows-1;i++){
+    for(j=1;j<w->cols-1;j++){
+      if(life_rand(10) == 0){
+        w->grid[i*w->cols + j] = 1;
+      }
     }
   }
-  memset(w->grid_step, 0, w->grid_size);
+}
+int count_neighbors(world *w, int x, int y){
+  //the compiler should optimize these out
+  uint8_t *g = w->grid;
+  int cols = w->cols;
+  int neighbors =
+    g[(y-1)*cols + x-1] + g[(y-1)*cols + x] + g[(y-1)*cols + x+1] +
+    g[y*cols + x-1]     + g[y*cols + x+1] +
+    g[(y+1)*cols + x-1] + g[(y+1)*cols + x] + g[(y+1)*cols + x+1];
+  return neighbors;
+}
+void step_world(world *w){
+  int i,j;
+  for(i=1;i<w->rows-1;i++){
+    for(j=1;j<w->cols-1;j++){
+      int neighbors = count_neighbors(w, j, i);
+      //the two ifs check the cases where a cell might change state
+      if(w->grid[i*w->cols + j] == 1 &&
+         neighbors < 2 || neighbors > 3){
+         //         (neighbors < w->life_min || neighbors > w->life_max)){
+        w->grid_step[i*w->cols + j] = 0;
+      } else if (w->grid[i*w->cols + j] == 0 && neighbors == 3){
+                 //                 neighbors >= w->birth_min && neighbors <= w->birth_max){
+        w->grid_step[i*w->cols + j] = 1;
+      } else {
+        w->grid_step[i*w->cols + j] = w->grid[i*w->cols +j];
+      }
+    }
+  }
+  SWAP(w->grid, w->grid_step);
 }
 world *read_world_from_file(char *filename){
   int fd = open(filename, O_RDONLY);
@@ -200,11 +239,11 @@ void set_world_rules(world *w, int life_min, int life_max,
   w->edge_rule = edge_rule;
   return;
 }
-  
+
 world *init_world(int rows, int cols){
   world *w = xmalloc(sizeof(world));
   w->grid_size = rows * cols;
-  w->grid = xmalloc(w->grid_size);  
+  w->grid = xmalloc(w->grid_size);
   w->grid_step = xmalloc(w->grid_size);
   memset(w->grid, '\0', w->grid_size);
   memset(w->grid_step, '\0', w->grid_size);
@@ -213,21 +252,110 @@ world *init_world(int rows, int cols){
   set_world_rules(w, 2, 3, 2, 2, Edge_Dead);
   return w;
 }
-void dump_world_to_file(world *w, char *filename){
-  FILE* f = fopen(filename, "w");
-  //add code to write world parameters as a header
-  int i,j;
-  for(i=0;i<w->rows;i++){
-    for(j=0;j<w->cols;j++){
-      fputc(w->grid[i*w->rows + j] ? '#' : ' ', f);
-    }
-    fputc('\n', f);
+void write_hline(int width, FILE *f){
+  int i;
+  fputc('+', f);
+  for(i=0;i<width;i++){
+    fputc('-', f);
   }
+  fputs("+\n", f);
+} 
+void write_neighbors(world *w, char *filename){
+  FILE* f = fopen(filename, "w");
+  int i,j;
+  write_hline(w->cols, f);
+  for(i=0;i<w->rows;i++){
+    fputc('|', f);
+    for(j=0;j<w->cols;j++){
+      if(i==0 | j == 0 | i == w->rows-1 || j == w->cols -1){
+        fputc('0', f);
+        continue;
+      }
+      int neighbors = count_neighbors(w, j, i);
+      if(neighbors < 0 || neighbors > 9){
+        fprintf(stderr, "Error, impossible number of neighbors %d at (%d, %d)\n",
+                neighbors, i, j);
+        assert(neighbors < 9);
+      }
+      fputc(neighbors + 0x30, f);
+    }
+    fputs("|\n", f);
+  }
+  write_hline(w->cols, f);
   fclose(f);
 }
-      
+void write_world_to_file(world *w, char *filename){
+  FILE* f = fopen(filename, "w");
+  int i,j;
+  write_hline(w->cols, f);
+  for(i=0;i<w->rows;i++){
+    fputc('|',f);
+    for(j=0;j<w->cols;j++){
+      fputc(w->grid[i*w->rows + j] ? '1' : '0', f);
+    }
+    fputs("|\n", f);
+  }
+  write_hline(w->cols, f);
+  fclose(f);
+}
 void run_life_debug(world *w){
   while(1){
     step_world(w);
   }
 }
+#ifdef LIFE_MAIN
+void run_life_test(int rows, int cols, int steps){
+  char *filename1, *filename2;
+  int i,j,step;
+  world *w = init_world(rows, cols);
+  randomize_grid(w);
+  asprintf(&filename1, "grid_step_0");
+  asprintf(&filename2, "grid_neighbors_0");
+  write_world_to_file(w, filename1);
+  write_neighbors(w, filename2);
+  for(step=0;step < steps; step++){
+    step_world(w);
+    asprintf(&filename1, "grid_step_%d",step);
+    asprintf(&filename2, "grid_neighbors_%d", step);
+    write_world_to_file(w, filename1);
+    write_neighbors(w, filename2);
+  }
+  return;
+}
+int main(int argc, char **argv){
+  int rows = 40, cols = 40, steps = 10;
+  char *outdir = "life_output";
+  srandom(0);
+  if(argc >= 3){
+    rows = strtol(argv[1], NULL, 0);
+    cols = strtol(argv[2], NULL, 0);
+    if(argc >=4){
+      steps = strtol(argv[3], NULL, 0);
+    }
+    if(argc >= 5){
+      outdir = argv[4];
+    }
+  }
+  struct stat buf;
+  int err = stat(outdir, &buf);
+  if(err != -1){
+    if(!S_ISDIR(buf.st_mode)){
+      fprintf(stderr,"File %s exists and is not a directory\n",outdir);
+      exit(1);
+    }
+  } else {
+    if(errno != ENOENT){
+      perror("stat");
+      exit(1);
+    }    
+    mkdir(outdir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+  }
+  err = chdir(outdir);
+  if(err == -1){
+    perror("chdir");
+    exit(1);
+  }
+  run_life_test(rows, cols, steps);
+}
+    
+#endif
