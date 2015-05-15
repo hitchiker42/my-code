@@ -172,11 +172,11 @@ void step_world(world *w){
       int neighbors = count_neighbors(w, j, i);
       //the two ifs check the cases where a cell might change state
       if(w->grid[i*w->cols + j] == 1 &&
-         neighbors < 2 || neighbors > 3){
-         //         (neighbors < w->life_min || neighbors > w->life_max)){
+         //neighbors < 2 || neighbors > 3){
+         (neighbors < w->life_min || neighbors > w->life_max)){
         w->grid_step[i*w->cols + j] = 0;
-      } else if (w->grid[i*w->cols + j] == 0 && neighbors == 3){
-                 //                 neighbors >= w->birth_min && neighbors <= w->birth_max){
+      } else if (w->grid[i*w->cols + j] == 0// && neighbors == 3){
+                 && neighbors >= w->birth_min && neighbors <= w->birth_max){
         w->grid_step[i*w->cols + j] = 1;
       } else {
         w->grid_step[i*w->cols + j] = w->grid[i*w->cols +j];
@@ -249,7 +249,7 @@ world *init_world(int rows, int cols){
   memset(w->grid_step, '\0', w->grid_size);
   w->rows = rows;
   w->cols = cols;
-  set_world_rules(w, 2, 3, 2, 2, Edge_Dead);
+  set_world_rules(w, 2, 3, 3, 3, Edge_Dead);
   return w;
 }
 void write_hline(int width, FILE *f){

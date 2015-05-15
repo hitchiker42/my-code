@@ -3,16 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
+#include "util.h"
 //possible rules for neighbors for cells on the edge of the grid
 //bitmask for speed/familarity 
 enum edge_rules {
-  Edge_Alive = 0x1,//treat any cell outside the grid as alive
-  Edge_Dead = 0x2,//""                               "" dead
-  Edge_Grow = 0x4,//Treat any cell outside as dead, but if one would turn alive
-            //enlarge the grid and set it as alive
-  Edge_Wrap = 0x8,//Treat the grid as a toroid
-  Edge_Random = 0x10,//randomly set the cells outside the grid to alive or dead
-              //each iteration
+  Edge_Dead,//default, treat any cell outside the grid as dead
+  Edge_Wrap,//treat the grid as a toroid
 };
 typedef struct world {
   int rows;//rows in the active grid
@@ -30,8 +26,8 @@ typedef struct world {
   int life_max;//maximum ""                                        ""
   int birth_min;//mimumum number of neighbors alive to bring a dead cell to life
   int birth_max;//maximum number of neighbors alive to bring a dead cell to life
-
   int edge_rule;
+  void *userdata;
 } world;
 void step_world(world *w);
 world *init_world(int rows, int cols);
@@ -66,7 +62,3 @@ static inline uint32_t grid_point(world *w, point pt){
   }
   return w->grid[offset];
   }*/
-#define SWAP(x,y)                               \
-  ({__typeof(x) __temp = x;                     \
-    x = y;                                      \
-    y = __temp;})

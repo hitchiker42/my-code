@@ -9,8 +9,8 @@
 #define NANO_SECONDS(x) (long)(x * 1e9)
 #define MICRO_SECONDS(x) (long)(x * 1e6)
 void catch_interupt(int signo);
-static int running_life;
-static struct timespec wait_time = {.tv_nsec = 2e8, .tv_sec = 0};
+//static struct timespec wait_time = {.tv_nsec = 2e8, .tv_sec = 0};
+double wait_time = 0.2;
 static struct sigaction default_act = {.sa_handler = SIG_DFL};
 static struct sigaction interupt_act = {.sa_handler = catch_interupt};
 int term_rows;
@@ -18,15 +18,9 @@ int term_cols;
 //^C stops the current simulation, if no simulation is running it kills the program
 void catch_interupt(int signo){
   fprintf(stderr, "Caught signal %d", signo);
-  if(running_life){
-    fprintf(stderr, "stopping simulation");
-    running_life = 0;
-    return;
-  } else {
-    endwin();
-    sigaction(signo, &default_act, NULL);
-    raise(signo);
-  }
+  endwin();
+  sigaction(signo, &default_act, NULL);
+  raise(signo);
 }
 #define getxy(win,x,y) getyx(win,y,x)
 void ncurses_init(){
@@ -43,7 +37,7 @@ static inline void* xmalloc(size_t sz){
   }
   return mem;
 }
-void nsec_add(struct timespec *ts, long nsecs){
+/*void nsec_add(struct timespec *ts, long nsecs){
   ts->tv_nsec += nsecs;
   if(nsecs > 0){
     while(ts->tv_nsec > 1e9){
@@ -57,7 +51,7 @@ void nsec_add(struct timespec *ts, long nsecs){
     }
     ts->tv_nsec = ts->tv_nsec < 0 ? 0 : ts->tv_nsec;
   }
-}
+  }*/
 
 void draw_world(world *w, WINDOW *win){
   int i,j;
@@ -77,19 +71,11 @@ void draw_world(world *w, WINDOW *win){
 void run_life(world *w, WINDOW *win){
 
   draw_world(w, win);
-  running_life = 1;
   nodelay(win, 1);
   curs_set(0);
   struct timeval tv1,tv2;
-  while(running_life){//this could cause a delay in reacting to ^C
-    gettimeofday(&tv1, NULL);
-    int interupt = nanosleep(&wait_time, NULL);
-    /*    if(interupt == -1){
-      fprintf(stderr, "Nanosleep interupted\n");
-    } else {
-      gettimeofday(&tv2, NULL);
-      assert(tv2.tv_usec - tv1.tv_usec >= MICRO_SECONDS(0.5));
-      }*/
+  while(1){
+    double interupt = float_sleep(wait_time);
     step_world(w);
     draw_world(w, win);
     if(wgetch(win) != ERR){
@@ -131,13 +117,12 @@ void setup_initial_conditons(world *w, WINDOW *win){
         x = y = 0;
         break;
       case '+':
-        nsec_add(&wait_time, 5e7);
+        wait_time += 0.05;
         break;
       case '-':
-        nsec_add(&wait_time, -5e7);
+        wait_time -= 0.05;
         break;
       case 'q':
-        endwin();
         exit(0);
       case 'r':
         randomize_grid(w);
@@ -170,9 +155,9 @@ void setup_initial_conditons(world *w, WINDOW *win){
 */
 int main(int argc, char **argv){
   srandom(time(NULL));
-  //  run_life_debug(w);
   //add options later
   ncurses_init();
+  atexit((void(*)(void))endwin);
   sigaction(SIGTERM, &interupt_act, NULL);
   world *w = init_world(term_rows, term_cols);
   randomize_grid(w);
@@ -182,5 +167,4 @@ int main(int argc, char **argv){
     setup_initial_conditons(w, stdscr);
     run_life(w, stdscr);
   }
-  endwin();//presumably we'll never get here
 }
