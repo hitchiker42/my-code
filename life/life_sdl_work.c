@@ -16,31 +16,31 @@ jmp_buf event_loop;*/
 void run_worker_thread(life_context *c){
   //  while(atomic_read(&running_life) >= 0){//this should only happen at program termination
   while(running_life >= 0){
-    sem_wait(c->SDL_ctx->sem);
+    SDL_SemWait(c->SDL_ctx->sem);
     //I could install a signal handler for SIGUSR1 to jump to the top of this loop
     //but that seems excessive, though this way seems excessive too
     update_pixels(c);
     //    if(atomic_read(&running_life) < 1){
     if(running_life < 1){
-      sem_post(c->sem);
+      SDL_SemPost(c->sem);
       continue;
     }
     step_world(c->w);
     //    if(atomic_read(&running_life) < 1){
     if(running_life < 1){
       step_world_back(c->w);//undo the last step
-      sem_post(c->sem);
+      SDL_SemPost(c->sem);
       continue;
     }
-    sem_post(c->sem);
+    SDL_SemPost(c->sem);
   }
 }
   
 void update_pixels(life_context *c){
   world *w = c->w;
   int i,j,k,l;
-  for(i=0;i<w->rows;i++){
-    for(j=0;j<w->cols;j++){
+  for(i=0;i<(w->rows - (c->cell_height - 1));i++){
+    for(j=0;j<(w->cols - (c->cell_width -1));j++){
       uint32_t color = w->grid[i*w->cols + j] ? c->live_color : c->dead_color;
       uint32_t *cell =
         c->pixels + (i * c->width * c->cell_height) + (j * c->cell_width);
@@ -70,15 +70,15 @@ void update_pixels(life_context *c){
      event:
       handle event, may involve communicating with other thread(s);
      timeout:
-      sem_post(c->sem);//or something
-      sem_wait(w->sem);//or whatever
+      SDL_SemPost(c->sem);//or something
+      SDL_SemWait(w->sem);//or whatever
    loop
   worker
    //the order doesn't really matter
    Update pixel array for texture
    Step grid
-   sem_post(w->sem);
-   sem_wait(c->sem);
+   SDL_SemPost(w->sem);
+   SDL_SemWait(c->sem);
 
 */
 /*

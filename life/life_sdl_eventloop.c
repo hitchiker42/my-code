@@ -4,33 +4,37 @@ jmp_buf event_loop;
 uint32_t keymod_state;
 int handle_window_resize(SDL_WindowEvent *e, SDL_context *c){
   //make the screen look nice
-  SDL_RenderClear(c->renderer);
-  SDL_RenderPresent(c->renderer);
   //  if(atomic_read(&running_life)){
   if(running_life){
     //atomic_write(&running_life, 0);
     running_life = 0;
-    sem_wait(c->life_ctx->sem);
+    SDL_SemWait(c->life_ctx->sem);
     SDL_UnlockTexture(c->texture);
   }
+  clear_screen(c->renderer, (union rgba)c->life_ctx->dead_color);
   int new_width = e->data1;
   int new_height = e->data2;
   //clear the winow (make it white)
   c->life_ctx->width = c->width = new_width;
   c->life_ctx->height = c->height = new_height;
-  resize_world(c->w, new_width, new_height);
+  resize_world(c->w, new_width/c->life_ctx->cell_width,
+               new_height/c->life_ctx->cell_height);
   randomize_grid(c->w);
   /*
     calling SDL_RenderClear here would allow the existing renderer to
     continue working, but at the same size
   */
   //SDL_RenderClear(c->renderer);
-  //this may be a bit drastic/unecessary, but maybe not
+  //this may be a bit drastic/unecessary, but maybe not (I'm still not sure)
   SDL_DestroyTexture(c->texture);
   SDL_DestroyRenderer(c->renderer);
   c->renderer = SDL_CreateRenderer(c->window, -1, 0);
+  clear_screen(c->renderer, (union rgba)c->life_ctx->dead_color);
+  SDL_SetRenderDrawColor(c->renderer, expand_rgba(c->life_ctx->dead_color));
   c->texture = SDL_CreateTexture(c->renderer, SDL_PIXELFORMAT_ABGR8888,
                                  SDL_TEXTUREACCESS_STREAMING, c->width, c->height);
+  SDL_RenderClear(c->renderer);
+  SDL_RenderPresent(c->renderer);
   longjmp(event_loop, 1);
 }
 int handle_window_event(SDL_WindowEvent *e, SDL_context *c){
@@ -55,15 +59,35 @@ int handle_keyboard_event(SDL_KeyboardEvent *e, SDL_context *c){
   if(key == '+' || key == '-' ||
      (key == '=' && get_keymod_state() & keymod_shift)){
     if(key == '+' || key == '='){
-      c->delay += 100;
+      c->delay += 50;
     } else if (key == '-'){
-      c->delay = MIN(c->delay - 100, 0);
+      int delay = c->delay;
+      c->delay = MAX(c->delay - 50, 0);
+    }
+    return 0;
+  }
+  if(key == 'c'){
+    int index = 0;
+    char num[7] = {0};//6 digit hex code + trailing null
+    while(index < 6){
+      SDL_WaitEvent((SDL_Event*)e);
+      if(e->type == SDL_KEYUP){
+        if(e->keysym.sym == '\x1B'){//ESC
+          return 0;
+        }
+        num[index++] = e->keysym.sym;
+      }
+    }
+    char *endptr;
+    uint32_t color = strtoul(num, &endptr, 16);
+    if(*endptr == '\0' && color <= 0xffffffUL){
+      c->life_ctx->live_color = color;
     }
     return 0;
   }
   //any keypress stops the current simulation
   if(/*atomic_read(&*/running_life > 0){
-    atomic_write(&running_life, 1);
+    /*atomic_write(&*/running_life = 1;
     return 1;
   }
   switch(e->keysym.sym){
@@ -123,35 +147,52 @@ void __attribute__((noreturn)) run_life(SDL_context *c){
   draw_world(c);
   step_world(c->w);
   while(running_life){
-    //update pixels in worker thread    
+    //update pixels in worker thread
     int lock = SDL_LockTexture(c->texture, NULL, (void**)&pixels, &stride);
     if(lock < 0){
       longjmp(event_loop, lock);
     } else {
       c->life_ctx->pixels = pixels;
     }
-    sem_post(c->sem);//tell worker thread to...work
+    SDL_SemPost(c->sem);//tell worker thread to...work
     //wait, other thread computes and renders next frame in the mean time
     ticks1 = SDL_GetTicks();//time since SDL started
-    if(SDL_WaitEventTimeout(&e, c->delay)){
+    /*    if(SDL_WaitEventTimeout(&e, c->delay)){
       int retval = sdl_handle_event(&e, c);
       if(retval > 0){
-        while(SDL_PollEvent(&e) && retval >= 0){
-          retval = sdl_handle_event(&e, c);
-        }
-        //        atomic_write(&running_life, 0);
+        while(SDL_PollEvent(&e) && sdl_handle_event(&e, c) > 0);
         running_life = 0;
-        sem_wait(c->life_ctx->sem);
+        SDL_SemWait(c->life_ctx->sem);
         SDL_UnlockTexture(c->texture);
         longjmp(event_loop, retval);
       } else {
+        //make sure we wait at least c->delay ms
         ticks2 = SDL_GetTicks();
         if((ticks1 + c->delay) > ticks2){
           SDL_Delay((ticks1 + c->delay) - ticks2);
         }
       }
-    }
-    sem_wait(c->life_ctx->sem);//make sure the worker thread is done
+      }*/
+    //This is basically a busy wait, but it increases responciveness
+    //to events, and the delay between frames shouldn't be very long anyway
+    do {//insure we always check for events, even if delay == 0
+      if(SDL_PollEvent(&e)){
+        int retval = sdl_handle_event(&e, c);
+        if(retval > 0){
+          if(SDL_PollEvent(&e)){
+            sdl_handle_event(&e, c);
+          }
+          running_life = 0;
+          SDL_SemWait(c->life_ctx->sem);
+          SDL_UnlockTexture(c->texture);
+          longjmp(event_loop, retval);
+        }
+      } else {
+        SDL_Delay(0);//basically the same as a pause in a spin/wait loop
+      }
+    } while (SDL_GetTicks() - ticks1 < c->delay);
+    
+    SDL_SemWait(c->life_ctx->sem);//make sure the worker thread is done
     SDL_UnlockTexture(c->texture);
     SDL_RenderCopy(c->renderer, c->texture, NULL, NULL);
     SDL_RenderPresent(c->renderer);
@@ -174,7 +215,10 @@ void run_event_loop(SDL_context *c){
   SDL_SetEventFilter(event_filter, NULL);
   while(1){
     if(jmp_retval = setjmp(event_loop)){
-      fprintf(stderr, "Caught longjmp with value %d\n",jmp_retval);
+      if(jmp_retval < 0){
+        fprintf(stderr,"Error, caught longjmp with value %d, exiting\n", jmp_retval);
+        exit(1);
+      }
     }
     SDL_WaitEvent(&e);
     sdl_handle_event(&e, c);

@@ -3,17 +3,21 @@
 #include <stdint.h>
 #include <SDL2/SDL.h> //includes all other sdl headers
 union rgba {
+  uint32_t pixel;
+  SDL_Color sdl;//literally the same thing as the struct below
   struct {
     uint8_t r;
     uint8_t g;
     uint8_t b;
     uint8_t a;
-  } rgba;
-  uint32_t pixel;
-};
+  };
+} rgba_pixel;
 #define make_rgb(r,g,b) make_rgba(r,g,b,0xff)
+//assume little endian
+#define expand_rgba(rgba) ((rgba << 24)&0xff), ((rgba << 16)&0xff),     \
+    ((rgba << 8)&0xff), ((rgba)&0xff)
 static inline uint32_t make_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a){
-  union rgba temp = {.rgba = {.r=r, .g=g, .b=b, .a=a}};
+  union rgba temp = {.r=r, .g=g, .b=b, .a=a};
   return temp.pixel;
 }
 static inline uint8_t *IYUV_getY(uint8_t *p, int w, int h){
@@ -53,35 +57,7 @@ static const int keyboard_keysym_mask   = 0x00fff;
 #define get_key_modifers(key) (key & keyboard_modifer_mask)
 extern uint32_t keymod_state;//needs to be declared by the application
 //this should probaly go in a seperate file
-static int handle_keymod_event(SDL_KeyboardEvent *e){
-  uint32_t mod = 0;
-  switch(e->keysym.sym){
-    case SDLK_LCTRL:
-      mod = keymod_lctrl; break;
-    case SDLK_RCTRL:
-      mod = keymod_rctrl; break;
-    case SDLK_LSHIFT:
-      mod = keymod_lshift; break;
-    case SDLK_RSHIFT:
-      mod = keymod_rshift; break;
-    case SDLK_LALT:
-      mod = keymod_lalt; break;
-    case SDLK_RALT:
-      mod = keymod_ralt; break;
-    case SDLK_LGUI:
-      mod = keymod_lsuper; break;
-    case SDLK_RGUI:
-      mod = keymod_rsuper; break;
-    default:
-      return 0;//not a modifier key
-  }
-  if(e->type == SDL_KEYDOWN){
-    keymod_state |= mod;
-  } else {
-    keymod_state &= (~mod);
-  }
-  return 1;
-}
+int handle_keymod_event(SDL_KeyboardEvent *e);
 static uint32_t get_keymod_state(){
   return keymod_state;
 }
@@ -91,21 +67,15 @@ static uint32_t get_keymod_state(){
 #define get_keymod_alt_state() (get_keymod_state() & keymod_alt)
 #define get_keymod_super_state() (get_keymod_state() & keymod_super)
 
-static int
+int
 SDL_CreateWindowRendererAndTexture(int w, int h, uint32_t window_flags,
                                    uint32_t texture_format,
                                    uint32_t texture_access,
                                    SDL_Window **window, SDL_Renderer **renderer,
-                                   SDL_Texture **texture){
-  int err = SDL_CreateWindowAndRenderer(w, h, window_flags, window, renderer);
-  if(err == -1){
-    return -1;
-  }
-  *texture = SDL_CreateTexture(*renderer, texture_format, texture_access, w, h);
-  if(*texture == NULL){
-    return -2;
-  }
-  return 0;
+                                   SDL_Texture **texture);
+static void clear_screen(SDL_Renderer *renderer, union rgba rgba){
+  SDL_SetRenderDrawColor(renderer, rgba.a, rgba.g, rgba.b, rgba.a);
+  SDL_RenderClear(renderer);
+  SDL_RenderPresent(renderer);
 }
-           
 #endif

@@ -3,8 +3,6 @@
 #include "life.h"
 #include "sdl_util.h"
 #include <setjmp.h>
-#include <pthread.h>
-#include <semaphore.h>
 
 extern jmp_buf event_loop;
 //atomic flag indicating if a simulation is running
@@ -21,11 +19,10 @@ typedef struct SDL_context {
   uint32_t live_color;
   uint32_t dead_color;*/
   struct life_context *life_ctx;
-  sem_t *sem;
-  pthread_t id;
+  SDL_sem *sem;
+  SDL_threadID id;
   world *w;//Soley for convience
   uint32_t delay;
-  int texture_locked;
 } SDL_context;
 //holds state for the worker thread(s)
 typedef struct life_context {
@@ -41,8 +38,8 @@ typedef struct life_context {
   int err;//set if an error is encountered during processing
   world *w;
   SDL_context *SDL_ctx;
-  sem_t *sem;
-  pthread_t id;
+  SDL_sem *sem;
+  SDL_threadID id;
 } life_context;
 typedef SDL_Event SDL_MouseEvent;
 #define atomic_read(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
