@@ -1,96 +1,60 @@
-#include "life.h"
-#include "sdl_util.h"
-typedef struct SDL_context {
-  SDL_Texture *texture;
-  SDL_Renderer *renderer;
-  SDL_Window *window;
-  int width;
-  int height;
-  int cell_width;
-  int cell_height;
-  uint32_t live_color;
-  uint32_t dead_color;
-  int delay;
-} SDL_context;
-int handle_window_event(SDL_WindowEvent *e){
-  switch(e->event){
-    case SDL_WINDOWEVENT_CLOSE:
-      exit(0);
-    default:
-      return 0;
-  }
+#include "life_sdl.h"
+volatile int8_t running_life = 0;
+static void end_life(void){
+  running_life = -1;
 }
-int sdl_handle_event(SDL_Event *e){
-  switch(e->type){
-    case SDL_WINDOWEVENT:
-      return handle_window_event((SDL_WindowEvent*)e);
-    default:
-      return 0;
-  }
-}
-
-//TODO: figure out the best way to pass a cell size parameter
-int draw_world(world *w, SDL_context *c){
-  int i,j,k,l;
-  //assume rgba pixels for now
-  uint32_t *pixels;
-  int stride;
-  int lock = SDL_LockTexture(c->texture, NULL, (void**)&pixels, &stride);
-  if(lock == -1){
-    return -1;//couldn't lock texture
-  }
-  for(i=0;i<w->rows;i++){
-    for(j=0;j<w->cols;j++){
-      uint32_t color = w->grid[i*w->cols + j] ? c->live_color : c->dead_color;
-      uint32_t *cell = (pixels+(i * c->width * c->cell_height) + (j * c->cell_width));
-      //not super efficent, but I can't think of another way to do this
-      for(k=0;k<c->cell_height;k++){
-        for(l=0;l<c->cell_width;l++){
-          cell[k*c->cell_width + l] = color;
-        }
-      }
-    }
-  }
-  SDL_UnlockTexture(c->texture);
-  SDL_RenderCopy(c->renderer, c->texture, NULL, NULL);
-  SDL_RenderPresent(c->renderer);
-}
-int run_life(world *w, SDL_context *c){
-  SDL_Event e;
-  while(1){
-    if(draw_world(w,c) == -1){
-      return -1;
-    }
-    //If no events are posted this acts the same as SDL_Delay(c->delay);
-    if(SDL_WaitEventTimeout(&e, c->delay)){
-      int retval = sdl_handle_event(&e);
-      if(retval != 0){
-        return retval;
-      }
-    }
-    //potentially wait more here if an event happened?
-    step_world(w);
-  }
-  return 0;//never get here (for now);
-}
-
+/*
+  Features:
+   Run multiple steps of the simulation between frames
+   set colors (preferably by user input of hex values)
+   Interactivly manipulate the grid
+  Options:
+    set initial delay
+    set cell size
+    set window size
+    set initial colors
+    set inital grid
+*/
 int main(int argc, char **argv){
-  SDL_context c;
+  //process options
+  SDL_context c = {0};
+  life_context lc = {0};
+  pthread_attr_t attr;
+  //init structs
+  c.life_ctx = &lc;
+  lc.SDL_ctx = &c;
   c.width = c.height = 0xff;
+  lc.width = lc.height = 0xff;
+  lc.cell_height = lc.cell_width = 1;
+  lc.w = init_world(lc.width/lc.cell_width, lc.height/lc.cell_height);
+  c.w = lc.w;
+  lc.live_color = make_rgb(0,0,0xff);//blue
+  lc.dead_color = 0xffffffff;//white
+  //create worker thread/ init semaphores
+  pthread_attr_init(&attr);
+  pthread_attr_setdetachstate(&attr, 1);
+  lc.sem = malloc(sizeof(sem_t));
+  c.sem = malloc(sizeof(sem_t));
+  sem_init(lc.sem, 0, 0);
+  sem_init(c.sem, 0, 0);
+  pthread_create(&lc.id, &attr, (void*(*)(void*))run_worker_thread, &lc);
+  //init SDL
   SDL_Init(SDL_INIT_VIDEO);
-  SDL_CreateWindowAndRenderer(c.width, c.height, 0, &c.window, &c.renderer);
+  atexit(SDL_Quit);
+  atexit(end_life);
+  SDL_CreateWindowAndRenderer(c.width, c.height,
+                              SDL_WINDOW_INPUT_FOCUS | SDL_WINDOW_RESIZABLE,
+                              &c.window, &c.renderer);
+  SDL_SetWindowTitle(c.window, "The Game of Life SDL");
   SDL_SetRenderDrawColor(c.renderer, 0xff, 0xff, 0xff, 0xff);//white
   SDL_RenderClear(c.renderer);
   SDL_RenderPresent(c.renderer);
   SDL_Delay(1000);
   c.texture = SDL_CreateTexture(c.renderer, SDL_PIXELFORMAT_ABGR8888,
-                                SDL_TEXTUREACCESS_STREAMING, 0xff, 0xff);
-  c.cell_height = c.cell_width = 1;
-  c.live_color = make_rgb(0,0,0xff);//blue
-  c.dead_color = 0xffffffff;
+                                SDL_TEXTUREACCESS_STREAMING, c.width, c.height);
   c.delay = 100;
-  world *w = init_world(c.width/c.cell_width, c.height/c.cell_height);
-  randomize_grid(w);
-  //this is a bit cheating
-  run_life(w, &c);
+  randomize_grid(c.w);//should this get called from the other thread?
+  draw_world(&c);
+  run_event_loop(&c);
+  return 0;//we never get here
 }

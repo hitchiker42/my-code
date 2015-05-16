@@ -30,6 +30,9 @@ typedef struct world {
   void *userdata;
 } world;
 void step_world(world *w);
+//step back one iteration, only works once, and only if the world hasn't
+//been modified by the last call to step_world. Akin to unread_char
+void step_world_back(world *w);
 world *init_world(int rows, int cols);
 //initialize the world by setting each point in pts as alive
 void init_world_from_points(world *w, int *x, int *y, int num_pts);
@@ -38,6 +41,8 @@ void init_world_from_points(world *w, int *x, int *y, int num_pts);
 //(ex ('1','0'),('#',' '),etc...), default to 1,0
 void init_world_from_array(world *w, char *arr, char alive, char dead);
 void reset_world(world *w);
+//destroys the current grid
+void resize_world(world *w, int width, int height);
 #define reset_grid(w) reset_world(w);
 void randomize_grid(world *w);
 void write_world_to_file(world *w, char *filename);

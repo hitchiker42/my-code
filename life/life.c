@@ -155,6 +155,16 @@ void randomize_grid(world *w){
     }
   }
 }
+void resize_world(world *w, int width, int height){
+  w->cols = width;
+  w->rows = height;
+  w->grid = realloc(w->grid, width*height);
+  w->grid_step = realloc(w->grid_step, width*height);
+  memset(w->grid, '\0', width*height);
+  memset(w->grid_step, '\0', width*height);
+  w->grid_size = width*height;
+  return;
+}
 int count_neighbors(world *w, int x, int y){
   //the compiler should optimize these out
   uint8_t *g = w->grid;
@@ -183,6 +193,10 @@ void step_world(world *w){
       }
     }
   }
+  SWAP(w->grid, w->grid_step);
+}
+void step_world_back(world *w){
+  //just swap the old grid back
   SWAP(w->grid, w->grid_step);
 }
 world *read_world_from_file(char *filename){

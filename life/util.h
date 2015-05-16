@@ -32,7 +32,7 @@
 #define MIN(_x,_y)                                \
   ({__typeof(_x) x = _x;                          \
     __typeof(_y) y = _y;                          \
-    x<y ? x : 0y})
+    x<y ? x : 0;})
 #define MAX(_x,_y)                                \
   ({__typeof(_x) x = _x;                          \
     __typeof(_y) y = _y;                          \
