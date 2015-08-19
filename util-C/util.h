@@ -19,8 +19,11 @@
 #define PAGE_SIZE 4096
 #endif
 #endif
-//define some useful macros if we're not in scilisp
-#ifndef _SL_C_MACROS_
+/*
+  Macros/Functions/Data Structures which aren't needed in scilisp.
+*/
+#ifndef _SCILISP_
+/* Macros*/
 #define SWAP(x,y)                               \
   ({__typeof(x) __temp = x;                     \
     x = y;                                      \
@@ -32,7 +35,7 @@
 #define MIN(_x,_y)                                \
   ({__typeof(_x) x = _x;                          \
     __typeof(_y) y = _y;                          \
-    x<y ? x : 0y})
+    x<y ? x : 0})
 #define MAX(_x,_y)                                \
   ({__typeof(_x) x = _x;                          \
     __typeof(_y) y = _y;                          \
@@ -41,7 +44,6 @@
 #define NEXT_POW_OF_2(num)                                \
   ({int leading_zeros = __builtin_clzl(num);              \
     (1UL << (64 - leading_zeros));})
-
 //these 3 macros should work the same on floating point numbers
 #define SIGN(x) ((x) < 0)
 #define NEG(x) (-(x))
@@ -52,61 +54,65 @@
 #define SIGNBIT(x)                              \
   ({__typeof(x) tmp = x;                        \
     int shift = (sizeof(x) * CHAR_BIT)-1;       \
-  (x & (1 << shift - 1))>>shift;})
-
+    (x & (1 << shift - 1))>>shift;})
 #define BITNEG(x) (~(x)+1)
-
 #define BITABS(x) (SIGNBIT(x) ? BITNEG(x) : x)
-#endif
+#define DOWNCASE_ASCII(c) (c > 0x40 && c < 0x5B ? c | 0x20 : c)
+#define UPCASE_ASCII(c) (c > 0x60 && c < 0x7B ? c & (~0x20) : c)
+#define CHAR_TO_NUMBER(c) (assert(c >= 0x30 && c <= 0x39), c - 0x30)
+/* Data Structures */
+//don't use cons and don't typedef to avoid poluting the user namespace
+#define NIL NULL
+struct _cons {
+  //this is a rough attempt to provide a generic type, it should be enough
+  //for most cases, obviously the user needs to know what type the values
+  //actually are, since there's no tag field
+  union {
+    void *car;
+    long car_int;
+    double car_double;
+  };
+  union {
+    void *cdr;
+    long cdr_int;
+    double cdr_double;
+  };
+}
+#define XCAR(ls) (ls->car)
+#define XCDR(ls) (ls->cdr)
+#define XCAR_INT(ls) (ls->car_int)
+#define XCDR_INT(ls) (ls->cdr_int)
+#define XCAR_DOUBLE(ls) (ls->car_double)
+#define XCDR_DOUBLE(ls) (ls->cdr_double)
+#endif /*!_SCILISP_*/
+#define get_access_mode(mode) (mode & O_ACCMODE)    
 /*
   Given a file access mode, of the type accepted by open return a string
   representing the access mode that can be passed to fopen.
 */
 __attribute__((const)) char *filemode_bits_to_string(int mode);
-/*
-  Various functions that act on files take a void * as an argument and
-  an integer specifiying what that argument is.
-
-  For now these funcitons can take either a file name or a file
-  descriptor as an argument. The integer should be 0 for a filname
-  and 1 for a file descriptor
-*/
 off_t file_len_by_fd(int fd);
 off_t file_len_by_name(const char *filename);
-off_t FILE_len(FILE *file);
-#define file_len(x)                                                     \
-  ({ __typeof (x) arg = (x);                                            \
-    off_t retval = 0;                                                   \
-    if(__builtin_types_compatible_p(typeof(x), int) ||                  \
-       __builtin_types_compatible_p(typeof(x), long)){                  \
-      retval = file_len_by_fd((long)arg);                               \
-    } else if (__builtin_types_compatible_p(typeof(x), char*) ||        \
-               __builtin_types_compatible_p(typeof(x), uint8_t *)){     \
-      retval = file_len_by_name(arg, 0);                                \
-    } else if (__builtin_types_compatible_p(typeof(x), FILE*)){         \
-      retval = FILE_len(arg);                                           \
-    } else {                                                            \
-      abort();                                                          \
-    }                                                                   \
-    retval;})
+off_t file_len_by_FILE(FILE *file);
+int regular_filep_FILE(FILE* file);
+int regular_filep_filename(char *filename);
+int regular_filep_fd(long fd);
 /*
-  return 1 if the file is a regular file
+  TODO: wrap this in an #if (defined _ISOC11_SOURCE) 
+  and define alternative versions for older C versions
 */
-int __regular_filep(void *arg, int is_fd);
-#define regular_filep(x)                                                \
-  ({ __typeof (x) arg = (x);                                            \
-    int retval = 0;                                                     \
-    if(__builtin_types_compatible_p(typeof(x), int) ||                  \
-       __builtin_types_compatible_p(typeof(x), long)){                  \
-      long _fd = (long)arg;                                             \
-      retval = __regular_filep(((void*)_fd), 1);                        \
-    } else if (__builtin_types_compatible_p(typeof(x), char*) ||        \
-               __builtin_types_compatible_p(typeof(x), uint8_t *)){     \
-      retval = __regular_filep((void*)(long)arg,0);                     \
-    } else {                                                            \
-      abort();                                                          \
-    }                                                                   \
-    retval;})
+#define file_len(x)                             \
+  _Generic((x),                                 \
+           long : file_len_by_fd,               \
+           int : file_len_by_fd,                       \
+           FILE* : file_len_by_FILE,                    \
+           char* : file_len_by_name)(x)
+#define regular_filep(x)                                \
+  _Generic((x),                                         \
+           long : regular_filep_fd,                     \
+           int : regular_filep_fd,                     \
+           FILE* : regular_filep_FILE,                  \
+           char* : regular_filep_filename)(x)
 //mmap the file given by fd, return a struct contanintg a pointer
 //to the maping and the length of the mapping, if shared is
 //nonzero the mapping is shared, otherwise it is private
@@ -120,6 +126,16 @@ uint32_t memspn(const uint8_t *buf, uint32_t len,
                 const uint8_t *accept, uint32_t len2);
 uint32_t memcspn(const uint8_t *buf, uint32_t len,
                  const uint8_t *reject, uint32_t len2);
+/*
+  These do the same thing as strspn and friends, but expect a prepopulated
+  table, rather than creating a table each time.
+*/
+uint32_t strspn_table(const uint8_t *str, const uint8_t accept[256]);
+uint32_t strcspn_table(const uint8_t *str, const uint8_t reject[256]);
+uint32_t memspn_table(const uint8_t *buf, uint32_t len,
+                      const uint8_t accept[256]);
+uint32_t memcspn_table(const uint8_t *buf, uint32_t len, 
+                       const uint8_t reject[256]);
 /*
   convert a number of seconds in floating point format to a timespec
 */
@@ -138,6 +154,16 @@ double float_sleep(double sleep_time);
   sleep for at least sleep_time seconds even if interupted.
 */
 void float_sleep_full(double sleep_time);
-/* I was going to write a byte array version of strstr but 
+/* I was going to write a byte array version of strstr but
    it already exists (memmem, which is a gnu extension) */
+/*
+  Functionally identical to asprintf, but uses alloca to allocate
+  memory on the stack instead of using malloc.
+ */
+#define asprintf_alloca(fmt, args...)           \
+  ({size_t sz = sprintf(NULL, fmt, 0, ##args);  \
+    char *str = alloca(sz);                     \
+    snprintf(str, sz, fmt, ##args);             \
+    str;})
+
 #endif

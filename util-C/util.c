@@ -6,9 +6,12 @@
 #include <sys/types.h>
 #include <assert.h>
 #include <errno.h>
-
+#ifndef DEBUG_PRINTF
+#define DEBUG_PRINTF(fmt,args...)               \
+  fprintf(stderr,fmt,##args)
+#endif
 char * __attribute__((const)) filemode_bits_to_string(int mode){
-  if(mode & O_RDWR){
+  if(get_access_mode(mode) == O_RDWR){
     if(mode & O_TRUNC){
       return "w+";
     } else if(mode & O_APPEND){
@@ -16,13 +19,13 @@ char * __attribute__((const)) filemode_bits_to_string(int mode){
     } else {
       return "r+";
     }
-  } else if(mode & O_WRONLY){
+  } else if(get_access_mode(mode) == O_WRONLY){
     if(mode & O_APPEND){
       return "a";
     } else {
       return "w";
     }
-  } else if(mode & O_RDONLY){
+  } else if(get_access_mode(mode) == O_RDONLY){
     return "r";
   } else {
     return NULL;
@@ -30,16 +33,19 @@ char * __attribute__((const)) filemode_bits_to_string(int mode){
 }
 
 off_t file_len_by_fd(int fd){
+  DEBUG_PRINTF("Calling file_len_by_fd\n");
   struct stat buf;
   fstat(fd, &buf);
   return buf.st_size;
 }
 off_t file_len_by_name(const char *filename){
+  DEBUG_PRINTF("Calling file_len_by_name\n");
   struct stat buf;
   stat(filename, &buf);
   return buf.st_size;
 }
-off_t FILE_len(FILE *file){
+off_t file_len_by_FILE(FILE *file){
+  DEBUG_PRINTF("Calling file_len_by_FILE\n");
   off_t pos = ftello(file);//to get back to where we awere
   if(fseeko(file, 0, SEEK_END) == (off_t)-1){
     return (off_t)-1;
@@ -48,7 +54,22 @@ off_t FILE_len(FILE *file){
   fseeko(file, pos, SEEK_SET);
   return end;
 }
-  
+int regular_filep_fd(long fd){
+  DEBUG_PRINTF("Calling regular_filep_fd\n");
+  struct stat buf;
+  fstat(fd, &buf);
+  return S_ISREG(buf.st_mode);
+}
+int regular_filep_filename(char *filename){
+  DEBUG_PRINTF("Calling regular_filep_filename\n");
+  struct stat buf;
+  stat((char *)filename, &buf);
+  return S_ISREG(buf.st_mode);
+}
+int regular_filep_FILE(FILE* file){
+  DEBUG_PRINTF("Calling regular_filep_FILE\n");
+  return regular_filep_fd(fileno(file));
+}
 int __regular_filep(void *arg, int is_fd){
   struct stat buf;
   if(is_fd){
@@ -80,20 +101,75 @@ void *mmap_anon(size_t sz){
   }
   return mem;
 }
+uint32_t strspn_table(const uint8_t *str, const uint8_t accept[256]){
+  int i=0;
+  
+  //accept['\0'] == 0)
+  //We assume (or we could force by uncommenting above) that '\0' is not
+  //in the accept set, this means we'll always return the length of the
+  //string if all characters are in the accept set
+  while(1){
+    if(!accept[str[i]]){return i;}
+    if(!accept[str[i+1]]){return i+1;}
+    if(!accept[str[i+2]]){return i+2;}
+    if(!accept[str[i+3]]){return i+3;}
+    i+=4;
+  }
+}
+uint32_t strcspn_table(const uint8_t *str, const uint8_t reject[256]){
+  int i=0;
+  reject['\0'] == 1;//force the null byte to be in the reject set
+  while(1){
+    if(reject[str[i]]){return i;}
+    if(reject[str[i+1]]){return i+1;}
+    if(reject[str[i+2]]){return i+2;}
+    if(reject[str[i+3]]){return i+3;}
+    i+=4;
+  }
+}
+uint32_t memspn_table(const uint8_t *str, uint32_t len,
+                      const uint8_t accept[256]){
+  int i=0;
+  //this is for speed, but I'm not sure how much it's worth it
+  while(i+4 < len){
+    if(!accept[str[i]]){return i;}
+    if(!accept[str[i+1]]){return i+1;}
+    if(!accept[str[i+2]]){return i+2;}
+    if(!accept[str[i+3]]){return i+3;}
+    i+=4;
+  }
+  switch(len-i){
+    case 3: if(!accept[str[i]]){return i;} i++;
+    case 2: if(!accept[str[i]]){return i;} i++;
+    case 1: if(!accept[str[i]]){return i;}
+  }
+  return len;
+}
+uint32_t memcspn_table(const uint8_t *str, uint32_t len,
+                       const uint8_t reject[256]){
+  int i=0;
+  while(1+4 < len){
+    if(reject[str[i]]){return i;}
+    if(reject[str[i+1]]){return i+1;}
+    if(reject[str[i+2]]){return i+2;}
+    if(reject[str[i+3]]){return i+3;}
+    i+=4;
+  }
+  switch(len-i){
+    case 3: if(reject[str[i]]){return i;} i++;
+    case 2: if(reject[str[i]]){return i;} i++;
+    case 1: if(reject[str[i]]){return i;}
+  }
+  return len;
+}
 uint32_t memspn(const uint8_t *buf, uint32_t len,
                 const uint8_t *accept, uint32_t len2){
-  //creating an array of all byte values is by far the easiest way to do this 
   uint8_t bytes[256] = {0};
   int i;
   for(i = 0; i < len2; i++){
     bytes[accept[i]] = 1;
   }
-  for(i = 0; i < len; i++){
-    if(!bytes[buf[i]]){
-      return i;
-    }
-  }
-  return i;
+  return memspn_table(buf, len, bytes);
 }
 uint32_t memcspn(const uint8_t *buf, uint32_t len,
                  const uint8_t *reject, uint32_t len2){
@@ -102,12 +178,7 @@ uint32_t memcspn(const uint8_t *buf, uint32_t len,
   for(i = 0; i < len2; i++){
     bytes[reject[i]] = 1;
   }
-  for(i = 0; i < len; i++){
-    if(bytes[buf[i]]){
-      return i;
-    }
-  }
-  return i;
+  return memcspn_table(buf, len, bytes);
 }
 struct timespec float_to_timespec(double t){
   struct timespec ts;
@@ -151,9 +222,7 @@ void float_sleep_full(double sleep_time){
     assert(errno != EINVAL);
   } while (err == -1);
   return;
-} 
-  
-  
+}    
 //mremap was taken, thus the stupid name, also this assumes
 //it's resizing an anonymous map, since that's the only thing
 //that makes sense
