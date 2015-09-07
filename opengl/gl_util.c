@@ -17,6 +17,7 @@ GLFWwindow* init_gl_context(int w, int h, const char* name){
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, 1);
   GLFWwindow *win = glfwCreateWindow(w, h, name, NULL, NULL);
   if(!win){
     fprintf(stderr, "Error creating window\n");
@@ -24,6 +25,7 @@ GLFWwindow* init_gl_context(int w, int h, const char* name){
   }
   glfwMakeContextCurrent(win);
   //  glfwSwapInterval(1);
+  glewExperimental = 1;
   GLenum err = glewInit();
   if(err != GLEW_OK){
     fprintf(stderr, "Error, glew init failure\n");
@@ -35,42 +37,43 @@ GLFWwindow* init_gl_context(int w, int h, const char* name){
   }
   return win;
 }
+static inline GLuint compile_shader(GLenum type, const char *source, int len){  
+  GLint status;
+  GLuint shader = glCreateShader(type);
+  glShaderSource(shader, 1, &source, &len);
+  glCompileShader(shader);
+  glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+  if(!status){
+    GLint log_size;
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &log_size);
+    char *buf = alloca(log_size*sizeof(char));
+    glGetShaderInfoLog(shader, log_size, NULL, buf);
+    fprintf(stderr, "Error when compiling shader.\nShader info log:\n%s",buf);
+    exit(EXIT_FAILURE);
+  }
+  return shader;
+}
 GLuint create_shader_program(const char *vertex_shader_source,
                              const char *fragment_shader_source){
   DEBUG_PRINTF("creating shaders\n");
   
-  GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);
-  GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);  
+  GLuint vertex_shader = compile_shader(GL_VERTEX_SHADER,
+                                        vertex_shader_source, 0);
+  GLuint fragment_shader = compile_shader(GL_FRAGMENT_SHADER,
+                                          fragment_shader_source, 0);
+  GLuint program = glCreateProgram();
 
-  DEBUG_PRINTF("setting shader sources\n");
-  
-  glShaderSource(vertex_shader, 1, (const char**)&vertex_shader_source, NULL);
-  glShaderSource(fragment_shader, 1, (const char**)&fragment_shader_source, NULL);
+  glAttachShader(program, vertex_shader);
+  glAttachShader(program, fragment_shader);
 
-  DEBUG_PRINTF("set shader sources\n");
-  
-  glCompileShader(vertex_shader);
-  glCompileShader(fragment_shader);
+  glLinkProgram(program);
+  glValidateProgram(program);
 
-  DEBUG_PRINTF("Compiled shaders\n");
-    
-  DEBUG_PRINTF("creating gl program\n");
-  GLuint prog = glCreateProgram();
-
-  DEBUG_PRINTF("Created gl program\n");
-
-  glAttachShader(prog, vertex_shader);
-  glAttachShader(prog, fragment_shader);
-
-
-  glLinkProgram(prog);
-  glValidateProgram(prog);
-
-  glDetachShader(prog, vertex_shader);
-  glDetachShader(prog, fragment_shader);
+  glDetachShader(program, vertex_shader);
+  glDetachShader(program, fragment_shader);
   glDeleteShader(vertex_shader);
   glDeleteShader(fragment_shader);
-  return prog;
+  return program;
 }
 void glfw_main_loop(GLFWwindow *window,
                     void(*draw)(void*), void *userdata){
