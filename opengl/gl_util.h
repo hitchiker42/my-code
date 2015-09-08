@@ -20,6 +20,9 @@ GLFWwindow* init_gl_context(int w, int h, const char* name);
 */
 GLuint create_shader_program(const char *vertex_shader_source,
                              const char *fragment_shader_source);
+/*
+  Clear the screen, call draw, swap buffers and then poll events
+*/
 void glfw_main_loop(GLFWwindow *win, void(*draw)(void*), void *userdata);
 //create a buffer on the gpu and bind the given data to it
 GLuint make_data_buffer(void *data, size_t size, int usage);

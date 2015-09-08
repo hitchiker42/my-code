@@ -25,14 +25,20 @@ static struct vertex data_2[3] = //upside down triangle
   {{.x = -1.0f, .y = 1.0f, .r = 0.0f, .g = 1.0f, .b = 1.0f, .a = 0.5f},
    {.x = 1.0f, .y = 1.0f, .r = 1.0f, .g = 0.0f, .b = 1.0f, .a = 0.5f},
    {.x = 0.0f, .y = -1.0f, .r = 1.0f, .g = 1.0f, .b = 0.0f, .a = 0.5f}};
+void quit_on_esc(GLFWwindow *window, int key, int scancode, int action, int mods){
+  if(key == GLFW_KEY_ESCAPE && action == GLFW_RELEASE){
+    glfwSetWindowShouldClose(window,0);
+  }
+  return;
+}
+  //specify the location of a uniform variable
+  //this variable doesn't really do anything, but that's ok
+  //  glUniform1f(loc[2], 1.0f);//set uniform variable to a single float
 void draw_triangle(GLuint buffer){
   bind_vertex_attrib(buffer, 0, 3, GL_FLOAT, 0,
                      sizeof(struct vertex), NULL);
   bind_vertex_attrib(buffer, 1, 4, GL_FLOAT, 0,
                      sizeof(struct vertex), offsetof(struct vertex, color));
-  //specify the location of a uniform variable
-  //this variable doesn't really do anything, but that's ok
-  //  glUniform1f(loc[2], 1.0f);//set uniform variable to a single float
   glDrawArrays(GL_TRIANGLES, 0, 3);
   unbind_vertex_attrib_2(0,1);
 }
@@ -58,5 +64,6 @@ int main(int argc, char *argv[]){
   //compile shaders into program
   GLuint program = create_shader_program(vertex_shader_source,
                                          fragment_shader_source);
+  glfwSetKeyCallback(win, quit_on_esc);
   main_loop(win, program);//draw stuff
 }

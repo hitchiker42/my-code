@@ -32,6 +32,7 @@ typedef struct color gl_color; //rgba, as floats
 typedef struct gl_string gl_string; //string + length
 typedef struct gl_vec gl_vec;//1D vector
 typedef struct gl_mat gl_mat;//2D matrix
+typedef struct shape gl_shape;
 /*
   Enums use a capatilized prefix to avoid namespace collisions
 */
@@ -173,4 +174,11 @@ struct vertex {
   inline_struct_color(color);
 };
 typedef struct vertex gl_triangle[3];
+struct shape {
+  struct vertex *vertices;
+  int num_vertices;
+  GLuint buffer;
+  GLuint VAO;
+  
+  
 #endif
