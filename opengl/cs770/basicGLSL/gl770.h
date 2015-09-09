@@ -17,7 +17,13 @@
  *       09/06/15 Added contents of glsl770.h for Angel's checkGL
  *                and makeShaders
  */
-
+#include <GL/glew.h>
+#include <GL/glut.h>
+#include <GL/freeglut_ext.h>
+/*
+  To get OpenGL 3.3 on linux the function glutInitContextVersion(3,3)
+  needs to be called.
+*/
 #ifndef __GL770_H__
     #define __GL770_H__
     #define GL_GLEXT_PROTOTYPES
@@ -28,7 +34,7 @@
     #  include <OpenGL/gl3.h>
     #  include <OpenGL/gl3ext.h>
     #  include <GLUT/glut.h>
-    /* #  include <GL/glui.h> */
+    #  include <GLUT/freeglut_ext.h> //might not exist/be needed
     #  include "GL/glui.h"
     #elif defined( __WIN32 ) || defined( __WIN64 )
     #  include <windows.h>
@@ -37,13 +43,14 @@
     #  include <GL/glui.h>
     #  // not sure if the rest of these are needed
     #  include <GL/glew.h>
-    // i think this comes with GL/glut.h #  include <GL/freeglut.h>
-    // i think this comes with GL/glut.h #  include <GL/freeglut_ext.h>
+    #  include <GL/freeglut_ext.h>
 
     #else     // assume linix (__LINUX__) or cygwin (__CYGWIN__)
-    #  include <GL/glew.h>
-    #  include <GL/glut.h>   // glut.h includes gl.h
-    #  include <GL/glui.h>
+    #  include <GL/glew.h>   //glew includes all needed gl headers
+    #  include <GL/glut.h>   //alias for GL/freeglut_std.h
+    #  include <GL/freeglut_ext.h>
+    //#  include <GL/glui.h> I don't have this and everything
+    //compiles and works fine for me
     #  include <GL/glext.h>
     #endif  // __APPLE__
 

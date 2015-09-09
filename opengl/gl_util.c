@@ -1,4 +1,4 @@
-#include "gl_util.h"
+#include "common.h"
 /*
   Basic error handling function to help diganose glfw errors.
 */
@@ -6,7 +6,7 @@ static void handle_error(int err_code, const char *err_string){
   fprintf(stderr,"Glfw error %d:\n%s\n",err_code, err_string);
   return;
 }
-GLFWwindow* init_gl_context(int w, int h, const char* name){
+GLFWwindow* init_gl_context(int w, int h, const char* name){  
   if(!glfwInit()){
     fprintf(stderr, "Error, failed to initialize glfw\n");
     exit(EXIT_FAILURE);
@@ -140,12 +140,32 @@ void glfw_main_loop(GLFWwindow *window,
   }
 }
 
+/*
+  Binds the data/vertex layout for vertex attribute loc to the
+  current VAO
+*/
 void bind_vertex_attrib(GLuint buffer, GLint loc, int size, GLenum type,
                         int normalized, size_t stride, size_t offset){
   glEnableVertexAttribArray(loc);
   glBindBuffer(GL_ARRAY_BUFFER, buffer);
   glVertexAttribPointer(loc, size, type, normalized, stride, (void*)offset);
 }
+void bind_vertex_attribs(GLuint buffer, struct vertex_attrib *attribs,
+                         int num_attribs){
+  int i;
+  glBindBuffer(GL_ARRAY_BUFFER, buffer); 
+  for(i=0;i<num_attribs;i++){
+    gl_vertex_attrib attrib = attribs[i];
+    glEnableVertexAttribArray(attrib.location);
+    glVertexAttribPointer(attrib.location, attrib.size, attrib.type,
+                          attrib.normalized, attrib.stride,
+                          (void*)attrib.offset);
+  }
+}
+                          
+/*
+  Creates a gl buffer and binds the data given in data to it.
+*/
 GLuint make_data_buffer(void *data, size_t size, int usage){
   GLuint buffer;
   glGenBuffers(1,&buffer);

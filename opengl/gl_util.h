@@ -1,6 +1,6 @@
 #ifndef __GL_UTIL_H__
 #define __GL_UTIL_H__
-#include "gl_types.h"
+//#include "common.h"
 
 #if (defined DEBUG) && !(defined NDEBUG)
 #define DEBUG_PRINTF(msg,args...) fprintf(stderr, msg, ##args)
@@ -44,4 +44,24 @@ static inline void unbind_vertex_attrib(GLint loc){
 #define unbind_vertex_attrib_3(loc1, loc2, loc3)        \
   unbind_vertex_attrib_2(loc1, loc2);                   \
   unbind_vertex_attrib(loc3);
+/*
+  This should be evaluated at compile time, but if not the same think
+  can be accomplished by macros, albeit in a really clunky way.
+*/
+static inline __attribute__((const, optimize(3)))
+gl_color rgba_float(uint32_t rgba){
+  gl_color ret;
+#ifdef __LITTLE_ENDIAN
+  ret.a = (rgba & 0xff); rgba >>= 8;
+  ret.b = (rgba & 0xff); rgba >>= 8;
+  ret.g = (rgba & 0xff); rgba >>= 8;
+  ret.r = (rgba & 0xff);
+#else //big endian
+  ret.r = (rgba & 0xff); rgba >>= 8;
+  ret.g = (rgba & 0xff); rgba >>= 8;
+  ret.b = (rgba & 0xff); rgba >>= 8;
+  ret.a = (rgba & 0xff);
+#endif
+  return ret;
+}
 #endif

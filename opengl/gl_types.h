@@ -3,17 +3,7 @@
 */
 #ifndef __MY_GL_TYPES_H__
 #define __MY_GL_TYPES_H__
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-#include "config.h"
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
-#include <string.h>
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
+//#include "common.h"
 /*
   GL code uses camel case so using a gl_ prefix should avoid
   namespace clashes. Since this is C structs have their own namespace
@@ -33,6 +23,7 @@ typedef struct gl_string gl_string; //string + length
 typedef struct gl_vec gl_vec;//1D vector
 typedef struct gl_mat gl_mat;//2D matrix
 typedef struct shape gl_shape;
+typedef struct vertex_attrib gl_vertex_attrib;
 /*
   Enums use a capatilized prefix to avoid namespace collisions
 */
@@ -173,12 +164,28 @@ struct vertex {
   inline_struct_position(position);
   inline_struct_color(color);
 };
+struct vertex_attrib {
+  GLuint location;
+  GLuint size;
+  GLenum type;
+  int normalized;
+  int stride;
+  size_t offset;
+};
+  
+  
 typedef struct vertex gl_triangle[3];
 struct shape {
   struct vertex *vertices;
   int num_vertices;
   GLuint buffer;
   GLuint VAO;
-  
-  
+};
+struct solid_shape {
+  gl_position *points;
+  int num_points;
+  gl_color color;
+  GLuint buffer;
+  GLuint VAO;
+};
 #endif

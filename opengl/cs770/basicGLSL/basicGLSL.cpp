@@ -74,16 +74,12 @@ void init( void )
  */
 void openWindow()
 {
-    #ifndef GLUT_3_2_CORE_PROFILE  // no support for OpenGL 3.2
-    #   define GLUT_3_2_CORE_PROFILE 0 // 2048 define as 0 so can compile
-        std::cerr << "*** Error GL 3.2 not supported by this GLUT. "
-                  << "Program probably won't work\n";
-    #endif
-
+    //this should fail if OpenGL3.3 isn't supported
+    glutInitContextVersion( 3,3 );
     glutInitWindowSize( windowWidth, windowHeight );
     glutInitWindowPosition( 100, 150 );           // window pos on screen
-    glutInitDisplayMode( GLUT_SINGLE | GLUT_RGB | // GLUT_DEPTH |
-                         GLUT_3_2_CORE_PROFILE ); 
+    glutInitDisplayMode( GLUT_SINGLE | GLUT_RGB);// | // GLUT_DEPTH |
+    //                         GLUT_3_2_CORE_PROFILE ); 
 
     glutCreateWindow( "cppGLSL demo" );           // open the screen window
     checkGL();
