@@ -6,25 +6,7 @@ static void handle_error(int err_code, const char *err_string){
   fprintf(stderr,"Glfw error %d:\n%s\n",err_code, err_string);
   return;
 }
-GLFWwindow* init_gl_context(int w, int h, const char* name){  
-  if(!glfwInit()){
-    fprintf(stderr, "Error, failed to initialize glfw\n");
-    exit(EXIT_FAILURE);
-  }
-  atexit(glfwTerminate);
-  glfwSetErrorCallback(handle_error);
-  glfwWindowHint(GLFW_SAMPLES, 4);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, 1);
-  GLFWwindow *win = glfwCreateWindow(w, h, name, NULL, NULL);
-  if(!win){
-    fprintf(stderr, "Error creating window\n");
-    exit(EXIT_FAILURE);
-  }
-  glfwMakeContextCurrent(win);
-  //  glfwSwapInterval(1);
+static inline void init_glew(void){
   glewExperimental = 1;
   GLenum err = glewInit();
   if(err != GLEW_OK){
@@ -35,8 +17,72 @@ GLFWwindow* init_gl_context(int w, int h, const char* name){
     fprintf(stderr, "Error, OpenGL 3.3 not supported\n");
     exit(EXIT_FAILURE);
   }
+  if(GLEW_ARB_multisample){
+    glEnable(GL_MULTISAMPLE);
+  }
+  return;
+}
+#if (defined USE_GLFW) || !(defined USE_GLUT)
+int gl_window_should_close(gl_window window){
+  return glfwWindowShouldClose(window);
+}
+/*void gl_swap_buffers(gl_window win){
+  glfwSwapBuffers(win);
+  }*/
+void gl_handle_events(){
+  glfwPollEvents();
+}
+gl_window init_gl_context(int w, int h, const char* name){
+  if(!glfwInit()){
+    fprintf(stderr, "Error, failed to initialize glfw\n");
+    exit(EXIT_FAILURE);
+  }
+  atexit(glfwTerminate);
+  glfwSetErrorCallback(handle_error);
+  glfwWindowHint(GLFW_SAMPLES, 4);//4xAA
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, 1);
+  GLFWwindow *win = glfwCreateWindow(w, h, name, NULL, NULL);
+  if(!win){
+    fprintf(stderr, "Error creating window\n");
+    exit(EXIT_FAILURE);
+  }
+  glfwMakeContextCurrent(win);
+  init_glew();
+  glfwSwapInterval(1);
   return win;
 }
+#else
+int glut_window_should_close = 0;
+static void glut_set_window_should_close(void){
+  glut_window_should_close = 1;
+}
+int gl_window_should_close(gl_window window){
+  return glut_window_should_close;
+}
+void gl_swap_buffers(){
+  glutSwapBuffers();
+}
+void gl_handle_events(){
+  glutMainLoopEvent();
+}
+gl_window init_gl_context(int w, int h, const char* name){
+  glutInit(0,0);//might need to pass a non-null pontier as first arg
+  glutInitContextVersion(3,3);
+  glutInitContextFlags(GLUT_FORWARD_COMPATIBLE);
+  glutSetOption(GLUT_MULTISAMPLE, 4);//4xAA
+  glutSetOption(GLUT_ACTION_ON_WINDOW_CLOSE,
+                GLUT_ACTION_GLUTMAINLOOP_RETURNS);
+  glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA |
+                      GLUT_DEPTH | GLUT_MULTISAMPLE);
+  glutInitWindowSize(w,h);
+  glutCreateWindow(name);
+  atexit(glutExit);
+  glutCloseFunc(glut_set_window_should_close);
+}
+#endif  
 static inline __attribute__((pure))
 char *shader_type_to_string(GLenum type){
   switch(type){
@@ -74,7 +120,7 @@ static inline GLuint compile_shader(GLenum type, const char *source, int len){
   glShaderSource(shader, 1, &source, &len);
   glCompileShader(shader);
   glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-  if(!status){    
+  if(!status){
     print_shader_info_log(shader, "Error when compiling shader.\n");
     exit(EXIT_FAILURE);
   }
@@ -128,9 +174,9 @@ GLuint create_shader_program(const char *vertex_shader_source,
     free(vsource); free(fsource);
   } else {
     vertex_shader = compile_shader(GL_VERTEX_SHADER,
-                                        vertex_shader_source, 0);
+                                   vertex_shader_source, 0);
     fragment_shader = compile_shader(GL_FRAGMENT_SHADER,
-                                          fragment_shader_source, 0);
+                                     fragment_shader_source, 0);
   }
   GLuint program = glCreateProgram();
   //this should be optimized out, but I may need to rewrite things to
@@ -166,7 +212,7 @@ void bind_vertex_attrib(GLuint buffer, GLint loc, int size, GLenum type,
 void bind_vertex_attribs(GLuint buffer, struct vertex_attrib *attribs,
                          int num_attribs){
   int i;
-  glBindBuffer(GL_ARRAY_BUFFER, buffer); 
+  glBindBuffer(GL_ARRAY_BUFFER, buffer);
   for(i=0;i<num_attribs;i++){
     gl_vertex_attrib attrib = attribs[i];
     glEnableVertexAttribArray(attrib.location);
@@ -175,11 +221,12 @@ void bind_vertex_attribs(GLuint buffer, struct vertex_attrib *attribs,
                           (void*)attrib.offset);
   }
 }
-                          
+
 /*
   Creates a gl buffer and binds the data given in data to it.
 */
-GLuint make_data_buffer(void *data, size_t size, int usage){
+GLuint make_data_buffer(GLenum buffer_type, void *data,
+                        size_t size, int usage){
   GLuint buffer;
   glGenBuffers(1,&buffer);
   glBindBuffer(GL_ARRAY_BUFFER, buffer);//make buffer current

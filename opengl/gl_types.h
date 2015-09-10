@@ -3,7 +3,8 @@
 */
 #ifndef __MY_GL_TYPES_H__
 #define __MY_GL_TYPES_H__
-//#include "common.h"
+#include <GL/glew.h>
+#include "common.h"
 /*
   GL code uses camel case so using a gl_ prefix should avoid
   namespace clashes. Since this is C structs have their own namespace
@@ -161,7 +162,7 @@ struct color {
     };                                          \
   };
 struct vertex {
-  inline_struct_position(position);
+  inline_struct_position(pos);
   inline_struct_color(color);
 };
 struct vertex_attrib {

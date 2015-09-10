@@ -3,9 +3,9 @@
   this is the best I can do, it gets the job done, though it's quite ugly.
 */
 #define RGBA_FLOAT(r,g,b,a) \
-  RGBA_FLOAT_##r, RGBA_FLOAT_##g, RGBA_FLOAT_##b, RGBA_FLOAT_##a
-#define RGBA_FLOAT_STRUCT(r,g,b,a) \
   {RGBA_FLOAT_##r, RGBA_FLOAT_##g, RGBA_FLOAT_##b, RGBA_FLOAT_##a}
+#define RGBA_FLOAT_LIST(r,g,b,a) \
+  RGBA_FLOAT_##r, RGBA_FLOAT_##g, RGBA_FLOAT_##b, RGBA_FLOAT_##a
 #define RGBA_FLOAT_0 0.000000f
 #define RGBA_FLOAT_1 0.003922f
 #define RGBA_FLOAT_2 0.007843f

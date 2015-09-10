@@ -15,11 +15,12 @@
 #define USE_GLFW
 #if (defined USE_GLFW) || !(defined USE_GLUT)
 #include <GLFW/glfw3.h>
-typedef GLFWwindow* window;
+typedef GLFWwindow* gl_window;
 #else
 #include <GL/freeglut_std.h>
 #include <GL/freeglut_ext.h>
-typedef GLuint window;
+typedef int gl_window;
+extern int glut_window_should_close;
 #endif
 #include "C_util.h"
 #include "gl_types.h"
