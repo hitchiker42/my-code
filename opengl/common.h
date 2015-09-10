@@ -21,6 +21,7 @@ typedef GLFWwindow* window;
 #include <GL/freeglut_ext.h>
 typedef GLuint window;
 #endif
+#include "C_util.h"
 #include "gl_types.h"
 #include "gl_util.h"
 #ifndef OOM_FUN

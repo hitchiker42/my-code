@@ -101,9 +101,9 @@ int main(int argc, char *argv[]){
   GLFWwindow *win = init_gl_context(1024,768,"basic_test");
   //compile shaders into program
   GLuint program = create_shader_program(vertex_shader_source,
-                                         fragment_shader_source);
+                                         fragment_shader_source, 0);
   GLuint square_program = create_shader_program(square_vertex_shader_source,
-                                                fragment_shader_source);
+                                                fragment_shader_source, 0);
   glfwSetKeyCallback(win, quit_on_esc);
   main_loop(win, program, square_program);//draw stuff
 }

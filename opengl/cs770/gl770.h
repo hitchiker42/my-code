@@ -22,10 +22,7 @@
 #include <GL/freeglut_ext.h>
 /*
   To get OpenGL 3.3 on linux the function glutInitContextVersion(3,3)
-  needs to be called. This is defined in GL/freeglut_ext.h
-
-  I'm not sure where this function is defined on other platforms, but
-  I added what I imagine is the equivlent header for osx and windows. 
+  needs to be called.
 */
 #ifndef __GL770_H__
     #define __GL770_H__
@@ -44,7 +41,7 @@
     #  include <GL/glut.h>   // glut.h includes gl.h
     #  include <GL/glext.h>
     #  include <GL/glui.h>
-      // not sure if the rest of these are needed
+    #  // not sure if the rest of these are needed
     #  include <GL/glew.h>
     #  include <GL/freeglut_ext.h>
 
@@ -52,9 +49,9 @@
     #  include <GL/glew.h>   //glew includes all needed gl headers
     #  include <GL/glut.h>   //alias for GL/freeglut_std.h
     #  include <GL/freeglut_ext.h>
-    //#  include <GL/glui.h> I don't have this header, but after
-    //commenting it out everything works on my machine
-    //#  include <GL/glext.h> //unnecessary since glew.h is included
+    //#  include <GL/glui.h> I don't have this and everything
+    //compiles and works fine for me
+    //#  include <GL/glext.h>
     #endif  // __APPLE__
 
     // Include some Angel includes

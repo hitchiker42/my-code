@@ -19,7 +19,8 @@ GLFWwindow* init_gl_context(int w, int h, const char* name);
   Could be eaisly modified to take more arguments.
 */
 GLuint create_shader_program(const char *vertex_shader_source,
-                             const char *fragment_shader_source);
+                             const char *fragment_shader_source,
+                             int is_pathname);
 /*
   Clear the screen, call draw, swap buffers and then poll events
 */

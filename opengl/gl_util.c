@@ -110,15 +110,28 @@ static inline void link_program(GLuint program, GLuint *shaders, int nshaders){
   }
   return;
 }
-  
-GLuint create_shader_program(const char *vertex_shader_source,
-                             const char *fragment_shader_source){
-  DEBUG_PRINTF("creating shaders\n");
 
-  GLuint vertex_shader = compile_shader(GL_VERTEX_SHADER,
+GLuint create_shader_program(const char *vertex_shader_source,
+                             const char *fragment_shader_source,
+                             int is_pathname){
+  DEBUG_PRINTF("creating shaders\n");
+  GLuint vertex_shader, fragment_shader;
+  if(is_pathname){
+    size_t vlen = 0, flen = 0;
+    //could allocate these with alloca
+    char *vsource = read_file_to_string(vertex_shader_source, &vlen);
+    char *fsource = read_file_to_string(fragment_shader_source, &flen);
+    vertex_shader = compile_shader(GL_VERTEX_SHADER,
+                                          vsource, vlen);
+    fragment_shader = compile_shader(GL_FRAGMENT_SHADER,
+                                            fsource, flen);
+    free(vsource); free(fsource);
+  } else {
+    vertex_shader = compile_shader(GL_VERTEX_SHADER,
                                         vertex_shader_source, 0);
-  GLuint fragment_shader = compile_shader(GL_FRAGMENT_SHADER,
+    fragment_shader = compile_shader(GL_FRAGMENT_SHADER,
                                           fragment_shader_source, 0);
+  }
   GLuint program = glCreateProgram();
   //this should be optimized out, but I may need to rewrite things to
   //just use this array if not
