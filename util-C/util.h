@@ -92,27 +92,30 @@ struct _cons {
 */
 __attribute__((const)) char *filemode_bits_to_string(int mode);
 off_t file_len_by_fd(int fd);
-off_t file_len_by_name(const char *filename);
+off_t file_len_by_filename(const char *filename);
 off_t file_len_by_FILE(FILE *file);
 int regular_filep_FILE(FILE* file);
 int regular_filep_filename(char *filename);
 int regular_filep_fd(long fd);
+char* read_file_to_string_fd(int fd, size_t *sz);
+char* read_file_to_string_FILE(FILE *file, size_t *sz);
+char* read_file_to_string_filename(FILE *file, size_t *sz);
 /*
   TODO: wrap this in an #if (defined _ISOC11_SOURCE) 
   and define alternative versions for older C versions
 */
-#define file_len(x)                             \
-  _Generic((x),                                 \
-           long : file_len_by_fd,               \
-           int : file_len_by_fd,                       \
-           FILE* : file_len_by_FILE,                    \
-           char* : file_len_by_name)(x)
-#define regular_filep(x)                                \
+#define generic_file_macro(base_name, x, args...)       \
   _Generic((x),                                         \
-           long : regular_filep_fd,                     \
-           int : regular_filep_fd,                     \
-           FILE* : regular_filep_FILE,                  \
-           char* : regular_filep_filename)(x)
+           long  : base_name##fd,                      \
+           int   : base_name##fd,                      \
+           FILE* : base_name##FILE,                    \
+           char* : base_name##filename)(x,##args)
+#define file_len(x)                             \
+  generic_file_macro(file_len_by_, x)
+#define regular_filep(x)                                \
+  generic_file_macro(regular_filep_, x)
+#define read_file_to_string(x, szptr)                                   \
+  generic_file_macro(read_file_to_string_, x, szptr)
 //mmap the file given by fd, return a struct contanintg a pointer
 //to the maping and the length of the mapping, if shared is
 //nonzero the mapping is shared, otherwise it is private

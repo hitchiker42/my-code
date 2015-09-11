@@ -20,16 +20,21 @@ static inline void init_glew(void){
   if(GLEW_ARB_multisample){
     glEnable(GL_MULTISAMPLE);
   }
+  /*
+    Enable basic depth testing
+   */
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LESS);
   return;
 }
 #if (defined USE_GLFW) || !(defined USE_GLUT)
 int gl_window_should_close(gl_window window){
   return glfwWindowShouldClose(window);
 }
-/*void gl_swap_buffers(gl_window win){
+void gl_swap_buffers(gl_window win){
   glfwSwapBuffers(win);
-  }*/
-void gl_handle_events(){
+}
+void gl_poll_events(){
   glfwPollEvents();
 }
 gl_window init_gl_context(int w, int h, const char* name){
@@ -62,10 +67,10 @@ static void glut_set_window_should_close(void){
 int gl_window_should_close(gl_window window){
   return glut_window_should_close;
 }
-void gl_swap_buffers(){
+void gl_swap_buffers(gl_window win){
   glutSwapBuffers();
 }
-void gl_handle_events(){
+void gl_poll_events(){
   glutMainLoopEvent();
 }
 gl_window init_gl_context(int w, int h, const char* name){
@@ -187,6 +192,7 @@ GLuint create_shader_program(const char *vertex_shader_source,
 
   glDeleteShader(vertex_shader);
   glDeleteShader(fragment_shader);
+  glUseProgram(program);
   return program;
 }
 void glfw_main_loop(GLFWwindow *window,

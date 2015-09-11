@@ -88,7 +88,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = x86_64-unknown-linux-gnu
 host_triplet = x86_64-unknown-linux-gnu
-bin_PROGRAMS = basic_test$(EXEEXT)
+bin_PROGRAMS = basic_test$(EXEEXT) cube$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_check_gl.m4 \
@@ -110,17 +110,18 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_basic_test_OBJECTS = basic_test-basic_test.$(OBJEXT) \
-	basic_test-gl_util.$(OBJEXT) basic_test-C_util.$(OBJEXT)
+am_basic_test_OBJECTS = basic_test.$(OBJEXT) gl_util.$(OBJEXT) \
+	C_util.$(OBJEXT)
 basic_test_OBJECTS = $(am_basic_test_OBJECTS)
-basic_test_DEPENDENCIES =
+basic_test_LDADD = $(LDADD)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
 am__v_lt_0 = --silent
 am__v_lt_1 = 
-basic_test_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(basic_test_CFLAGS) \
-	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+am_cube_OBJECTS = basic_loop.$(OBJEXT) gl_util.$(OBJEXT) \
+	C_util.$(OBJEXT) cube.$(OBJEXT)
+cube_OBJECTS = $(am_cube_OBJECTS)
+cube_LDADD = $(LDADD)
 AM_V_P = $(am__v_P_$(V))
 am__v_P_ = $(am__v_P_$(AM_DEFAULT_VERBOSITY))
 am__v_P_0 = false
@@ -155,8 +156,8 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(basic_test_SOURCES)
-DIST_SOURCES = $(basic_test_SOURCES)
+SOURCES = $(basic_test_SOURCES) $(cube_SOURCES)
+DIST_SOURCES = $(basic_test_SOURCES) $(cube_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -357,8 +358,9 @@ top_build_prefix =
 top_builddir = .
 top_srcdir = .
 basic_test_SOURCES = basic_test.c gl_util.c C_util.c
-basic_test_CFLAGS = -I/usr/include/libdrm -I/usr/include/libdrm  -I/usr/include/libdrm  -I/usr/include/libdrm  -Wall -Wno-unused -g -O2 -D_GNU_SOURCE -fPIC
-basic_test_LDADD = -lGL -lGLU -lGL -lglut -lGLU -lGL  -lGL   -lglfw -lGLEW -lm -lpthread -ldl 
+cube_SOURCES = basic_loop.c gl_util.c C_util.c cube.c
+AM_CFLAGS = -I/usr/include/libdrm -I/usr/include/libdrm  -I/usr/include/libdrm  -I/usr/include/libdrm  -Wall -Wno-unused -g -O2 -D_GNU_SOURCE -fPIC
+AM_LDFLAGS = -lGL -lGLU -lGL -lglut -lGLU -lGL  -lGL   -lglfw -lGLEW -lm -lpthread -ldl 
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -464,7 +466,11 @@ clean-binPROGRAMS:
 
 basic_test$(EXEEXT): $(basic_test_OBJECTS) $(basic_test_DEPENDENCIES) $(EXTRA_basic_test_DEPENDENCIES) 
 	@rm -f basic_test$(EXEEXT)
-	$(AM_V_CCLD)$(basic_test_LINK) $(basic_test_OBJECTS) $(basic_test_LDADD) $(LIBS)
+	$(AM_V_CCLD)$(LINK) $(basic_test_OBJECTS) $(basic_test_LDADD) $(LIBS)
+
+cube$(EXEEXT): $(cube_OBJECTS) $(cube_DEPENDENCIES) $(EXTRA_cube_DEPENDENCIES) 
+	@rm -f cube$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(cube_OBJECTS) $(cube_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -472,9 +478,11 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-include ./$(DEPDIR)/basic_test-C_util.Po
-include ./$(DEPDIR)/basic_test-basic_test.Po
-include ./$(DEPDIR)/basic_test-gl_util.Po
+include ./$(DEPDIR)/C_util.Po
+include ./$(DEPDIR)/basic_loop.Po
+include ./$(DEPDIR)/basic_test.Po
+include ./$(DEPDIR)/cube.Po
+include ./$(DEPDIR)/gl_util.Po
 
 .c.o:
 	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -499,48 +507,6 @@ include ./$(DEPDIR)/basic_test-gl_util.Po
 #	$(AM_V_CC)source='$<' object='$@' libtool=yes \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LTCOMPILE) -c -o $@ $<
-
-basic_test-basic_test.o: basic_test.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -MT basic_test-basic_test.o -MD -MP -MF $(DEPDIR)/basic_test-basic_test.Tpo -c -o basic_test-basic_test.o `test -f 'basic_test.c' || echo '$(srcdir)/'`basic_test.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/basic_test-basic_test.Tpo $(DEPDIR)/basic_test-basic_test.Po
-#	$(AM_V_CC)source='basic_test.c' object='basic_test-basic_test.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -c -o basic_test-basic_test.o `test -f 'basic_test.c' || echo '$(srcdir)/'`basic_test.c
-
-basic_test-basic_test.obj: basic_test.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -MT basic_test-basic_test.obj -MD -MP -MF $(DEPDIR)/basic_test-basic_test.Tpo -c -o basic_test-basic_test.obj `if test -f 'basic_test.c'; then $(CYGPATH_W) 'basic_test.c'; else $(CYGPATH_W) '$(srcdir)/basic_test.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/basic_test-basic_test.Tpo $(DEPDIR)/basic_test-basic_test.Po
-#	$(AM_V_CC)source='basic_test.c' object='basic_test-basic_test.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -c -o basic_test-basic_test.obj `if test -f 'basic_test.c'; then $(CYGPATH_W) 'basic_test.c'; else $(CYGPATH_W) '$(srcdir)/basic_test.c'; fi`
-
-basic_test-gl_util.o: gl_util.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -MT basic_test-gl_util.o -MD -MP -MF $(DEPDIR)/basic_test-gl_util.Tpo -c -o basic_test-gl_util.o `test -f 'gl_util.c' || echo '$(srcdir)/'`gl_util.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/basic_test-gl_util.Tpo $(DEPDIR)/basic_test-gl_util.Po
-#	$(AM_V_CC)source='gl_util.c' object='basic_test-gl_util.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -c -o basic_test-gl_util.o `test -f 'gl_util.c' || echo '$(srcdir)/'`gl_util.c
-
-basic_test-gl_util.obj: gl_util.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -MT basic_test-gl_util.obj -MD -MP -MF $(DEPDIR)/basic_test-gl_util.Tpo -c -o basic_test-gl_util.obj `if test -f 'gl_util.c'; then $(CYGPATH_W) 'gl_util.c'; else $(CYGPATH_W) '$(srcdir)/gl_util.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/basic_test-gl_util.Tpo $(DEPDIR)/basic_test-gl_util.Po
-#	$(AM_V_CC)source='gl_util.c' object='basic_test-gl_util.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -c -o basic_test-gl_util.obj `if test -f 'gl_util.c'; then $(CYGPATH_W) 'gl_util.c'; else $(CYGPATH_W) '$(srcdir)/gl_util.c'; fi`
-
-basic_test-C_util.o: C_util.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -MT basic_test-C_util.o -MD -MP -MF $(DEPDIR)/basic_test-C_util.Tpo -c -o basic_test-C_util.o `test -f 'C_util.c' || echo '$(srcdir)/'`C_util.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/basic_test-C_util.Tpo $(DEPDIR)/basic_test-C_util.Po
-#	$(AM_V_CC)source='C_util.c' object='basic_test-C_util.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -c -o basic_test-C_util.o `test -f 'C_util.c' || echo '$(srcdir)/'`C_util.c
-
-basic_test-C_util.obj: C_util.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -MT basic_test-C_util.obj -MD -MP -MF $(DEPDIR)/basic_test-C_util.Tpo -c -o basic_test-C_util.obj `if test -f 'C_util.c'; then $(CYGPATH_W) 'C_util.c'; else $(CYGPATH_W) '$(srcdir)/C_util.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/basic_test-C_util.Tpo $(DEPDIR)/basic_test-C_util.Po
-#	$(AM_V_CC)source='C_util.c' object='basic_test-C_util.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(basic_test_CFLAGS) $(CFLAGS) -c -o basic_test-C_util.obj `if test -f 'C_util.c'; then $(CYGPATH_W) 'C_util.c'; else $(CYGPATH_W) '$(srcdir)/C_util.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

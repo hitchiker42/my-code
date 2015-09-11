@@ -71,6 +71,214 @@ ex: given f(x) = (x-1)^2(x-2)^3(x-3)^10(x-4)^5
 sign:  - | + | - | - | +
 x:       1   2   3   4 
 
+* 'up-down' picture
+  sign picture of \Delta{}f(x), shows when f(x) in increasing/decreasing, doesn't
+  really tell anything else. Can be used to find potential minima/maxima
+  but the function needs to be evaluated to actually find the actual
+  minima/maxima. 
+* Power Series
+  f(x) = \sum_{n=0}^{\infty}C_{n}x^n, R = radius of convergnce (converges when |x|<R)
+  f'(x) = \sum_{n=0}^{\infty}nC_{n}x^{n-1} same radius of convergence
+  f^n(x) = \sum_{n=0}^{\infty}C_{n}*(d^n/dx^{n }x^{n}) ''                ''
+  f^n(x) = \sum_{k=0}^{\infty}f^{(k)}(0)/k! * x^k
+
+Analogue in this fucked up system:
+\sum_{k=0}^{\infty} \Delta{}^{k}f(0)/k! * x^{<k>}, when k>x then x^{<k>}=0
+So this is always a finite sum (i.e sum from k=0 to x)
+* Polynomial interpolation
+  given a table of function values (i.e f(x) for x = 1,2,3,4,etc)
+  compute derivatives/deltas until they're consistantly 0,
+  create polynomial of a degree equal to the number of deritivees/deltas
+    taken, but using the given function values so that the polynomial
+    passes through the given points exactly
+
+  use ∑_{n=0}^{∞}Δ^{n}f(0)/n! * x^{<n>}
+* Psuedo chain rule
+  suppose f,g\in{}F(Z,R) and \forall{}x g(x)=f(x+a)
+  then \forall{}n\ge0 \Delta{}^{n}g(x) = \Delta^{n}f(x+a) \forall{}a\in{}N
+
+  Basically we can ignore constants when taking deltas
+
+let d = \Delta:
+prove d^{n}f(0) = \Sum_{k=0}^{n}(-1)^k(\binom{n}{k})f(n-k)
+let g(x) = f(x+1)
+get d^{n}f(1) = ... f(n-k+1)
+evaluate d^{n+1}f which is d^{n}f(1) - d^{n}f^{}(0)
+After lots of complicated arithmatic and factorials we get
+d^{n+1}f = \sum_{k=0}^{n+1}(-1)^k(\binom{n+1}{k})f(n+1-k)
+
+Lots more floundering about to get
+f(x) = \sum_{n=0}^{\infty}\Delta^{n}f(0)/n! * x^{<n>}
+
+* fake integration
+  As in calculus `integration` produces and infinite number of functions
+  i.e integral(x) = x^2/2 + C
+
+** Antidifference
+   \Sigma{}f = F + C iff \Delta{}F = f
+- rules
+  \Sigma{}(f+g) = \Sigma{}f + \Sigma{}g
+  \Sigma{}af = a\Sigma{}f
+  \Sigma{}x^{<n>} = x^{<n+1>}/n+1
+  To find Σ of x^n convert to factorias powers, then take Σ
+
+  Finding sigmas of sin/cos  you need to solve a linear system of equations
+  in sin and cos to get the right coefficents
+** Summation by parts
+   ΣΔ(fg)x = Σ((Δf)(x)g(x)) + Σ(f(x+1)(Δg)(x))
+   fg = Σ((Δf)(x)g(x)) + Σ(f(x+1)(Δg)(x))
+   Σ(Δf(x)g(x)) = f(x)g(x) + Σ(f(x+1)(Δg)(x))
+
+   Δfg = Δf*g + Δg*f + Δg*Δf
+   ΣfΔg = f(x)g(x) - Σ((g(x)+Δg(x))f(x))
+** Definate Summation
+formula:
+   \sum_{x=a}^b f(x) = Σf(b+1) + Σf(a)
+explanatino:
+   given f:Z->R find F:Z->R s.t ΔF = f and F(0) = 0
+   by evaluating deltas we can find F(n) which is:
+   F(n) = ∑_{i=0}^{n-1}f(i)
+i.e (Σf(x))(n) = ∑_{i=0}^{n-1}f(i)
+
+Thm:
+if ΔG = f then ∀x∈Z ∑_{k=0}^{x} f(k) = G(x+1)-G(0)
+* Stirling numbers
+  Used in combinatorics, used to express factorial powers as polynomials
+  defined by:
+  S(0,0) = 0, S(0,k) = 0, S(n, 0) = 0, S(n, k) = 0 when k > n
+  othewise
+  S(n+1,k) = n * S(n,k) + S(n, k-1)
+
+  Using these we can represent xⁿ by a sum of  falling factorial powers: 
+  xⁿ = ∑_{k=0}^{n} (k*S(n,k) + S(n,k-1))*x^{<k>}
+
+  See the little c program I wrote to generate them
+
+* Summations of powers of sin/cos
+  thm: 2ⁿcosⁿθ = ∑_{k}binomial(n,k)cos((n-2k)θ);
+  allows you to rewrite products of cosines as sums of cosines
+
+* review (after spring break)
+  We can view F:Z^{+}->R as a vector space, and \Delta as a linear transform
+  -delta of powers
+    Δxⁿ = ∑_{k=0}^{n-1}(n/k) xᵏ
+* archimedes principle
+  ∀x ∈ R, ∃n ∈ Z^{+} s.t x<n
+  (there's an integer bigger than any given real number)
+
+  Thm: let a,b ∈ R and m>0 s.t ∀ n ∈ Z^{+} a ≤ b + m/n, then a≤b
+
+  This is just like the closed and open sets in real analysis
+
+  This ultimately leads to using reimann sums to find the area under a curve
+  Also using disks of rotation to find the volumes of things
+  
+* Matrices
+** Jordan Canonical Form Theorem
+  If T is a 2x2 matrix then there is an invertable matrix S such that:
+  T = SJS^{-1} with J=(\alpha 0)(0 β), or J = (α 1)(0 β)
+  and f(T) = Sf(J)S^{-1}
+** inverse
+  Matrix A=(a b)(c d) has an inverse if Det(A) = ad-bc != 0
+  A^{-1} will be Det(A)*((d -b)(-c a))
+** eigenvalues & characteristic polynomial
+λ is an eigenvalue of A=(a b)(c d) iff λI₂-A is not invertable
+i.e Det(λI₂-A) == Det((λ-a -b)(-c λ-d)) == 0
+i.e (λ-a)(λ-d) - bc = λ² - (a+d)λ + (ad -bc) = 0 ;characteristic polynomial
+
+Defn: Trace of A = ∑_{i=0}^{n}A_{ii}
+
+P_{A}(λ) = λ² - Tr(A)*λ + det(A)  ;;only for 2x2 matrices
+
+let α,β be the eigenvalues of A=(a b)(c d), such that
+α<=β
+then A = SJS^{-1} where J = (α 0)(0 β) if α!=β (or A is diagonal)
+   and J = (α 1)(0 β) otherwise (in this case α == β)
+
+if A = (a b) (0 d) the eigenvalues of a are a,d
+
+** Cayley-Hamilton Theorem
+   P_{A}(λ) = 0 -> A^{2} - Tr(A)λ + det(A)*I₂ = 0n
+
+** S
+   find S s.t A=SJS^{-1}
+   when α!=β
+   first column of S = first non-zero column of βI-A
+   second column of S = first non-zero column of αI-A
+   (if c!=0 S = (β-a -c)(α-a -c))
+
+   when \alpha==β and A is diagonal
+   S = I₂
+
+   when α == β and A is non-diagonal
+   if c==0
+   S=(b 0)(0 1)
+   if c!=0
+   S=(α-a 1)(c 0)
+* Difference equations
+  Basically differential equations using finite differences.
+
+  Using 2x2 matrices the difference equation Y_{n+1} = C_{1}Y_{n+1} + C_{2}Y_{n}
+  written as Wₙ = A*W₀, where W_n=((Yₙ)(Y_{n+1})). Converting A to 
+  jordan form the general solution will be:
+  Yₙ = C₁αⁿ + C₂βⁿ if α!=β and Yₙ = C₁αⁿ + C₂α^{n-1} if α=β
+  where \alpha and β are as described above in the notes about jordan
+  cannonical form.
+
+** Non-homogenous
+   A non-homogenous difference equation is solved the same way as a
+non-homogenous differential equation, the homogenous solution plus
+one specific solution to the non-homogenous version.
+i.e given Y_{n+2} = aY_{n+1} + bY_{n} + f(n) solve Y_{n+1} = aYₙ + b then guess the form of
+the solution (i.e yₙ = C₁n + C₂)
+
+The solution to this equation is:
+Y_{n+1} = aYₙ + b, if a == 1 or
+Yₙ = (b/1-a)+ (Y₀+(b/1-a)aⁿ if a!=1
+* Differential equations
+  you can solve an ode by writing it in matrix form
+  this is (kinda) how you get the solutions. It's just that ordinarly you don't
+  actually write out the maxrix.
+* Number Theory
+  Proof that a number with a repeating decimal expansion is rational 
+  let x = n.a_{1}a_{2}...a_{k}(b_{1}b_{2}...b_{m})*
+  then 10^{k}x = 10^{k}n + a_{1}..a_{k} + 0.(b_{1}...b_{m})*
+  and  10^{k+m}x = 10^{k+m}n + 10^{m}a_1...a_k + b_1...b_m + 0.(b_1...b_m)*
+  subtract and get 10^{k+m}^{}x - 10^{k}x = 10^{k+m} - 10^{k}n + (10^m-1)a_1...a_k + b_1...b_m
+  which can be simplified to get x = A/B, where A and B are integers
+  Replace 10 with whatever base you want to prove this for
+  
+
+  As for the other way around (i.e the decimal expansion of a rational number
+  repeats), you just do long division  enough times and you get in a loop
+
+  The set of numbers which are roots of polynomials with integer coefficients is
+  the same as the set of numbers which are roots of polynomials with rational
+  coefficients 
+
+* Liouville numbers
+  Assume x is irrational and algebraic
+  Let n be the smallest integer such that x is a root of a polynomial of
+  degree n.
+  Let f(x) be a polynomial of degree n with x as a root.
+  No roots of f can be rational (because reasons) 
+
+
+* Exam1 review
+**  function composition
+    i.e (f-g)(x) = f(x) - g(x), duh
+** Delta
+   \Delta{}f(x) = f(x+1)-f(x)
+   Various rules (product, sum, divison, etc)
+** Factorial powers
+   x^{<0>} = 1
+   x^{<n+1>} = x^{<n>}(x - n)
+** Increasing/Decreasing 
+   How it relates to delta (maxima/minima problems)
+** Solving inequalities
+* Quiz review
+  -complex number stuff
+* Local Variables
 # Local Variables:
 # eval: (auto-fill-mode)
 # eval: (flyspell-mode)

@@ -1,5 +1,8 @@
 #ifndef __MY_GL_COMMON_H__
 #define __MY_GL_COMMON_H__
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
@@ -45,4 +48,7 @@ static inline void* zmalloc(size_t sz){
   }
   return mem;
 }
+#ifdef __cplusplus
+}
+#endif
 #endif

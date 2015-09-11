@@ -1,4 +1,5 @@
 #include "common.h"
+#include "basic_loop.h"
 /*
   An opengl program is specified by a global context, containing the
   opengl context information (via a window), a pointer to opaque user
@@ -48,40 +49,6 @@
   //possibly call a cleanup function
 
 */
-struct global_context {
-  gl_window *window;
-  void *userdata;
-  void(*update_userdata)(void*);
-  gl_scene *scenes;
-  int num_scenes;
-};
-struct gl_scene {
-  global_context *ctx;
-  GLuint program;
-  GLuint VAO;
-  //called with the program_context and userdata, mainly intended
-  //to be used to update the uniform variables
-  void(*update_scene)(gl_scene*,void*);
-  gl_buffer *buffers;
-  void *uniform_block;
-  GLuint uniform_buffer;
-  int uniform_block_index;
-  int uniform_variable_size;
-  int num_buffers;
-};
-struct gl_buffer {
-  gl_program_context *ctx;
-  //called with the buffer and user data to update
-  //the buffer data, if necessary
-  void(*update_buffer)(gl_buffer*,void*);
-  void *vertices;
-  size_t index_offset;
-  GLuint array_buffer;
-  GLuint index_buffer;
-  GLsizei draw_count;
-  GLenum draw_mode;
-  GLenum index_type
-};
 void bind_scene(gl_scene *scene){
   glBindProgram(scene->program);
   glBindVertexArray(scene->VAO);
@@ -94,10 +61,12 @@ void bind_buffer(gl_buffer *buf){
 }
 void __attribute__((noreturn)) main_loop(global_context *ctx){
   int i,j,k;
-  while(!gl_window_should_close(cxt->window)){
-    ctx->update_userdata(cxt->userdata);
-    for(i=0;i<ctx->num_scenes){
-      gl_scene *scene = ctx->scenes + i*sizeof(gl_scene*);
+  while(!gl_window_should_close(ctx->window)){
+    if(ctx->update_userdata){
+      ctx->update_userdata(ctx->userdata);
+    }
+    for(i=0;i<ctx->num_scenes;i++){
+      gl_scene *scene = &(ctx->scenes[i]);
       //or gl_scene scene = ctx->scenes[i];
       bind_scene(scene);
       if(scene->update_scene){
@@ -107,9 +76,15 @@ void __attribute__((noreturn)) main_loop(global_context *ctx){
       for(j=0;j<scene->num_buffers;j++){
         gl_buffer *buf = scene->buffers + j*sizeof(gl_buffer);
         bind_buffer(buf);
-        buf->update_buffer(buf, ctx->userdata);
+        if(buf->update_buffer){
+          buf->update_buffer(buf, ctx->userdata);
+        }
+        /*
+          TODO: update the buffer struct to contain index limits
+          and optimze this by calling glDrawRangeElements instead.
+        */
         glDrawElements(buf->draw_mode, buf->draw_count,
-                       buf->index_type, buf->index_offset);
+                       buf->index_type, (void*)buf->index_offset);
       }
     }
     gl_swap_buffers(ctx->window);

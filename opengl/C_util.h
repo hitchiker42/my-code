@@ -1,5 +1,5 @@
-#ifndef _UTIL_H_
-#define _UTIL_H_
+#ifndef _C_UTIL_H_
+#define _C_UTIL_H_
 /*
   Various utility C functions, specifically functions that would fit as
   stdlib functions.

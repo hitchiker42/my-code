@@ -10,6 +10,14 @@
 #define DEBUG_PRINTF(fmt,args...)               \
   fprintf(stderr,fmt,##args)
 #endif
+void * __attribute__((weak, malloc)) xmalloc(size_t sz){
+  void *mem = malloc(sz);
+  if(mem == NULL && sz != 0){
+    fprintf("out of memory\n");
+    raise(SIGABRT);
+  }
+  return mem;
+}
 char * __attribute__((const)) filemode_bits_to_string(int mode){
   if(get_access_mode(mode) == O_RDWR){
     if(mode & O_TRUNC){
@@ -39,13 +47,11 @@ off_t file_len_by_fd(int fd){
   return buf.st_size;
 }
 off_t file_len_by_name(const char *filename){
-  DEBUG_PRINTF("Calling file_len_by_name\n");
   struct stat buf;
   stat(filename, &buf);
   return buf.st_size;
 }
 off_t file_len_by_FILE(FILE *file){
-  DEBUG_PRINTF("Calling file_len_by_FILE\n");
   off_t pos = ftello(file);//to get back to where we awere
   if(fseeko(file, 0, SEEK_END) == (off_t)-1){
     return (off_t)-1;
@@ -55,20 +61,42 @@ off_t file_len_by_FILE(FILE *file){
   return end;
 }
 int regular_filep_fd(long fd){
-  DEBUG_PRINTF("Calling regular_filep_fd\n");
   struct stat buf;
   fstat(fd, &buf);
   return S_ISREG(buf.st_mode);
 }
 int regular_filep_filename(char *filename){
-  DEBUG_PRINTF("Calling regular_filep_filename\n");
   struct stat buf;
   stat((char *)filename, &buf);
   return S_ISREG(buf.st_mode);
 }
 int regular_filep_FILE(FILE* file){
-  DEBUG_PRINTF("Calling regular_filep_FILE\n");
   return regular_filep_fd(fileno(file));
+}
+char* read_file_to_string_fd(int fd, size_t *szptr){
+  off_t len = file_len_by_fd(fd);
+  char *buf = xmalloc(len + 1);
+  read(fd, buf, len+1);
+  buf[len] = '\0';
+  if(szptr){
+    *szptr = len;
+  }
+  return buf;
+} 
+char* read_file_to_string_FILE(FILE *file, size_t *szptr){
+  off_t len = file_len_by_FILE(file);
+  char *buf = xmalloc(len + 1);
+  fread(buf, 1, len, file);
+  buf[len] = '\0';
+  if(szptr){
+    *szptr = len;
+  }
+}
+char* read_file_to_string_filename(char *filename, size_t *szptr){
+  int fd = open(filename, O_RDONLY);
+  char *ret = read_file_to_string_fd(fd, szptr);
+  close(fd);
+  return ret;
 }
 int __regular_filep(void *arg, int is_fd){
   struct stat buf;
