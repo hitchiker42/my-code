@@ -63,13 +63,11 @@ struct gl_scene {
   //to be used to update the uniform variables
   void(*update_scene)(gl_scene*,void*);
   gl_buffer *buffers;
-  /*
-    change to use uniform blocks
-  */
-  void *uniform_variables
-  int *uniform_variable_locations;
+  void *uniform_block;
+  GLuint uniform_buffer;
+  int uniform_block_index;
+  int uniform_variable_size;
   int num_buffers;
-  int num_uniform_variables;
 };
 struct gl_buffer {
   gl_program_context *ctx;
@@ -87,6 +85,7 @@ struct gl_buffer {
 void bind_scene(gl_scene *scene){
   glBindProgram(scene->program);
   glBindVertexArray(scene->VAO);
+  glBindBuffer(GL_UNIFORM, scene->uniform_buffer);
   return;
 }
 void bind_buffer(gl_buffer *buf){
@@ -101,7 +100,9 @@ void __attribute__((noreturn)) main_loop(global_context *ctx){
       gl_scene *scene = ctx->scenes + i*sizeof(gl_scene*);
       //or gl_scene scene = ctx->scenes[i];
       bind_scene(scene);
-      scene->update_scene(scene, ctx->userdata);
+      if(scene->update_scene){
+        scene->update_scene(scene, ctx->userdata);
+      }
       //bind uniform blocks
       for(j=0;j<scene->num_buffers;j++){
         gl_buffer *buf = scene->buffers + j*sizeof(gl_buffer);

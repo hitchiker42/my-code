@@ -233,3 +233,23 @@ GLuint make_data_buffer(GLenum buffer_type, void *data,
   glBufferData(GL_ARRAY_BUFFER, size, data, usage);
   return buffer;
 }
+/*
+  A basic vertex and fragment shader.
+*/
+const char *basic_vertex_shader =
+  "#version 330 core\n"
+  "layout(location = 0) in vec3 position;\n"
+  "layout(location = 1) in vec4 color;\n"
+  "out vec4 v_color;\n"
+  "void main(){\n"
+  "  gl_Position.xyz = position;\n"
+  "  gl_Position.w = 1.0f;\n"
+  "  v_color = color;\n"
+  "}\n";
+const char *basic_fragment_shader =
+  "#version 330 core\n"
+  "in vec4 v_color;\n"
+  "layout(location = 2) out vec4 f_color;\n"
+  "void main(){\n"
+  "  f_color = v_color;\n"
+  "}\n";

@@ -12,11 +12,14 @@ const char *vertex_shader_source =
   "}\n";
 const char *square_vertex_shader_source =
   "#version 330 core\n"
+  "layout(row_major) uniform;\n"
   "layout(location = 0) in vec3 position;\n"
-  //  "uniform vec4 rot;\n"
-  "uniform vec4 ucolor;\n"
-  "uniform vec2 shift;\n"
-  "uniform mat2 rot;\n"
+  "uniform uniform_block {\n"
+  "  uniform vec4 ucolor;\n"
+  "  uniform mat2 rot;\n"
+  "  uniform vec2 shift;\n"
+  "  //8 bytes of padding\n"
+  "};\n"
   "out vec4 v_color;\n"
   "void main(){\n"
   "  gl_Position.xyz = position;\n"//*scale;\n"

@@ -15,26 +15,33 @@ gl_shape *make_shape(gl_vertex *vertices, int num_vertices,
                                    num_vertices*sizeof(gl_vertex), usage);
   shape->buffer = buffer;
 }
-/*void draw_shape(gl_shape *shape){
-  //assume buffer data to upto date
-  bind_vertex_attrib(buffer, 0, 3, GL_FLOAT, 0,
-                     sizeof(struct vertex), NULL);
-  bind_vertex_attrib(buffer, 1, 4, GL_FLOAT, 0,
-                     sizeof(struct vertex), offsetof(struct vertex, color));
-  glDrawArrays(GL_TRIANGLES, first, count, num_triangles);
-  }*/
-void draw_triangles(GLuint buffer, int num_triangles){
-  bind_vertex_attrib(buffer, 0, 3, GL_FLOAT, 0,
-                     sizeof(struct vertex), NULL);
-  bind_vertex_attrib(buffer, 1, 4, GL_FLOAT, 0,
-                     sizeof(struct vertex), offsetof(struct vertex, color));
-  int *first = alloca(num_triangles), *count = alloca(num_triangles);
-  int i;
-  for(i=0;i<num_triangles;i++){
-    first[i] = i*3;
-    count[i] = 3;
-  }
-  glMultiDrawArrays(GL_TRIANGLES, first, count, num_triangles);
-  unbind_vertex_attrib_2(0,1);
-}
-void draw_square(GLuint buffer, 
+struct color cube_color_1 = {.r = 0.0, .g = 0.5, .b = 1.0, .a = 0.5};
+struct color cube_color_2 = {.r = 0.0, .g = 1.0, .b = 0.5, .a = 0.5};
+struct vertex cube[8] =
+  {{.pos = {-0.25,0.25,0.5}, .color = cube_color_1},
+   {.pos = {0.25,0.25,0.5}, .color = cube_color_1},
+   {.pos = {-0.25,-0.25,0.5}, .color = cube_color_1},
+   {.pos = {0.25,-0.25,0.5}, .color = cube_color_1},
+   {.pos = {-0.125,-0.125,0}, .color = cube_color_2},
+   {.pos = {0.375,-0.125,0}, .color = cube_color_2},
+   {.pos = {-0.125,0.375,0}, .color = cube_color_2},
+   {.pos = {0.375,0.375,0}, .color = cube_color_2}};
+uint8_t cube_indices[17] =
+  {0,1,2,3,4,5,6,7,0xff,2,4,0,6,1,7,3,5};
+/*
+      6 -- 7  (4 is hidden)
+     /|   /|
+    0----1 5
+    |/   |/
+    2----3
+
+    This is the best I can do, I think we need one restart
+    draw the front face: (0,1,2), (1,2,3)
+    draw the bottom face: (2,3,4), (3,4,5)
+    draw the rear face: (4,5,6), (5,6,7)
+    restart:
+    draw the left face: (2,4,0),(4,0,6)
+    draw the top face: (0,6,1), (6,1,7)
+    draw the right face: (1,7,3),(7,3,5)
+
+*/
