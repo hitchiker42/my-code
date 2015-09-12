@@ -49,10 +49,13 @@
   //possibly call a cleanup function
 
 */
+void init_scene_uniforms(gl_scene *scene, char *name, 
 void bind_scene(gl_scene *scene){
   glBindProgram(scene->program);
   glBindVertexArray(scene->VAO);
-  glBindBuffer(GL_UNIFORM, scene->uniform_buffer);
+  //implictly binds scene->uniform_buffer to GL_UNIFORM_BUFFER
+  glBindBufferRange(GL_UNIFORM_BUFFER, scene->scene_index, 
+                    scene->uniform_buffer, 0, 0);
   return;
 }
 void bind_buffer(gl_buffer *buf){

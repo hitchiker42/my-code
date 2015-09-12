@@ -22,6 +22,14 @@ extern "C" {
 #define __CAT(x,y) x ## y
 #define CAT(x,y) __CAT(x,y)
 #define M_PIf CAT(M_PI, f)
+#define I_4 {1.0,0.0,0.0,0.0,                   \
+             0.0,1.0,0.0,0.0,                   \
+             0.0,0.0,1.0,0.0,                   \
+             0.0,0.0,0.0,1.0}
+#define I_3 {1.0,0.0,0.0,                       \
+             0.0,1.0,0.0,                       \
+             0.0,0.0,1.0}
+
 //make programs bind the same as every other kind of object
 #define glBindProgram(p) glUseProgram(p)
 /*

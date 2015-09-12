@@ -34,6 +34,7 @@ AC_CHECK_LIB([pthread], [pthread_create])
 AC_CHECK_LIB([m], [cos])
 AC_CHECK_LIB([GLEW], [glewInit])
 AC_CHECK_LIB([glfw], [glfwInit])
+AC_CHECK_LIB([cblas], [cblas_sdot])
 AX_CHECK_GL
 AX_CHECK_GLU
 AX_CHECK_GLUT

@@ -30,6 +30,7 @@ struct gl_scene {
   int uniform_block_index;
   int uniform_variable_size;
   int num_buffers;
+  int scene_index;//used as the index for the uniform buffer binding
 };
 struct gl_buffer {
   gl_scene *scene;

@@ -267,7 +267,7 @@ INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
 LD = /usr/bin/ld -m elf_x86_64
 LDFLAGS = 
 LIBOBJS = 
-LIBS = -lglfw -lGLEW -lm -lpthread -ldl 
+LIBS = -lcblas -lglfw -lGLEW -lm -lpthread -ldl 
 LIBTOOL = $(SHELL) $(top_builddir)/libtool
 LIPO = 
 LN_S = ln -s
@@ -360,7 +360,7 @@ top_srcdir = .
 basic_test_SOURCES = basic_test.c gl_util.c C_util.c
 cube_SOURCES = basic_loop.c gl_util.c C_util.c cube.c
 AM_CFLAGS = -I/usr/include/libdrm -I/usr/include/libdrm  -I/usr/include/libdrm  -I/usr/include/libdrm  -Wall -Wno-unused -g -O2 -D_GNU_SOURCE -fPIC
-AM_LDFLAGS = -lGL -lGLU -lGL -lglut -lGLU -lGL  -lGL   -lglfw -lGLEW -lm -lpthread -ldl 
+AM_LDFLAGS = -lGL -lGLU -lGL -lglut -lGLU -lGL  -lGL   -lcblas -lglfw -lGLEW -lm -lpthread -ldl 
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
