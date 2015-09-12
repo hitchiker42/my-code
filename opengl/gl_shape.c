@@ -1,4 +1,9 @@
-#include "gl_types.h"p
+#include "gl_types.h"
+/*
+  Some functions to simplify creation of basic shapes
+*/
+gl_position *make_regular_polygon(gl_position center, int nsides, float radius){
+}
 gl_shape *make_triangle(gl_vertex *vertices, GLenum usage, GLuint VAO){
   gl_shape *tri = xmalloc(sizeof(gl_shape));
   tri->vertices = vertices;

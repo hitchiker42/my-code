@@ -59,9 +59,10 @@ void bind_buffer(gl_buffer *buf){
   glBindBuffer(GL_ARRAY_BUFFER, buf->array_buffer);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buf->index_buffer);
 }
-void __attribute__((noreturn)) main_loop(global_context *ctx){
+void __attribute__((noreturn)) gl_main_loop(global_context *ctx){
   int i,j,k;
   while(!gl_window_should_close(ctx->window)){
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     if(ctx->update_userdata){
       ctx->update_userdata(ctx->userdata);
     }
@@ -88,7 +89,7 @@ void __attribute__((noreturn)) main_loop(global_context *ctx){
       }
     }
     gl_swap_buffers(ctx->window);
-    gl_poll_events(ctx->window);
+    gl_poll_events();
   }
   exit(0);//need a way to specify an exit value
 }

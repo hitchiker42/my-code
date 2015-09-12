@@ -25,6 +25,11 @@ static inline void init_glew(void){
    */
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_LESS);
+  /*
+    Enable basic color blending
+  */
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   return;
 }
 #if (defined USE_GLFW) || !(defined USE_GLUT)
