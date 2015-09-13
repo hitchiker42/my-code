@@ -244,6 +244,8 @@ GLuint make_data_buffer(GLenum buffer_type, void *data,
   glBufferData(GL_ARRAY_BUFFER, size, data, usage);
   return buffer;
 }
+gl_positon compute_normal(void *triangle, int offset, int stride){
+  
 /*
   A basic vertex and fragment shader.
 */

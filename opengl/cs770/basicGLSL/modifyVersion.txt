@@ -1,0 +1,46 @@
+//--------------------- modifyVersion ------------------------------
+    /* NO LONGER NEEDED OR USED; 
+     * Linux only supports 3.0 shaders (right now) and still uses
+     * the old labeling: 1.3 or version 130. It supports all the
+     * functionality we need. In order to provide portability of
+     * these shaders, this code replaces the 
+     *    #version 330 
+     * specification in the first line with
+     *    #version 130
+     */
+    void modifyVersion( char* shaderText )
+    {
+        char* ostype = getenv( "OSTYPE" );
+        if ( ostype == NULL )
+        {
+            std::cerr << "************** Warning ******************\n"
+                      << "OSTYPE not defined; if this is a linux system,\n"
+                      << "can't fix shader versions\n"
+                      << "*****************************************\n";
+            return;
+        }
+        //                      ostype.startsWith( "linux" )
+        if ( strstr( ostype , "linux" ) == ostype )
+        {
+            std::cerr << "------ Linux: converting shader version ----\n"; 
+ 
+            std::string expectedVersion = "#version 330";
+            int vLen = expectedVersion.length();
+            std::string inVersion = std::string( shaderText, vLen );
+            if ( inVersion.compare( expectedVersion ) == 0 )
+            {
+                shaderText[ vLen - 3 ] = '1';
+                std::string outVersion = std::string( shaderText, vLen );
+                std::cerr << "-------------- Changed shader version from " 
+                          << inVersion << " to " << outVersion << "\n";
+            }
+            else
+            {
+                std::cerr << "\n****************** Warning *****************\n"
+                          << "No change: input shader is " << inVersion << "\n"
+                          << "expecting version 330 for portabilty.\n"
+                          << "********************************************\n";
+            }
+        }
+    }
+

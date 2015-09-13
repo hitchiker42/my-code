@@ -13,11 +13,6 @@
  *              in Triangle.cpp
  *
  *  7 Nov 2014: Added call to glew for Mac OS X
- *  7 Sep 2015: Added compile-time checks for 3.2 support
- * 10 Sep 2015: Compiler check wasn't quite right, linux
- *              supports 3.3, but doesn't define the GLUT
- *              constant! 
- *              Needs freeglut_ext.h added to includes in gl770.h
  */
 
 
@@ -49,7 +44,7 @@ void keyboardHandler( unsigned char key, int x, int y );
 
 //--------------------- constructor ---------------------
 
-//---------------------- init --------------------
+//----------------------< init --------------------
 void init( void )
 {
     openWindow();
@@ -79,18 +74,14 @@ void init( void )
  */
 void openWindow()
 {
+    //this should fail if OpenGL3.3 isn't supported
+    glutInitContextVersion( 3,3 );
     glutInitWindowSize( windowWidth, windowHeight );
     glutInitWindowPosition( 100, 150 );           // window pos on screen
+    glutInitDisplayMode( GLUT_SINGLE | GLUT_RGB);// | // GLUT_DEPTH |
+    //                         GLUT_3_2_CORE_PROFILE ); 
 
-    #ifdef __APPLE__
-        glutInitDisplayMode( GLUT_SINGLE | GLUT_RGB | GLUT_3_2_CORE_PROFILE ); 
-    #else
-        // if OpenGL3.3 isn't supported, createWindow fails hard!
-        glutInitContextVersion( 3, 3 );
-        glutInitDisplayMode( GLUT_SINGLE | GLUT_RGB );// | // GLUT_DEPTH |
-    #endif
-
-    glutCreateWindow( "cppGLSL demo" );      // open the screen window
+    glutCreateWindow( "cppGLSL demo" );           // open the screen window
     checkGL();
 
     // Must be done after create window
@@ -183,6 +174,11 @@ void buildShaders()
     
     // Load shaders and use the resulting shader shaderProgram
     shaderProgram = makeShaders( "transform.vsh", "flat.fsh" );
+    
+    // If using vColor attached to a vertex, we'd do something like:
+    //GLuint col = glGetAttribLocation( shaderProgram, "vColor" );
+    //glEnableVertexAttribArray( col );
+    //glVertexAttribPointer( col, 2, GL_FLOAT, GL_FALSE, 0, BUFFER_OFFSET(0) );
     
     glUseProgram( shaderProgram );
     checkGL();

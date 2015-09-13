@@ -18,7 +18,7 @@ class Regular_Polygon(Shape):
     def __init__(self, positon, sides, radius): 
         """Construct a regular polygon given the center 
         and the (circum)radius"""
-        self.interior_angle = ((sides - 2)*math.pi)/sides
+        self.interior_angle = ((sides - 2)*math.pi)/W1sides
         
         
     
