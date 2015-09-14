@@ -1,5 +1,8 @@
 #ifndef _C_UTIL_H_
 #define _C_UTIL_H_
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*
   Various utility C functions, specifically functions that would fit as
   stdlib functions.
@@ -102,6 +105,10 @@ char* read_file_to_string_fd(int fd, size_t *sz);
 char* read_file_to_string_FILE(FILE *file, size_t *sz);
 char* read_file_to_string_filename(const char *file, size_t *sz);
 /*
+  Since this just define macros the _Generic is never acutally evaluated
+  so this is valid in any version of C or C++, however they can only
+  be used in C11.
+
   TODO: wrap this in an #if (defined _ISOC11_SOURCE) 
   and define alternative versions for older C versions
 */
@@ -118,6 +125,9 @@ char* read_file_to_string_filename(const char *file, size_t *sz);
   generic_file_macro(regular_filep_, x)
 #define read_file_to_string(x, szptr)                                   \
   generic_file_macro(read_file_to_string_, x, szptr)
+
+  
+
 //mmap the file given by fd, return a struct contanintg a pointer
 //to the maping and the length of the mapping, if shared is
 //nonzero the mapping is shared, otherwise it is private
@@ -170,5 +180,7 @@ void float_sleep_full(double sleep_time);
     char *str = alloca(sz);                     \
     snprintf(str, sz, fmt, ##args);             \
     str;})
-
+#ifdef __cplusplus
+}
+#endif
 #endif

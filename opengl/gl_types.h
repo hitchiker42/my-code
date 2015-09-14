@@ -17,7 +17,8 @@ typedef struct gl_imm gl_imm;//type of 32 bit objects
 typedef struct vertex gl_vertex;
 //simple vertex, only xy, rgb
 typedef struct svertex gl_svertex;
-typedef struct position gl_position;//xyzw
+typedef struct position gl_position;//xyz
+typedef struct position4 gl_position4;//xyzw
 typedef struct point gl_point; //just x and y
 typedef struct color gl_color; //rgba, as floats
 typedef struct gl_string gl_string; //string + length
@@ -73,7 +74,7 @@ union gl_obj {
   void *ptr;//generic pointer
   struct gl_imm imm;//has a float in it, which is why we need this union
 };
-_Static_assert(sizeof(gl_obj) == sizeof(uint64_t),
+static_assert(sizeof(gl_obj) == sizeof(uint64_t),
                "Error, gl_obj is too large, ensure gl_imm is the right size\n");
 /*
   Macros to get values from a gl_obj
@@ -136,6 +137,12 @@ struct position {
   float y;
   float z;
 };
+struct position4 {
+  float x;
+  float y;
+  float z;
+  float w;
+};
 struct color {
   float r;
   float g;
@@ -172,21 +179,5 @@ struct vertex_attrib {
   int normalized;
   int stride;
   size_t offset;
-};
-  
-  
-typedef struct vertex gl_triangle[3];
-struct shape {
-  struct vertex *vertices;
-  int num_vertices;
-  GLuint buffer;
-  GLuint VAO;
-};
-struct solid_shape {
-  gl_position *points;
-  int num_points;
-  gl_color color;
-  GLuint buffer;
-  GLuint VAO;
 };
 #endif

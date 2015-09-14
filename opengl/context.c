@@ -49,18 +49,68 @@
   //possibly call a cleanup function
 
 */
-//void init_scene_uniforms(gl_scene *scene, char *name, 
+//void init_scene_uniforms(gl_scene *scene, char *name,
 void bind_scene(gl_scene *scene){
   glBindProgram(scene->program);
   glBindVertexArray(scene->VAO);
   //implictly binds scene->uniform_buffer to GL_UNIFORM_BUFFER
-  glBindBufferRange(GL_UNIFORM_BUFFER, scene->scene_index, 
+  glBindBufferRange(GL_UNIFORM_BUFFER, scene->scene_index,
                     scene->uniform_buffer, 0, 0);
   return;
 }
 void bind_buffer(gl_buffer *buf){
   glBindBuffer(GL_ARRAY_BUFFER, buf->array_buffer);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buf->index_buffer);
+}
+global_context *allocate_global_context(){
+  global_context *ctx = zmalloc(sizeof(global_context));
+  return ctx;
+}
+gl_buffer *allocate_gl_buffer(){
+  gl_buffer *buf = zmalloc(sizeof(gl_buffer));
+  return buf;
+}
+gl_scene *allocate_gl_scene(){
+  gl_scene *scene = zmalloc(sizeof(gl_scene));
+  return scene;
+
+global_context *make_global_context(int window_width, int window_height,
+                                    const char *name, void* userdata){
+  gl_window win = init_gl_context(window_width, window_height, name);
+  gl_context *ctx = zmalloc(sizeof(gl_context));//zero it to be safe
+  ctx->window = win;
+  ctx->userdata = userdata;
+  return ctx;
+}
+/*
+  Allocates a gl_scene, compiles a program using the given vertex and
+  fragment shader sources (which are strings containing the literal source)
+  and initializes the VAO.
+*/
+gl_scene *make_simple_scene(const char *vertex_shader, const char *fragment_shader){
+  GLuint prog = create_shader_program(vertex_shader, fragment_shader, 0);
+  gl_scene *scene = zmalloc(sizeof(gl_scene));
+  scene->program = prog;
+  glGenVertexArrays(1, &scene->VAO);
+  return scene;
+}
+/*
+  Allocates a gl_buffer, creates and sets the context of the array
+  and index buffers.
+*/
+gl_buffer *make_gl_buffer(void *vertices, size_t vertices_size, GLenum vertex_usage,
+                          void *indices, size_t indices_size, GLenum index_usage){
+  gl_buffer *buf = zmalloc(sizeof(gl_buffer));
+  glGenBuffers(2,&(buf->buffers));
+  glBindBuffer(GL_ARRAY_BUFFER, buf->array_buffer);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buf->array_buffer);
+  glBufferData(GL_ARRAY_BUFER, vertices, vertices_size, vertex_usage);
+  glBufferData(GL_ARRAY_BUFER, indices, indices_size, index_usage);
+  buf->vertices = vertices;
+  buf->vertices_size = vertices_size;
+  buf->indices = indices;
+  buf->indices_size = indices_size;
+  return buf;
 }
 void __attribute__((noreturn)) gl_main_loop(global_context *ctx){
   int i,j,k;

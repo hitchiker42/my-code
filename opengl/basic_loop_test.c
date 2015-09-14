@@ -1,5 +1,5 @@
 #include "common.h"
-#include "basic_loop.c"
+#include "context.c"
 const char *vertex_shader_source =
   "#version 330 core\n"
   "layout(location = 0) in vec3 position;\n"
@@ -91,7 +91,7 @@ void update_scene_2(gl_scene *scene, userdata *data){
   unis->rot[1] = data->sin_theta; unis->rot[2] = -data->sin_theta;
   unis->shift[0] = cos_theta; unis->shift[1] = sin_theta;
   glBufferSubData(GL_UNIFORM, 4*sizeof(float), 6*sizeof(float), &unis->rot);
-  glUniformBlockBinding(scene->program, scene->uniform
+  glUniformBlockBinding(scene->program, scene->uniform_block_index
   
 int main(){
   GLFW *win = init_gl_context(800, 800, "basic_test");

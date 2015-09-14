@@ -1,6 +1,7 @@
 #ifndef __MY_GL_COMMON_H__
 #define __MY_GL_COMMON_H__
 #ifdef __cplusplus
+#define restrict __restrict__
 extern "C" {
 #endif
 #ifndef _GNU_SOURCE

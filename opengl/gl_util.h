@@ -22,16 +22,18 @@ extern "C" {
 #define __CAT(x,y) x ## y
 #define CAT(x,y) __CAT(x,y)
 #define M_PIf CAT(M_PI, f)
-#define I_4 {1.0,0.0,0.0,0.0,                   \
-             0.0,1.0,0.0,0.0,                   \
-             0.0,0.0,1.0,0.0,                   \
-             0.0,0.0,0.0,1.0}
-#define I_3 {1.0,0.0,0.0,                       \
-             0.0,1.0,0.0,                       \
-             0.0,0.0,1.0}
+#define I_4(x) {x,0.0,0.0,0.0,                  \
+                0.0,x,0.0,0.0,                  \
+                0.0,0.0,x,0.0,                  \
+                0.0,0.0,0.0,x}
+#define I_3(x) {x,0.0,0.0,                      \
+                0.0,x,0.0,                      \
+                0.0,0.0,x}
 
 //make programs bind the same as every other kind of object
 #define glBindProgram(p) glUseProgram(p)
+//this name makes more sense (maybe change to GL_ARRAY_INDEX_BUFFER)
+#define GL_INDEX_BUFER GL_ELEMENT_ARRAY_BUFFER
 /*
   functions to control glut/glfw
 */

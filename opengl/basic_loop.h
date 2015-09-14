@@ -1,8 +1,5 @@
-#ifndef __BASIC_LOOP_H__
-#define __BASIC_LOOP_H__
-/*
-  Needs a bettern name
-*/
+#ifndef __CONTEXT_H__
+#define __CONTEXT_H__
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -12,10 +12,6 @@
   All transformation matrices are 4x4 matrices unless otherwise stated.
 */
 //literal for the 4x4 identity matrix
-#define I_4 {1.0,0.0,0.0,0.0,                   \
-             0.0,1.0,0.0,0.0,                   \
-             0.0,0.0,1.0,0.0,                   \
-             0.0,0.0,0.0,1.0}
 #define I_4(x) {x,0.0,0.0,0.0,                  \
                 0.0,x,0.0,0.0,                  \
                 0.0,0.0,x,0.0,                  \
@@ -23,8 +19,7 @@
 //only evaluates mat once
 #define set_diagonal(mat, x)                            \
   ({__typeof(mat) _mat = mat;                           \
-    _mat[0] = _mat[5] = _mat[10] = _mat[15] = x;        \
-    _mat;})
+    _mat[0] = _mat[5] = _mat[10] = _mat[15] = x;})
 /*
   Utility routines for creating and manipulating transformation matrices.
   All transformation matrices are 4x4 matrices unless otherwise stated, with indices
@@ -50,8 +45,8 @@ float *generalized_rotation_f(float theta, float l, float m, float n){
   cblas_smat scratch = make_smat_square(scratch_data, 4);
   //cos * identity matrix
   float *rot_data = ZMALLOC(4*4*sizeof(float));
-  rot_data[0] = rot_dat[5] = rot_data[10] = c;
-  rot[15] = 1.0f;//this should be 1 right?
+  rot_data[0] = rot_data[5] = rot_data[10] = c;
+  rot_data[15] = 1.0f;//this should be 1 right?
   cblas_smat rot = make_smat_square(rot_data, 4);
 
   rot = smat_addmul_square(1,scratch,1,rot);//cos(θ)I + sin(θ)[u]ₓ
@@ -71,8 +66,8 @@ double *generalized_rotation_d(double theta, double l, double m, double n){
   cblas_dmat scratch = make_dmat_square(scratch_data, 4);
   //cos * identity matrix
   double *rot_data = ZMALLOC(4*4*sizeof(double));
-  rot_data[0] = rot_dat[5] = rot_data[10] = c;
-  rot[15] = 1.0f;//this should be 1 right? or should it be c?
+  rot_data[0] = rot_data[5] = rot_data[10] = c;
+  rot_data[15] = 1.0f;//this should be 1 right? or should it be c?
   cblas_dmat rot = make_dmat_square(rot_data, 4);
 
   rot = dmat_addmul_square(1,scratch,1,rot);//cos(θ)I + sin(θ)[u]ₓ
@@ -82,24 +77,49 @@ double *generalized_rotation_d(double theta, double l, double m, double n){
 }
 
 #define sincosd sincos
-#define make_rot_fun(type, axis, suffix, a, b, c, d)            \
-  SINLINE type *make_rot_##plane##_##suffix(type theta){        \
-    type s,c;                                                   \
-    sincos##suffix(theta, &s, &c);                              \
-    type *rot = ZMALLOC(4*4*sizeof(type));                      \
-    rot[a] = rot[b] = c;                                        \
-    rot[c] = s; rot[d] = -s;                                    \
-    return rot;                                                 \
-  }
-#define make_rot_funs(axis, a, b, c, d)         \
-  make_rot_fun(float, axis, f, a, b, c, d);     \
-  make_rot_fun(double, axis, d, a, b, c, d);
+#define make_rot_fun(type, axis, suffix, size, i1, i2, i3, i4)          \
+  type *axis##_rotation_##suffix(type theta){                           \
+    type s_,c_;                                                         \
+    sincos##suffix(theta, &s_, &c_);                                    \
+    type *rot = ZMALLOC(4*4*sizeof(type));                              \
+    set_diagonal(rot, 1.0);                                             \
+    rot[i1] = rot[i2] = c_;                                             \
+    rot[i3] = s_; rot[i4] = -s_;                                        \
+    return rot;                                                         \
+  }/*                                                                     \
+  type *add_##axis##_rotationi2efore_##suffix(type *data, type theta){  \
+    type s_,c_;                                                         \
+    sincos##suffix(theta, &s_, &c_);                                    \
+    type *rot = ZMALLOC(4*4*sizeof(type));                              \
+    seti4iagonal(rot, 1.0);                                             \
+    rot[i1] = rot[i2] = c_;                                             \
+    rot[i3] = s_; rot[i4] = -s_;                                        \
+    cblas_##size##mat rot_mat = make_##size##mat_square(rot, 4);        \
+    cblas_##size##mat mat = make_##size##mat_square(data, 4);           \
+    size##gemm(1,rot_mat, mat, 0, mat);                                 \
+    return mat.data;                                                    \
+  }                                                                     \
+  type *add_##axis##_rotationi1fter_##suffix(type *data, type theta){   \
+    type s_,c_;                                                         \
+    sincos##suffix(theta, &s_, &c_);                                    \
+    type *rot = ZMALLOC(4*4*sizeof(type));                              \
+    seti4iagonal(rot, 1.0);                                             \
+    rot[i1] = rot[i2] = c_;                                             \
+    rot[i3] = s_; rot[i4] = -s_;                                        \
+    cblas_##size##mat rot_mat = make_##size##mat_square(rot, 4);        \
+    cblas_##size##mat mat = make_##size##mat_square(data, 4);           \
+    size##gemm(1, mat, rot_mat, 0, mat);                                \
+    return mat.data;                                                    \
+  }*/
+#define make_rot_funs(axis, _a, _b, _c, _d)         \
+  make_rot_fun(float, axis, f, s, _a, _b, _c, _d);  \
+  make_rot_fun(double, axis, d, d, _a, _b, _c, _d);
 //clockwise rotation matrices
-make_rot_funs(x, 5, 10, 6, 9);
+make_rot_funs(x, 5, 10, 6, 9;)
 make_rot_funs(y, 0, 10, 8, 2);
 make_rot_funs(z, 0, 5,  1, 4);
 
-static float *translation_matrix_internal_f(float *trans, 
+static float *translation_matrix_internal_f(float *trans,
                                             float x, float y, float z){
   set_diagonal(trans, 1.0);
   trans[3] = x;
@@ -107,7 +127,7 @@ static float *translation_matrix_internal_f(float *trans,
   trans[11] = z;
   return trans;
 }
-static double *translation_matrix_internal_d(double *trans, 
+static double *translation_matrix_internal_d(double *trans,
                                              double x, double y, double z){
   set_diagonal(trans, 1.0);
   trans[3] = x;
@@ -129,7 +149,7 @@ float *add_translation_before_f(float *mat, float x, float y, float z){
   memset(scratch,'\0', 4*4*sizeof(float));
   cblas_smat transform = make_smat_square(mat, 4);
   cblas_smat translate = make_smat_square(scratch, 4);
-  transform = sgemm(1, translate, transform, 0 transform);
+  transform = sgemm(1, translate, transform, 0, transform);
   return transform.data;
 }
 float *add_translation_after_f(float *mat, float x, float y, float z){
@@ -137,7 +157,7 @@ float *add_translation_after_f(float *mat, float x, float y, float z){
   memset(scratch,'\0', 4*4*sizeof(float));
   cblas_smat transform = make_smat_square(mat, 4);
   cblas_smat translate = make_smat_square(scratch, 4);
-  transform = sgemm(1, transform, translate, 0 transform);
+  transform = sgemm(1, transform, translate, 0, transform);
   return transform.data;
 }
 
@@ -146,7 +166,7 @@ double *add_translation_before_d(double *mat, double x, double y, double z){
   memset(scratch,'\0', 4*4*sizeof(double));
   cblas_dmat transform = make_dmat_square(mat, 4);
   cblas_dmat translate = make_dmat_square(scratch, 4);
-  transform = dgemm(1, translate, transform, 0 transform);
+  transform = dgemm(1, translate, transform, 0, transform);
   return transform.data;
 }
 double *add_translation_after_d(double *mat, double x, double y, double z){
@@ -154,7 +174,6 @@ double *add_translation_after_d(double *mat, double x, double y, double z){
   memset(scratch,'\0', 4*4*sizeof(double));
   cblas_dmat transform = make_dmat_square(mat, 4);
   cblas_dmat translate = make_dmat_square(scratch, 4);
-  transform = dgemm(1, transform, translate, 0 transform);
+  transform = dgemm(1, transform, translate, 0, transform);
   return transform.data;
 }
-#endif /* __MATRIX_TRANSFORMS_H__ */

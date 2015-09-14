@@ -11,6 +11,7 @@
 
 #include "gl770.h"
 
+#include "common.h"
 #define point2 vec2
 
 class Shape

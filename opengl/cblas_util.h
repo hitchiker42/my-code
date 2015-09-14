@@ -40,10 +40,12 @@
 #define row_major_order CblasRowMajor
 typedef struct cblas_svector cblas_svector;
 typedef cblas_svector cblas_svec;
+typedef cblas_svector cblas_fvec;
 typedef struct cblas_dvector cblas_dvector;
 typedef cblas_dvector cblas_dvec;
 typedef struct cblas_smatrix cblas_smatrix;
 typedef cblas_smatrix cblas_smat;
+typedef cblas_smatrix cblas_fmat;
 typedef struct cblas_dmatrix cblas_dmatrix;
 typedef cblas_dmatrix cblas_dmat;
 struct cblas_svector {
@@ -464,14 +466,14 @@ SINLINE cblas_smat *make_dmat_idenity(int n){
 SINLINE cblas_smat* stensor_mul(const cblas_svec x, const cblas_svec y){
   //need to explicitly zero this
   cblas_smat *ret = ZMALLOC(x.n*y.n*sizeof(float) + sizeof(cblas_smat));
-  ret->m = x.n; ret->n = y.n; ret->lda = x.n; ret->CblasRowMajor;
+  ret->m = x.n; ret->n = y.n; ret->lda = x.n; ret->order = CblasRowMajor;
   cblas_sger(ret->order, x.n, y.n, 1, x.data, x.inc,
              y.data, y.inc, ret->data, ret->lda);
   return ret;
 }
 SINLINE cblas_dmat* dtensor_mul(const cblas_dvec x, const cblas_dvec y){
   cblas_dmat *ret = ZMALLOC(x.n*y.n*sizeof(double) + sizeof(cblas_dmat));
-  ret->m = x.n; ret->n = y.n; ret->lda = x.n; ret->CblasRowMajor;
+  ret->m = x.n; ret->n = y.n; ret->lda = x.n; ret->order = CblasRowMajor;
   cblas_dger(ret->order, x.n, y.n, 1, x.data, x.inc,
              y.data, y.inc, ret->data, ret->lda);
   return ret;
@@ -480,14 +482,14 @@ SINLINE cblas_dmat* dtensor_mul(const cblas_dvec x, const cblas_dvec y){
 SINLINE cblas_smat* stensor_mul_col(const cblas_svec x, const cblas_svec y){
   //need to explicitly zero this
   cblas_smat *ret = ZMALLOC(x.n*y.n*sizeof(float) + sizeof(cblas_smat));
-  ret->m = x.n; ret->n = y.n; ret->lda = x.n; ret->CblasColMajor;
+  ret->m = x.n; ret->n = y.n; ret->lda = x.n; ret->order = CblasColMajor;
   cblas_sger(ret->order, x.n, y.n, 1, x.data, x.inc,
              y.data, y.inc, ret->data, ret->lda);
   return ret;
 }
 SINLINE cblas_dmat* dtensor_mul_col(const cblas_dvec x, const cblas_dvec y){
   cblas_dmat *ret = ZMALLOC(x.n*y.n*sizeof(double) + sizeof(cblas_dmat));
-  ret->m = x.n; ret->n = y.n; ret->lda = x.n; ret->CblasColMajor;
+  ret->m = x.n; ret->n = y.n; ret->lda = x.n; ret->order = CblasColMajor;
   cblas_dger(ret->order, x.n, y.n, 1, x.data, x.inc,
              y.data, y.inc, ret->data, ret->lda);
   return ret;

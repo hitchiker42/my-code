@@ -1,9 +1,7 @@
 #ifndef __MATRIX_TRANSFORMS_H__
 #define __MATRIX_TRANSFORMS_H__
 #include "cblas_util.h"
-#ifndef SINLINE
-#define SINLINE static inline
-#endif
+#include "matrix_transforms.h"
 #ifndef ZMALLOC
 #define UNDEF_ZMALLOC
 #define ZMALLOC(sz) calloc(sz,1)
@@ -12,47 +10,65 @@
 #define UNDEF_XMALLOC
 #define XMALLOC(sz) malloc(sz)
 #endif
-//literal for the 4x4 identity matrix
-#define I_4 {1.0,0.0,0.0,0.0,                   \
-             0.0,1.0,0.0,0.0,                   \
-             0.0,0.0,1.0,0.0,                   \
-             0.0,0.0,0.0,1.0}
 /*
   Utility routines for creating and manipulating transformation matrices.
-  All transformation matrices are 4x4 matrices unless otherwise stated, with indices
-  |0 |1 |2 |3 |
-  |4 |5 |6 |7 |
-  |8 |9 |10|11|
-  |12|13|14|15|
-  Generalized rotation matrix around unit vector (l,m,n) (taken from wikipedia)
-  |ll(1-cos(θ)) +  (cos(θ))|ml(1-cos(θ)) - n(sin(θ))|nl(1-cos(θ)) + m(sin(θ))|
-  |lm(1-cos(θ)) + n(sin(θ))|mm(1-cos(θ)) -  (cos(θ))|nm(1-cos(θ)) - l(sin(θ))|
-  |ln(1-cos(θ)) + m(sin(θ))|mn(1-cos(θ)) - l(sin(θ))|nn(1-cos(θ)) +  (cos(θ))|
+  All transformation matrices are 4x4 matrices unless otherwise stated
 */
-#define sincosd sincos
-#define make_rot_fun(type, axis, suffix, a, b, c, d)            \
-  SINLINE type *make_rot_##plane##_##suffix(type theta){        \
-    type s,c;                                                   \
-    sincos##suffix(theta, &s, &c);                              \
-    type *rot = ZMALLOC(4*4*sizeof(type));                      \
-    rot[a] = rot[b] = c;                                        \
-    rot[c] = s; rot[d] = -s;                                    \
-    return rot;                                                 \
-  }
-//clockwise rotation matrices
-make_rot_fun(float, x, f, 5, 10, 1, 4);
-make_rot_fun(float, y, f, 0, 10, 8, 3);
-make_rot_fun(float, z, f, 0, 5,  1, 4);
+/*
+  Functions which create new transformation matrices
+*/
+//Create a rotation matrix that rotates a given point theta radians
+//around the axis specified by the unit vector [l,m,n]
+float *generalized_rotation_f(float theta, float l, float m, float n);
+double *generalized_rotation_d(double theta, double l, double m, double n);
 
-make_rot_fun(double, x, d, 5, 10, 1, 4);
-make_rot_fun(double, y, d, 0, 10, 8, 3);
-make_rot_fun(double, z, d, 0, 5,  1, 4);
-float *make_rot_xy_f(float theta){
-  float sin,cos
-double *make_rot_xy_d(double theta);
-float *make_rot_yz_f(float theta);
-double *make_rot_yz_d(double theta);
-float *make_rot_zx_f(float theta);
-double *make_rot_zx_d(double theta);
+/*
+  Create a rotation matrix to rotate a point theta radians around the
+  x, y, or z axis. These are special cases of the generalized_rotation
+  function, but are much faster since the axis is fixed at compile time.
+*/
+float *x_rotation_f(float theta);
+float *y_rotation_f(float theta);
+float *z_rotation_f(float theta);
+
+float *add_x_rotation_after_f(float* data, float theta);
+float *add_y_rotation_after_f(float* data, float theta);
+float *add_z_rotation_after_f(float* data, float theta);
+
+float *add_x_rotation_before_f(float* data, float theta);
+float *add_y_rotation_before_f(float* data, float theta);
+float *add_z_rotation_before_f(float* data, float theta);
+
+double *x_rotation_d(double theta);
+double *y_rotation_d(double theta);
+double *z_rotation_d(double theta);
+
+double *add_x_rotation_after_d(double* data, double theta);
+double *add_y_rotation_after_d(double* data, double theta);
+double *add_z_rotation_after_d(double* data, double theta);
+
+double *add_x_rotation_before_d(double* data, double theta);
+double *add_y_rotation_before_d(double* data, double theta);
+double *add_z_rotation_before_d(double* data, double theta);
+
+/*
+  Create a Matrix which given a point (a,b,c,1) produces (a+x,b+y,c+z,1)
+*/
+float *make_translation_f(float x, float y, float z);
+double *make_translation_d(double x, double y, double z);
+
+/*
+  Functions which add a transformation to an existing matrix
+*/
+/*
+  create a translation matrix T using x, y, z, and return T*mat
+*/
+float *add_translation_before_f(float *mat, float x, float y, float z);
+double *add_translation_before_d(double *mat, double x, double y, double z);
+/*
+  create a translation matrix T using x, y, z, and return mat*T
+*/
+float *add_translation_after_f(float *mat, float x, float y, float z);
+double *add_translation_after_d(double *mat, double x, double y, double z);
 
 #endif /* __MATRIX_TRANSFORMS_H__ */

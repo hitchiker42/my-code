@@ -1,6 +1,6 @@
 #include "common.h"
 #include "basic_loop.h"
-#include <cblas.h>
+#include "cblas_util.h"
 const char *vertex_shader =
   "#version 330 core\n"
   "layout(row_major) uniform;\n"
@@ -27,9 +27,10 @@ struct userdata {
 };
 //non c++ compatible initializers
 struct userdata rot_angle = {0,1,0};
-float rotation_matrix[16] = I_4;
-float shift_matrix[16] = I_4;
+float rotation_matrix[16] = I_4(1.0);
+float shift_matrix[16] = I_4(1.0);
 float transform_matrix[16];
+
 /*
       6 -- 7  (4 is hidden)
      /|   /|
@@ -87,19 +88,10 @@ void main_loop(global_context *ctx){
   }
   exit(EXIT_SUCCESS);
 }
-#define sgemm_square(n,a,A,B,b,C)               \
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, n, n, n, a,  \
-              A, n, B, n, b, C, n);
 //just do the updating of userdata here
 void update_scene(gl_scene *scene, struct userdata *data){
   data->theta = fmod((data->theta  + (2*M_PIf/360)),(2*M_PIf));
   sincosf(data->theta, &data->sin_theta, &data->cos_theta);
-  /* We're rotating around the y-z axis so the rotation matrix looks like:
-     |1|0      |0     |0|
-     |0|cos(θ) |sin(θ)|0|
-     |0|-sin(θ)|cos(θ)|0|
-     |0|0      |0     |1|
-   */
   
   rotation_matrix[5] = rotation_matrix[10] = data->cos_theta;
   rotation_matrix[6] = data->sin_theta;
@@ -107,8 +99,11 @@ void update_scene(gl_scene *scene, struct userdata *data){
 
   shift_matrix[3] = data->cos_theta;
   shift_matrix[7] = data->sin_theta;
-//  shift_matrix[11] = (data->theta - M_PIf)/M_PIf;
-  sgemm_square(4, 1.0, shift_matrix, rotation_matrix, 0, transform_matrix);
+
+  cblas_smat rot = make_smat_square(rotation_matrix, 4);
+  cblas_smat shift = make_smat_square(shift_matrix, 4);
+  cblas_smat transform = make_smat_square(transform_matrix, 4);
+  sgemm(1,shift,rot,0,transform);
 }
 gl_scene* init_scene(void){
   gl_scene *scene = xmalloc(sizeof(gl_scene));
