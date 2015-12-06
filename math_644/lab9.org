@@ -1,0 +1,51 @@
+5.
+Begin R-Code:
+n.errors = c(3,2,4,1,3,1,3,1,0,1,3,2,0,2,0,1,1,1,2,3)
+n.errors = sort(n.errors)
+# output 0 0 0 1 1 1 1 1 1 1 2 2 2 2 3 3 3 3 3 4
+err.count = c(3,7,4,5,1)
+sum(err.count) == 20
+# TRUE, Check that count is correct
+p = sum(n.errors)/20*1000
+# 0.0017
+binom.prob = function(k,n,p){choose(n,k)*p**k*(1-p)**(n-k)}
+expected.prob = sapply(seq(0,4), function(x){binom.prob(x,20,p)})
+# 9.665435e-01 3.291844e-02 5.325381e-04 5.441139e-06 3.937917e-08
+# We can do the chi^2 test in R with the info we have now
+chisq.test(n.errors,p = rep(expected.value, err.count), rescale.p = TRUE)
+#NOTE: df is really 18, but I'm not sure how to tell R that, but given what
+#We get for the p value, I'd say it doesn't really matter.
+#	Chi-squared test for given probabilities
+#
+#data:  n.errors
+#X-squared = 38195000, df = 19, p-value < 2.2e-16
+#
+#Warning message:
+#In chisq.test(n.errors, p = rep(expected.value, err.count), rescale.p = TRUE) :
+#  Chi-squared approximation may be incorrect
+expected.count = expected.prob*20
+# 1.933087e+01 6.583688e-01 1.065076e-02 1.088228e-04 7.875835e-07
+test.statistic =  (err.count-expected.count)**2/expected.count
+# 1.379645e+01 6.108474e+01 1.494250e+03 2.297213e+05 1.269705e+06
+ts = sum(test.statistic)
+# 1500995
+critical.value = qchisq(0.05, df=18)
+# 9.390455
+ts > critical.value
+# TRUE (duh)
+p.value = 1-pchisq(ts)
+# 0, i.e So small that it can't be represented in a floating point number
+End R-Code
+
+Table:
+| Number of Errors | Times Occured | Expected Probibility | Expected Count | (O_i-E_i)^2/E_i |
+|------------------+---------------+----------------------+----------------+-----------------|
+|                0 |             3 |            0.9665435 |       19.33087 |        13.79645 |
+|                1 |             7 |          0.003291844 |      0.6583688 |        61.08474 |
+|                2 |             4 |         5.325381e-04 |    0.001065076 |        1494.250 |
+|                3 |             5 |          5.441139e-6 |    1.088228e-4 |      2.297213e5 |
+|                4 |             1 |          3.937917e-8 |    7.875835e-7 |      1.269705e6 |
+
+Conclusion:
+We reject the null hypothesis, In fact we can be 100% confident that the data
+does not follow a binominal distribution.

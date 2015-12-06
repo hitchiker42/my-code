@@ -1,0 +1,33 @@
+# [0.5055, 0.5167, 0.4966, 0.4773, 0.5058, 0.4820, 0.4566, 0.4972, 0.4851, 0.5143,
+# 0.4942, 0.4957, 0.4957, 0.4778, 0.4894, 0.4865, 0.4950, 0.4826, 0.4923,
+# 0.5198]
+1. We need to know if the distribution is approximately normal, the different
+   tests used in hypothesis testing (t-test, z-test, etc...) only work for
+   normally distributed data.   
+2. The data seems roughly normal, the plots aren't perfectly normal, but they
+   seem close enough to normal that using the normal distribution is a good estimate.
+#+CAPTION: Histogram of lead diameters
+[[./hist.png]]
+#+CAPTION: Q-Q plot of lead diamaters
+[[./qqplot.png]]
+
+3.	One Sample z-test\\
+Data:  lead.diam\\
+\alpha = 0.01\\
+z = -1.497\\
+n = 20.0000000\\
+test statistic: sample mean = 1/20 * sum(lead.diam)\\
+mean of lead.diam (sample mean): 0.493305\\
+Std. Dev. = 0.0200000\\
+Std. Dev. of the sample mean = 0.0044721\\
+p-value = 0.1344 = P(Z<-1.497)*2\\
+null hypothesis: true mean is equal to 0.5\\
+alternative hypothesis: true mean is not equal to 0.5\\
+99 percent confidence interval: 0.4817855 0.5048245\\
+
+p-value >> \alpha, so we fail to reject the null hypothesis
+
+4. See data in part 2 for 99% confidence interval.
+   The 99% confidence interval is the interval in which 99% of values will fall
+   in, that is we are 99% confident that a value will fall within 0.4817855 and
+   0.5048245

@@ -1,0 +1,50 @@
+Tucker DiNapoli
+1.
+|    x | P(x) | xP(x) |
+|    0 | 0.48 | 0     |
+|    1 | 0.28 | 0.28  |
+|    2 | 0.14 | 0.28  |
+|    3 | 0.06 | 0.18  |
+|    4 | 0.03 | 0.12  |
+|    5 | 0.01 | 0.05  |
+| Sum: |  1.0 | 0.91  |
+
+a. Is this a valid probability distribution?
+   Yes, The sum of the probabilities is 1.0.
+b. All dead lobsters: 0.01
+   No  dead lobsters: 0.48
+c. 1 - P(0) = 1 - 0.48 = 0.52
+   The compliment rule, the probability of at least 1 dead lobster
+   is 1 - the probability of having no dead lobsters.
+d. The mean is 0.91, meaning practically we would expect to find about
+   1 dead lobster per crate.
+
+2.
+a. P(200<x<208) = F(208)-F(200) = (0.1*208-20) - (0.1*200-20) =
+      0.1*(208-200) = 0.1*8 = 0.8
+   Thus P(200<x<208) = 0.8
+b. pdf(x) = d/dx F(x) = {0, x<200; 0, x>210; 0.1 200 ≤ x ≤ 210}
+c. The mean is 205, the cumulative distribution function is linear
+   in x for 200<x<210 and 0 for any other x, which means the mean
+   is simply the value of x which gives 0.5 for the cdf, which is 205
+
+3.
+a. 0.000429 (Computed using R (pnorm(5000, 7000, 600)))
+b. 7986.91, this is the 95th quantile
+   (again comptued using R (qnorm(0.95, 7000, 600)))
+
+4.
+a. f(x;r,λ) = (r^λ/Γ(r))*x^(r-1)*exp(-λ*x)
+   with r=2.5,λ=0.5: Γ(2.5) = 1.329, 2.5^0.5 = 1.5812, 1.329/1.5818 = 0.8407
+   f(x) = 0.8407 * x^(1.5)*exp(0.5x)
+b. The mean is r/λ = 2.5/0.5 = 5
+c. This is the chi-squared distribution Χ²(k) with k = 5
+
+5.
+  shape β = 1/3, scale δ = 900
+  f(x;δ,β) = β/δ*(x/δ)^(β-1)*exp(-(x/δ)^β)
+  f(x;900,1/3) = 1/2700 * (x/900)^(-2/3) * exp(-(x/900)^(1/3))
+
+a. Mean = δ*Γ(1+1/β) = 900*Γ(4/3) = 803.68
+b. P(X<500) = 0.5605 (again using R, dweibull(500, 1.0/3.0, 900))
+c. 3752.02 (again R, qweibull(0.80, 1.0/3.0, 900))

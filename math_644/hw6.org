@@ -1,0 +1,112 @@
+#+BEGIN_SRC R
+#Function to compute the confidence interval of the ratio of the variances
+#x and y are either vectors, or standard deviations, if they are standard
+#deviations df1 and df2 need to be specified
+pooled.ci.test = function(x,y,alpha, df1 = length(x)-1, df2 = length(y)-1){
+  x.var = if(length(x)>1) var(x) else x**2;
+  y.var = if(length(y)>1) var(y) else y**2;
+  high = (x.var/y.var) * qf((1-alpha/2), df2, df1);
+  low = (y.var/x.var) * qf(alpha/2, df2, df1);
+  #return(c(low, high));
+  return(1 >= low && 1 <= high)
+}
+t.test.statistic = function(x,y,paired = FALSE, pooled = FALSE){
+  if(paired){
+    diff = x - y;
+    return(mean(differences)/(sd(differences)/sqrt(length(differences))));
+  } else if(pooled){
+    stddev = sqrt(var(x) + var(y));
+    return((mean(x)-mean(y))/(stddev/sqrt(length(x))));
+  } else {
+    s.x = var(x)/length(x);
+    s.y = var(y)/length(y);
+#   df = ((s.x + s.y)**2)/((s.x**2)/(length(x)-1) + (s.y**2)/(length(y)-1));
+    return((mean(x)-mean(y))/(sqrt(s.x + s.y)));
+  }
+}
+    
+# question 1
+tire_data = read.csv("hw6_1.csv");
+tire.1 = tire_data[[2]];
+tire.2 = tire_data[[3]];
+#Data is paired
+ts = t.test.statistic(tire.1,tire.2,pooled=TRUE);
+critical.value = qt(0.01, length(tire.1));
+t.test(tire.1, tire.2, paired = TRUE, conf.level = 0.99);
+# question 2
+require(MASS)
+# it's much eaiser to compute things using data, so generate data with
+# the specified mean and stddev
+r1 = mvrnorm(25,84.2,19.4**2,empirical=TRUE);
+r2 = mvrnorm(25,91.6,18.8**2,empirical=TRUE);
+ts = t.test.statistic(r1,r2, pooled = pooled.ci.test(r1,r2);
+t.test(r1,r2, var.equal = pooled.ci.test(r1,r2,0.99), conf.level = 0.99)
+
+# question 3
+# I can't actually read this data, since it's in jmp format
+# but the procedure would be similar, For the sake of it I do
+# what you would do using some random data
+# read.csv("hw6_2.csv")
+before = rt(11,10)
+after = rt(13,12)
+ts = t.test.statistic(before,befor, pooled = pooled.ci.test(before, after,0.95));
+t.test(before, after, var.equal = pooled.ci.test(before,after,0.95),
+       alternative = "greater", conf.level=0.95);
+#+END_SRC
+Assumptions that need to be satisified for a t test are that the data are
+approximatly normal (i.e n >5 and random sampling was used) and that the
+population standard deviation is unknown.
+1.
+Hypothesis: Null: true difference in means is equal to 0
+            Alt : true difference in means is not equal to 0
+
+We use a paired t-test since the tires are being subjected to the same
+exact (or close to it) stress at the same time.
+
+Results:
+	Paired t-test
+
+data:  tire.1 and tire.2
+t = 1.9548, df = 7, p-value = 0.09152
+alternative hypothesis: true difference in means is not equal to 0
+99 percent confidence interval:
+ -703.9995 2485.7495
+sample estimates:
+mean of the differences 
+  890.875 
+
+Decision: We fail to reject the null hypothesis since the p value is greater
+than the significance level
+Conclusion: There is insufficent evidence to state that the true difference in
+means is not equal to 0 at 99% confidence.
+2.
+Hypothesis: Null: true difference in means is equal to 0
+            Alt : true difference in means is not equal to 0
+We use a pooled standard deviation for the t-test since 1 lies in the
+confidence interval of the ratio of the variances of the data.
+
+	Two Sample t-test
+
+data:  r1 and r2
+t = -1.3696, df = 48, p-value = 0.1772
+alternative hypothesis: true difference in means is not equal to 0
+99 percent confidence interval:
+ -21.891847   7.091847
+sample estimates:
+mean of x mean of y 
+     84.2      91.6 
+
+Decision: We fail to reject the null hypothesis since the p value is greater
+than the significance level
+Conclusion: There is insufficent evidence to state that the true difference in
+means is not equal to 0 at 99% confidence.
+
+3.
+We don't use a pooled test since different samples are used for the different
+temperatures. A pooled standard deviation is used if 1 lies in the
+confidence interval of the ratio of the variances of the data.
+
+Hypothesis: Null: true difference in means is equal to 0
+            Alt : true difference in means is less than to 0
+
+I can't really give the results since I don't have the data.

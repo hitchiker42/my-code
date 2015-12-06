@@ -1,0 +1,75 @@
+1.
+a.
+formula: (low, high) = X_bar ± (Z_(1-(α/2))*(σ/n^0.5))
+R Code:
+lead = c(0.5055, 0.5167, 0.4966, 0.4773, 0.5058, 0.4820, 0.4566, 0.4972, 0.4851, 0.5143,
+0.4942, 0.4957, 0.4957, 0.4778, 0.4894, 0.4865, 0.4950, 0.4826, 0.4923,
+0.5198);
+confidence.interval = c(mean(lead) - qnorm(0.995)*(0.02/(length(lead)**0.5)),
+                        mean(lead) + qnorm(0.995)*(0.02/(length(lead)**0.5)));
+print(confidence.interval);
+Output:
+0.4817855 0.5048245
+b.
+R Code:
+lead = c(0.5055, 0.5167, 0.4966, 0.4773, 0.5058, 0.4820, 0.4566, 0.4972, 0.4851, 0.5143,
+0.4942, 0.4957, 0.4957, 0.4778, 0.4894, 0.4865, 0.4950, 0.4826, 0.4923, 0.5198);
+require(TeachingDemos);
+z.test(lead, 0.05, 0.02,alternative = "two.sided", conf.level = 0.99);
+Output:
+    
+    One Sample z-test
+
+data:  lead
+z = 99.126, n = 20.0000000, Std. Dev. = 0.0200000,
+Std. Dev. of the sample mean = 0.0044721, p-value < 2.2e-16
+alternative hypothesis: true mean is not equal to 0.05
+99 percent confidence interval:
+ 0.4817855 0.5048245
+sample estimates:
+mean of lead
+    0.493305
+c.
+  The confidence interval is the interval in which the population mean will be
+  located a percentage of the time equal to the confidence level (i.e if the
+  confidence level in 95%, the population mean would be located within the
+  confidence interval 95% of the time).
+
+  The confidence interval can be used for hypothesis testing. If the sample
+  mean lies within the confidence interval we reject the null hypothesis, if it
+  does not we fail to reject the null hypothesis.
+2.
+a.
+Power = P(Z<(Z_(α/2) - ((δ)/(σ/n^0.5)))) +
+        P(Z<(Z_(1-(α/2)) - ((δ)/(σ/n^0.5))))
+R Code:
+pow.z = function(a,d,s,n){
+          pnorm(qnorm(a/2) - (d/(s/sqrt(n)))) +
+          1-pnorm((qnorm(1-(a/2)) - (d/(s/sqrt(an)))))
+        }
+print(pow.z(0.01,0.01,0.02,20));
+Output:
+  0.3670189
+b.
+1. Increase the sample size.
+ex. for n = 100,  power = 0.9923283
+2. Increase δ
+ex. for δ = 0.05, power = 1
+3. Decrease the population standard deviation
+ex. for σ = 0.01, power = 0.9710402
+
+c. Values for n=20 - n=100
+  0.3670189 0.3879983 0.4088049 0.4293958 0.4497318 0.4697776 0.4895014
+  0.5088746 0.5278722 0.5464722 0.5646556 0.5824062 0.5997105 0.6165576
+  0.6329387 0.6488474 0.6642793 0.6792319 0.6937042 0.7076972 0.7212129
+  0.7342549 0.7468280 0.7589378 0.7705913 0.7817959 0.7925599 0.8028924
+  0.8128029 0.8223013 0.8313980 0.8401039 0.8484297 0.8563868 0.8639862
+  0.8712395 0.8781580 0.8847531 0.8910362 0.8970184 0.9027109 0.9081248
+  0.9132707 0.9181595 0.9228015 0.9272068 0.9313856 0.9353474 0.9391017
+  0.9426577 0.9460244 0.9492104 0.9522240 0.9550734 0.9577663 0.9603102
+  0.9627125 0.9649801 0.9671196 0.9691376 0.9710402 0.9728334 0.9745228
+  0.9761138 0.9776117 0.9790213 0.9803475 0.9815948 0.9827674 0.9838695
+  0.9849049 0.9858775 0.9867907 0.9876479 0.9884522 0.9892068 0.9899145
+  0.9905779 0.9911998 0.9917825 0.9923283
+
+Power = 0.9 between n = 40 and n = 41.

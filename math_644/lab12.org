@@ -1,0 +1,81 @@
+#+BEGIN_SRC R
+chips = read.csv("chips.csv");
+chips.aov = with(chips, aov(resistance ~ process));
+png("chips_boxplot.png", main = "Chips Boxplot")
+with(chips, boxplot(resistance ~ process));
+dev.off()
+png("chips_anova.png")
+par(mfrow = c(2,2));
+plot(chips.aov)
+dev.off();
+summary(unstack(chips, resistance ~ process));
+summary(chips.aov);
+#+END_SRC
+#+BEGIN_EXAMPLE
+> summary(unstack(chips, resistance ~ process))
+      X.A             X.B             X.C             X.D       
+ Min.   :5.115   Min.   :5.883   Min.   :5.613   Min.   :5.970  
+ 1st Qu.:5.466   1st Qu.:5.926   1st Qu.:5.869   1st Qu.:6.171  
+ Median :5.818   Median :5.968   Median :6.125   Median :6.373  
+ Mean   :5.626   Mean   :5.966   Mean   :6.088   Mean   :6.333  
+ 3rd Qu.:5.881   3rd Qu.:6.008   3rd Qu.:6.325   3rd Qu.:6.514  
+ Max.   :5.945   Max.   :6.048   Max.   :6.525   Max.   :6.655  
+> summary(chips.aov)
+            Df Sum Sq Mean Sq F value Pr(>F)
+process      3  0.778  0.2593   1.942  0.201
+Residuals    8  1.068  0.1336               
+#+END_EXAMPLE
+
+#+BEGIN_SRC R
+options(show.signif.stars=F) #these are annoying
+pulse = read.csv("pulse.csv")
+pulse.lm = lm(max ~ run, pulse)
+png("pulse_scatter.png", main = "Pulse Scatterplot")
+plot(pulse)
+abline(pulse.lm, col = "red")
+dev.off()
+png("pulse_reg.png")
+layout(matrix(c(1,2,3,4,5,6),ncol=2,nrow = 3))
+plot(pulse.lm)
+plot(residuals(pulse.lm), main = "Residuals vs Row Number") # residuals vs row number
+dev.off()
+summary(pulse.lm)
+anova(pulse.lm)
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+> summary(pulse.lm)
+
+Call:
+lm(formula = max ~ run, data = pulse)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-4.4069 -2.5624 -0.4069  1.2687 11.9309 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)
+(Intercept) 32.78332   10.38610   3.156  0.00371
+run          0.83109    0.06111  13.599  4.1e-14
+
+Residual standard error: 3.432 on 29 degrees of freedom
+Multiple R-squared:  0.8644,	Adjusted R-squared:  0.8598 
+F-statistic: 184.9 on 1 and 29 DF,  p-value: 4.095e-14
+
+> anova(pulse.lm)
+Analysis of Variance Table
+
+Response: max
+          Df  Sum Sq Mean Sq F value    Pr(>F)
+run        1 2177.89 2177.89  184.93 4.095e-14
+Residuals 29  341.53   11.78                  
+#+END_EXAMPLE
+
+#+CAPTION: Box Plot for Chips data
+[[./chips_boxplot.png]]
+#+CAPTION: Anova Plots for Chips data
+[[./chips_anova.png]]
+#+CAPTION: Scatter Plot for Pulse data
+[[./pulse_scatter.png]]
+#+CAPTION: Regression Plots for Pulse data
+[[./pulse_reg.png]]

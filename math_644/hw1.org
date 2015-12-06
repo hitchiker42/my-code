@@ -1,0 +1,55 @@
+1.
+a. Observational study, Data is being collected for the study, and there is no
+   control group.
+b. Columbus, Ohio residents
+c. The 25 people interviewed
+d. Interviewing people going to a baseball game. Incredibly flawed since people
+   actually going to a baseball game are likely biased in favor of a new stadium.
+
+2.
+a. People with gastric ulcers
+b. the 160 patients involved in the study
+
+3.
+a. It's debateable, either all people, or all dental patients, probably the
+   latter
+b. The two groups where randomly chosen to ensure they represented an accurate
+   sample of the population, letting people choose the group would create
+   biases sample groups, and so could not be allowed.
+c. Yes, instead of comparing two groups the results could be compared to the
+   ammount of decay between past dental examinations. The method uses might
+   lead to better data, but comparing to past restults would still lead to
+   valid data.
+
+4.
+a. No, for various reasons, one of the prominate one's being it's impossible to
+   file a warranty claim for a fatal crash.
+b. Retrospective, past data is being analyzed.
+
+5.
+Assuming by hand allows using a computer to evaluate equations:
+(setq data '(96 96 102 102 102 104 104 108 126 126
+             128 128 140 156 160 160 164 170))
+mean = (/ (reduce #'+ data) (length data)) = 126
+variance = stddev = (/ (reduce #'+ (mapcar (lambda (x) (expt x 2)) data))
+                       (1- (length data)))
+stddev = (/ (expt (reduce #'+ (mapcar (lambda (x) (expt x 2)) data)) 1)
+            (1- (length data)))
+(defun median (data)
+  (if (evenp (length data))
+    (/ (+ (nth (/ (length data) 2) data) 
+          (nth (1+ (/ (length data) 2)) data)) 2)
+    (nth (/ (length data) 2) data)))
+median = (median data)
+1st quartile = (median (butlast data (/ (length data) 2)))
+3st quartile = (median (last data (/ (length data) 2)))
+mean = 126
+stddev = 32.14
+variance = 17552
+range = (- 170 96) = 74
+median = 127
+1st quartile = 102
+2nd quartile = median = 127
+3rd quartile = 156
+IRQ = (- 156 102) = 54
+95th percential = (nth (floor (* 0.95 (length data))) data) = 170

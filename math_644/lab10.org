@@ -1,0 +1,74 @@
+1.
+1. Welches two sample t-test. (aka approximate t-test)
+2. Null: The true means of the two populations are equal
+   Alt : The true means of the two populations are unequal
+3. Normality: Random sampling was use, n is large-ish
+              (n = 15, which is a bit small)
+   Equal variance: The samples are from seperate populations,
+                   so the variances are unequal.
+4.
+test statistic is from the t-distribution, see below for formula/value
+#+BEGIN_SRC R
+type.1 = c(206, 193, 192, 188, 207, 210, 205, 185, 194,
+           187, 189, 178, 194, 213, 205);
+
+
+type.2 = c(177, 176, 198, 197, 185, 188, 206, 200, 189,
+           201, 197, 203, 180, 192, 192);
+ts = (mean(type.1)-mean(type.2))/
+       (sqrt((var(type.1)/length(type.1))+(var(type.2)/length(type.2))));
+#ts = 1.19
+t.test(type.1,type.2)
+#+END_SRC
+#+BEGIN_EXAMPLE
+R output:
+Welch Two Sample t-test
+data:  type.1 and type.2
+t = 1.19, df = 27.698, p-value = 0.2441
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -3.129368 11.796035
+sample estimates:
+mean of x mean of y
+ 196.4000  192.0667
+#+END_EXAMPLE
+5,6. p value = 0.2441, So we fail to reject the null hypothesis since the p
+value is greater than the significance level.
+7. with 95% confidence The true means of the two populations are equal.
+8. see above 
+
+2.
+1. Paired t-test
+2. Null: The true mean of the differencs of the population before
+         and after the process is not 0
+   Alt: The true mean of the differencs of the population before
+        and after the process is 0
+3. Normality: Not satisified, no evidence random sampling was
+   used, also n is pretty small, greater than 5, but still small.
+3. The test statistic is from the t distribution, see below for the
+   formula and value
+#+BEGIN_SRC R
+before = c(215, 226, 226, 219, 222, 231, 234, 219, 209, 216)
+after = c(203, 216, 217, 211, 215, 218, 224, 210, 201, 207)
+differences = before-after
+ts = mean(differences)/(sd(differences)/sqrt(length(differences)))
+#ts = 16.319
+t.test(before,after,paired=TRUE)
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+R output:
+Paired t-test
+data:  before and after
+t = 16.319, df = 9, p-value = 5.414e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+  8.183104 10.816896
+sample estimates:
+mean of the differences
+                    9.5
+#+END_EXAMPLE
+4,5. p value ≈ 0, so we reject the null hypothesis since the p value is less
+than the significance level.
+6. With 95% confidence the true difference in means is not equal to 0
+7. see above

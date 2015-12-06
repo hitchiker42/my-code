@@ -1,0 +1,98 @@
+Question 1:\\
+R-Code:
+#+BEGIN_SRC R
+voltage = c(9.099, 9.174, 9.327, 9.377, 8.471, 9.575, 
+            9.514, 8.928, 8.800, 8.920, 9.913, 8.306)
+png("qqplot.png")
+qqnorm(voltage, main = "Q-Q Plot")
+qqline(voltage);
+dev.off()
+png("hist.png")
+hist(voltage)
+dev.off()
+#+END_SRC
+The histogram mostly follows a bell curve, but there aren't enough samples for
+it to appear truely normal, nonetheless it seems a normal approximation should
+be ok. The Q-Q plot is much more definitive, it shows the data matches up with
+the normal quantiles almost perfectly.
+
+\\
+Question 2:\\
+R-Code:
+#+BEGIN_SRC R
+voltage = c(9.099, 9.174, 9.327, 9.377, 8.471, 9.575, 
+            9.514, 8.928, 8.800, 8.920, 9.913, 8.306)
+t.test(voltage, mu = 9, conf.level = 0.95, alternative = "two.sided")
+#+END_SRC
+#+BEGIN_VERBATIM
+Output:
+	One Sample t-test
+
+data:  voltage
+t = 0.87385, df = 11, p-value = 0.4009
+alternative hypothesis: true mean is not equal to 9
+95 percent confidence interval:
+ 8.822309 9.411691
+sample estimates:
+mean of x 
+    9.117 
+#+END_VERBATIM
+The Null hypothesis is that the population mean voltage is equal to 9.
+The Alternative hypothesis is that the population mean voltage is not equal
+to 9. The significance level is 0.05. Since the p-value is 0.4009, which is
+much higher than the significance level we fail to reject the Null hypothesis.
+
+\\
+Question 3:
+#+BEGIN_VERBATIM
+α = 0.05
+power = 0.1711521
+β = 1 - power = 0.8288479;
+δ = 0.317
+s = 12
+#+END_VERBATIM
+R-Code:
+#+BEGIN_SRC R
+power.t.test(delta = abs(mean(voltage)-8.8), power = 0.95,
+             sd = sd(voltage), sig.level = 0.05, type = "one.sample")
+#+END_SRC
+#+BEGIN_VERBATIM
+Output:
+
+     One-sample t test power calculation 
+
+              n = 29.81338
+          delta = 0.317
+             sd = 0.4638101
+      sig.level = 0.05
+          power = 0.95
+    alternative = two.sided
+
+#+END_VERBATIM
+Question 4:\\
+R-Code:
+#+BEGIN_SRC R
+samples=seq(2,100)
+power = power.t.test(n = samples, delta = 3,
+sig.level = 0.05, type = "one.sample", sd = 4.5)[["power"]]
+min.samples = Position(function(x){x>=0.9},power) + 1
+png("sample_power.png")
+plot(samples, power, main = "Samples vs Power")
+dev.off()
+cat(sprintf("Minimum samples by plot = %d\nActual mininum samples = %f\n",
+              min_samples, power.t.test(n=NULL, delta = 3, sd = 4.5,
+                                        type = "one.sample", power = 0.90)[["n"]]))
+#+END_SRC
+#+BEGIN_VERBATIM
+Output:
+Minimum samples by plot = 26
+Actual mininum samples = 25.639898
+#+END_VERBATIM
+
+
+#+CAPTION: Voltage Q-Q plot
+[[./qqplot.png]]
+#+CAPTION: Voltage Histogram 
+[[./hist.png]]
+#+CAPTION: Sample vs Power plot
+[[./sample_power.png]]

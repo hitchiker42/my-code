@@ -1,0 +1,92 @@
+1. 
+a. Yes, the sample size is large and random sampling was used.
+   Also n*p = 850 > 5 and n*(1-p) = 150 >5.
+b. Null: The true proportion of lung cancer deaths is 0.85
+   Alt : The true proportion of lung cancer deaths is not 0.85
+c.
+  TS = (p' - p_0)/sqrt((p_0(1-p_0))/n), 
+     p' = 823/1000 = 0.823, p = 0.85, n = 1000
+  TS = -2.39116
+d. Critical Region = (qnorm(-0.975),qnorm(0.975)) = (-1.96,1.96).
+   I can't really plot things right now, but the plot would be the normal
+   distribution, with the regions <-1.96 and >1.96 filled in, i.e two tails
+
+g. 
+p-value = 2*qnorm(-2.39116) = 0x0168
+e. Reject the Null hypothesis since the p-value is less than the significance
+   level
+f. We are 95% confident the true proportion of lung cancer deaths is not 0.85.
+h. MOE = qnorm(0.975)*sqrt((0.85*0.15)/1000) = 0.02213111
+   Confidence interval = (p'-MOE,p'+MOE) = (0.8009,0.8451)
+g.
+   MOE = 0.01, alpha = 0.5
+   n = (qnorm(1-alpha/2)/MOE)^2 * 0.85*0.15
+     = 580.0439
+
+Output from R (to check results):
+
+	1-sample proportions test without continuity correction
+
+data:  823 out of 1000, null probability 0.85
+X-squared = 5.7176, df = 1, p-value = 0.0168
+alternative hypothesis: true p is not equal to 0.85
+95 percent confidence interval:
+ 0.7981213 0.8454066
+sample estimates:
+    p 
+0.823 
+
+2.
+Most of my work was done in R, I have included the annotated code below, so
+refer to that for my work
+d. The frequency for 4 underfilled bottles is < 5, so we need to combine it
+   with the frequency for 3 underfilled bottles, this is the data used for all
+   computions (i.e (21, 30, 22, 7))
+a. p = 0.09895833
+b. Null: The data fits a binomial distribution with n = 12
+   Alt : The data does not fits a binomial distribution with n = 12
+c. (0.2863772, 0.3774220, 0.2279804, 0.1082204)
+   The first 3 were calculated via the density function of the binomial
+   distribution, the 4th which represents 3 or more is 1 - the sum of the
+   first 3.
+e. TS = sum((O_i - E_i)^2/E_i), where 0 is a list of the sample probabilities
+   and E is a list of the expected frequencies.
+   TS = 0.01567111
+   Distribution is the Χ² distribution.
+   df = 2  = (4 samples - 1 estimated parameter - 1)
+f. critical.value = qchisq(0.99, 2) = 9.21034
+g. p-value = pchisq(0.01567111, 2) = 0.9921951
+   Fail to reject the null hypothesis since the p-value is greater than the
+   significance level.
+h. We are 99% confidence the data fits a binomial distribution with n = 12.
+i. You would need a significance level of α > 0.9922, which is rather high.
+
+Begin R-Code:
+total = 80
+# Frequency of group 4 is <5 So combine the 3rd and 4th groups 
+count = c(21, 30, 22, 6 + 1)
+# Question a. multiply eoch count by the number of bottles it represents
+# then divide by 
+indivual.prob = sum((seq(0,3)*count))/(total*12)
+# 0.09895833
+sample.prob = count/total
+# 0.2625 0.3750 0.2750 0.0875
+binom.prob = dbinom(seq(0,2), 12, indivual.prob)
+binom.prob[4] = 1 - sum(binom.prob)
+# 0.2863772 0.3774220 0.2279804 0.1082204
+prob.diff = sample.prob - binom.prob
+# -0.023877236 -0.002422022  0.047019646 -0.020720388
+test.statistic = ((sample.prob-binom.prob)**2)/(binom.prob)
+# 1.990809e-03 1.554279e-05 9.697533e-03 3.967224e-03
+ts = sum(test.statistic)
+# 0.01567111
+p.value = 1-pchisq(ts, df = 2)
+# 0.9921951
+critical.value = qchisq(0.95, 2)
+# 0.02010067
+# I'm not sure how to pass set df for the chisq test in R
+# so this isn't the exact same thing I just tested
+chisq.test(sample.prob, p=binom.prob)
+# 	Chi-squared test for given probabilities
+# data:  sample.prob
+# X-squared = 0.015671, df = 3, p-value = 0.9995

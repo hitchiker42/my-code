@@ -1,0 +1,30 @@
+1.
+Both samples are approximately normally distributed and randomly sampled.
+To assume normality we need np and n(1-p) both > 5
+For the 1st sample np = 350.9, n(1-p) = 254.1
+for the 2nd sample np = 72.15, n(1-p) = 122.85
+Both samples are approximately normal. Presumably random sampling was used.
+
+2.
+Null: The proportions of the two samples are the same
+Alt: The proportions of the two samples are different
+3.
+n1 = 605, n2 = 195
+y1 = 351, y2 = 41
+p1 = 0.58, p2 = 0.21
+alpha = 0.05
+conf.level = 0.95
+p.pooled = (y1+y2)/(n1+n2) = 0.49
+ts.denom = sqrt((p_pooled*(1-p_pooled))*((1/n1)+(1/n2))) = 0.04116547
+Z = (p1-p2)/ts.denom = 8.988114;
+4.
+critical_val = qnorm(conf.level) = 1.64485
+7.
+p-value = min(pnorm(Z),1-pnorm(Z)) = 0
+8.
+MOE = pnorm(1-(alpha/2))*ts.denom = 0.8352*0.04117 = 0.03438222
+conf.interval = (p_pooled - MOE , p_pooled + MOE) = (0.4556178, 0.5243822)
+
+5. Reject the null hypothesis since the test statistic is greater than the
+   critical value/the significance level is greater than the p value
+6. We are 95% confident that the proportions of the two samples are different

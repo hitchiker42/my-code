@@ -1,0 +1,101 @@
+Question 1:\\
+\Theta_1 = 1/9 * sum(X_i,i=1..9)\\
+\Theta_2 = 1/2 * (3X_1 - X_6 + 2X_4)\\
+Expected Value = 1/9 * sum(X_i,i=1..9)\\
+
+Bias of \Theta_1 is 0;\\
+Bias of \Theta_2 = X_1(1/9 - 3/2) + X_6(1/9 + 1/2) + X_4(1/9 - 1) +
+                  X_{2,3,5,7,8,9}
+                = -25/19*X_1 + 11/18 * X_6 + -8/9 *X_4 + 1/9(X_{2,3,5,7,8,9})\\
+\Theta_1 is best\\
+
+NOTE:\\
+For the following:\\
+Define the function for the margin of error,\\
+MOE(\alpha, n, \sigma) = P(Z < (1 - \alpha/2)) * \sigma/sqrt(n)\\
+
+
+Question 2:\\
+n = 1500$/10$ = 150\\
+\sigma = 14\\
+\alpha = 0.10\\
+margin of error = MOE(\alpha, n, \sigma) = 0.9475618\\
+1.0152 < 2.5 ∎\\
+
+Question 3:\\
+n = 63\\
+\sigma = 2\\
+\mu = 100.6\\
+\alpha = 0.10\\
+
+1. Yes, n is large and random sampling was used.
+2. margin of error = MOE(\alpha, n, \sigma) = 0.2088742
+3. 100.3911 - 100.8089
+4. 90% of the time the population mean will lie in between
+   100.3911 and 100.8089
+5. 11, see below for R code used to find this
+
+#+BEGIN_SRC R
+MOE = function(a, n, o){pnorm(1 - \alpha/2) * (o/sqrt(n))};
+n = seq(1,63); #we know we don't need more than 63 samples
+err = MOE(0.10, n, 2);
+min.sample = Position(function(x){x < 0.5}, err);
+print(min.sample) #prints 11
+#+END_SRC
+
+Question 4:\\
+n = 50\\
+\sigma = 0.2\\
+X_bar = 4.10\\
+\mu = 4.00\\
+\alpha = 0.01\\
+
+1. Yes, n > 30 and random sampling was used
+2. Null: Mean battery life is less than or equal to 4 hours
+   Alt : Mean battery life is greater than 4 hours
+3. ts = (X_bar - \mu)/(\sigma/sqrt(n)) = 3.535534
+4. Critical value = P(Z > (1-\alpha)) = 0.8389129
+5. Reject the null hypothesis since the test statistic
+   is greater than the critical value
+6. We are 99% confident that the mean battery life is greater than 4 hours 
+7. p = P(Z > 3.535534) = 0.0002034759
+8. 0.2882239
+9. 181, see below for R code used to calculate 8 and 9
+#+BEGIN_SRC R
+pow.z = function(a,d,s,n){
+          1-pnorm((qnorm(1-a) - (d/(s/sqrt(n)))))
+        }
+n = seq(1,300)
+p = pow.z(0.01,0.05,0.2,n)
+initial.power = p[50]
+required.samples = Position(function(x){x>0.85},p)
+print(initial.power) #prints 0.2882239
+print(required.samples) #prints 181
+#+END_SRC R
+
+Question 5:\\
+NOTE: See section following answers for R code used to calculate statistics
+1. no, n<30
+2. Null: Mean Izod impact strength is less than 1
+   Alt : Mean Izod impact strength is greater than 1
+3. 1.6498
+4. cv = 0.8326924
+5. reject the null hypothesis since the test stastic is greater than the critical value
+6. Mean Izod impact strength is greater than 1
+7. 0.05771
+8. (0.9941802, Inf)
+#+BEGIN_SRC R
+n = 20
+mu = 1.121
+mu.0 = 1
+std.dev = 0.328
+alternative = "greater"
+sig.level = 0.01
+require(MASS)
+# This generates dummy random data with the given mean and variance
+dummy.sample = mvrnorm(n, mu, std.dev**2, empirical=TRUE);
+critical.value = pt(0.99, 19)
+t.test(dummy.sample,alternative=alternative,mu = mu.0, conf.level = 1-sig.level);
+#for the last question
+t.test(dummy.sample,alternative=alternative,mu = mu.0, conf.level = 0.95);
+#+END_SRC

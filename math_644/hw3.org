@@ -1,0 +1,55 @@
+Tucker DiNapoli
+1.
+This follows the binomial distribution with size, n = 1000 and probility, p = 0.02.
+
+Given that n is large this can be approximated by the normal distribution with 
+mean μ = n*p and standard deviation σ = n*p(1-p), or μ = 20 and σ = 19.6
+
+To find the probability that >25 chips are defective we use the complement rule
+and calculate 1-P(X<25), which gives a probability of 0.3993, or a 39.93%
+that more than 25 chips are defective.
+
+2.
+We can approximate the Poisson distribution with a given λ with a normal
+distribution with μ = λ and σ = λ^0.5
+
+In this case with λ = 36 this gives us μ = 36 and σ = 6, it is then simple to
+calculate the probability that there are less than 30 calls.
+P(X<30) = 0.1587, or a 15.87% chance there are less than 30 calls.
+
+3.
+I did the second and third problems incorrectly here.
+a. N(6.16, 0.08), P(X<5.95) = 0.004332, or 0.4332%
+b. N(6.16, 0.08), P(X<5.95)20 = 5.428351e-48, effectively 0%
+c. N(x, 0.08), P(X<5.95) = 0.0316 (aka 0.001^0.05), solve for x.
+   Assuming we only need x to 2 decimal places (which is a resonable assuption,
+   given that all other given values are to 2 decimal places), we can simply
+   compute P(X<5.95) for x from 5.95 to 6.16, incrementing by 0.01 each time.
+   Doing this the value of x which gives the closest to the expected results
+   is x = 6.10, which gives P(X<5.95) = 0.0304
+4.
+a. P(X>5|X>3) = (P(X>5)*P(X>3))/P(X>3) = 4.54e-5, P(X>5) = 4.54e-5
+   The probability X is greater than 5 is independent on the probability that X
+   is greater than 3, that is to say the probability X>5 is independent of X
+   being greater than 3, the distribution doesn't 'remember' that X>3 when
+   determining if X>5.
+
+I'm not entirely sure how the gamma distribution is being defined here, I
+assumed it was a gamma distribution with shape α = 2 and scale λ = 0.5.
+b. E[W] = 8*E[X]-E[Y].
+   E[X] = 1/2, E[Y] = α*λ = 1/2
+   E[W] = 7/2 = 3.5
+   
+c. V[W] = 8²*V[X] - V[Y]
+   σ for X = 1/(2²) = 1/4, σ for Y = α*λ² = 1/4
+   So V[X] = V[Y] = 0.0625 and V[W] = 63*0.0625 = 3.9375
+   So σ for W = 3.9375^0.5 = 1.984313
+
+d.
+  Via the central limit theorem we can approximate the distribution of the mean
+  for this sample by N(3.5, 0.2115) (0.2115 = σ/n^0.5 = 1.984313/(88^0.5)).
+  
+  This means it is almost certian the mean will be greater than 2.
+
+* NOTE:
+  Probability calculations were done using R, specifically the pnorm function.
