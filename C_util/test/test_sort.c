@@ -166,25 +166,25 @@ int main(int argc, char *argv[]){
       double times[6];
       uint64_t *arr_bkup = xmalloc(len * sizeof(uint64_t)); 
       memcpy(arr_bkup, arr, (len * sizeof(uint64_t)));
-//      times[0] = time_sort(arr, len, bubble_sort_u64);
-//      memcpy(arr, arr_bkup, (len * sizeof(uint64_t)));
-      times[0] = time_sort(arr, len, insertion_sort_u64);
+      times[0] = time_sort(arr, len, bubble_sort_u64);
       memcpy(arr, arr_bkup, (len * sizeof(uint64_t)));
-      times[1] = time_sort(arr, len, mergesort_u64);
+      times[1] = time_sort(arr, len, insertion_sort_u64);
       memcpy(arr, arr_bkup, (len * sizeof(uint64_t)));
-      times[2] = time_sort(arr, len, heapsort_u64);
+      times[2] = time_sort(arr, len, mergesort_u64);
       memcpy(arr, arr_bkup, (len * sizeof(uint64_t)));
-      times[3] = time_sort(arr, len, qsort_u64);
+      times[3] = time_sort(arr, len, heapsort_u64);
       memcpy(arr, arr_bkup, (len * sizeof(uint64_t)));
-      times[4] = time_sort(arr, len, radix_sort_u64);
+      times[4] = time_sort(arr, len, qsort_u64);
+      memcpy(arr, arr_bkup, (len * sizeof(uint64_t)));
+      times[5] = time_sort(arr, len, radix_sort_u64);
       printf("Times taken to sort:\n"
-//             "Bubble sort: %f\n"
+             "Bubble sort: %f\n"
              "Insertion sort: %f\n"
              "Merge sort: %f\n"
              "Heap sort: %f\n"
              "Quick sort: %f\n"
              "Radix sort: %f\n",
-             times[0], times[1], times[2], times[3], times[4]);
+             times[0], times[1], times[2], times[3], times[4], times[5]);
       return 0;
     }
   }

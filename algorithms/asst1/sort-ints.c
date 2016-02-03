@@ -57,7 +57,7 @@ static unsigned int do_counting_sort(unsigned long ary[],
   //This is faster than doing a seperate loop to compute the indices
   //but makes the sort not stable, which is find for a counting sort
   //but not for a radix sort.
-  for(i=0, idx=0;i<(1<<nbits), idx<n;i++){    
+  for(i=0, idx=0;i<(1<<nbits) && idx<n;i++){
     while(hist[i]--){
       ary[idx++] = i;
     }

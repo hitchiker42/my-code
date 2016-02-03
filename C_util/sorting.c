@@ -76,8 +76,8 @@ void insertion_sort_u64(uint64_t *input, size_t len){
 */
 static inline int qsort_partition_generic(void **arr, long left, long right,
                                           cmp_fun cmp){
-  //long pivot_idx = MEDIAN(left, right, (left+right)/2);
-  long pivot_idx = left;
+  long pivot_idx = MEDIAN(left, right, (left+right)/2);
+  //long pivot_idx = left;
   void* pivot = arr[pivot_idx];
   long i = left - 1, j = right + 1;
   do {
@@ -107,8 +107,8 @@ void qsort_generic(void **arr, size_t len, cmp_fun cmp){
   return;
 }
 static inline int qsort_partition_u64(uint64_t *arr, long left, long right){
-  //long pivot_idx = MEDIAN(left, right, (left+right)/2);
-  long pivot_idx = left;
+  long pivot_idx = MEDIAN(left, right, (left+right)/2);
+  //long pivot_idx = left;
   uint64_t pivot = arr[pivot_idx];
   long i = left - 1, j = right + 1;
   do {

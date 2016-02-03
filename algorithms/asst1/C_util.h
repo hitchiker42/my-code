@@ -52,7 +52,7 @@ typedef unsigned long ulong;
 #define MIN(_x,_y)                                \
   __extension__ ({__typeof(_x) x = _x;                          \
     __typeof(_y) y = _y;                          \
-    x<y ? x : 0;})
+    x<y ? x : y;})
 #define MAX(_x,_y)                                \
   __extension__ ({__typeof(_x) x = _x;                          \
     __typeof(_y) y = _y;                          \

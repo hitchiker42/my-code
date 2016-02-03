@@ -39,33 +39,50 @@ extern "C" {
 #endif
 #endif
 
+/* typedefs */
 typedef unsigned int uint;
 typedef unsigned long ulong;
-
+/*
+  Type of comparision functions for the sorting functions.
+  Should return true if the arguments are correctly ordered, and false
+  if they are not.
+*/
+typedef int(*cmp_fun)(void*,void*);
+/*
+  Types of sorting functions.
+*/
+typedef void(*sort_fn)(void**, size_t, cmp_fun);
+typedef void(*int_sort_fn)(uint64_t*, size_t);
 /* Macros*/
 #define SWAP(x,y)                               \
-  __extension__ ({__typeof(x) __temp = x;       \
+  __extension__                                 \
+  ({__typeof(x) __temp = x;                     \
     x = y;                                      \
     y = __temp;})
 #define ARR_SWAP(arr,i,j)                       \
-  __extension__ ({__typeof(arr[i]) __temp = arr[i];     \
+  __extension__                                 \
+  ({__typeof(arr[i]) __temp = arr[i];           \
     arr[i] = arr[j];                            \
     arr[j] = __temp;})
-#define MIN(_x,_y)                                \
-  __extension__ ({__typeof(_x) x = _x;                          \
-    __typeof(_y) y = _y;                          \
-    x<y ? x : 0;})
-#define MAX(_x,_y)                                \
-  __extension__ ({__typeof(_x) x = _x;                          \
-    __typeof(_y) y = _y;                          \
+#define MIN(_x,_y)                              \
+  __extension__                                 \
+  ({__typeof(_x) x = _x;                        \
+    __typeof(_y) y = _y;                        \
+    x<y ? x : y;})
+#define MAX(_x,_y)                              \
+  __extension__                                 \
+  ({__typeof(_x) x = _x;                        \
+    __typeof(_y) y = _y;                        \
     x>y ? x : y;})
 #define IS_POW_OF_2(num) (!(num & (num-1)))
-#define NEXT_POW_OF_2(num)                                \
-  __extension__ ({int leading_zeros = __builtin_clzl(num);              \
+#define NEXT_POW_OF_2(num)                      \
+  __extension__                                 \
+  ({int leading_zeros = __builtin_clzl(num);    \
     (1UL << (64 - leading_zeros));})
 //The nearest integer to x/y, where x and y are integers
-#define IDIV_CEIL(x,y)                           \
-  __extension__ ({__typeof(x) quot, rem, _x = x;               \
+#define IDIV_CEIL(x,y)                          \
+  __extension__                                 \
+  ({__typeof(x) quot, rem, _x = x;              \
     __typeof(y) _y = y;                         \
     quot = x/y; rem = x % y;                    \
     (quot + (rem !=  0));})
@@ -78,21 +95,29 @@ typedef unsigned long ulong;
 //with some work SIGNBIT could work on floats
 //signed shifts are techincally undefined, but who cares
 #define SIGNBIT(x)                              \
-  __extension__ ({__typeof(x) tmp = x;                        \
+  __extension__                                 \
+  ({__typeof(x) tmp = x;                        \
     int shift = (sizeof(x) * CHAR_BIT)-1;       \
     ((x) & (1 << (shift - 1)))>>shift;})
 //test the sign on an n bit integer
 #define SIGNBIT_N(x,n)                          \
-  __extension__ ({int bit = (1 << (n-1));       \
+  __extension__                                 \
+  ({int bit = (1 << (n-1));                     \
     (x & bit)>>(n-1);})
 #define BITNEG(x) (~(x)+1)
 //fails for the most negitive integer (i.e -128 for an 8 bit int)
 #define BITABS(x) (SIGNBIT(x) ? BITNEG(x) : x)
-//This is technically undefined behavoir, but every compiler
-//will do what you want
+/*
+  You need to use a union to do this to avoid breaking strict aliasing.
+  Also the standard *(type*)&val idom is technically undefined behavior,
+  though pretty much every C compiler will do what you want.
+*/
 #define BITCAST(val, type)                      \
-  __extension__ ({ __typeof(val) tmp = val;     \
-      (*(type*)&tmp);})
+  __extension__                                 \
+  ({union {__typeof(val) old;                   \
+      type new;} tmp;                           \
+    tmp.old = val;                              \
+    tmp.new;})
 #define DOWNCASE_ASCII(c) (c > 0x40 && c < 0x5B ? c | 0x20 : c)
 #define UPCASE_ASCII(c) (c > 0x60 && c < 0x7B ? c & (~0x20) : c)
 #define CHAR_TO_NUMBER(c) (assert(c >= 0x30 && c <= 0x39), c - 0x30)
@@ -164,6 +189,9 @@ typedef unsigned long ulong;
 #define ATTRIBUTE(...) __attribute__((__VA_ARGS__))
 #define UNREACHABLE() __builtin_unreachable()
 #define ATRIBUTE_NORETURN() __attribute__((noreturn))
+#define ATTRIBUTE_NORETURN __attribute__((noreturn))
+#define ATTRIBUTE_UNUSED __attribute__((unused))
+#define ATTRIBUTE_ALIGNED(align) __attribute__((aligned(align)))
 #ifndef thread_local
 #if (defined HAVE_C11)
 #define thread_local _Thread_local
@@ -171,6 +199,7 @@ typedef unsigned long ulong;
 #define thread_local __thread
 #endif
 #endif
+/* Data Structures */
 /*
   Really simple linked list
 */
@@ -198,6 +227,22 @@ static inline struct cons_t* make_cons(void* car, void* cdr){
 #define XCDDR(d) XCDR(XCDR(c))
 /* Data Structures */
 //#include "svector.h"
+typedef struct heap binary_heap;
+struct heap {
+  void **heap;
+  int (*cmp)(void*,void*);
+  int len;
+  int mem;
+};
+binary_heap *make_new_heap(void *arr, int len, cmp_fun cmp);
+binary_heap *heap_sort(binary_heap *heap);
+void* heap_pop(binary_heap *heap);
+void heap_add(binary_heap *heap, void *new_element);
+void destroy_heap(binary_heap *heap);
+//these are static in heap.c
+//void heapify(binary_heap *heap);
+//void sift_up(binary_heap *heap, int index);
+//void sift_down(binary_heap *heap, long root, long end);
 
 #define get_access_mode(mode) (mode & O_ACCMODE)
 /*
@@ -352,18 +397,6 @@ int *iota(int start, int stop, int step);
   Sorting functions
 */
 /*
-  Type of comparision functions for the sorting functions.
-  Should return true if the arguments are correctly ordered, and false
-  if they are not.
-*/
-typedef int(*cmp_fun)(void*,void*);
-/*
-  Types of sorting functions.
-*/
-typedef void(*sort_fn)(void**, size_t, cmp_fun);
-typedef void(*int_sort_fn)(uint64_t*, size_t);
-typedef cons_t(*sort_cons)(cons_t *, cmp_fun);
-/*
   Functions for sorting arrays of generic data.
 */
 void insertion_sort_generic(void **input, size_t len, cmp_fun cmp);
@@ -403,22 +436,22 @@ void heapsort_u64(uint64_t *input, size_t len);
       snprintf(str, sz, fmt, ##__VA_ARGS__);                            \
       str;})
 
-static void print_backtrace(){
+static void print_backtrace(ATTRIBUTE_UNUSED int signo){
   #define BACKTRACE_BUF_SIZE 128
   void *buffer[BACKTRACE_BUF_SIZE];
   int stack_entries = backtrace(buffer, BACKTRACE_BUF_SIZE);
   //just write the backtrace straight to stderr
   backtrace_symbols_fd(buffer, stack_entries, STDERR_FILENO);
 }
-static void enable_backtraces(void){
+static ATTRIBUTE_UNUSED void enable_backtraces(void){
   struct sigaction act;
-  act.sa_handler = (void*)print_backtrace;
+  act.sa_handler = print_backtrace;
   act.sa_flags = SA_RESETHAND;
   sigaction(SIGSEGV, &act, NULL);
   sigaction(SIGABRT, &act, NULL);
 }
 
-#if (defined NEED_XMALLOC) || (defined NEED_MALLOC) || (defined NEED_ZMALLOC)
+//#if (defined NEED_XMALLOC) || (defined NEED_MALLOC) || (defined NEED_ZMALLOC)
 #ifndef OOM_FUN
 static void oom_fun(void){
   fputs("Out of memory\n",stderr);
@@ -445,7 +478,6 @@ static inline void* zmalloc(size_t sz){
   return mem;
 }
 #endif
-#endif /* NEED_XMALLOC */
 #ifdef __cplusplus
 }
 #endif

@@ -1,3 +1,4 @@
+#include "C_util.h"
 #include "hash.h"
 #include <stdio.h>
 /*
@@ -16,14 +17,6 @@ struct hash_entry {
   void *value;
   struct hash_entry *next;
 };
-static void *xmalloc(size_t sz){
-  void *mem = calloc(sz, 1);
-  if(!mem && sz != 0){
-    fprintf(stderr, "Error, out of memory\n");
-    abort();
-  }
-  return mem;
-}
 #ifndef ATOMIC_HASHTABLE
 #define atomic_inc(ptr)
 #define atomic_dec(ptr)
@@ -79,16 +72,17 @@ static void maybe_rehash(htable *ht);
 
 #define fnv_prime_64 1099511628211UL
 #define fnv_offset_basis_64 14695981039346656037UL
-static uint64_t fnv_hash(const void *key,int keylen){
+static uint64_t fnv_hash(const void *key, size_t keylen){
   const uint8_t *raw_data=(const uint8_t *)key;
-  int i;
+  size_t i;
   uint64_t hash=fnv_offset_basis_64;
   for(i=0; i < keylen; i++){
     hash = (hash ^ raw_data[i])*fnv_prime_64;
   }
   return hash;
 }
-static int bool_memcmp(void *x, void *y, size_t x_sz, size_t y_sz){
+static int bool_memcmp(const void *x, const void *y,
+                       size_t x_sz, size_t y_sz){
   if(x_sz != y_sz){
     return 0;
   } else {
@@ -153,10 +147,6 @@ static void rehash(htable *ht){
     sem_post(&ht->sem);
   }
 }
-#else
-static void rehash(htable *ht){
-  rehash_internal(ht);
-}
 static void maybe_rehash(htable *ht){
   //we make a check for a rehash which will usually catch
   //a pending rehash, but we also do a cmpxchg to actually set the
@@ -166,9 +156,18 @@ static void maybe_rehash(htable *ht){
     rehash(ht);
   }
 }
+#else
+static void rehash(htable *ht){
+  rehash_internal(ht);
+}
+static void maybe_rehash(htable *ht){
+  if(((float)ht->entries/(float)ht->size) > ht->load_factor){
+    rehash(ht);
+  }
+}
 #endif
 
-void* hashtable_add(htable *ht, void *key, size_t key_sz, void *value){
+int hashtable_add(htable *ht, void *key, size_t key_sz, void *value){
   inc_hashtable_threadcount(ht);
   uint64_t hv = ht->hash(key, key_sz);
   uint32_t index = hv % ht->size;
@@ -186,7 +185,7 @@ void* hashtable_add(htable *ht, void *key, size_t key_sz, void *value){
     if(entry->hv == hv){
       if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
         atomic_dec(&ht->num_threads_using);
-        return entry->value;
+        return 0;
       }
     }
     entry = entry->next;
@@ -200,22 +199,146 @@ void* hashtable_add(htable *ht, void *key, size_t key_sz, void *value){
     atomic_inc(&ht->entries);
     atomic_dec(&ht->num_threads_using);
     maybe_rehash(ht);
-    return value;
+    return 1;
   }
   goto retry;
 #else
   while(entry){
     if(entry->hv == hv){
       if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
-        return entry->value;
+        return 0;
       }
     }
     entry = entry->next;
   }
-  hentry *new_entry = make_hentry(key, key_sz, hv, value, bucket);
+  new_entry = make_hentry(key, key_sz, hv, value, bucket);
   ht->table[index] = new_entry;
   ht->entries++;
-  return value;
+  return 1;
+#endif
+}
+/*
+  I Really wish C marcos were more lispy, then I wouldn't have to
+  write basically the same function twice.
+ */
+void* hashtable_set(htable *ht, void *key, size_t key_sz, void *value){
+  inc_hashtable_threadcount(ht);
+  uint64_t hv = ht->hash(key, key_sz);
+  uint32_t index = hv % ht->size;
+  /*
+    bucket = head of linked list, entry = current entry
+  */
+  hentry *new_entry = NULL;
+  hentry *entry, *bucket;
+  bucket = ht->table[index];
+#ifdef ATOMIC_HASHTABLE
+  //use a label to indicate this isn't a normal loop
+ retry:
+  entry = bucket;
+  while(entry){
+    if(entry->hv == hv){
+      if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
+        void *retval = entry->value;
+        if(atomic_cmpxchg(&entry->value, retval, value)){
+          atomic_dec(&ht->num_threads_using);
+          return retval;
+        } else {
+          goto retry;
+        }
+      }
+    }
+    entry = entry->next;
+  }
+  if(!new_entry){
+    new_entry = make_hentry(key, key_sz, hv, value, bucket);
+  } else {
+    new_entry->next = bucket;
+  }
+  if(atomic_compare_exchange(ht->table+index, &bucket, new_entry)){
+    atomic_inc(&ht->entries);
+    atomic_dec(&ht->num_threads_using);
+    maybe_rehash(ht);
+    return NULL;
+  }
+  goto retry;
+#else
+  while(entry){
+    if(entry->hv == hv){
+      if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
+        void *retval = entry->value;
+        entry->value = value;
+        return retval;
+      }
+    }
+    entry = entry->next;
+  }
+  new_entry = make_hentry(key, key_sz, hv, value, bucket);
+  ht->table[index] = new_entry;
+  ht->entries++;
+  return NULL;
+#endif
+}
+/*
+  There really isn't any C abstraction I could use to simplify
+  this. C really needs more compile time features.
+*/
+void* hashtable_update(htable *ht, void *key, size_t key_sz, 
+                       void *(*update)(void*)){
+  inc_hashtable_threadcount(ht);
+  uint64_t hv = ht->hash(key, key_sz);
+  uint32_t index = hv % ht->size;
+  /*
+    bucket = head of linked list, entry = current entry
+  */
+  hentry *new_entry = NULL;
+  hentry *entry, *bucket;
+  bucket = ht->table[index];
+#ifdef ATOMIC_HASHTABLE
+  //use a label to indicate this isn't a normal loop
+ retry:
+  entry = bucket;
+  while(entry){
+    if(entry->hv == hv){
+      if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
+        void *oldval = entry->value;
+        void *newval = update(oldval);
+        if(atomic_cmpxchg(&entry->value, oldval, newval)){
+          atomic_dec(&ht->num_threads_using);
+          return oldval;
+        } else {
+          goto retry;
+        }
+      }
+    }
+    entry = entry->next;
+  }
+  if(!new_entry){
+    new_entry = make_hentry(key, key_sz, hv, update(NULL), bucket);
+  } else {
+    new_entry->next = bucket;
+  }
+  if(atomic_compare_exchange(ht->table+index, &bucket, new_entry)){
+    atomic_inc(&ht->entries);
+    atomic_dec(&ht->num_threads_using);
+    maybe_rehash(ht);
+    return NULL;
+  }
+  goto retry;
+#else
+  while(entry){
+    if(entry->hv == hv){
+      if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
+        void *oldval = entry->value;
+        entry->value = update(oldval);
+        return oldval;
+      }
+    }
+    entry = entry->next;
+  }
+  new_entry = make_hentry(key, key_sz, hv, update(NULL), bucket);
+  ht->table[index] = new_entry;
+  ht->entries++;
+  return NULL;
 #endif
 }
 /*
@@ -244,7 +367,7 @@ void* hashtable_find(htable *ht, void *key, size_t key_sz){
   }
   return NULL;
 }
-#ifdef ATOMIC_HASHTABLE
+
 void *hashtable_remove(htable *ht, void *key, size_t key_sz){
   void *ret = NULL;
   inc_hashtable_threadcount(ht);
@@ -301,6 +424,18 @@ void *hashtable_remove(htable *ht, void *key, size_t key_sz){
   return ret;
 #endif
 }
+void hashtable_iter(struct hashtable *ht, void(*fun)(void*,size_t,void*)){
+  inc_hashtable_threadcount(ht);
+  int i;
+  hentry *entry;
+  for(i=0;i<ht->size;i++){
+    entry = ht->table[i];
+    while(entry){
+      fun(entry->key, entry->key_sz, entry->value);
+      entry = entry->next;
+    }
+  }
+}
 /*
   It is up to the caller of this function to insure no threads
   start using the table after it has been called.
@@ -329,11 +464,14 @@ void destroy_hashtable(struct hashtable *ht){
   return;
 }
 
-void* hashtable_add_string(htable *ht, char *str, void *value){
+int hashtable_add_string(htable *ht, char *str, void *value){
   return hashtable_add(ht, str, strlen(str), value);
 }
-void hashtable_remove_string(htable *ht, char *str){
+void* hashtable_remove_string(htable *ht, char *str){
   return hashtable_remove(ht, str, strlen(str));
+}
+void* hashtable_set_string(htable *ht, char *str, void *value){
+  return hashtable_set(ht, str, strlen(str), value);
 }
 void* hashtable_find_string(htable *ht, char *str){
   return hashtable_find(ht, str, strlen(str));

@@ -10,9 +10,9 @@ struct heap {
   int len;
   int mem;
 };
-binary_heap* make_new_heap(void *arr,int size);
+binary_heap* make_new_heap(void *arr, int size);
 binary_heap* heap_sort(binary_heap *heap);
-void heap_sift_down(english_word **heap, int start, int end);
+void heap_sift_down(binary_heap **heap, int start, int end);
 void heap_sift_up(english_word **heap, int index);
 void heapify(binary_heap *heap);
 void* heap_pop(binary_heap *heap);

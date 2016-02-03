@@ -1,0 +1,2660 @@
+%!PS-Adobe-3.0
+%%Title: sorting.c, sort-ints.c
+%%For: 
+%%Creator: a2ps version 4.14
+%%CreationDate: Wed Feb  3 10:57:32 2016
+%%BoundingBox: 24 24 588 768
+%%DocumentData: Clean7Bit
+%%Orientation: Landscape
+%%Pages: 7
+%%PageOrder: Ascend
+%%DocumentMedia: Letter 612 792 0 () ()
+%%DocumentNeededResources: font Courier
+%%+ font Courier-Bold
+%%+ font Courier-BoldOblique
+%%+ font Courier-Oblique
+%%+ font Helvetica
+%%+ font Helvetica-Bold
+%%+ font Symbol
+%%+ font Times-Bold
+%%+ font Times-Roman
+%%DocumentProcessColors: Black 
+%%DocumentSuppliedResources: procset a2ps-a2ps-hdr
+%%+ procset a2ps-black+white-Prolog
+%%+ encoding ISO-8859-1Encoding
+%%EndComments
+/a2psdict 200 dict def
+a2psdict begin
+%%BeginProlog
+%%Copyright: (c) 1988, 89, 90, 91, 92, 93 Miguel Santana
+%%Copyright: (c) 1995, 96, 97, 98 Akim Demaille, Miguel Santana
+% Check PostScript language level.
+/languagelevel where {
+  pop /gs_languagelevel languagelevel def
+} {
+  /gs_languagelevel 1 def
+} ifelse
+
+% EPSF import as in the Red Book
+/BeginInclude {
+  /b4_Inc_state save def    		% Save state for cleanup
+  /dict_count countdictstack def	% Count objects on dict stack
+  /op_count count 1 sub def		% Count objects on operand stack 
+  userdict begin
+    0 setgray 0 setlinecap
+    1 setlinewidth 0 setlinejoin
+    10 setmiterlimit [ ] 0 setdash newpath
+    gs_languagelevel 1 ne {
+      false setstrokeadjust false setoverprint 
+    } if
+} bind def
+
+/EndInclude {
+  count op_count sub { pos } repeat	% Clean up stacks
+  countdictstack dict_count sub { end } repeat
+  b4_Inc_state restore
+} bind def
+
+/BeginEPSF {
+  BeginInclude
+  /showpage { } def
+} bind def
+
+/EndEPSF {
+  EndInclude
+} bind def
+
+% Page prefeed
+/page_prefeed {         % bool -> -
+  statusdict /prefeed known {
+    statusdict exch /prefeed exch put
+  } {
+    pop
+  } ifelse
+} bind def
+
+/deffont {
+  findfont exch scalefont def
+} bind def
+
+/reencode_font {
+  findfont reencode 2 copy definefont pop def
+} bind def
+
+% Function c-show (str => -)
+% centers text only according to x axis.
+/c-show { 
+  dup stringwidth pop
+  2 div neg 0 rmoveto
+  show
+} bind def
+
+% Function l-show (str => -)
+% prints texts so that it ends at currentpoint
+/l-show {
+  dup stringwidth pop neg 
+  0 
+  rmoveto show
+} bind def
+
+% center-fit show (str w => -)
+% show centered, and scale currentfont so that the width is less than w
+/cfshow {
+  exch dup stringwidth pop
+  % If the title is too big, try to make it smaller
+  3 2 roll 2 copy
+  gt
+  { % if, i.e. too big
+    exch div
+    currentfont exch scalefont setfont
+  } { % ifelse
+    pop pop 
+  }
+  ifelse
+  c-show			% center title
+} bind def
+
+% Return the y size of the current font
+% - => fontsize
+/currentfontsize {
+  currentfont /FontMatrix get 3 get 1000 mul
+} bind def
+
+% reencode the font
+% <encoding-vector> <fontdict> -> <newfontdict>
+/reencode { %def
+  dup length 5 add dict begin
+    { %forall
+      % <vector> <key> <val>
+      1 index /FID ne 
+      { def }{ pop pop } ifelse
+    } forall
+    /Encoding exch def % -
+
+    % Use the font's bounding box to determine the ascent, descent,
+    % and overall height; don't forget that these values have to be
+    % transformed using the font's matrix.
+    % We use `load' because sometimes BBox is executable, sometimes not.
+    % Since we need 4 numbers an not an array avoid BBox from being executed
+    /FontBBox load aload pop
+    FontMatrix transform /Ascent exch def pop
+    FontMatrix transform /Descent exch def pop
+    /FontHeight Ascent Descent sub def
+
+    % Get the underline position and thickness if they're defined.
+    % Use 1 if they are not defined.
+    currentdict /FontInfo 2 copy known
+    { get
+      /UnderlinePosition 2 copy % <FontInfo> /UP <FontInfo> /UP
+      2 copy known
+      { get }{ pop pop 1 } ifelse
+      0 exch FontMatrix transform exch pop
+      def % <FontInfo>
+
+      /UnderlineThickness 2 copy % <FontInfo> /UT <FontInfo> /UT
+      2 copy known
+      { get }{ pop pop 1 } ifelse
+      0 exch FontMatrix transform exch pop
+      def % <FontInfo>
+      pop % -
+    }{ pop pop
+    } ifelse
+
+    currentdict
+  end 
+} bind def
+
+% Function print line number (<string> # -)
+/# {
+  gsave
+    sx cw mul neg 2 div 0 rmoveto
+    f# setfont
+    c-show
+  grestore
+} bind def
+
+% -------- Some routines to enlight plain b/w printings ---------
+
+% Underline
+% width --
+/dounderline {
+  currentpoint
+  gsave
+    moveto
+    0 currentfont /Descent get currentfontsize mul rmoveto
+    0 rlineto
+    stroke
+  grestore
+} bind def
+
+% Underline a string
+% string --
+/dounderlinestring {
+  stringwidth pop
+  dounderline
+} bind def
+
+/UL {
+  /ul exch store
+} bind def
+
+% Draw a box of WIDTH wrt current font
+% width --
+/dobox {
+  currentpoint
+  gsave
+    newpath
+    moveto
+    0 currentfont /Descent get currentfontsize mul rmoveto
+    dup 0 rlineto
+    0 currentfont /FontHeight get currentfontsize mul rlineto
+    neg 0 rlineto
+    closepath
+    stroke
+  grestore
+} bind def
+
+/BX {
+  /bx exch store
+} bind def
+
+% Box a string
+% string --
+/doboxstring {
+  stringwidth pop
+  dobox
+} bind def
+
+%
+% ------------- Color routines ---------------
+%
+/FG /setrgbcolor load def
+
+% Draw the background
+% width --
+/dobackground {
+  currentpoint
+  gsave
+    newpath
+    moveto
+    0 currentfont /Descent get currentfontsize mul rmoveto
+    dup 0 rlineto
+    0 currentfont /FontHeight get currentfontsize mul rlineto
+    neg 0 rlineto
+    closepath
+    bgcolor aload pop setrgbcolor
+    fill
+  grestore
+} bind def
+
+% Draw bg for a string
+% string --
+/dobackgroundstring {
+  stringwidth pop
+  dobackground
+} bind def
+
+
+/BG {
+  dup /bg exch store
+  { mark 4 1 roll ] /bgcolor exch store } if
+} bind def
+
+
+/Show {
+  bg { dup dobackgroundstring } if
+  ul { dup dounderlinestring } if
+  bx { dup doboxstring } if
+  show
+} bind def
+
+% Function T(ab), jumps to the n-th tabulation in the current line
+/T {
+  cw mul x0 add
+  bg { dup currentpoint pop sub dobackground } if
+  ul { dup currentpoint pop sub dounderline } if
+  bx { dup currentpoint pop sub dobox } if
+  y0 moveto
+} bind def
+
+% Function n: move to the next line
+/n {
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+} bind def
+
+% Function N: show and move to the next line
+/N {
+  Show
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+} bind def
+
+/S {
+  Show
+} bind def
+
+%%BeginResource: procset a2ps-a2ps-hdr 2.0 2
+%%Copyright: (c) 1988, 89, 90, 91, 92, 93 Miguel Santana
+%%Copyright: (c) 1995, 96, 97, 98 Akim Demaille, Miguel Santana
+% Function title: prints page header.
+% <ct> <rt> <lt> are passed as argument
+/title { 
+  % 1. Draw the background
+  x v get y v get moveto
+  gsave
+    0 th 2 div neg rmoveto 
+    th setlinewidth
+    0.95 setgray
+    pw 0 rlineto stroke
+  grestore
+  % 2. Border it
+  gsave
+    0.7 setlinewidth
+    pw 0 rlineto
+    0 th neg rlineto
+    pw neg 0 rlineto
+    closepath stroke
+  grestore
+  % stk: ct rt lt
+  x v get y v get th sub 1 add moveto
+%%IncludeResource: font Helvetica
+  fHelvetica fnfs 0.8 mul scalefont setfont
+  % 3. The left title
+  gsave
+    dup stringwidth pop fnfs 0.8 mul add exch % leave space took on stack
+    fnfs 0.8 mul hm rmoveto
+    show			% left title
+  grestore
+  exch
+  % stk: ct ltw rt
+  % 4. the right title
+  gsave
+    dup stringwidth pop fnfs 0.8 mul add exch % leave space took on stack
+    dup
+    pw exch stringwidth pop fnfs 0.8 mul add sub
+    hm
+    rmoveto
+    show			% right title
+  grestore
+  % stk: ct ltw rtw
+  % 5. the center title
+  gsave
+    pw 3 1 roll
+    % stk: ct pw ltw rtw
+    3 copy 
+    % Move to the center of the left room
+    sub add 2 div hm rmoveto
+    % What is the available space in here?
+    add sub fnfs 0.8 mul sub fnfs 0.8 mul sub
+    % stk: ct space_left
+%%IncludeResource: font Helvetica-Bold
+  fHelvetica-Bold fnfs scalefont setfont
+    cfshow
+  grestore
+} bind def
+
+% Function border: prints virtual page border
+/border { %def
+  gsave				% print four sides
+    0 setgray
+    x v get y v get moveto
+    0.7 setlinewidth		% of the square
+    pw 0 rlineto
+    0 ph neg rlineto
+    pw neg 0 rlineto
+    closepath stroke
+  grestore
+} bind def
+
+% Function water: prints a water mark in background
+/water { %def
+  gsave
+    scx scy moveto rotate
+%%IncludeResource: font Times-Bold
+  fTimes-Bold 100 scalefont setfont
+    .97 setgray
+    dup stringwidth pop 2 div neg -50 rmoveto
+    show
+  grestore
+} bind def
+
+% Function rhead: prints the right header
+/rhead {  %def
+  lx ly moveto
+  fHelvetica fnfs 0.8 mul scalefont setfont
+  l-show
+} bind def
+
+% Function footer (cf rf lf -> -)
+/footer {
+  fHelvetica fnfs 0.8 mul scalefont setfont
+  dx dy moveto
+  show
+
+  snx sny moveto
+  l-show
+  
+  fnx fny moveto
+  c-show
+} bind def
+%%EndResource
+%%BeginResource: procset a2ps-black+white-Prolog 2.0 1
+
+% Function T(ab), jumps to the n-th tabulation in the current line
+/T { 
+  cw mul x0 add y0 moveto
+} bind def
+
+% Function n: move to the next line
+/n { %def
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+} bind def
+
+% Function N: show and move to the next line
+/N {
+  Show
+  /y0 y0 bfs sub store
+  x0 y0 moveto
+}  bind def
+
+/S {
+  Show
+} bind def
+
+/p {
+  false UL
+  false BX
+  fCourier bfs scalefont setfont
+  Show
+} bind def
+
+/sy {
+  false UL
+  false BX
+  fSymbol bfs scalefont setfont
+  Show
+} bind def
+
+/k {
+  false UL
+  false BX
+  fCourier-Oblique bfs scalefont setfont
+  Show
+} bind def
+
+/K {
+  false UL
+  false BX
+  fCourier-Bold bfs scalefont setfont
+  Show
+} bind def
+
+/c {
+  false UL
+  false BX
+  fCourier-Oblique bfs scalefont setfont
+  Show
+} bind def
+
+/C {
+  false UL
+  false BX
+  fCourier-BoldOblique bfs scalefont setfont
+  Show 
+} bind def
+
+/l {
+  false UL
+  false BX
+  fHelvetica bfs scalefont setfont
+  Show
+} bind def
+
+/L {
+  false UL
+  false BX
+  fHelvetica-Bold bfs scalefont setfont
+  Show 
+} bind def
+
+/str{
+  false UL
+  false BX
+  fTimes-Roman bfs scalefont setfont
+  Show
+} bind def
+
+/e{
+  false UL
+  true BX
+  fHelvetica-Bold bfs scalefont setfont
+  Show
+} bind def
+
+%%EndResource
+%%EndProlog
+%%BeginSetup
+%%IncludeResource: font Courier
+%%IncludeResource: font Courier-Oblique
+%%IncludeResource: font Courier-Bold
+%%IncludeResource: font Times-Roman
+%%IncludeResource: font Symbol
+%%IncludeResource: font Courier-BoldOblique
+%%BeginResource: encoding ISO-8859-1Encoding
+/ISO-8859-1Encoding [
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/space /exclam /quotedbl /numbersign /dollar /percent /ampersand /quoteright 
+/parenleft /parenright /asterisk /plus /comma /minus /period /slash 
+/zero /one /two /three /four /five /six /seven 
+/eight /nine /colon /semicolon /less /equal /greater /question 
+/at /A /B /C /D /E /F /G 
+/H /I /J /K /L /M /N /O 
+/P /Q /R /S /T /U /V /W 
+/X /Y /Z /bracketleft /backslash /bracketright /asciicircum /underscore 
+/quoteleft /a /b /c /d /e /f /g 
+/h /i /j /k /l /m /n /o 
+/p /q /r /s /t /u /v /w 
+/x /y /z /braceleft /bar /braceright /asciitilde /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef /.notdef 
+/space /exclamdown /cent /sterling /currency /yen /brokenbar /section 
+/dieresis /copyright /ordfeminine /guillemotleft /logicalnot /hyphen /registered /macron 
+/degree /plusminus /twosuperior /threesuperior /acute /mu /paragraph /bullet 
+/cedilla /onesuperior /ordmasculine /guillemotright /onequarter /onehalf /threequarters /questiondown 
+/Agrave /Aacute /Acircumflex /Atilde /Adieresis /Aring /AE /Ccedilla 
+/Egrave /Eacute /Ecircumflex /Edieresis /Igrave /Iacute /Icircumflex /Idieresis 
+/Eth /Ntilde /Ograve /Oacute /Ocircumflex /Otilde /Odieresis /multiply 
+/Oslash /Ugrave /Uacute /Ucircumflex /Udieresis /Yacute /Thorn /germandbls 
+/agrave /aacute /acircumflex /atilde /adieresis /aring /ae /ccedilla 
+/egrave /eacute /ecircumflex /edieresis /igrave /iacute /icircumflex /idieresis 
+/eth /ntilde /ograve /oacute /ocircumflex /otilde /odieresis /divide 
+/oslash /ugrave /uacute /ucircumflex /udieresis /yacute /thorn /ydieresis 
+] def
+%%EndResource
+% Initialize page description variables.
+/sh 612 def
+/sw 792 def
+/llx 24 def
+/urx 768 def
+/ury 588 def
+/lly 24 def
+/#copies 1 def
+/th 15.000000 def
+/fnfs 11 def
+/bfs 7.493857 def
+/cw 4.496314 def
+
+% Dictionary for ISO-8859-1 support
+/iso1dict 8 dict begin
+  /fCourier ISO-8859-1Encoding /Courier reencode_font
+  /fCourier-Bold ISO-8859-1Encoding /Courier-Bold reencode_font
+  /fCourier-BoldOblique ISO-8859-1Encoding /Courier-BoldOblique reencode_font
+  /fCourier-Oblique ISO-8859-1Encoding /Courier-Oblique reencode_font
+  /fHelvetica ISO-8859-1Encoding /Helvetica reencode_font
+  /fHelvetica-Bold ISO-8859-1Encoding /Helvetica-Bold reencode_font
+  /fTimes-Bold ISO-8859-1Encoding /Times-Bold reencode_font
+  /fTimes-Roman ISO-8859-1Encoding /Times-Roman reencode_font
+currentdict end def
+/bgcolor [ 0 0 0 ] def
+/bg false def
+/ul false def
+/bx false def
+% The font for line numbering
+/f# /Helvetica findfont bfs .6 mul scalefont def
+/fSymbol /Symbol findfont def
+/hm fnfs 0.25 mul def
+/pw
+   cw 81.400000 mul
+def
+/ph
+   522.321860 th add
+def
+/pmw urx llx sub pw 2 mul sub 1 div def
+/pmh 0 def
+/v 0 def
+/x [
+  0
+  dup pmw add pw add
+] def
+/y [
+  pmh ph add 0 mul ph add
+  dup
+] def
+/scx sw 2 div def
+/scy sh 2 div def
+/snx urx def
+/sny lly 2 add def
+/dx llx def
+/dy sny def
+/fnx scx def
+/fny dy def
+/lx snx def
+/ly ury fnfs 0.8 mul sub def
+/sx 0 def
+/tab 8 def
+/x0 0 def
+/y0 0 def
+%%EndSetup
+
+%%Page: (1-2) 1
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(#define) K
+( NEED_XMALLOC) p n
+(#include) K
+( ") p
+(C_util.h) str
+(") p n
+(#define) K
+( get_byte\(val, byte\)                     \\) p n
+(  \(\(\(val\) >> \(\(byte\)*CHAR_BIT\)\) & 0xffu\)) N
+(#define) K
+( SWAP\(x,y\)                                    \\) p n
+(  __extension__ \({__typeof\(x\) __temp = x;                          \\) N
+(      x = y;                                                       \\) N
+(      y = __temp;}\)) N
+(//should return true if the 2 arguments are in the correct order) c n
+(//and false otherwised) N
+(typedef) K
+( ) p
+(int) k
+(\(*cmp_fun\)\() p
+(void) k
+(*,) p
+(void) k
+(*\);) p n
+(typedef) K
+( ) p
+(void) k
+(\(*sort_fn\)\() p
+(void) k
+(**, size_t, cmp_fun\);) p n
+(typedef) K
+( ) p
+(void) k
+(\(*int_sort_fn\)\(uint64_t*, size_t\);) p n
+(void) k
+( print_arr\(ulong *arr, ) p
+(int) k
+( len, ) p
+(FILE) k
+( *out\);) p n
+(int) k
+( cmp_gt\() p
+(void) k
+( *x, ) p
+(void) k
+( *y\){) p n
+(  ) S
+(return) K
+( \(\(uintptr_t\)x\) > \(\(uintptr_t\) y\);) p n
+(}) N
+(int) k
+( cmp_lt\() p
+(void) k
+( *x, ) p
+(void) k
+( *y\){) p n
+(  ) S
+(return) K
+( \(\(uintptr_t\)x\) < \(\(uintptr_t\) y\);) p n
+(}) N
+(//threshold for switching to insertion sort in merge/quick sort) c n
+(//this is the size used by glibc) N
+(#define) K
+( INSERTION_SORT_THRESHOLD 4) p n
+(void) k
+( insertion_sort_generic\() p
+(void) k
+( **input, size_t len, cmp_fun cmp\){) p n
+(  uint i,j;) N
+(  ) S
+(for) K
+(\(i=1;i<len;i++\){) p n
+(    ) S
+(void) k
+( *temp = input[i];) p n
+(    j = i;) N
+(    ) S
+(while) K
+(\(j>0 && !cmp\(input[j-1],temp\)\){) p n
+(      input[j] = input[j-1];) N
+(      j--;) N
+(    }) N
+(    input[j] = temp;) N
+(  }) N
+(}) N
+(void) k
+( insertion_sort_u64\(uint64_t *input, size_t len\){) p n
+(  uint i,j;) N
+(  ) S
+(for) K
+(\(i=1;i<len;i++\){) p n
+(    uint64_t temp = input[i];) N
+(    j = i;) N
+(    ) S
+(while) K
+(\(j > 0 && \(temp < input[j-1]\)\){) p n
+(      input[j] = input[j-1];) N
+(      j--;) N
+(    }) N
+(    input[j] = temp;) N
+(  }) N
+(}) N
+(static) K
+( ) p
+(inline) K
+( ) p
+(long) k
+( median\() p
+(long) k
+( x, ) p
+(long) k
+( y, ) p
+(long) k
+( z\){) p n
+(  ) S
+(long) k
+( lg = MAX\(x,y\);) p n
+(  ) S
+(long) k
+( sm = MIN\(x,y\);) p n
+(  ) S
+(long) k
+( ret = z;) p n
+(  ) S
+(if) K
+(\(z > lg\){) p n
+(    ret = lg;) N
+(  } ) S
+(else) K
+( ) p
+(if) K
+(\(z < sm\){) p n
+(    ret = sm;) N
+(  }) N
+(  ) S
+(return) K
+( ret;) p n
+(}) N
+(/*) c n
+(  Similar to the algorithm used by glibc, but glibc uses an explict stack) N
+(  while we use recursion, since I'm lazy.) N
+(*/) N
+(static) K
+( ) p
+(inline) K
+( ) p
+(int) k
+( qsort_partition_generic\() p
+(void) k
+( **arr, ) p
+(long) k
+( left, ) p
+(long) k
+( right,) p n
+(                                          cmp_fun cmp\){) N
+(  ) S
+(long) k
+( pivot_idx = median\(left, right, \(left+right\)/2\);) p n
+(  ) S
+(void) k
+(* pivot = arr[pivot_idx];) p n
+(  ) S
+(long) k
+( i = left - 1, j = right + 1;) p n
+(  ) S
+(do) K
+( {) p n
+(    ) S
+(do) K
+( {) p n
+(sorting.c) (Page 1/8) (Feb 02, 16 13:55) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(      i++;) p n
+(    } ) S
+(while) K
+(\(cmp\(arr[i], pivot\)\);) p n
+(    ) S
+(do) K
+( {) p n
+(      j--;) N
+(    } ) S
+(while) K
+(\(cmp\(pivot, arr[j]\)\);) p n
+(    ) S
+(if) K
+(\(i<j\){) p n
+(      SWAP\(arr[i], arr[j]\);) N
+(    } ) S
+(else) K
+( {) p n
+(      ) S
+(return) K
+( j;) p n
+(    }) N
+(  } ) S
+(while) K
+(\(i<=j\);) p n
+(  ) S
+(return) K
+( j;) p n
+(}) N
+(void) k
+( qsort_generic\() p
+(void) k
+( **arr, size_t len, cmp_fun cmp\){) p n
+(  ) S
+(if) K
+(\(len <= INSERTION_SORT_THRESHOLD\){) p n
+(    insertion_sort_generic\(arr, len, cmp\);) N
+(  } ) S
+(else) K
+( {) p n
+(    ) S
+(long) k
+( pivot_idx = qsort_partition_generic\(arr, 0, len-1, cmp\);) p n
+(    qsort_generic\(arr, pivot_idx+1, cmp\);) N
+(    qsort_generic\(arr+\(pivot_idx+1\), len - \(pivot_idx+1\), cmp\);) N
+(  }) N
+(  ) S
+(return) K
+(;) p n
+(}) N
+(static) K
+( ) p
+(inline) K
+( ) p
+(int) k
+( qsort_partition_u64\(uint64_t *arr, ) p
+(long) k
+( left, ) p
+(long) k
+( right\){) p n
+(  ) S
+(long) k
+( pivot_idx = median\(left, right, \(left + \(right-left\)/2\)\);) p n
+(  uint64_t pivot = arr[pivot_idx];) N
+(  ) S
+(long) k
+( i = left - 1, j = right + 1;) p n
+(  ) S
+(do) K
+( {) p n
+(    ) S
+(do) K
+( {) p n
+(      i++;) N
+(    } ) S
+(while) K
+(\(arr[i] < pivot\);) p n
+(    ) S
+(do) K
+( {) p n
+(      j--;) N
+(    } ) S
+(while) K
+(\(pivot < arr[j]\);) p n
+(    ) S
+(if) K
+(\(i<j\){) p n
+(      SWAP\(arr[i], arr[j]\);) N
+(    } ) S
+(else) K
+( {) p n
+(      ) S
+(return) K
+( j;) p n
+(    }) N
+(  } ) S
+(while) K
+(\(i<=j\);) p n
+(  ) S
+(return) K
+( j;) p n
+(}) N
+(void) k
+( qsort_u64\(uint64_t *arr, size_t len\){) p n
+(  ) S
+(if) K
+(\(len <= INSERTION_SORT_THRESHOLD\){) p n
+(    ) S
+(//putting a check for non-zero len here might speed things up) c n
+(    insertion_sort_u64\(arr, len\);) p n
+(  } ) S
+(else) K
+( {) p n
+(    ) S
+(long) k
+( pivot_idx = qsort_partition_u64\(arr, 0, len-1\);) p n
+(    qsort_u64\(arr, pivot_idx+1\);) N
+(    qsort_u64\(arr+\(pivot_idx+1\), len - \(pivot_idx+1\)\);) N
+(  }) N
+(  ) S
+(return) K
+(;) p n
+(}) N
+(static) K
+( ) p
+(void) k
+( merge\() p
+(void) k
+( **A, ) p
+(void) k
+( **B, ) p
+(void) k
+( **tmp,) p n
+(                  size_t n1, size_t n2, cmp_fun cmp\){) N
+(  ) S
+(while) K
+(\(n1 > 0 && n2 > 0\){) p n
+(    ) S
+(if) K
+(\(cmp\(*A,*B\)\){) p n
+(      *tmp++ = *A++;) N
+(      n1--;) N
+(    } ) S
+(else) K
+( {) p n
+(      *tmp++ = *B++;) N
+(      n2--;) N
+(    }) N
+(  }) N
+(  ) S
+(if) K
+(\(n1 > 0\){) p n
+(    memcpy\(tmp, A, n1*) S
+(sizeof) K
+(\() p
+(void) k
+(*\)\);) p n
+(  }) N
+(  ) S
+(if) K
+(\(n2 > 0\){) p n
+(    memcpy\(tmp, B, n2*) S
+(sizeof) K
+(\() p
+(void) k
+(*\)\);) p n
+(sorting.c) (Page 2/8) (Feb 02, 16 13:55) title
+border
+grestore
+(Printed by ) rhead
+(sorting.c) (1/7) (Wednesday February 03, 2016) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (3-4) 2
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(  }) p n
+(}) N
+(static) K
+( ) p
+(void) k
+( mergesort_internal\() p
+(void) k
+( **arr, ) p
+(void) k
+( **tmp,) p n
+(                               size_t len, cmp_fun cmp\){) N
+(  ) S
+(if) K
+(\(len <= INSERTION_SORT_THRESHOLD\){) p n
+(    insertion_sort_generic\(arr, len, cmp\);) N
+(    ) S
+(return) K
+(;) p n
+(  }) N
+(  size_t mid = len/2;) N
+(//  size_t n2 = len - n1;) c n
+(//  void **A = arr;) N
+(//  void **B = arr + n1;) N
+(  mergesort_internal\(arr, tmp, mid, cmp\);) p n
+(  mergesort_internal\(arr + mid, tmp, len - mid, cmp\);) N
+(  merge\(arr, arr + mid, tmp, mid, len - mid, cmp\);) N
+(  memcpy\(arr, tmp, len*) S
+(sizeof) K
+(\() p
+(void) k
+(*\)\);) p n
+(}) N
+(void) k
+( mergesort_generic\() p
+(void) k
+( **arr, size_t len, cmp_fun cmp\){) p n
+(  ) S
+(//alloca would be faster, but limits len to 8M/sizeof\(void*\)) c n
+(  ) p
+(//and I'm too lazy to test the length) c n
+(  ) p
+(void) k
+( **tmp = zmalloc\(len*) p
+(sizeof) K
+(\() p
+(void) k
+(*\)\);) p n
+(  mergesort_internal\(arr, tmp, len, cmp\);) N
+(  free\(tmp\);) N
+(}) N
+() N
+(static) K
+( ) p
+(void) k
+( merge_u64\(uint64_t *A, uint64_t *B, uint64_t *tmp,) p n
+(                         size_t n1, size_t n2\){) N
+(  ) S
+(while) K
+(\(n1 > 0 && n2 > 0\){) p n
+(    ) S
+(if) K
+(\(*A<*B\){) p n
+(      *tmp++ = *A++;) N
+(      n1--;) N
+(    } ) S
+(else) K
+( {) p n
+(      *tmp++ = *B++;) N
+(      n2--;) N
+(    }) N
+(  }) N
+(  ) S
+(if) K
+(\(n1 > 0\){) p n
+(    memcpy\(tmp, A, n1*) S
+(sizeof) K
+(\() p
+(void) k
+(*\)\);) p n
+(  }) N
+(  ) S
+(if) K
+(\(n2 > 0\){) p n
+(    memcpy\(tmp, B, n2*) S
+(sizeof) K
+(\() p
+(void) k
+(*\)\);) p n
+(  }) N
+(}) N
+(static) K
+( ) p
+(void) k
+( mergesort_internal_u64\(uint64_t *arr, uint64_t *tmp, size_t len\){) p n
+(  ) S
+(if) K
+(\(len <= INSERTION_SORT_THRESHOLD\){) p n
+(    insertion_sort_u64\(arr, len\);) N
+(    ) S
+(return) K
+(;) p n
+(  }) N
+(  size_t mid = len/2;) N
+(//  size_t n2 = len - n1;) c n
+(//  void **A = arr;) N
+(//  void **B = arr + n1;) N
+(  mergesort_internal_u64\(arr, tmp, mid\);) p n
+(  mergesort_internal_u64\(arr + mid, tmp, len - mid\);) N
+(  merge_u64\(arr, arr + mid, tmp, mid, len - mid\);) N
+(  memcpy\(arr, tmp, len*) S
+(sizeof) K
+(\() p
+(void) k
+(*\)\);) p n
+(}) N
+(void) k
+( mergesort_u64\(uint64_t *input, size_t len\){) p n
+(  uint64_t *tmp = zmalloc\(len*) S
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  mergesort_internal_u64\(input, tmp, len\);) N
+(  free\(tmp\);) N
+(}) N
+(/*) c n
+(  We need to reimplement a heap to get a fast integer heapsort) N
+(*/) N
+(#define) K
+( heap_left_child\(i\) \(\(2*i\)+1\)) p n
+(#define) K
+( heap_right_child\(i\) \(\(2*i\)+2\)) p n
+(#define) K
+( heap_parent\(i\) \(\(i-1\)/2\)) p n
+(static) K
+( ) p
+(void) k
+( sift_down\(uint64_t *heap, size_t root, size_t len\){) p n
+(sorting.c) (Page 3/8) (Feb 02, 16 13:55) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(  ) p
+(int) k
+(64_t l,r,swap;) p n
+(  ) S
+(while) K
+(\(\(l=heap_left_child\(root\)\) < len\){) p n
+(    r = heap_right_child\(root\);) N
+(    swap = root;) N
+(    ) S
+(if) K
+(\(heap[l] > heap[swap]\){) p n
+(      swap = l;) N
+(    }) N
+(    ) S
+(if) K
+(\(r < len && \(heap[r] > heap[swap]\)\){) p n
+(      swap = r;) N
+(    }) N
+(    ) S
+(if) K
+(\(swap != root\){) p n
+(      SWAP\(heap[root], heap[swap]\);) N
+(      root = swap;) N
+(    } ) S
+(else) K
+( {) p n
+(      ) S
+(break) K
+(;) p n
+(    }) N
+(  }) N
+(}) N
+(static) K
+( ) p
+(void) k
+( heapify\(uint64_t *heap, size_t len\){) p n
+(  ) S
+(int) k
+(64_t start = heap_parent\(len-1\);) p n
+(  ) S
+(while) K
+(\(start >= 0\){) p n
+(    sift_down\(heap, start, len\);) N
+(    start--;) N
+(  }) N
+(}) N
+(void) k
+( heapsort_u64\(uint64_t *arr, size_t len\){) p n
+(  heapify\(arr, len\);) N
+(  ) S
+(int) k
+(64_t end = len-1;) p n
+(  ) S
+(do) K
+( {) p n
+(    SWAP\(arr[end], arr[0]\);) N
+(    sift_down\(arr, 0, end\);) N
+(  } ) S
+(while) K
+(\(--end > 0\);) p n
+(}) N
+(/*) c n
+(  This used to use arrays for hist and sum, and loops, but it sometimes failed.) N
+(  I manually unrolled all the loops and used seperate variables and it worked.) N
+(  I could probably figure out what was wrong and  put back in the loops and arra) N
+(ys,) N
+(  but this works and I'm lazy.) N
+(*/) N
+(/*) N
+(  Note for posterity:) N
+(  I made a mistake when I first wrote this, I set size of the histograms to) N
+(  be 255 \(i.e 0xff\) bytes each, however a byte can take on 256 \(i.e 0x100\) possi) N
+(ble) N
+(  values. This caused a subtle bug, the function would work so long as the byte ) N
+(0xff didn't) N
+(  appear in the input, but if it did then memory out of bounds would be written ) N
+(\(generally) N
+(  writing to hist_n[0xff] would write to hist_n+1[0] instead\). It took me a whil) N
+(e) N
+(  to realize what was going on.) N
+(*/) N
+(void) k
+( radix_sort_u8_u64\(uint64_t *in, size_t sz\){) p n
+(  uint64_t *hist = alloca\(8 * 0x100 * ) S
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  uint64_t *hist0 = hist;) N
+(  uint64_t *hist1 = hist0 + 0x100;) N
+(  uint64_t *hist2 = hist1 + 0x100;) N
+(  uint64_t *hist3 = hist2 + 0x100;) N
+(  uint64_t *hist4 = hist3 + 0x100;) N
+(  uint64_t *hist5 = hist4 + 0x100;) N
+(  uint64_t *hist6 = hist5 + 0x100;) N
+(  uint64_t *hist7 = hist6 + 0x100;) N
+(  uint64_t total = 0, sum0 = 0, sum1 = 0, sum2 = 0, sum3 = 0;) N
+(  uint64_t sum4 = 0, sum5 = 0, sum6 = 0 , sum7 = 0;) N
+(  size_t i;) N
+(  memset\(hist, ') S
+(\\0) str
+(', 8*0x100*) p
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    hist0[get_byte\(in[i], 0\)]++;) N
+(sorting.c) (Page 4/8) (Feb 02, 16 13:55) title
+border
+grestore
+(Printed by ) rhead
+(sorting.c) (2/7) (Wednesday February 03, 2016) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (5-6) 3
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(    hist1[get_byte\(in[i], 1\)]++;) p n
+(    hist2[get_byte\(in[i], 2\)]++;) N
+(    hist3[get_byte\(in[i], 3\)]++;) N
+(    hist4[get_byte\(in[i], 4\)]++;) N
+(    hist5[get_byte\(in[i], 5\)]++;) N
+(    hist6[get_byte\(in[i], 6\)]++;) N
+(    hist7[get_byte\(in[i], 7\)]++;) N
+(  }) N
+(#define) K
+( set_index\(byte\)                         \\) p n
+(  total = CAT\(hist,byte\)[i] + CAT\(sum,byte\);    \\) N
+(  CAT\(hist,byte\)[i] = CAT\(sum, byte\);           \\) N
+(  CAT\(sum, byte\) = total;) N
+() N
+(  ) S
+(for) K
+(\(i=0;i<0x100;i++\){) p n
+(    set_index\(0\);) N
+(    set_index\(1\);) N
+(    set_index\(2\);) N
+(    set_index\(3\);) N
+(    set_index\(4\);) N
+(    set_index\(5\);) N
+(    set_index\(6\);) N
+(    set_index\(7\);) N
+(  }) N
+() N
+(  uint64_t *temp = zmalloc\(sz*) S
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  uint64_t *a = in, *b = temp;) N
+(  size_t pos = 0;) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_byte\(a[i], 0\);) N
+(    b[hist0[pos]++] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_byte\(a[i], 1\);) N
+(    b[hist1[pos]++] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_byte\(a[i], 2\);) N
+(    b[hist2[pos]++] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_byte\(a[i], 3\);) N
+(    b[hist3[pos]++] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_byte\(a[i], 4\);) N
+(    b[hist4[pos]++] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_byte\(a[i], 5\);) N
+(    b[hist5[pos]++] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_byte\(a[i], 6\);) N
+(    b[hist6[pos]++] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_byte\(a[i], 7\);) N
+(    b[hist7[pos]++] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  free\(temp\);) N
+(//  return in;) c n
+(sorting.c) (Page 5/8) (Feb 02, 16 13:55) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(}) p n
+(void) k
+( radix_sort_compact_u64\(uint64_t *in, size_t sz\){) p n
+(  uint64_t hist[8][0x100];) N
+(  uint64_t total = 0, sum[8];) N
+(  size_t i, j;) N
+(  memset\(hist, ') S
+(\\0) str
+(', 8*0x100*) p
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  memset\(sum, ') S
+(\\0) str
+(', 8*) p
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    hist[0][get_byte\(in[i], 0\)]++;) N
+(    hist[1][get_byte\(in[i], 1\)]++;) N
+(    hist[2][get_byte\(in[i], 2\)]++;) N
+(    hist[3][get_byte\(in[i], 3\)]++;) N
+(    hist[4][get_byte\(in[i], 4\)]++;) N
+(    hist[5][get_byte\(in[i], 5\)]++;) N
+(    hist[6][get_byte\(in[i], 6\)]++;) N
+(    hist[7][get_byte\(in[i], 7\)]++;) N
+(  }) N
+(  ) S
+(for) K
+(\(i=0;i<0x100;i++\){) p n
+(    ) S
+(for) K
+(\(j=0;j<8;j++\){) p n
+(      total = hist[j][i] + sum[j];) N
+(      hist[j][i] = sum[j];) N
+(      sum[j] = total;) N
+(    }) N
+(  }) N
+() N
+(  uint64_t *temp = zmalloc\(sz*) S
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  uint64_t *a = in, *b = temp;) N
+(  size_t pos = 0;) N
+(  ) S
+(for) K
+(\(j=0;j<8;j++\){) p n
+(    ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(      pos = get_byte\(a[i], j\);) N
+(      b[hist[j][pos]++] = a[i];) N
+(    }) N
+(    SWAP\(a, b\);) N
+(  }) N
+(  free\(temp\);) N
+(//  return in;) c n
+(}) p n
+(/*) c n
+(  Radix sort to sort arbitary data based on integer keys.) N
+(*/) N
+(void) k
+( radix_sort_keys\() p
+(void) k
+( **in, size_t sz, uint64_t\(*get_key\)\() p
+(void) k
+(*\)\){) p n
+(  uint64_t hist[8][0x100];) N
+(  uint64_t total = 0, sum[8];) N
+(  size_t i, j;) N
+(  memset\(hist, ') S
+(\\0) str
+(', 8*0x100*) p
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  memset\(sum, ') S
+(\\0) str
+(', 8*) p
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    uint64_t key = get_key\(in[i]\);) N
+(    hist[0][get_byte\(key, 0\)]++;) N
+(    hist[1][get_byte\(key, 1\)]++;) N
+(    hist[2][get_byte\(key, 2\)]++;) N
+(    hist[3][get_byte\(key, 3\)]++;) N
+(    hist[4][get_byte\(key, 4\)]++;) N
+(    hist[5][get_byte\(key, 5\)]++;) N
+(    hist[6][get_byte\(key, 6\)]++;) N
+(    hist[7][get_byte\(key, 7\)]++;) N
+(  }) N
+(  ) S
+(for) K
+(\(i=0;i<0x100;i++\){) p n
+(    ) S
+(for) K
+(\(j=0;j<8;j++\){) p n
+(      total = hist[j][i] + sum[j];) N
+(      hist[j][i] = sum[j];) N
+(      sum[j] = total;) N
+(    }) N
+(  }) N
+() N
+(  ) S
+(void) k
+( **temp = zmalloc\(sz*) p
+(sizeof) K
+(\() p
+(void) k
+(*\)\);) p n
+(  ) S
+(void) k
+( **a = in, **b = temp;) p n
+(  size_t pos = 0;) N
+(sorting.c) (Page 6/8) (Feb 02, 16 13:55) title
+border
+grestore
+(Printed by ) rhead
+(sorting.c) (3/7) (Wednesday February 03, 2016) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (7-8) 4
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(  ) p
+(for) K
+(\(j=0;j<8;j++\){) p n
+(    ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(      uint64_t key = get_key\(a[i]\);) N
+(      pos = get_byte\(key, j\);) N
+(      b[hist[j][pos]++] = a[i];) N
+(    }) N
+(    SWAP\(a, b\);) N
+(  }) N
+(  free\(temp\);) N
+(//  return in;) c n
+(}) p n
+(/*) c n
+(  same as above but using histograms of words instead of bytes. This will be) N
+(  faster for a large enough size \(I'm not totally sure what the threshold is\), b) N
+(ut) N
+(  it uses a lot more memory) N
+(*/) N
+(#define) K
+( get_word\(val, word\)                     \\) p n
+(  \(\(\(val\) >> \(\(2*word\)*CHAR_BIT\)\) & 0xffffu\)) N
+(void) k
+( radix_sort_u16_u64\(uint64_t *in, size_t sz\){) p n
+(  uint64_t *hist = alloca\(4 * 0x10000 * ) S
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  uint64_t *hist0 = hist;) N
+(  uint64_t *hist1 = hist0 + 0x10000;) N
+(  uint64_t *hist2 = hist1 + 0x10000;) N
+(  uint64_t *hist3 = hist2 + 0x10000;) N
+(  uint64_t total = 0, sum0 = 0, sum1 = 0, sum2 = 0, sum3 = 0;) N
+(  size_t i;) N
+(  memset\(hist, ') S
+(\\0) str
+(', 4*0x10000*) p
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    hist0[get_word\(in[i], 0\)]++;) N
+(    hist1[get_word\(in[i], 1\)]++;) N
+(    hist2[get_word\(in[i], 2\)]++;) N
+(    hist3[get_word\(in[i], 3\)]++;) N
+(  }) N
+(  ) S
+(for) K
+(\(i=0;i<0x10000;i++\){) p n
+(    total = hist0[i] + sum0;) N
+(    hist0[i] = sum0;) N
+(    sum0 = total;) N
+() N
+(    total = hist1[i] + sum1;) N
+(    hist1[i] = sum1;) N
+(    sum1 = total;) N
+() N
+(    total = hist2[i] + sum2;) N
+(    hist2[i] = sum2;) N
+(    sum2 = total;) N
+() N
+(    total = hist3[i] + sum3;) N
+(    hist3[i] = sum3;) N
+(    sum3 = total;) N
+(  }) N
+(  uint64_t *temp = zmalloc\(sz*) S
+(sizeof) K
+(\(uint64_t\)\);) p n
+(  uint64_t *a = in, *b = temp;) N
+(  size_t pos = 0;) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_word\(a[i], 0\);) N
+(    b[\(hist0[pos]++\)] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_word\(a[i], 1\);) N
+(    b[\(hist1[pos]++\)] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(  ) S
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_word\(a[i], 2\);) N
+(    b[\(hist2[pos]++\)] = a[i];) N
+(  }) N
+(  SWAP\(a, b\);) N
+(sorting.c) (Page 7/8) (Feb 02, 16 13:55) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(  ) p
+(for) K
+(\(i=0;i<sz;i++\){) p n
+(    pos = get_word\(a[i], 3\);) N
+(    b[\(hist3[pos]++\)] = a[i];) N
+(  }) N
+(  free\(temp\);) N
+(//  return in;) c n
+(}) p n
+(void) k
+( radix_sort_u64\(uint64_t *in, size_t sz\){) p n
+(  radix_sort_u16_u64\(in,sz\);) N
+(}) N
+(sorting.c) (Page 8/8) (Feb 02, 16 13:55) title
+border
+grestore
+(Printed by ) rhead
+(sorting.c) (4/7) (Wednesday February 03, 2016) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (1-2) 5
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(/**) c n
+( * \\file sort_skele.c) N
+( *) N
+( * Sorts integers from a file using various algorithms.) N
+( *) N
+( * \\author eaburns) N
+( * \\date 28-07-2010) N
+( */) N
+() p n
+(#include) K
+( ") p
+(C_util.h) str
+(") p n
+() N
+(/* The various sorting algorithm names */) c n
+(static) K
+( ) p
+(const) K
+( ) p
+(char) k
+( *counting_sort_str = ") p
+(counting) str
+(";) p n
+(static) K
+( ) p
+(const) K
+( ) p
+(char) k
+( *radix_sort_str = ") p
+(radix) str
+(";) p n
+(static) K
+( ) p
+(const) K
+( ) p
+(char) k
+( *quick_sort_str = ") p
+(quick) str
+(";) p n
+(static) K
+( ) p
+(const) K
+( ) p
+(char) k
+( *insertion_sort_str = ") p
+(insertion) str
+(";) p n
+(static) K
+( ) p
+(const) K
+( ) p
+(char) k
+( *system_quick_sort_str = ") p
+(system_quick) str
+(";) p n
+() N
+(/* Number of bits in an unsigned long. */) c n
+(static) K
+( ) p
+(const) K
+( ) p
+(unsigned) k
+( ) p
+(long) k
+( ulong_bits = 8 * ) p
+(sizeof) K
+(\() p
+(unsigned) k
+( ) p
+(long) k
+(\);) p n
+() N
+(extern) K
+( ) p
+(void) k
+( qsort_u64\(uint64_t *input, size_t len\);) p n
+(extern) K
+( ) p
+(void) k
+( radix_sort_u64\(uint64_t *input, size_t len\);) p n
+(extern) K
+( ) p
+(void) k
+( insertion_sort_u64\(uint64_t *input, size_t len\);) p n
+() N
+(/************************************************************) c n
+( * Functions that you must implement) N
+( ************************************************************/) N
+() p n
+(/*) c n
+( * Radix sort) N
+( * Return 0 on success and 1 on failure.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(int) k
+( do_radix_sort\() p
+(unsigned) k
+( ) p
+(long) k
+( ary[],) p n
+(                                  ) S
+(unsigned) k
+( ) p
+(long) k
+( n, ) p
+(unsigned) k
+( ) p
+(long) k
+( nbits\){) p n
+(  radix_sort_u64\(ary, n\);) N
+(  ) S
+(return) K
+( 0;) p n
+(}) N
+() N
+() N
+(/*) c n
+( * Counting sort) N
+( * Return 0 on success and 1 on failure.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(int) k
+( do_counting_sort\() p
+(unsigned) k
+( ) p
+(long) k
+( ary[],) p n
+(                                     ) S
+(unsigned) k
+( ) p
+(long) k
+( n, ) p
+(unsigned) k
+( ) p
+(long) k
+( nbits\){) p n
+(  ) S
+(if) K
+( \(nbits > 20\){) p n
+(    exit\(EXIT_FAILURE\);) N
+(  }) N
+(  ) S
+(int) k
+( i, idx;) p n
+(  ) S
+(int) k
+( hist_size = ) p
+(sizeof) K
+(\(uint64_t\) * \(1<<nbits\);) p n
+(  uint64_t *hist = alloca\(hist_size\);) N
+(  memset\(hist, ') S
+(\\0) str
+(', hist_size\);) p n
+(  ) S
+(for) K
+(\(i=0;i<n;i++\){) p n
+(    hist[ary[i]]++;) N
+(  }) N
+(  ) S
+(//This is faster than doing a seperate loop to compute the indices) c n
+(  ) p
+(//but makes the sort not stable, which is find for a counting sort) c n
+(  ) p
+(//but not for a radix sort.) c n
+(  ) p
+(for) K
+(\(i=0, idx=0;i<\(1<<nbits\) && idx<n;i++\){) p n
+(    ) S
+(while) K
+(\(hist[i]--\){) p n
+(      ary[idx++] = i;) N
+(    }) N
+(  }) N
+(  ) S
+(return) K
+( 0;) p n
+(}) N
+() N
+() N
+(/*) c n
+(sort-ints.c) (Page 1/6) (Feb 02, 16 14:28) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+( * Quicksort) c n
+( * Return 0 on success and 1 on failure.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(int) k
+( do_quicksort\() p
+(unsigned) k
+( ) p
+(long) k
+( ary[],) p n
+(                                 ) S
+(unsigned) k
+( ) p
+(long) k
+( n, ) p
+(unsigned) k
+( ) p
+(long) k
+( nbits\){) p n
+(  qsort_u64\(ary, n\);) N
+(  ) S
+(return) K
+( 0;) p n
+(}) N
+() N
+() N
+(/************************************************************) c n
+( *) N
+( * You probably don't need to modify anything beyond here.) N
+( *) N
+( ************************************************************/) N
+() p n
+() N
+(/************************************************************) c n
+( * Example: Using the standard library's qsort\(\) routine.) N
+( ************************************************************/) N
+() p n
+(/* The comparison function for qsort\(\). */) c n
+(static) K
+( ) p
+(int) k
+( compare\() p
+(const) K
+( ) p
+(void) k
+( *_a, ) p
+(const) K
+( ) p
+(void) k
+( *_b\)) p n
+({) N
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( *a = \() p
+(unsigned) k
+( ) p
+(long) k
+( *\) _a;) p n
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( *b = \() p
+(unsigned) k
+( ) p
+(long) k
+( *\) _b;) p n
+() N
+(  ) S
+(return) K
+( *a - *b;) p n
+(}) N
+() N
+() N
+(/*) c n
+( * Uses the standard library quicksort function.) N
+( * Return 0 on success and 1 on failure.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(int) k
+( do_system_quicksort\() p
+(unsigned) k
+( ) p
+(long) k
+( ary[],) p n
+(                                        ) S
+(unsigned) k
+( ) p
+(long) k
+( n,) p n
+(                                        ) S
+(unsigned) k
+( ) p
+(long) k
+( nbits\)) p n
+({) N
+(  ) S
+(/* This is the system's quick sort function. */) c n
+(  qsort\(ary, n, ) p
+(sizeof) K
+(\(*ary\), compare\);) p n
+() N
+(  ) S
+(return) K
+( 0;) p n
+(}) N
+() N
+() N
+(/************************************************************) c n
+( * Example: insertion sort) N
+( ************************************************************/) N
+() p n
+(/*) c n
+( * Insertion sort.) N
+( * Return 0 on success and 1 on failure.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(int) k
+( do_insertion_sort\() p
+(unsigned) k
+( ) p
+(long) k
+( ary[], ) p
+(unsigned) k
+( ) p
+(long) k
+( n,) p n
+(                                      ) S
+(unsigned) k
+( ) p
+(long) k
+( nbits\)) p n
+({) N
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( j;) p n
+() N
+(  ) S
+(for) K
+( \(j = 1; j < n; j += 1\) {) p n
+(    ) S
+(unsigned) k
+( ) p
+(long) k
+( key = ary[j];) p n
+(    ) S
+(unsigned) k
+( ) p
+(long) k
+( i = j;) p n
+(    ) S
+(while) K
+( \(i > 0 && ary[i-1] > key\) {) p n
+(      ary[i] = ary[i-1];) N
+(      i -= 1;) N
+(    }) N
+(    ary[i] = key;) N
+(  }) N
+() N
+(sort-ints.c) (Page 2/6) (Feb 02, 16 14:28) title
+border
+grestore
+(Printed by ) rhead
+(sort-ints.c) (5/7) (Wednesday February 03, 2016) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (3-4) 6
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(  ) p
+(return) K
+( 0;) p n
+(}) N
+() N
+(/*) c n
+( * Read the header from the input file and returts the number of) N
+( * values in the input using the 'nvalues' argument and the number of) N
+( * bits for each number using the 'nbits' argument.) N
+( *) N
+( * Returns 0 on success and 1 on failure.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(int) k
+( read_file_header\() p
+(FILE) k
+( * infile, ) p
+(unsigned) k
+( ) p
+(long) k
+( *nvalues,) p n
+(                                     ) S
+(unsigned) k
+( ) p
+(long) k
+( *nbits\)) p n
+({) N
+(  ) S
+(int) k
+( ret;) p n
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( _nvalues, _nbits;) p n
+() N
+(  ret = fscanf\(infile, ") S
+( %lu %lu) str
+(", &_nvalues, &_nbits\);) p n
+(  ) S
+(if) K
+( \(ret == EOF\) {) p n
+(    fprintf\(stderr, ") S
+(Unexpected end of file\\n) str
+("\);) p n
+(    ) S
+(return) K
+( 1;) p n
+(  }) N
+(  ) S
+(if) K
+( \(ret != 2\) {) p n
+(    fprintf\(stderr, ") S
+(Malformed file header\\n) str
+("\);) p n
+(    ) S
+(return) K
+( 1;) p n
+(  }) N
+() N
+(  ) S
+(if) K
+( \(_nbits > ulong_bits\) {) p n
+(    fprintf\(stderr, ") S
+(%lu bits input values are too big\\n) str
+(", _nbits\);) p n
+(    fprintf\(stderr, ") S
+(Word size seems to be %lu bits\\n) str
+(", ulong_bits\);) p n
+(    ) S
+(return) K
+( 1;) p n
+(  }) N
+() N
+(  ) S
+(if) K
+( \(nvalues\)) p n
+(    *nvalues = _nvalues;) N
+(  ) S
+(if) K
+( \(nbits\)) p n
+(    *nbits = _nbits;) N
+() N
+(  ) S
+(return) K
+( 0;) p n
+(}) N
+() N
+(/*) c n
+( * Reads the next number from the input file into the 'num' argument.) N
+( * If the end of the file is reached then 'num' is left as is and) N
+( * 'eof' is set to 1, otherwise 'eof' is set to zero.) N
+( *) N
+( * Returns 0 on success and 1 on failure.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(int) k
+( read_next_number\() p
+(FILE) k
+( * infile, ) p
+(unsigned) k
+( ) p
+(long) k
+( *num,) p n
+(                                     ) S
+(unsigned) k
+( ) p
+(int) k
+( *eof\)) p n
+({) N
+(  ) S
+(int) k
+( ret;) p n
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( _num;) p n
+() N
+(  ret = fscanf\(infile, ") S
+( %lu) str
+(", &_num\);) p n
+(  ) S
+(if) K
+( \(ret == EOF\) {) p n
+(    *eof = 1;) N
+(    ) S
+(return) K
+( 0;) p n
+(  }) N
+(  ) S
+(if) K
+( \(ret != 1\) {) p n
+(    perror\(") S
+(fscanf failed) str
+("\);) p n
+(    ) S
+(return) K
+( 1;) p n
+(  }) N
+() N
+(  *num = _num;) N
+(  *eof = 0;) N
+() N
+(  ) S
+(return) K
+( 0;) p n
+(}) N
+() N
+(sort-ints.c) (Page 3/6) (Feb 02, 16 14:28) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(/*) c n
+( * Reads 'n' numbers from the given input file into the provided) N
+( * array.) N
+( *) N
+( * Returns 0 on success and 1 on failure.  The state of 'ary' on) N
+( * failure is unspecified.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(int) k
+( read_into_array\() p
+(FILE) k
+( * infile, ) p
+(unsigned) k
+( ) p
+(long) k
+( n,) p n
+(                                    ) S
+(unsigned) k
+( ) p
+(long) k
+( ary[]\)) p n
+({) N
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( i;) p n
+() N
+(  ) S
+(for) K
+( \(i = 0; i < n; i += 1\) {) p n
+(    ) S
+(unsigned) k
+( ) p
+(int) k
+( err, eof;) p n
+(    err = read_next_number\(infile, &ary[i], &eof\);) N
+(    ) S
+(if) K
+( \(err\)) p n
+(      ) S
+(return) K
+( 1;) p n
+(    ) S
+(if) K
+( \(eof\) {) p n
+(      fprintf\(stderr, ") S
+(Unexpected EOF when reading %lu values) str
+(", n\);) p n
+(      ) S
+(return) K
+( 1;) p n
+(    }) N
+(  }) N
+() N
+(  ) S
+(return) K
+( 0;) p n
+(}) N
+() N
+(/* Writes the given number to the output file. */) c n
+(static) K
+( ) p
+(void) k
+( output_number\() p
+(FILE) k
+( * outfile, ) p
+(unsigned) k
+( ) p
+(long) k
+( num\)) p n
+({) N
+(  fprintf\(outfile, ") S
+(%lu\\n) str
+(", num\);) p n
+(}) N
+() N
+(/* Output the given array to the output file. */) c n
+(static) K
+( ) p
+(void) k
+( output_from_array\() p
+(FILE) k
+( * outfile, ) p
+(unsigned) k
+( ) p
+(long) k
+( ary[],) p n
+(                              ) S
+(unsigned) k
+( ) p
+(long) k
+( n\)) p n
+({) N
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( i;) p n
+() N
+(  ) S
+(for) K
+( \(i = 0; i < n; i += 1\)) p n
+(    output_number\(outfile, ary[i]\);) N
+(}) N
+() N
+(/* Print the usage string */) c n
+(static) K
+( ) p
+(void) k
+( usage\() p
+(void) k
+(\)) p n
+({) N
+(  fprintf\(stderr, ") S
+(usage: sort <algorithm> <infile> <outfile>\\n) str
+("\);) p n
+(  fprintf\(stderr,) N
+(              ") S
+(Where <algorithm> is one of: counting, radix, quick,\\n) str
+(") p n
+(              ") S
+(                             insertion or system_quick\\n) str
+(") p n
+(              ") S
+(and <infile> and/or <outfile> may be '-' to indicate that\\n) str
+(") p n
+(          ") S
+(the standard input and/or output stream should be used\\n) str
+("\);) p n
+(}) N
+() N
+() N
+(/*) c n
+( * Reads the file header and the values.  The return value is an array) N
+( * of values that must be freed by the caller.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(long) k
+( *get_values\() p
+(FILE) k
+( * infile, ) p
+(unsigned) k
+( ) p
+(long) k
+( *n,) p n
+(                                 ) S
+(unsigned) k
+( ) p
+(long) k
+( *nbits\)) p n
+({) N
+(  ) S
+(unsigned) k
+( ) p
+(int) k
+( err;) p n
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( _n, _nbits;) p n
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( *ary;) p n
+() N
+(  err = read_file_header\(infile, &_n, &_nbits\);) N
+(  ) S
+(if) K
+( \(err\)) p n
+(    ) S
+(return) K
+( ) p
+(NULL) K
+(;) p n
+() N
+(sort-ints.c) (Page 4/6) (Feb 02, 16 14:28) title
+border
+grestore
+(Printed by ) rhead
+(sort-ints.c) (6/7) (Wednesday February 03, 2016) footer
+end % of iso1dict
+pagesave restore
+showpage
+%%Page: (5-6) 7
+%%BeginPageSetup
+/pagesave save def
+sh 0 translate 90 rotate
+%%EndPageSetup
+iso1dict begin
+gsave
+llx lly 12 add translate
+/v 0 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(  ary = malloc\() p
+(sizeof) K
+(\(*ary\) * _n\);) p n
+(  ) S
+(if) K
+( \(!ary\) {) p n
+(    perror\(") S
+(Failed to allocate array) str
+("\);) p n
+(    ) S
+(return) K
+( ) p
+(NULL) K
+(;) p n
+(  }) N
+() N
+(  err = read_into_array\(infile, _n, ary\);) N
+(  ) S
+(if) K
+( \(err\) {) p n
+(    free\(ary\);) N
+(    ) S
+(return) K
+( ) p
+(NULL) K
+(;) p n
+(  }) N
+() N
+(  ) S
+(if) K
+( \(n\)) p n
+(    *n = _n;) N
+(  ) S
+(if) K
+( \(nbits\)) p n
+(    *nbits = _nbits;) N
+() N
+(  ) S
+(return) K
+( ary;) p n
+(}) N
+() N
+(/* Gets the time of day in seconds. */) c n
+(static) K
+( ) p
+(double) k
+( get_current_seconds\() p
+(void) k
+(\)) p n
+({) N
+(  ) S
+(double) k
+( sec, usec;) p n
+(  ) S
+(struct) k
+( timeval tv;) p n
+() N
+(  ) S
+(if) K
+( \(gettimeofday\(&tv, ) p
+(NULL) K
+(\) < 0\) {) p n
+(    perror\(") S
+(gettimeofday failed) str
+("\);) p n
+(    exit\(EXIT_FAILURE\);) N
+(  }) N
+() N
+(  sec = tv.tv_sec;) N
+(  usec = tv.tv_usec;) N
+() N
+(  ) S
+(return) K
+( sec + \(usec / 1000000\);) p n
+(}) N
+() N
+(/*) c n
+( * Reads the values, begins the timer, calls the sorting algorithm,) N
+( * stops the timer and outputs the values.  The time taken is printed) N
+( * to standard error.) N
+( */) N
+(static) K
+( ) p
+(unsigned) k
+( ) p
+(int) k
+( do_sort\() p
+(const) K
+( ) p
+(char) k
+( *) p
+(const) K
+( algorithm, ) p
+(FILE) k
+( * infile,) p n
+(                            ) S
+(FILE) k
+( * outfile\)) p n
+({) N
+(  ) S
+(int) k
+( err = 0;) p n
+(  ) S
+(double) k
+( start, end;) p n
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( n, nbits;) p n
+(  ) S
+(unsigned) k
+( ) p
+(long) k
+( *ary;) p n
+() N
+(  ary = get_values\(infile, &n, &nbits\);) N
+(  ) S
+(if) K
+( \(!ary\)) p n
+(    ) S
+(return) K
+( 1;) p n
+() N
+(  start = get_current_seconds\(\);) N
+() N
+(  ) S
+(if) K
+( \(strcmp\(algorithm, counting_sort_str\) == 0\) {) p n
+(    err = do_counting_sort\(ary, n, nbits\);) N
+() N
+(  } ) S
+(else) K
+( ) p
+(if) K
+( \(strcmp\(algorithm, radix_sort_str\) == 0\) {) p n
+(    err = do_radix_sort\(ary, n, nbits\);) N
+() N
+(  } ) S
+(else) K
+( ) p
+(if) K
+( \(strcmp\(algorithm, quick_sort_str\) == 0\) {) p n
+(    err = do_quicksort\(ary, n, nbits\);) N
+() N
+(  } ) S
+(else) K
+( ) p
+(if) K
+( \(strcmp\(algorithm, insertion_sort_str\) == 0\) {) p n
+(    err = do_insertion_sort\(ary, n, nbits\);) N
+() N
+(  } ) S
+(else) K
+( ) p
+(if) K
+( \(strcmp\(algorithm, system_quick_sort_str\) == 0\) {) p n
+(sort-ints.c) (Page 5/6) (Feb 02, 16 14:28) title
+border
+/v 1 store
+/x0 x v get 3.147420 add sx cw mul add store
+/y0 y v get bfs th add sub store
+x0 y0 moveto
+(    err = do_system_quicksort\(ary, n, nbits\);) p n
+() N
+(  } ) S
+(else) K
+( {) p n
+(    fprintf\(stderr, ") S
+(Impossible\\n) str
+("\);) p n
+(    exit\(EXIT_FAILURE\);) N
+(  }) N
+() N
+(  end = get_current_seconds\(\);) N
+() N
+(  output_from_array\(outfile, ary, n\);) N
+(  fprintf\(stderr, ") S
+(%f\\n) str
+(", end - start\);) p n
+() N
+(  free\(ary\);) N
+() N
+(  ) S
+(return) K
+( err;) p n
+(}) N
+() N
+() N
+(int) k
+( main\() p
+(int) k
+( argc, ) p
+(char) k
+( *) p
+(const) K
+( argv[]\)) p n
+({) N
+(  ) S
+(int) k
+( ret = EXIT_SUCCESS;) p n
+(  ) S
+(unsigned) k
+( ) p
+(int) k
+( err;) p n
+(  ) S
+(FILE) k
+( *infile = stdin, *outfile = stdout;) p n
+() N
+(  ) S
+(if) K
+( \(argc < 4 || \(strcmp\(argv[1], counting_sort_str\) != 0) p n
+(                   && strcmp\(argv[1], radix_sort_str\) != 0) N
+(                   && strcmp\(argv[1], quick_sort_str\) != 0) N
+(                   && strcmp\(argv[1], insertion_sort_str\) != 0) N
+(                   && strcmp\(argv[1], system_quick_sort_str\) != 0\)\) {) N
+(    usage\(\);) N
+(    ) S
+(return) K
+( EXIT_FAILURE;) p n
+(  }) N
+() N
+() N
+(  ) S
+(if) K
+( \(strcmp\(argv[2], ") p
+(-) str
+("\) != 0\) {) p n
+(    infile = fopen\(argv[2], ") S
+(r) str
+("\);) p n
+(    ) S
+(if) K
+( \(!infile\) {) p n
+(      perror\(") S
+(Failed to open input file for reading) str
+("\);) p n
+(      ret = EXIT_FAILURE;) N
+(      ) S
+(goto) K
+( out;) p n
+(    }) N
+(  }) N
+() N
+(  ) S
+(if) K
+( \(strcmp\(argv[3], ") p
+(-) str
+("\) != 0\) {) p n
+(    outfile = fopen\(argv[3], ") S
+(w) str
+("\);) p n
+(    ) S
+(if) K
+( \(!outfile\) {) p n
+(      perror\(") S
+(Failed to open output file for writing) str
+("\);) p n
+(      ret = EXIT_FAILURE;) N
+(      ) S
+(goto) K
+( out;) p n
+(    }) N
+(  }) N
+() N
+(  err = do_sort\(argv[1], infile, outfile\);) N
+(  ) S
+(if) K
+( \(err\)) p n
+(    ret = EXIT_FAILURE;) N
+() N
+( out:) N
+() N
+(  ) S
+(if) K
+( \(outfile && outfile != stdout\)) p n
+(    fclose\(outfile\);) N
+(  ) S
+(if) K
+( \(infile && infile != stdin\)) p n
+(    fclose\(infile\);) N
+() N
+(  ) S
+(return) K
+( ret;) p n
+(}) N
+(sort-ints.c) (Page 6/6) (Feb 02, 16 14:28) title
+border
+grestore
+(Printed by ) rhead
+(sort-ints.c) (7/7) (Wednesday February 03, 2016) footer
+end % of iso1dict
+pagesave restore
+showpage
+
+%%Trailer
+end
+%%EOF

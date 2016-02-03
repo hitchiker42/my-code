@@ -3,14 +3,6 @@
 */
 #include "C_util.h"
 #include <sys/types.h>
-void * __attribute__((weak, malloc)) xmalloc(size_t sz){
-  void *mem = malloc(sz);
-  if(mem == NULL && sz != 0){
-    fprintf(stderr, "out of memory\n");
-    raise(SIGABRT);
-  }
-  return mem;
-}
 char * __attribute__((const)) filemode_bits_to_string(int mode){
   if(get_access_mode(mode) == O_RDWR){
     if(mode & O_TRUNC){

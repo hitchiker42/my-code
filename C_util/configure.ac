@@ -1,7 +1,7 @@
 AC_PREREQ([2.69]) # autoconf minimum version
 LT_PREREQ([2.4.5]) # libtool minium version
 AC_INIT([util_c], [0.01]) # pkg information
-AC_CONFIG_HEADERS([src/config.h]) # where to put config.h
+AC_CONFIG_HEADERS([config.h]) # where to put config.h
 AC_CONFIG_AUX_DIR([build-aux]) # where to put files needed by autotools
 AC_CONFIG_MACRO_DIR([m4]) # where to search for extra macros
 AM_INIT_AUTOMAKE([subdir-objects foreign -Wall -Wno-gnu]) # init automake
