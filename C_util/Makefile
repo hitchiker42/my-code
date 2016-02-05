@@ -88,6 +88,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = x86_64-unknown-linux-gnu
 host_triplet = x86_64-unknown-linux-gnu
+check_PROGRAMS = test/test_sort$(EXEEXT) test/test_hash$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -141,6 +142,13 @@ AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
 am__v_lt_0 = --silent
 am__v_lt_1 = 
+test_test_hash_SOURCES = test/test_hash.c
+am__dirstamp = $(am__leading_dot)dirstamp
+test_test_hash_OBJECTS = test/test_hash.$(OBJEXT)
+test_test_hash_DEPENDENCIES = libcutil.la
+test_test_sort_SOURCES = test/test_sort.c
+test_test_sort_OBJECTS = test/test_sort.$(OBJEXT)
+test_test_sort_DEPENDENCIES = libcutil.la
 AM_V_P = $(am__v_P_$(V))
 am__v_P_ = $(am__v_P_$(AM_DEFAULT_VERBOSITY))
 am__v_P_0 = false
@@ -175,8 +183,9 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libcutil_la_SOURCES)
-DIST_SOURCES = $(libcutil_la_SOURCES)
+SOURCES = $(libcutil_la_SOURCES) test/test_hash.c test/test_sort.c
+DIST_SOURCES = $(libcutil_la_SOURCES) test/test_hash.c \
+	test/test_sort.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -243,10 +252,10 @@ AWK = gawk
 CC = ccache gcc
 CCAS = ccache gcc
 CCASDEPMODE = depmode=gcc3
-CCASFLAGS = -g -O2
+CCASFLAGS = 
 CCDEPMODE = depmode=gcc3
-CFLAGS = -g -O2
-CFLAGS_EXTRA = 
+CFLAGS = 
+CFLAGS_EXTRA = -fmax-errors=20 -Og
 CPP = ccache gcc -E
 CPPFLAGS = 
 CYGPATH_W = echo
@@ -351,8 +360,11 @@ target_alias =
 top_build_prefix = 
 top_builddir = .
 top_srcdir = .
+AM_CPPFLAGS = -O2 -g $(CFLAGS_EXTRA) -std=gnu11
 lib_LTLIBRARIES = libcutil.la
 libcutil_la_SOURCES = C_util.c svector.c sorting.c heap.c utf8.c hash.c
+test_test_sort_LDADD = libcutil.la
+test_test_hash_LDADD = libcutil.la
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -445,8 +457,36 @@ clean-libLTLIBRARIES:
 libcutil.la: $(libcutil_la_OBJECTS) $(libcutil_la_DEPENDENCIES) $(EXTRA_libcutil_la_DEPENDENCIES) 
 	$(AM_V_CCLD)$(LINK) -rpath $(libdir) $(libcutil_la_OBJECTS) $(libcutil_la_LIBADD) $(LIBS)
 
+clean-checkPROGRAMS:
+	@list='$(check_PROGRAMS)'; test -n "$$list" || exit 0; \
+	echo " rm -f" $$list; \
+	rm -f $$list || exit $$?; \
+	test -n "$(EXEEXT)" || exit 0; \
+	list=`for p in $$list; do echo "$$p"; done | sed 's/$(EXEEXT)$$//'`; \
+	echo " rm -f" $$list; \
+	rm -f $$list
+test/$(am__dirstamp):
+	@$(MKDIR_P) test
+	@: > test/$(am__dirstamp)
+test/$(DEPDIR)/$(am__dirstamp):
+	@$(MKDIR_P) test/$(DEPDIR)
+	@: > test/$(DEPDIR)/$(am__dirstamp)
+test/test_hash.$(OBJEXT): test/$(am__dirstamp) \
+	test/$(DEPDIR)/$(am__dirstamp)
+
+test/test_hash$(EXEEXT): $(test_test_hash_OBJECTS) $(test_test_hash_DEPENDENCIES) $(EXTRA_test_test_hash_DEPENDENCIES) test/$(am__dirstamp)
+	@rm -f test/test_hash$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_test_hash_OBJECTS) $(test_test_hash_LDADD) $(LIBS)
+test/test_sort.$(OBJEXT): test/$(am__dirstamp) \
+	test/$(DEPDIR)/$(am__dirstamp)
+
+test/test_sort$(EXEEXT): $(test_test_sort_OBJECTS) $(test_test_sort_DEPENDENCIES) $(EXTRA_test_test_sort_DEPENDENCIES) test/$(am__dirstamp)
+	@rm -f test/test_sort$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_test_sort_OBJECTS) $(test_test_sort_LDADD) $(LIBS)
+
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
+	-rm -f test/*.$(OBJEXT)
 
 distclean-compile:
 	-rm -f *.tab.c
@@ -457,6 +497,8 @@ include ./$(DEPDIR)/heap.Plo
 include ./$(DEPDIR)/sorting.Plo
 include ./$(DEPDIR)/svector.Plo
 include ./$(DEPDIR)/utf8.Plo
+include test/$(DEPDIR)/test_hash.Po
+include test/$(DEPDIR)/test_sort.Po
 
 .c.o:
 	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -487,6 +529,7 @@ mostlyclean-libtool:
 
 clean-libtool:
 	-rm -rf .libs _libs
+	-rm -rf test/.libs test/_libs
 
 distclean-libtool:
 	-rm -f libtool config.lt
@@ -714,6 +757,7 @@ distcleancheck: distclean
 	       $(distcleancheck_listfiles) ; \
 	       exit 1; } >&2
 check-am: all-am
+	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-am
 all-am: Makefile $(LTLIBRARIES) config.h
 installdirs:
@@ -746,18 +790,20 @@ clean-generic:
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
 	-test . = "$(srcdir)" || test -z "$(CONFIG_CLEAN_VPATH_FILES)" || rm -f $(CONFIG_CLEAN_VPATH_FILES)
+	-rm -f test/$(DEPDIR)/$(am__dirstamp)
+	-rm -f test/$(am__dirstamp)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
 	@echo "it deletes files that may require special tools to rebuild."
 clean: clean-am
 
-clean-am: clean-generic clean-libLTLIBRARIES clean-libtool \
-	mostlyclean-am
+clean-am: clean-checkPROGRAMS clean-generic clean-libLTLIBRARIES \
+	clean-libtool mostlyclean-am
 
 distclean: distclean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) test/$(DEPDIR)
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-hdr distclean-libtool distclean-tags
@@ -805,7 +851,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
 	-rm -rf $(top_srcdir)/autom4te.cache
-	-rm -rf ./$(DEPDIR)
+	-rm -rf ./$(DEPDIR) test/$(DEPDIR)
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -824,18 +870,19 @@ ps-am:
 
 uninstall-am: uninstall-libLTLIBRARIES
 
-.MAKE: all install-am install-strip
+.MAKE: all check-am install-am install-strip
 
 .PHONY: CTAGS GTAGS TAGS all all-am am--refresh check check-am clean \
-	clean-cscope clean-generic clean-libLTLIBRARIES clean-libtool \
-	cscope cscopelist-am ctags ctags-am dist dist-all dist-bzip2 \
-	dist-gzip dist-lzip dist-shar dist-tarZ dist-xz dist-zip \
-	distcheck distclean distclean-compile distclean-generic \
-	distclean-hdr distclean-libtool distclean-tags distcleancheck \
-	distdir distuninstallcheck dvi dvi-am html html-am info \
-	info-am install install-am install-data install-data-am \
-	install-dvi install-dvi-am install-exec install-exec-am \
-	install-html install-html-am install-info install-info-am \
+	clean-checkPROGRAMS clean-cscope clean-generic \
+	clean-libLTLIBRARIES clean-libtool cscope cscopelist-am ctags \
+	ctags-am dist dist-all dist-bzip2 dist-gzip dist-lzip \
+	dist-shar dist-tarZ dist-xz dist-zip distcheck distclean \
+	distclean-compile distclean-generic distclean-hdr \
+	distclean-libtool distclean-tags distcleancheck distdir \
+	distuninstallcheck dvi dvi-am html html-am info info-am \
+	install install-am install-data install-data-am install-dvi \
+	install-dvi-am install-exec install-exec-am install-html \
+	install-html-am install-info install-info-am \
 	install-libLTLIBRARIES install-man install-pdf install-pdf-am \
 	install-ps install-ps-am install-strip installcheck \
 	installcheck-am installdirs maintainer-clean \
@@ -845,6 +892,7 @@ uninstall-am: uninstall-libLTLIBRARIES
 
 .PRECIOUS: Makefile
 
+TESTS: tests/run_test.pl
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -5,6 +5,8 @@ AC_CONFIG_HEADERS([config.h]) # where to put config.h
 AC_CONFIG_AUX_DIR([build-aux]) # where to put files needed by autotools
 AC_CONFIG_MACRO_DIR([m4]) # where to search for extra macros
 AM_INIT_AUTOMAKE([subdir-objects foreign -Wall -Wno-gnu]) # init automake
+# Prevent autoconf from setting CFLAGS
+${CFLAGS=""}
 
 # AM_PROG_AR and AM_PROG_AS need to be called before LT_INIT
 AM_PROG_AR # look for archiver
@@ -23,7 +25,7 @@ AC_PROG_LN_S # look for program to make symbolic links
 
 # Check for gcc, in order to set some compilier specific flags
 # Specifically this limits the number of errors gcc will output
-AS_CASE([$CC], [gcc], [cflags_extra='-fmax-errors=20'],[cflags_extra=''])
+AS_CASE([$CC], [*gcc], [cflags_extra='-fmax-errors=20 -Og'],[cflags_extra=''])
 # create makefile variable from shell variable
 AC_SUBST([CFLAGS_EXTRA],[$cflags_extra])
 

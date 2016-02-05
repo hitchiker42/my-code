@@ -107,6 +107,8 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define BITNEG(x) (~(x)+1)
 //fails for the most negitive integer (i.e -128 for an 8 bit int)
 #define BITABS(x) (SIGNBIT(x) ? BITNEG(x) : x)
+#define get_byte(val, byte)                     \
+  (((val) >> ((byte)*CHAR_BIT)) & 0xffu)
 /*
   You need to use a union to do this to avoid breaking strict aliasing.
   Also the standard *(type*)&val idom is technically undefined behavior,
@@ -139,6 +141,12 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 //TODO: Figure out how to font-lock these in emacs
 #define unless(cond) if(!(cond))
 #define until(cond) while(!(cond))
+
+#if !(defined NDEBUG)
+#define DEBUG_PRINTF(fmt,...) fprintf(stderr, fmt, ##__VA_ARGS__)
+#else
+#define DEBUG_PRINTF(fmt,...)
+#endif
 
 //Macro overloading
 
@@ -192,6 +200,30 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define ATTRIBUTE_NORETURN __attribute__((noreturn))
 #define ATTRIBUTE_UNUSED __attribute__((unused))
 #define ATTRIBUTE_ALIGNED(align) __attribute__((aligned(align)))
+/*
+  Always inline can be used to define fast generic versions of
+  functions paramaterized by function pointers.
+  Consider the code:
+    always_inline __sort_generic(void **arr, size_t len, cmp_fun cmp){
+      ...
+    }
+    sort_generic(void **arr, size_t len, cmp_fun cmp){
+      __sort_generic(arr,len,cmp);
+    }
+    int cmp_lt(void*x,void*y){return x < y;}
+    sort_u64(uint64_t *arr, size_t len){
+      __sort_generic((void**)arr, len, cmp_lt)
+    }
+  Since __sort_generic the compiler will generate sort_u64 using
+  a simple less than comparision, rather than making a function call
+  to compare things. If __sort_generic isn't declared always_inline
+  the compiler will only do this with O3 level optimization.
+
+  __attribute__((always_inline)) by itself causes compiler warnings
+*/
+#define ALWAYS_INLINE inline __attribute__((always_inline))
+//always inline functions are almost always static
+#define always_inline static ALWAYS_INLINE
 #ifndef thread_local
 #if (defined HAVE_C11)
 #define thread_local _Thread_local
@@ -436,7 +468,7 @@ void heapsort_u64(uint64_t *input, size_t len);
       snprintf(str, sz, fmt, ##__VA_ARGS__);                            \
       str;})
 
-static void print_backtrace(ATTRIBUTE_UNUSED int signo){
+static void print_backtrace(int ATTRIBUTE_UNUSED signo){
   #define BACKTRACE_BUF_SIZE 128
   void *buffer[BACKTRACE_BUF_SIZE];
   int stack_entries = backtrace(buffer, BACKTRACE_BUF_SIZE);
@@ -449,6 +481,7 @@ static ATTRIBUTE_UNUSED void enable_backtraces(void){
   act.sa_flags = SA_RESETHAND;
   sigaction(SIGSEGV, &act, NULL);
   sigaction(SIGABRT, &act, NULL);
+  sigaction(SIGINT, &act, NULL);
 }
 
 //#if (defined NEED_XMALLOC) || (defined NEED_MALLOC) || (defined NEED_ZMALLOC)

@@ -1,22 +1,16 @@
 #define NEED_XMALLOC
 #include "C_util.h"
-#define get_byte(val, byte)                     \
-  (((val) >> ((byte)*CHAR_BIT)) & 0xffu)
-#define SWAP(x,y)                                    \
-  __extension__ ({__typeof(x) __temp = x;                          \
-      x = y;                                                       \
-      y = __temp;})
 typedef void(*sort_fn)(void**, size_t, cmp_fun);
 typedef void(*int_sort_fn)(uint64_t*, size_t);
 //should return true if the 2 arguments are in the correct order
 //and false otherwised
 typedef int(*cmp_fun)(void*,void*);
 void print_arr(ulong *arr, int len, FILE *out);
-int cmp_gt(void *x, void *y){
-  return ((uintptr_t)x) > ((uintptr_t) y);
+static int cmp_gt(void *x, void *y){
+  return x > y;
 }
-int cmp_lt(void *x, void *y){
-  return ((uintptr_t)x) < ((uintptr_t) y);
+static int cmp_lt(void *x, void *y){
+  return x < y;
 }
 //threshold for switching to insertion sort in merge/quick sort
 //this is the size used by glibc
@@ -39,7 +33,8 @@ int is_sorted(uint64_t *input, size_t len){
   }
   return 1;
 }*/
-void insertion_sort_generic(void **input, size_t len, cmp_fun cmp){
+always_inline void __insertion_sort_generic(void **input,
+                                            size_t len, cmp_fun cmp){
   uint i,j;
   for(i=1;i<len;i++){
     void *temp = input[i];
@@ -52,16 +47,10 @@ void insertion_sort_generic(void **input, size_t len, cmp_fun cmp){
   }
 }
 void insertion_sort_u64(uint64_t *input, size_t len){
-  uint i,j;
-  for(i=1;i<len;i++){
-    uint64_t temp = input[i];
-    j = i;
-    while(j > 0 && (temp < input[j-1])){
-      input[j] = input[j-1];
-      j--;
-    }
-    input[j] = temp;
-  }
+  __insertion_sort_generic((void**)input, len, cmp_lt);
+}
+void insertion_sort_generic(void **input, size_t len, cmp_fun cmp){
+  __insertion_sort_generic(input, len, cmp);
 }
 #define MEDIAN(_x,_y,_z)                        \
   __extension__ ({__typeof(_x) x = _x;         \
@@ -74,11 +63,20 @@ void insertion_sort_u64(uint64_t *input, size_t len){
   Similar to the algorithm used by glibc, but glibc uses an explict stack
   while we use recursion, since I'm lazy.
 */
-static inline int qsort_partition_generic(void **arr, long left, long right,
-                                          cmp_fun cmp){
-  long pivot_idx = MEDIAN(left, right, (left+right)/2);
-  //long pivot_idx = left;
-  void* pivot = arr[pivot_idx];
+always_inline int qsort_partition(void **arr, long left,
+                                  long right, cmp_fun cmp){
+//  void* pivot = MEDIAN(arr[left], arr[right], arr[(left+right)/2]);
+  long mid = (left + right)/2;
+  if(cmp(arr[mid], arr[left])){
+    SWAP(arr[mid], arr[left]);
+  }
+  if(cmp(arr[right], arr[mid])){
+    SWAP(arr[right], arr[mid]);
+    if(cmp(arr[mid], arr[left])){
+      SWAP(arr[mid], arr[left]);
+    }
+  }
+  void* pivot = arr[mid];
   long i = left - 1, j = right + 1;
   do {
     do {
@@ -97,15 +95,25 @@ static inline int qsort_partition_generic(void **arr, long left, long right,
 }
 void qsort_generic(void **arr, size_t len, cmp_fun cmp){
   if(len <= INSERTION_SORT_THRESHOLD){
-    //putting a check for non-zero len here might speed things up
     insertion_sort_generic(arr, len, cmp);
   } else {
-    long pivot_idx = qsort_partition_generic(arr, 0, len-1, cmp);
+    long pivot_idx = qsort_partition(arr, 0, len-1, cmp);
     qsort_generic(arr, pivot_idx+1, cmp);
     qsort_generic(arr+(pivot_idx+1), len - (pivot_idx+1), cmp);
   }
   return;
 }
+void qsort_u64(uint64_t *arr, size_t len){
+  if(len <= INSERTION_SORT_THRESHOLD){
+    insertion_sort_u64(arr, len);
+  } else {
+    long pivot_idx = qsort_partition((void**)arr, 0, len-1, cmp_lt);
+    qsort_u64(arr, pivot_idx+1);
+    qsort_u64(arr+(pivot_idx+1), len - (pivot_idx+1));
+  }
+  return;
+}
+/*
 static inline int qsort_partition_u64(uint64_t *arr, long left, long right){
   long pivot_idx = MEDIAN(left, right, (left+right)/2);
   //long pivot_idx = left;
@@ -136,9 +144,9 @@ void qsort_u64(uint64_t *arr, size_t len){
     qsort_u64(arr+(pivot_idx+1), len - (pivot_idx+1));
   }
   return;
-}
-static void merge(void **A, void **B, void **tmp, 
-                  size_t n1, size_t n2, cmp_fun cmp){
+}*/
+always_inline void merge(void **A, void **B, void **tmp,
+                         size_t n1, size_t n2, cmp_fun cmp){
   while(n1 > 0 && n2 > 0){
     if(cmp(*A,*B)){
       *tmp++ = *A++;
@@ -155,16 +163,13 @@ static void merge(void **A, void **B, void **tmp,
     memcpy(tmp, B, n2*sizeof(void*));
   }
 }
-static void mergesort_internal(void **arr, void **tmp, 
+static void mergesort_internal(void **arr, void **tmp,
                                size_t len, cmp_fun cmp){
   if(len <= INSERTION_SORT_THRESHOLD){
     insertion_sort_generic(arr, len, cmp);
     return;
   }
   size_t mid = len/2;
-//  size_t n2 = len - n1;
-//  void **A = arr;
-//  void **B = arr + n1;
   mergesort_internal(arr, tmp, mid, cmp);
   mergesort_internal(arr + mid, tmp, len - mid, cmp);
   merge(arr, arr + mid, tmp, mid, len - mid, cmp);
@@ -177,25 +182,6 @@ void mergesort_generic(void **arr, size_t len, cmp_fun cmp){
   mergesort_internal(arr, tmp, len, cmp);
   free(tmp);
 }
-
-static void merge_u64(uint64_t *A, uint64_t *B, uint64_t *tmp, 
-                         size_t n1, size_t n2){
-  while(n1 > 0 && n2 > 0){
-    if(*A<*B){
-      *tmp++ = *A++;
-      n1--;
-    } else {
-      *tmp++ = *B++;
-      n2--;
-    }
-  }
-  if(n1 > 0){
-    memcpy(tmp, A, n1*sizeof(void*));
-  }
-  if(n2 > 0){
-    memcpy(tmp, B, n2*sizeof(void*));
-  }
-}
 static void mergesort_internal_u64(uint64_t *arr, uint64_t *tmp, size_t len){
   if(len <= INSERTION_SORT_THRESHOLD){
     insertion_sort_u64(arr, len);
@@ -207,7 +193,8 @@ static void mergesort_internal_u64(uint64_t *arr, uint64_t *tmp, size_t len){
 //  void **B = arr + n1;
   mergesort_internal_u64(arr, tmp, mid);
   mergesort_internal_u64(arr + mid, tmp, len - mid);
-  merge_u64(arr, arr + mid, tmp, mid, len - mid);
+  merge((void**)arr, (void**)(arr + mid), (void**)tmp,
+        mid, len - mid, cmp_lt);
   memcpy(arr, tmp, len*sizeof(void*));
 }
 void mergesort_u64(uint64_t *input, size_t len){
@@ -263,7 +250,7 @@ void heapsort_u64(uint64_t *arr, size_t len){
 */
 /*
   Note for posterity:
-  I made a mistake when I first wrote this, I set size of the histograms to 
+  I made a mistake when I first wrote this, I set size of the histograms to
   be 255 (i.e 0xff) bytes each, however a byte can take on 256 (i.e 0x100) possible
   values. This caused a subtle bug, the function would work so long as the byte 0xff didn't
   appear in the input, but if it did then memory out of bounds would be written (generally
@@ -293,12 +280,14 @@ void radix_sort_u8_u64(uint64_t *in, size_t sz){
     hist5[get_byte(in[i], 5)]++;
     hist6[get_byte(in[i], 6)]++;
     hist7[get_byte(in[i], 7)]++;
-  }  
+  }
+  int have_16bit = (hist2[0] == sz);
+  int have_32bit = (hist4[0] == sz);
 #define set_index(byte)                         \
   total = CAT(hist,byte)[i] + CAT(sum,byte);    \
   CAT(hist,byte)[i] = CAT(sum, byte);           \
   CAT(sum, byte) = total;
-  
+
   for(i=0;i<0x100;i++){
     set_index(0);
     set_index(1);
@@ -309,7 +298,7 @@ void radix_sort_u8_u64(uint64_t *in, size_t sz){
     set_index(6);
     set_index(7);
   }
-  
+
   uint64_t *temp = zmalloc(sz*sizeof(uint64_t));
   uint64_t *a = in, *b = temp;
   size_t pos = 0;
@@ -323,6 +312,9 @@ void radix_sort_u8_u64(uint64_t *in, size_t sz){
     b[hist1[pos]++] = a[i];
   }
   SWAP(a, b);
+  if(have_16bit){
+    goto END;
+  }
   for(i=0;i<sz;i++){
     pos = get_byte(a[i], 2);
     b[hist2[pos]++] = a[i];
@@ -333,6 +325,9 @@ void radix_sort_u8_u64(uint64_t *in, size_t sz){
     b[hist3[pos]++] = a[i];
   }
   SWAP(a, b);
+  if(have_32bit){
+    goto END;
+  }
   for(i=0;i<sz;i++){
     pos = get_byte(a[i], 4);
     b[hist4[pos]++] = a[i];
@@ -353,9 +348,13 @@ void radix_sort_u8_u64(uint64_t *in, size_t sz){
     b[hist7[pos]++] = a[i];
   }
   SWAP(a, b);
+ END:
   free(temp);
 //  return in;
 }
+/*
+  Measurably slower than the unrolled version.
+*/
 void radix_sort_compact_u64(uint64_t *in, size_t sz){
   uint64_t hist[8][0x100];
   uint64_t total = 0, sum[8];
@@ -371,7 +370,7 @@ void radix_sort_compact_u64(uint64_t *in, size_t sz){
     hist[5][get_byte(in[i], 5)]++;
     hist[6][get_byte(in[i], 6)]++;
     hist[7][get_byte(in[i], 7)]++;
-  }  
+  }
   for(i=0;i<0x100;i++){
     for(j=0;j<8;j++){
       total = hist[j][i] + sum[j];
@@ -379,7 +378,7 @@ void radix_sort_compact_u64(uint64_t *in, size_t sz){
       sum[j] = total;
     }
   }
-  
+
   uint64_t *temp = zmalloc(sz*sizeof(uint64_t));
   uint64_t *a = in, *b = temp;
   size_t pos = 0;
@@ -412,7 +411,7 @@ void radix_sort_keys(void **in, size_t sz, uint64_t(*get_key)(void*)){
     hist[5][get_byte(key, 5)]++;
     hist[6][get_byte(key, 6)]++;
     hist[7][get_byte(key, 7)]++;
-  }  
+  }
   for(i=0;i<0x100;i++){
     for(j=0;j<8;j++){
       total = hist[j][i] + sum[j];
@@ -420,7 +419,7 @@ void radix_sort_keys(void **in, size_t sz, uint64_t(*get_key)(void*)){
       sum[j] = total;
     }
   }
-  
+
   void **temp = zmalloc(sz*sizeof(void*));
   void **a = in, **b = temp;
   size_t pos = 0;
@@ -469,7 +468,7 @@ void radix_sort_u16_u64(uint64_t *in, size_t sz){
     total = hist2[i] + sum2;
     hist2[i] = sum2;
     sum2 = total;
-      
+
     total = hist3[i] + sum3;
     hist3[i] = sum3;
     sum3 = total;

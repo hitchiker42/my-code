@@ -3,6 +3,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#define ATOMIC_HASHTABLE
 #include <stdlib.h>
 #include <stdint.h>
 #ifdef ATOMIC_HASHTABLE
@@ -19,10 +20,11 @@ struct hashtable {
   hash_cmp_fun_t cmp;
   float load_factor;
 #ifdef ATOMIC_HASHTABLE
-  sem_t sem;
-  void *freelist;
   atomic_int32_t rehash_pending;
   atomic_int32_t num_threads_using;
+  atomic_int32_t num_threads_waiting;
+  sem_t sem;
+  void *freelist;  
 #endif
 };
 struct hashtable *make_hashtable(uint32_t size, float load_factor,
@@ -54,8 +56,8 @@ void* hashtable_set_string(struct hashtable *ht, char *key, void *value);
 */
 void* hashtable_update(struct hashtable *ht,
                     void *key, size_t key_sz, void *(*update_fun)(void*));
-void* hashtable_set_string(struct hashtable *ht, char *key, 
-                           void *(*update_fun)(void*));
+void* hashtable_update_string(struct hashtable *ht, char *key, 
+                              void *(*update_fun)(void*));
 /*
   Remove an entry from hash table ht, if it is in the hashtable
   when this function is called.
@@ -75,12 +77,22 @@ void* hashtable_find_string(struct hashtable *ht, char *str);
   it's actually a pointer) will modify the value in the table, so be
   careful.
 
-  A note of warning, when the table needs to be rehashed the thread
-  doing the rehash waits for all other threads to finish using a spinlock.
-  Most functions are quick enough that this isn't a problem. But this
-  one can take a while, just keep that in mind.
+  If called in a multithreaded context some sort of external locking 
+  should probably be used. When the table needs to rehash it uses a spinlock
+  to wait for all threads to finish using the table, since this function is
+  O(N) whereas all the others are O(1) it could cause a lot of wasted cycles.
+  It will still work, but it'll be awful for performance
 */
 void hashtable_iter(struct hashtable *ht, void(*fun)(void*,size_t,void*));
+/*
+  Print the number of entries in each bucket in ht to out.
+  Useful for profiling hash functions.
+
+  The same warning as hashtable_iter applies to this, also bucket
+  counts may be inaccurate if the the hashtable is in use when
+  this function is running.
+*/
+void hashtable_bucket_counts(struct hashtable *ht, FILE *out);
 //It is not safe for any thread to start using the table after this
 //function has been called. Threads using the table at the time this
 //function is called are fine.

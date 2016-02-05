@@ -135,7 +135,7 @@ typedef enum {
   (__atomic_load(ptr, ATOMIC_ORDER_RW))
 #define atomic_store_ptr(ptr, val)              \
   (__atomic_store(ptr, val, ATOMIC_ORDER_RW))
-#define atomic_exchange_ptr(ptr,val)            \
+#define atomic_exchange_ptr(ptr,val)                \
   (__atomic_exchange(ptr,val,ATOMIC_ORDER_RW))
 #define atomic_cmpxchg_ptr(ptr, expected, val)                  \
   (__atomic_compare_exchange(ptr, expected, val, 0,             \
