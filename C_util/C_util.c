@@ -324,6 +324,45 @@ uint32_t memcspn(const uint8_t *buf, uint32_t len,
   }
   return memcspn_table(buf, len, bytes);
 }
+void *memdup(const void *src, size_t sz){
+  uint8_t *dest = xmalloc(sz);
+  memcpy(dest, src, sz);
+  return dest;
+}
+
+struct queue_node {
+  struct queue_node *next;
+  struct queue_node *prev;
+  void *data;
+};
+struct queue* make_queue(void){
+  struct queue *q = zmalloc(sizeof(struct queue));
+  return q;
+}
+void queue_push(struct queue *q, void *data){
+  struct queue_node *node = xmalloc(sizeof(struct queue_node));
+  node->next = q->head;
+  node->prev = NULL;
+  node->data = data;
+  if(q->tail == NULL){
+    q->tail = node;
+  }
+  q->head = node;
+
+};
+void *queue_pop(struct queue *q){
+  struct queue_node *node = q->tail;
+  if(node){
+    q->tail = node->prev;
+    q->tail->next = NULL;
+    void *ret = node->data;
+    free(node);
+    return ret;
+  }
+  return NULL;
+}
+  
+
 #define NANO_SCALE 1000000000
 #define NANO_SCALE_FLOAT 1e9
 #define MICRO_SCALE 1000000

@@ -177,7 +177,7 @@ static void maybe_rehash(htable *ht){
 }
 #endif
 
-int hashtable_add(htable *ht, void *key, size_t key_sz, void *value){
+void* hashtable_find_add(htable *ht, void *key, size_t key_sz, void *value){
   inc_hashtable_threadcount(ht);
   uint64_t hv = ht->hash(key, key_sz);
   uint32_t index = hv % ht->size;
@@ -196,7 +196,7 @@ int hashtable_add(htable *ht, void *key, size_t key_sz, void *value){
       if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
         atomic_dec(&ht->num_threads_using);
         free(new_entry);
-        return 0;
+        return atomic_load(&entry->value);
       }
     }
     entry = entry->next;
@@ -210,15 +210,16 @@ int hashtable_add(htable *ht, void *key, size_t key_sz, void *value){
     atomic_inc(&ht->entries);
     atomic_dec(&ht->num_threads_using);
     maybe_rehash(ht);
-    return 1;
+    return NULL;
   }
   goto retry;
 #else
+  bucket = ht->table[index];
   entry = bucket;
   while(entry){
     if(entry->hv == hv){
       if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
-        return 0;
+        return entry->value;
       }
     }
     entry = entry->next;
@@ -226,12 +227,12 @@ int hashtable_add(htable *ht, void *key, size_t key_sz, void *value){
   new_entry = make_hentry(key, key_sz, hv, value, bucket);
   ht->table[index] = new_entry;
   ht->entries++;
-  return 1;
+  return NULL;
 #endif
 }
 /*
   I Really wish C marcos were more lispy, then I wouldn't have to
-  write basically the same function twice.
+  write basically the same function several times.
  */
 void* hashtable_set(htable *ht, void *key, size_t key_sz, void *value){
   inc_hashtable_threadcount(ht);
@@ -503,20 +504,6 @@ void destroy_hashtable(struct hashtable *ht){
   free(ht);
   return;
 }
-
-int hashtable_add_string(htable *ht, char *str, void *value){
-  return hashtable_add(ht, str, strlen(str), value);
-}
-void* hashtable_remove_string(htable *ht, char *str){
-  return hashtable_remove(ht, str, strlen(str));
-}
-void* hashtable_set_string(htable *ht, char *str, void *value){
-  return hashtable_set(ht, str, strlen(str), value);
-}
-void* hashtable_find_string(htable *ht, char *str){
-  return hashtable_find(ht, str, strlen(str));
-}
-
 #ifdef ATOMIC_HASHTABLE
 static inline void freelist_push(htable *ht, void *data){
   fl_entry *entry = xmalloc(sizeof(fl_entry));

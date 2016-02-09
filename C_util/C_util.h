@@ -39,6 +39,9 @@ extern "C" {
 #endif
 #endif
 
+//Conditional definitions of debugging macros
+#include "debug.h"
+
 /* typedefs */
 typedef unsigned int uint;
 typedef unsigned long ulong;
@@ -107,8 +110,17 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define BITNEG(x) (~(x)+1)
 //fails for the most negitive integer (i.e -128 for an 8 bit int)
 #define BITABS(x) (SIGNBIT(x) ? BITNEG(x) : x)
+
 #define get_byte(val, byte)                     \
   (((val) >> ((byte)*CHAR_BIT)) & 0xffu)
+#define GET_BIT(val, bit)                       \
+  (((val) & (1ul << (bit))) ? 1 : 0)
+#define SET_BIT(val, bit)                       \
+  ((val) |= (1ul << (bit)))
+#define UNSET_BIT(val, bit)                     \
+  ((val) &= ~(1ul << (bit)))
+#define FLIP_BIT(val, bit)                      \
+  ((val) ^= (1ul << (bit)))
 /*
   You need to use a union to do this to avoid breaking strict aliasing.
   Also the standard *(type*)&val idom is technically undefined behavior,
@@ -120,6 +132,10 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
       type new;} tmp;                           \
     tmp.old = val;                              \
     tmp.new;})
+/*
+  DOWN/UPCASE_ASCII work on any ascii values, but only do anything on
+  values corresponding to alphabetic characters;
+*/
 #define DOWNCASE_ASCII(c) (c > 0x40 && c < 0x5B ? c | 0x20 : c)
 #define UPCASE_ASCII(c) (c > 0x60 && c < 0x7B ? c & (~0x20) : c)
 #define CHAR_TO_NUMBER(c) (assert(c >= 0x30 && c <= 0x39), c - 0x30)
@@ -142,12 +158,6 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define unless(cond) if(!(cond))
 #define until(cond) while(!(cond))
 
-#if !(defined NDEBUG)
-#define DEBUG_PRINTF(fmt,...) fprintf(stderr, fmt, ##__VA_ARGS__)
-#else
-#define DEBUG_PRINTF(fmt,...)
-#endif
-
 //Macro overloading
 
 //overload w/upto 8 args, each overload can be uniquely named
@@ -162,6 +172,7 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define CAT4(a,b,c,d) PRIMITIVE_CAT4(a, b, c, d)
 #define PRIMITIVE_CAT4(a,b,c,d) a ## b ## c ## d
 #define MACROEXPAND(...) __VA_ARGS__
+#define STRINGIFY(...) #__VA_ARGS__
 #define GET_MACR0_1(_1,NAME,...) MACROEXPAND(NAME)
 #define GET_MACRO_2(_1,_2,NAME,...) MACROEXPAND(NAME)
 #define GET_MACRO_3(_1,_2,_3,NAME,...) MACROEXPAND(NAME)
@@ -257,6 +268,17 @@ static inline struct cons_t* make_cons(void* car, void* cdr){
 #define XCADR(d) XCAR(XCDR(c))
 #define XCDAR(c) XCDR(XCAR(c))
 #define XCDDR(d) XCDR(XCDR(c))
+/*
+  really basic LIFO queue
+*/
+struct queue {
+  struct queue_node *head;
+  struct queue_node *tail;
+};
+struct queue* make_queue(void);
+void queue_push(struct queue *q, void *data);
+//returns NULL when empty, so you better not store NULL as a value
+void *queue_pop(struct queue *q);
 /* Data Structures */
 //#include "svector.h"
 typedef struct heap binary_heap;
@@ -349,6 +371,13 @@ uint32_t memspn_table(const uint8_t *buf, uint32_t len,
                       const uint8_t accept[256]);
 uint32_t memcspn_table(const uint8_t *buf, uint32_t len,
                        const uint8_t reject[256]);
+
+void *memdup(const void *src, size_t sz);
+#define memdupa(src, sz)                        \
+  __extension__                                 \
+  ({const uint8_t *dest = alloca(sz);           \
+    memcpy(dest, src, sz);                      \
+    dest;})
 /*
   Functions for dealing with time, functions which return a time use
   clock_gettime if available, and gettimeofday otherwise.

@@ -3,7 +3,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define ATOMIC_HASHTABLE
+//#define ATOMIC_HASHTABLE
 #include <stdlib.h>
 #include <stdint.h>
 #ifdef ATOMIC_HASHTABLE
@@ -24,27 +24,52 @@ struct hashtable {
   atomic_int32_t num_threads_using;
   atomic_int32_t num_threads_waiting;
   sem_t sem;
-  void *freelist;  
+  void *freelist;
 #endif
 };
 struct hashtable *make_hashtable(uint32_t size, float load_factor,
                                  hash_fun_t hash, hash_cmp_fun_t cmp);
+/*
+  The default size is 128, default load factor is 0.8,
+  default hash function is fnv hash, and default comparison
+  function is a wrapper around memcmp.
+*/
 struct hashtable *make_hashtable_default();
 /*
-  Add an entry to hash table ht, true if a value was added, otherwise false.
+  If key is already in the table return its value, otherwise set the
+  value of key to the given value.
 */
-int hashtable_add(struct hashtable *ht,
-                  void *key, size_t key_sz, void *value);
-int hashtable_add_string(struct hashtable *ht, char *key, void *value);
+void* hashtable_find_add(struct hashtable *ht,
+                    void *key, size_t key_sz, void *value);
+static void * hashtable_find_add_string(struct hashtable *ht,
+                                        char *str, void *value){
+  return hashtable_find_add(ht, str, strlen(str), value);
+}
+/*
+  Add an entry to hash table ht, true if a value was added, otherwise false.
+  Just a wrapper around hashtable_find_add.
+*/
+static int hashtable_add(struct hashtable *ht, void *key,
+                         size_t keylen, void *value){
+  void *prev_val = hashtable_find_add(ht, key, keylen, value);
+  return (prev_val ? 1 : 0);
+}
+static int hashtable_add_string(struct hashtable *ht,
+                                char *str, void *value){
+  return hashtable_add(ht, str, strlen(str), value);
+}
 /*
   Add an entry to hashtable ht, or set the value of a prexisting entry.
   Returns the old value (or NULL if there was no old value)
 */
 void* hashtable_set(struct hashtable *ht,
                     void *key, size_t key_sz, void *value);
-void* hashtable_set_string(struct hashtable *ht, char *key, void *value);
+static void* hashtable_set_string(struct hashtable *ht,
+                                  char *str, void *value){
+  return hashtable_set(ht, str, strlen(str), value);
+}
 /*
-  Set the value of key in hashtable ht to the result of calling 
+  Set the value of key in hashtable ht to the result of calling
   update_fun with the current value of key. This is really only
   useful for the atomic hashtable (other than optimization).
   A simple example would be if the value of each key was a counter
@@ -56,28 +81,34 @@ void* hashtable_set_string(struct hashtable *ht, char *key, void *value);
 */
 void* hashtable_update(struct hashtable *ht,
                     void *key, size_t key_sz, void *(*update_fun)(void*));
-void* hashtable_update_string(struct hashtable *ht, char *key, 
-                              void *(*update_fun)(void*));
+static void* hashtable_update_string(struct hashtable *ht, char *key,
+                                     void *(*update_fun)(void*)){
+  return hashtable_update(ht, key, strlen(key), update_fun);
+}
 /*
   Remove an entry from hash table ht, if it is in the hashtable
   when this function is called.
 */
 void* hashtable_remove(struct hashtable *ht, void *key, size_t key_sz);
-void* hashtable_remove_string(struct hashtable *ht, char *str);
+static void* hashtable_remove_string(struct hashtable *ht, char *str){
+  return hashtable_remove(ht, str, strlen(str));
+}
 /*
   Return the value of key has in the hashtable ht at the time
   this function is called. It may have a different value when the
   function returns.
 */
 void* hashtable_find(struct hashtable *ht, void *key, size_t sz);
-void* hashtable_find_string(struct hashtable *ht, char *str);
+static void* hashtable_find_string(struct hashtable *ht, char *str){
+  return hashtable_find(ht, str, strlen(str));
+}
 /*
   Call the provided function on every key/value pair in the hashtable ht.
   The key shouldn't be modified, and any changes to the value (assuming
   it's actually a pointer) will modify the value in the table, so be
   careful.
 
-  If called in a multithreaded context some sort of external locking 
+  If called in a multithreaded context some sort of external locking
   should probably be used. When the table needs to rehash it uses a spinlock
   to wait for all threads to finish using the table, since this function is
   O(N) whereas all the others are O(1) it could cause a lot of wasted cycles.
