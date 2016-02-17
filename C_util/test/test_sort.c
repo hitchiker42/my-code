@@ -187,6 +187,8 @@ int main(int argc, char *argv[]){
              times[0], times[1], times[2], times[3], times[4], times[5]);
       return 0;
     }
+    default:
+      return 1;
   }
   printf("Time taken to sort: %f\n", time);
   return 0;

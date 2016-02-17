@@ -55,7 +55,7 @@ static void rbtree_test(int num_nodes){
   srand48(0);
   int i,j;
   rb_tree *tree = make_empty_rbtree(NULL);
-  volatile int64_t nodes[num_nodes];
+  int64_t *nodes = xmalloc(num_nodes * sizeof(int64_t));
   double time1, time2, time3;
   for(i=0;i<num_nodes;i++){
     nodes[i] = lrand48();
@@ -69,6 +69,7 @@ static void rbtree_test(int num_nodes){
     }
   }
   check_postorder(tree, num_nodes);
+  print_rbtree_sexp(tree, stdout, NULL);
   DEBUG_PRINTF("Deleteing nodes\n");
   for(i=(num_nodes-1);i>=0;i--){
     rb_check(tree, i+1);
@@ -89,9 +90,10 @@ static void rbtree_test(int num_nodes){
     }
   }
   time2 = float_time();
-  printf("Time to insert and delete %d nodes %d times: %f\n",
-         num_nodes, PERF_LOOPS, time2-time1);
-//  free(nodes);
+  fprintf(stderr, "Time to insert and delete %d nodes %d times: %f\n",
+          num_nodes, PERF_LOOPS, time2-time1);
+  free(nodes);
+  free(tree);
   return;
 }
 int main(int argc, char *argv[]){

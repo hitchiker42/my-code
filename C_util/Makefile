@@ -88,7 +88,8 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = x86_64-unknown-linux-gnu
 host_triplet = x86_64-unknown-linux-gnu
-check_PROGRAMS = test/test_sort$(EXEEXT) test/test_hash$(EXEEXT)
+check_PROGRAMS = test/test_sort$(EXEEXT) test/test_hash$(EXEEXT) \
+	test/test_rbtree$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -136,7 +137,7 @@ am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libcutil_la_LIBADD =
 am_libcutil_la_OBJECTS = C_util.lo svector.lo sorting.lo heap.lo \
-	utf8.lo hash.lo
+	utf8.lo hash.lo rbtree.lo
 libcutil_la_OBJECTS = $(am_libcutil_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
@@ -146,6 +147,9 @@ test_test_hash_SOURCES = test/test_hash.c
 am__dirstamp = $(am__leading_dot)dirstamp
 test_test_hash_OBJECTS = test/test_hash.$(OBJEXT)
 test_test_hash_DEPENDENCIES = libcutil.la
+test_test_rbtree_SOURCES = test/test_rbtree.c
+test_test_rbtree_OBJECTS = test/test_rbtree.$(OBJEXT)
+test_test_rbtree_DEPENDENCIES = libcutil.la
 test_test_sort_SOURCES = test/test_sort.c
 test_test_sort_OBJECTS = test/test_sort.$(OBJEXT)
 test_test_sort_DEPENDENCIES = libcutil.la
@@ -183,9 +187,10 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libcutil_la_SOURCES) test/test_hash.c test/test_sort.c
-DIST_SOURCES = $(libcutil_la_SOURCES) test/test_hash.c \
+SOURCES = $(libcutil_la_SOURCES) test/test_hash.c test/test_rbtree.c \
 	test/test_sort.c
+DIST_SOURCES = $(libcutil_la_SOURCES) test/test_hash.c \
+	test/test_rbtree.c test/test_sort.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -360,11 +365,12 @@ target_alias =
 top_build_prefix = 
 top_builddir = .
 top_srcdir = .
-AM_CPPFLAGS = -O2 -g $(CFLAGS_EXTRA) -std=gnu11
+AM_CPPFLAGS = -O2 -g $(CFLAGS_EXTRA) -std=gnu11 -Wall -Wno-unused
 lib_LTLIBRARIES = libcutil.la
-libcutil_la_SOURCES = C_util.c svector.c sorting.c heap.c utf8.c hash.c
+libcutil_la_SOURCES = C_util.c svector.c sorting.c heap.c utf8.c hash.c rbtree.c
 test_test_sort_LDADD = libcutil.la
 test_test_hash_LDADD = libcutil.la
+test_test_rbtree_LDADD = libcutil.la
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -477,6 +483,12 @@ test/test_hash.$(OBJEXT): test/$(am__dirstamp) \
 test/test_hash$(EXEEXT): $(test_test_hash_OBJECTS) $(test_test_hash_DEPENDENCIES) $(EXTRA_test_test_hash_DEPENDENCIES) test/$(am__dirstamp)
 	@rm -f test/test_hash$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_test_hash_OBJECTS) $(test_test_hash_LDADD) $(LIBS)
+test/test_rbtree.$(OBJEXT): test/$(am__dirstamp) \
+	test/$(DEPDIR)/$(am__dirstamp)
+
+test/test_rbtree$(EXEEXT): $(test_test_rbtree_OBJECTS) $(test_test_rbtree_DEPENDENCIES) $(EXTRA_test_test_rbtree_DEPENDENCIES) test/$(am__dirstamp)
+	@rm -f test/test_rbtree$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_test_rbtree_OBJECTS) $(test_test_rbtree_LDADD) $(LIBS)
 test/test_sort.$(OBJEXT): test/$(am__dirstamp) \
 	test/$(DEPDIR)/$(am__dirstamp)
 
@@ -494,10 +506,12 @@ distclean-compile:
 include ./$(DEPDIR)/C_util.Plo
 include ./$(DEPDIR)/hash.Plo
 include ./$(DEPDIR)/heap.Plo
+include ./$(DEPDIR)/rbtree.Plo
 include ./$(DEPDIR)/sorting.Plo
 include ./$(DEPDIR)/svector.Plo
 include ./$(DEPDIR)/utf8.Plo
 include test/$(DEPDIR)/test_hash.Po
+include test/$(DEPDIR)/test_rbtree.Po
 include test/$(DEPDIR)/test_sort.Po
 
 .c.o:

@@ -15,6 +15,7 @@ typedef struct rb_tree rb_tree;
 struct rb_tree {
   rb_node *root;
   cmp_fun cmp;
+  size_t sz;
 };
 //the structure of an rb_node should be concidered an
 //implementation detail, it is exposed to avoid the overhead of a function
@@ -48,6 +49,8 @@ static inline void *rb_node_value(rb_node *node){
 }
 void rb_insert(rb_tree *tree, void *val);
 void rb_delete(rb_tree *tree, rb_node *node);
+void rb_delete_custom(rb_tree *tree, rb_node *node,
+                      void(*cleanup)(void*));
 rb_node *rb_lookup(rb_tree *tree, void *val);
 rb_node *rb_first(rb_tree *tree);
 rb_node *rb_last(rb_tree *tree);
@@ -82,6 +85,11 @@ rb_tree *construct_rbtree(cmp_fun cmp, void **data,
 void destroy_rbtree(rb_tree *tree);
 void destroy_rbtree_custom(rb_tree *tree, void(*fun)(void*));
 
+//print the rbtree as a lisp style s-expression
+void print_rbtree_sexp(rb_tree *tree, FILE *out, 
+                       void(*print_val)(void*,FILE*));
+void print_rbtree(rb_tree *tree, FILE *out, 
+                  void(*print_node)(rb_node*,FILE*));
 void fprint_node(rb_node *node, FILE *out);
 void print_node(rb_node *node);
 #ifdef __cplusplus

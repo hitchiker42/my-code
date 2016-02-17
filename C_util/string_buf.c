@@ -5,6 +5,11 @@
   it is added to the list without being copied (by default) and only
   copied when turning the buffer into a string, avoiding excessive copying
   and memory allocation.
+
+  Characters are appended to and internal buffer, which is converted into
+  a string when full, or when a string is appended. This means performance
+  wise it is best to avoid intermixing appending characters and strings
+  to the string buffer
 */
 /*the string segement structure is an implementation detail*/
 typedef struct string_segment string_segment;
@@ -14,7 +19,7 @@ struct string_segment {
   uint32_t len;
 };
 string_segment *make_string_segment(const char *str, uint32_t len){
-  string_segment *segment = sl_malloc(sizeof(struct string_segment));
+  string_segment *segment = xmalloc(sizeof(struct string_segment));
   segment->str = str;
   segment->len = len;
   segment->next = NULL;
@@ -71,7 +76,7 @@ void string_buf_append_strn(string_buf *buf,
   string_buf_append_string_segment(buf, segment);
 }
 //since we need to copy the string no matter what we try to copy it into
-//the buffer first to avoid allocating memoryf and flushing the buffer
+//the buffer first to avoid allocating memory and flushing the buffer
 //and only allocate/flush if it won't fit
 void string_buf_append_strn_copy(string_buf *buf,
                                  const char *str, uint32_t len){
@@ -80,11 +85,47 @@ void string_buf_append_strn_copy(string_buf *buf,
     buf->bufptr += len;
     return;
   } else {
-    char *str_copy = memdup_atomic(str, len);
+    char *str_copy = memdup(str, len);
     string_segment *segment = make_string_segment(str, len);
     string_buf_append_string_segment(buf, segment);
   }
 }
+/*
+  We call vsnprintf once to determine the size needed, then again
+  to actualy print the restult. This is slower than requiring the
+  user to manually specify the length, but formatted output is 
+  going to be slow no matter what so we may as well be safe.
+*/
+void string_buf_vsprintf(string_buf *buf, const char *fmt, va_list ap){
+  va_list ap2;
+  va_copy(ap2, ap);
+  int nbytes = vsnprintf(NULL, 0, fmt, ap2);
+  va_end(ap2);
+  //The +1 is for the terminating nul byte, we don't need it but snprintf
+  //insists on putting it there (the return value of the previous call
+  //doesn't count the nul byte).
+  if((nbytes+1) < STRING_BUF_SIZE){
+    if((nbytes+1) > ((STRING_BUF_SIZE - (buf->bufptr - buf->buf)))){
+      string_buf_flush(buf);
+    }
+    vsnprintf(buf->bufptr, nbytes+1, fmt, ap);
+    buf->bufptr += nbytes;
+    return;
+  } else {
+    char *mem = xmalloc(nbytes+1);
+    vsnprintf(mem, nbytes+1, fmt, ap);
+    string_buf_append_strn(buf, mem, nbytes);
+    return;
+  }
+}
+void string_buf_sprintf(string_buf *buf, const char *fmt, ...){
+  va_list ap;
+  va_start(ap, fmt);
+  string_buf_vsnprintf(buf, fmt, ap);
+  va_end(ap);
+  return;
+}
+  
 /*
   Convert A string buffer into a string, if the list of string segments
   is empty then the buffer itself is just copied into a string, otherwise
@@ -93,37 +134,46 @@ void string_buf_append_strn_copy(string_buf *buf,
   means the string created, unlike the buffer, is independent from any
   other string.
 */
-string *string_buf_to_string(string_buf *buf){
+string string_buf_to_string(string_buf *buf){
   uint32_t buflen = buf->bufptr - buf->buf;
   //  buf->bufptr = buf->buf;
   if(buf->segments_start == NULL){
     //if we never flushed the buffer this is much easier
-    return make_string_unboxed(buf->buf, buflen, 0);
+    char *mem = xmalloc(buflen);
+    memcpy(mem, buf->buf, buflen);
+    return make_string(mem, buflen, 0);
   } else {
     uint32_t len = buflen + buf->total_len;
-    char *str_mem = malloc_atomic(len*sizeof(char));
+    char *str_mem = xmalloc(len*sizeof(char));
     char *strptr = str_mem;
     string_segment *segment = buf->segments_start;
+    string_segment *tmp;
     do {
       memcpy(strptr, segment->str, segment->len);
       strptr += segment->len;
+      tmp = segment;
       segment = segment->next;
+      free(tmp);
     } while(segment != NULL);
     memcpy(strptr, buf->buf, buflen);
-    return make_string_unboxed_nocopy(str_mem, len, 0);
+    return make_string(str_mem, len);
   }
 }
+string *string_buf_to_string_ptr(string_buf *buf){
+  string tmp = string_buf_to_string(buf);
+  string *ret = xmalloc(sizeof(string));
+  *ret = tmp;
+  return ret;
+}
+
 const char *string_buf_to_cstr(string_buf *buf, uint32_t *len){
-  string *str = string_buf_to_string(buf);
+  string str = string_buf_to_string(buf);
   if(len != NULL){
-    *len = str->len;
+    *len = str.len;
   }
-  return str->str;
+  return str.str;
 }
-obj string_buf_to_string_obj(string_buf *buf){
-  string *str = string_buf_to_string(buf);
-  return make_obj((obj)str, vector);
-}
+
 string_buf *malloc_string_buf(){
   string_buf *buf = malloc(sizeof(string_buf));
   buf->bufptr = buf->buf;

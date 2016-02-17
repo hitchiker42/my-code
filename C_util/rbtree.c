@@ -26,7 +26,7 @@
 
   Some of the rbtree code and accompaning comments (specifically the illustrations)
   is also adapted from the linux kernel implementation.
-  However the way the kernel does rb trees is a bit weird, so I still had to write 
+  However the way the kernel does rb trees is a bit weird, so I still had to write
   the code myself.
 */
 static inline void rb_set_parent(rb_node *x, rb_node *p){
@@ -92,6 +92,7 @@ void rb_insert(rb_tree *tree, void *val){
     y->right = new;
   }
   rb_insert_node(tree, new);
+  tree->sz++;
 }
 //equivlent to the RB-Insert-Fixup function from clrs
 static void rb_insert_node(rb_tree *tree, rb_node *node){
@@ -212,6 +213,17 @@ void rb_delete(rb_tree *tree, rb_node *node){
     rb_recolor(tree, rebalance);
   }
   free(node);
+  tree->sz--;
+}
+void rb_delete_custom(rb_tree *tree, rb_node *node,
+                      void(*cleanup)(void*)){
+  rb_node *rebalance = rb_delete_node(tree, node);
+  if(rebalance){
+    rb_recolor(tree, rebalance);
+  }
+  cleanup(node->data);
+  free(node);
+  tree->sz--;
 }
 /*
   Oh boy, deletion.
@@ -222,7 +234,7 @@ void* rb_delete_node(rb_tree *tree, rb_node *node){
   rb_node *tmp = node->left;
   rb_node *parent, *rebalance;
   //We do a lot of changing around parents in this function, so
-  //we store some parent pointers in their tagged form to make 
+  //we store some parent pointers in their tagged form to make
   //setting the parent field eaiser.
   ulong pc;
   if(!tmp){
@@ -282,7 +294,7 @@ void* rb_delete_node(rb_tree *tree, rb_node *node){
        *  (s)          (c)
        *    \
        *    (c)
-       */      
+       */
       do {  //find successor
         parent = successor;
         successor = tmp;
@@ -304,7 +316,7 @@ void* rb_delete_node(rb_tree *tree, rb_node *node){
     pc = node->parent_color;
     tmp = rb_parent(node);
     rb_change_child(tree, node, successor, tmp);
-    
+
     if(child2){
       successor->parent_color = pc;
       rb_set_parent_color(child2, parent, RB_BLACK);
@@ -328,7 +340,7 @@ void rb_recolor(rb_tree *tree, rb_node *parent){
      * - node is not the root (parent is not NULL)
      * - All leaf paths going through parent and node have a
      *   black node count that is 1 lower than other leaf paths.
-     */  
+     */
     sibling = parent->right;
     if(node != sibling){ /* node is left child*/
       if(rb_is_red(sibling)){
@@ -347,7 +359,7 @@ void rb_recolor(rb_tree *tree, rb_node *parent){
         rb_set_parent_color(tmp1, parent, RB_BLACK);
         rb_rotate_set_parents(tree, parent, sibling, RB_RED);
         sibling = tmp1;
-      } 
+      }
       tmp1 = sibling->right;
       if(rb_is_black_safe(tmp1)){
         tmp2 = sibling->left;
@@ -434,7 +446,7 @@ void rb_recolor(rb_tree *tree, rb_node *parent){
         rb_set_parent_color(tmp1, parent, RB_BLACK);
         rb_rotate_set_parents(tree, parent, sibling, RB_RED);
         sibling = tmp1;
-      } 
+      }
       tmp1 = sibling->left;
       if(rb_is_black_safe(tmp1)){
         tmp2 = sibling->right;
@@ -520,9 +532,7 @@ static inline void rb_traverse_preorder_recurse(rb_node *node, void *userdata,
 void rb_traverse_preorder(rb_tree *tree, void *userdata,
                            void(*visit)(rb_node*, void*)){
   rb_traverse_preorder_recurse(tree->root, userdata, visit);
-} 
-//void rb_traverse_breadth_first(rb_tree *tree, void *userdata,
-//                               void(*visit)(rb_node *,void *)){
+}
 rb_node *rb_lookup(rb_tree *tree, void *val){
   rb_node *node = tree->root;
   //tail recursive version...kinda
@@ -600,13 +610,15 @@ rb_node *rb_prev(rb_node *node){
 }
 void destroy_rbtree(rb_tree *tree){
   rb_traverse_postorder(tree, NULL, (void(*)(rb_node*,void*))free);
+  free(tree);
 }
 static void destroy_custom_fun(rb_node *node, void(*fun)(void*)){
-  fun(node);
+  fun(node->data);
   free(node);
 }
 void destroy_rbtree_custom(rb_tree *tree, void(*fun)(void*)){
-  rb_traverse(tree, (void*)fun, (void*)destroy_custom_fun);
+  rb_traverse_postorder(tree, (void*)fun, (void*)destroy_custom_fun);
+  free(tree);
 }
 static int default_cmp(void *x, void *y){
   if(x == y){
@@ -629,6 +641,7 @@ static inline void print_rbtree_recurse(rb_node *node, void **userdata){
   if(node){
     fputc('(',out);
     print_val(node->data, out);
+    fputc(' ',out);
     print_rbtree_recurse(node->left, userdata);
     fputs(" . ",out);
     print_rbtree_recurse(node->right, userdata);
@@ -642,14 +655,36 @@ static void default_print_val(void *val, FILE *out){
   snprintf(buf, 22, "%#0lx", (uintptr_t)val);
   fputs(buf, out);
 }
-void print_rbtree(rb_tree *tree, FILE *out, void(*print_val)(void*,FILE*)){
-  void *userdata[2] = {(out ? out : stdout), 
+void print_rbtree_sexp(rb_tree *tree, FILE *out, void(*print_val)(void*,FILE*)){
+  void *userdata[2] = {(out ? out : stdout),
                        (print_val ? print_val : default_print_val)};
   print_rbtree_recurse(tree->root, userdata);
 }
+//This could be used to implement a generic breadth first 
+//traversal, but I don't see much use for that aside from 
+//seralizing a tree
+void print_rbtree(rb_tree *tree, FILE *out, void(*print_node)(rb_node*,FILE*)){
+  if(!tree->root){
+    return;
+  }
+  /*
+    This prints a full binary tree, with empty nodes indicated by NIL
+  */
+  struct queue *q = alloca(sizeof(struct queue));
+  memset(q,'\0', sizeof(struct queue));
+  rb_node *node;
+  queue_push(q, tree->root);
+  while(!(queue_is_empty(q))){
+    node = queue_pop(q);
+    print_node(node, out);
+    queue_push(q, node->left);
+    queue_push(q, node->right);
+  }
+}  
+
 
 //make an rbtree from (potentially sorted) data
-rb_tree *construct_rbtree(cmp_fun cmp, void **data, 
+rb_tree *construct_rbtree(cmp_fun cmp, void **data,
                           size_t len, int sorted){
   size_t i;
   rb_tree *tree = xmalloc(sizeof(rb_tree));
@@ -671,5 +706,4 @@ static void construct_rbtree_recurse(rb_node *node, void **data, size_t len){
     node->data = data[len];
     if(len ==  2){
       node->left = make_rb_node(
-#endif    
-
+#endif

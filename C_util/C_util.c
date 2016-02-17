@@ -153,7 +153,7 @@ static int filetest_core(struct stat buf, char test){
     case 'c':
       return S_ISCHR(buf.st_mode);
     case 'd':
-      return S_ISDIR(buf.st_mode);      
+      return S_ISDIR(buf.st_mode);
     case 'e':
       //if this gets called stat succeded so the file must exist
       return 1;
@@ -235,7 +235,6 @@ void *mmap_filename(const char *file, int shared, int prot, size_t *sz){
   close(fd);
   return buf;
 }
-
 void *mmap_anon(size_t sz){
   void *mem = mmap(0, sz, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
@@ -245,6 +244,39 @@ void *mmap_anon(size_t sz){
   }
   return mem;
 }
+/*
+int stream_at_end(mem_stream *stream){
+  return(stream->off >= stream->sz);
+}
+void free_stream(mem_stream *stream){
+  munmap(stream->mem, stream->sz);
+  free(stream);
+}
+string stream_next_word(mem_stream *stream){
+  size_t start = stream->off;
+  while(stream->off < stream->sz && 
+        !isspace(stream->mem[stream->off])){
+    stream->off++;
+  }
+  string ret = {.mem = stream->mem + start,
+                 .sz = stream->off - start};
+  while(isspace(stream->mem[stream->off])){
+    stream->off++;
+  }
+  return ret;
+}
+mem_stream *FILE_to_stream(FILE *f){
+  int fd = fileno(f);
+  mem_stream *stream = xmalloc(sizeof(mem_stream));
+  stream->mem = mmap_file(fd, 0, PROT_READ | PROT_WRITE, &stream->sz);
+  if(!stream->mem){
+    free(stream);
+    return NULL;
+  }
+  stream->off = 0;
+  return stream;
+}
+*/
 uint32_t strspn_table(const uint8_t *str, const uint8_t accept[256]){
   int i=0;
 
@@ -347,22 +379,31 @@ void queue_push(struct queue *q, void *data){
   if(q->tail == NULL){
     q->tail = node;
   }
+  if(q->head){
+    q->head->prev = node;
+  }
   q->head = node;
 
 };
 void *queue_pop(struct queue *q){
   struct queue_node *node = q->tail;
+  void *ret = NULL;
   if(node){
-    q->tail = node->prev;
-    q->tail->next = NULL;
-    void *ret = node->data;
-    free(node);
-    return ret;
+    if(q->head == q->tail){
+      void *ret = node->data;
+      q->head = q->tail = NULL;
+    } else {
+      q->tail = node->prev;
+      q->tail->next = NULL;
+      void *ret = node->data;
+    }
   }
-  return NULL;
+  free(node);
+  return ret;
 }
-  
-
+int queue_is_empty(struct queue *q){
+  return !(q->head || q->tail);
+}
 #define NANO_SCALE 1000000000
 #define NANO_SCALE_FLOAT 1e9
 #define MICRO_SCALE 1000000

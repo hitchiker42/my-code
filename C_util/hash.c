@@ -230,6 +230,59 @@ void* hashtable_find_add(htable *ht, void *key, size_t key_sz, void *value){
   return NULL;
 #endif
 }
+int hashtable_add(htable *ht, void *key, size_t key_sz, void *value){
+  inc_hashtable_threadcount(ht);
+  uint64_t hv = ht->hash(key, key_sz);
+  uint32_t index = hv % ht->size;
+  /*
+    bucket = head of linked list, entry = current entry
+  */
+  hentry *new_entry = NULL;
+  hentry *entry, *bucket;
+#ifdef ATOMIC_HASHTABLE
+  //use a label to indicate this isn't a normal loop
+ retry:
+  bucket = ht->table[index];
+  entry = bucket;
+  while(entry){
+    if(entry->hv == hv){
+      if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
+        atomic_dec(&ht->num_threads_using);
+        free(new_entry);
+        return 0;
+      }
+    }
+    entry = entry->next;
+  }
+  if(!new_entry){
+    new_entry = make_hentry(key, key_sz, hv, value, bucket);
+  } else {
+    new_entry->next = bucket;
+  }
+  if(atomic_compare_exchange(ht->table+index, &bucket, new_entry)){
+    atomic_inc(&ht->entries);
+    atomic_dec(&ht->num_threads_using);
+    maybe_rehash(ht);
+    return 1;
+  }
+  goto retry;
+#else
+  bucket = ht->table[index];
+  entry = bucket;
+  while(entry){
+    if(entry->hv == hv){
+      if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
+        return 0;
+      }
+    }
+    entry = entry->next;
+  }
+  new_entry = make_hentry(key, key_sz, hv, value, bucket);
+  ht->table[index] = new_entry;
+  ht->entries++;
+  return 1;
+#endif
+}
 /*
   I Really wish C marcos were more lispy, then I wouldn't have to
   write basically the same function several times.

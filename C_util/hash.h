@@ -47,13 +47,13 @@ static void * hashtable_find_add_string(struct hashtable *ht,
 }
 /*
   Add an entry to hash table ht, true if a value was added, otherwise false.
-  Just a wrapper around hashtable_find_add.
+  Just a wrapper around hashtable_find_add. Hash table find add will
+  return NULL for an existing entry with a null value and for a non
+  existing entry. This will always tell you if you added an entry
+  or not.
 */
-static int hashtable_add(struct hashtable *ht, void *key,
-                         size_t keylen, void *value){
-  void *prev_val = hashtable_find_add(ht, key, keylen, value);
-  return (prev_val ? 1 : 0);
-}
+int hashtable_add(struct hashtable *ht, void *key,
+                  size_t keylen, void *value);
 static int hashtable_add_string(struct hashtable *ht,
                                 char *str, void *value){
   return hashtable_add(ht, str, strlen(str), value);

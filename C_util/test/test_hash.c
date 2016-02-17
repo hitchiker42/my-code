@@ -14,11 +14,11 @@ void *inc_counter(void *cntr){
   The value given to echo word is the index of it's first character in words.
 */
 void fill_htable(struct hashtable *ht, char *words, size_t sz){
-  char *ptr = words;
+  uint8_t *ptr = (uint8_t*)words;
   uint32_t word_len;
   long i = 0;
   while(i < sz){
-    word_len = memcspn(ptr, sz-i, " \n\t", 3);
+    word_len = memcspn(ptr, sz-i, (uint8_t*)" \n\t", 3);
     //hashtable_add(ht, ptr, word_len, (void*)i);
     hashtable_update(ht, ptr, word_len, inc_counter);
     i += word_len;
