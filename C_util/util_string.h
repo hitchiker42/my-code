@@ -53,7 +53,7 @@ static string make_string(uint8_t *str, int len){
 static string* make_string_ptr(uint8_t *str, int len){
   string *ret = xmalloc(sizeof(string));
   ret->mem = str;
-  ret->size = len;
+  ret->sz = len;
   return ret;
 }
 static string string_from_cstr(char *str){
@@ -83,6 +83,9 @@ static int string_ptr_cmp(string *a, string *b){
 static int string_eq(string a, string b){
   return (a.sz == b.sz && !memcmp(a.mem, b.mem, a.sz));
 }
+static int string_ptr_eq(string *a, string *b){
+  return (a->sz == b->sz && !memcmp(a->mem, b->mem, a->sz));
+}
 static string string_cat(string a, string b){
   string ret;
   ret.sz = a.sz + b.sz;
@@ -108,7 +111,7 @@ string string_ncatn(int n, ...);
 #define STRING_NCATN(...) VA_FUNC(string_ncatn, __VA_ARGS__)
 
 static string sub_string(string a, int start, int end){
-  start = (start ? start : 0):
+  start = (start ? start : 0);
   end = (end ? end : a.len);
   return make_string(a.mem + start, MIN(a.sz-start, end-start));
 }
@@ -122,7 +125,7 @@ static string copy_string(string a){
 static int string_index(string a, uint8_t c){
   int i = 0;
   while(i<a.len){
-    if(a[i] == c){
+    if(a.mem[i] == c){
       return i;
     }
     i++;

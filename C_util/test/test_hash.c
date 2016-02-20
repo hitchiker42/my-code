@@ -46,7 +46,7 @@ void thread_main(int thread_id){
   DEBUG_PRINTF("returning from thread %lu\n", pthread_self());
 }
 void print_entry(void *key, size_t keylen, void *value){
-  printf("key: %.*s, value: %ld\n", keylen, key, (long)value);
+  printf("key: %.*s, value: %ld\n", (int)keylen, (char*)key, (long)value);
   total += (long)value;
 }
 int main(int argc, char *argv[]){

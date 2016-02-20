@@ -25,6 +25,8 @@ typedef struct bptree_node bptree_node;
 #define btree_parent(node) ((btree_node*)((node->parent_leaf) & ~1))
 #define bptree_parent(node) ((bptree_node*)((node->parent_leaf) & ~1))
 #define is_leaf(node) (node->parent_leaf & 1)
+#define set_leaf(node) (node->parent_leaf |= 1)
+#define unset_leaf(node) (node->parent_leaf &= ~1)
 //Change this to change the size of the btree nodes
 #define btree_min_degree  (PAGE_SIZE/48)
 /*
@@ -73,12 +75,12 @@ struct bptree {
   For now I'm only doing insertion, lookup and deletion.
 */
 //uint128_t btree_hash(uint8_t *key, size_t key_sz);
+btree* make_btree(void);
 void btree_insert(btree *tree, uint64_t key, void *value);
 void *btree_lookup(btree *tree, uint64_t key);
 void *btree_delete(btree *tree, uint64_t key);
 
-
-uint64_t bptree_hash(uint8_t *key, size_t key_sz);
+/*
 void *bptree_find_add_hv(bptree *tree, uint64_t hv, void *value);
 static void *bptree_find_add(bptree *tree, uint8_t *key, 
                             size_t key_sz, void *value){
@@ -97,6 +99,7 @@ void *bptree_delete(bptree *tree, uint8_t *key, size_t key_sz){
   uint64_t hv = bptree_hash(key, key_sz);
   return bptree_delete_hv(tree, hv);
 }
+*/
 #ifdef __cplusplus
 }
 #endif

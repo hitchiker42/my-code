@@ -4,6 +4,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#if defined(__HAVE_CONFIG_H__)
+#include "config.h"
+#endif
 //check for C11
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)  && \
   !(defined(HAVE_C11)) /* C11 */
@@ -155,80 +158,80 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define M_TAU 2*M_PI
 #define M_SQRT3 1.7320508075688772 /* sqrt(3) */
 
-//bound x to the range [min,max]
-#define clamp(x, min, max) max(min(x, max),min)
-//return 0 if x < edge, otherwise 1
-#define step(edge, x) (x < edge ? 0 : 1)
+//Bound x to the range [min,max]
+#define CLAMP(x, min, max) max(min(x, max),min)
+//Return 0 if x < edge, otherwise 1
+#define STEP(edge, x) (x < edge ? 0 : 1)
 
-//control structures
+//Control structures
 //todo: figure out how to font-lock these in emacs
 #define unless(cond) if(!(cond))
 #define until(cond) while(!(cond))
 
 //preprocessor tricks/macro overloading
 
-//macros to use in place of '#' and '##'
-#define cat(a,b) primitive_cat(a, b)
-#define primitive_cat(a,b) a ## b
-#define cat3(a,b,c) primitive_cat3(a, b, c)
-#define primitive_cat3(a,b,c) a ## b ## c
-#define cat4(a,b,c,d) primitive_cat4(a, b, c, d)
-#define primitive_cat4(a,b,c,d) a ## b ## c ## d
-#define macroexpand(...) __va_args__
-#define stringify(...) #__va_args__
-//overload w/upto 8 args, each overload can be uniquely named
-//usage, for a macro foo with 3 variants, foo3, foo2 and foo1 define as
-//#define foo(...) get_macro(3, __va_args__, foo3, foo2, foo1)(__va_args__)
+//Macros to use in place of '#' and '##'
+#define CAT(a,b) PRIMITIVE_CAT(a, b)
+#define PRIMITIVE_CAT(a,b) a ## b
+#define CAT3(a, b, c) PRIMITIVE_CAT3(a, b, c)
+#define PRIMITIVE_CAT3(a, b, c) a ## b ##cC
+#define CAT4(a, b, c, d) PRIMITIVE_CAT4(a, b, c, d)
+#define PRIMITIVE_CAT4(a, b, c, d) a ## b ## c ## d
+#define MACROEXPAND(...) __VA_ARGS__
+#define STRINGIFY(...) #__VA_ARGS__
+//Overload w/upto 8 args, each overload can be uniquely named
+//Usage, for a macro foo with 3 variants, foo3, foo2 and foo1 define as
+//#define foo(...) GET_MACRO(3, __VA_ARGS__, FOO3, FOO2, FOO1)(__VA_ARGS__)
 //however unless there's a reason to name the variants uniquely, rather than
 //above (i.e foo1, foo2, foo3), it's better to use vfunc
 
-#define get_macr0_1(_1,name,...) macroexpand(name)
-#define get_macro_2(_1,_2,name,...) macroexpand(name)
-#define get_macro_3(_1,_2,_3,name,...) macroexpand(name)
-#define get_macro_4(_1,_2,_3,_4,name,...) macroexpand(name)
-#define get_macro_5(_1,_2,_3,_4,_5,name,...) macroexpand(name)
-#define get_macro_6(_1,_2,_3,_4,_5,_6,name,...) macroexpand(name)
-#define get_macro_7(_1,_2,_3,_4,_5,_6,_7,name,...) macroexpand(name)
-#define get_macro_8(_1,_2,_3,_4,_5,_6,_7,_8,name,...) macroexpand(name)
-#define get_macro(n,...) get_macro_##n(__va_args__)
+#define GET_MACR0_1(_1,NAME,...) MACROEXPAND(NAME)
+#define GET_MACRO_2(_1,_2,NAME,...) MACROEXPAND(NAME)
+#define GET_MACRO_3(_1,_2,_3,NAME,...) MACROEXPAND(NAME)
+#define GET_MACRO_4(_1,_2,_3,_4,NAME,...) MACROEXPAND(NAME)
+#define GET_MACRO_5(_1,_2,_3,_4,_5,NAME,...) MACROEXPAND(NAME)
+#define GET_MACRO_6(_1,_2,_3,_4,_5,_6,NAME,...) MACROEXPAND(NAME)
+#define GET_MACRO_7(_1,_2,_3,_4,_5,_6,_7,NAME,...) MACROEXPAND(NAME)
+#define GET_MACRO_8(_1,_2,_3,_4,_5,_6,_7,_8,NAME,...) MACROEXPAND(NAME)
+#define GET_MACRO(N,...) GET_MACRO_##N(__VA_ARGS__)
 // overload w/upto 63 args, all overloads must be of the form
 // base_n, where n is the number of args
 //__narg__ in effect, computes the number of arguments passed to it
-#define __narg__(...)  __narg_i_(__va_args__,__rseq_n())
-#define __narg_i_(...) __arg_n(__va_args__)
-#define __arg_n(_1, _2, _3, _4, _5, _6, _7, _8, _9,_10,         \
+#define __NARG__(...)  __NARG_I_(__VA_ARGS__,__RSEQ_N())
+#define __NARG_I_(...) __ARG_N(__VA_ARGS__)
+#define __ARG_N(_1, _2, _3, _4, _5, _6, _7, _8, _9,_10,         \
                 _11,_12,_13,_14,_15,_16,_17,_18,_19,_20,        \
                 _21,_22,_23,_24,_25,_26,_27,_28,_29,_30,        \
                 _31,_32,_33,_34,_35,_36,_37,_38,_39,_40,        \
                 _41,_42,_43,_44,_45,_46,_47,_48,_49,_50,        \
                 _51,_52,_53,_54,_55,_56,_57,_58,_59,_60,        \
                 _61,_62,_63,n,...) n
-#define __rseq_n() 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53,  \
+#define __RSEQ_N() 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53,  \
                    52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42,  \
                    41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31,  \
                    30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20,  \
                    19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9,   \
                    8, 7, 6, 5, 4, 3, 2, 1, 0
-// expands into func##n(__va_args__) where n is the number of arguments
-#define vfunc(func, ...) cat(func, __narg__(__va_args__))(__va_args__)
+// Expands into func##n(__va_args__) where n is the number of arguments
+#define VFUNC(func, ...) CAT(func, __NARG__(__VA_ARGS__))(__VA_ARGS__)
 
-// calls the variadic function func with the number of arguments as
+// Calls the variadic function func with the number of arguments as
 // its first argument.
-#define va_func(func, ...) func(__narg__(__va_args__), __va_args__)
-//i could add a preprocessor loop, if i was feeling evil
+#define VA_FUNC(func, ...) func(__NARG__(__VA_ARGS__), __VA_ARGS__)
+//I could add a preprocessor loop, if I was feeling evil
 /*
-  macros for some c extensions
+  Macros for some C extensions
 */
-#define attribute(...) __attribute__((__va_args__))
-#define unreachable() __builtin_unreachable()
-#define atribute_noreturn() __attribute__((noreturn))
-#define attribute_noreturn __attribute__((noreturn))
-#define attribute_unused __attribute__((unused))
-#define attribute_aligned(align) __attribute__((aligned(align)))
+#define ATTRIBUTE(...) __attribute__((__va_args__))
+#define UNREACHABLE() __builtin_unreachable()
+#define ATRIBUTE_NORETURN() __attribute__((noreturn))
+#define ATTRIBUTE_NORETURN __attribute__((noreturn))
+#define ATTRIBUTE_UNUSED __attribute__((unused))
+#define ATTRIBUTE_ALIGNED(align) __attribute__((aligned(align)))
 /*
-  always inline can be used to define fast generic versions of
+  Always inline can be used to define fast generic versions of
   functions paramaterized by function pointers.
-  consider the code:
+  Consider the code:
     always_inline __sort_generic(void **arr, size_t len, cmp_fun cmp){
       ...
     }
@@ -239,19 +242,19 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
     sort_u64(uint64_t *arr, size_t len){
       __sort_generic((void**)arr, len, cmp_lt)
     }
-  since __sort_generic the compiler will generate sort_u64 using
+    Since __sort_generic the compiler will generate sort_u64 using
   a simple less than comparision, rather than making a function call
-  to compare things. if __sort_generic isn't declared always_inline
-  the compiler will only do this with o3 level optimization.
+  to compare things. If __sort_generic isn't declared always_inline
+  the compiler will only do this with O3 level optimization.
 
   __attribute__((always_inline)) by itself causes compiler warnings
 */
-#define always_inline inline __attribute__((always_inline))
+#define ALWAYS_INLINE inline __attribute__((always_inline))
 //always inline functions are almost always static
-#define always_inline static always_inline
+#define always_inline static ALWAYS_INLINE
 
 #ifndef thread_local
-#if (defined have_c11)
+#if (defined HAVE_C11)
 #define thread_local _thread_local
 #else
 #define thread_local __thread
@@ -272,19 +275,19 @@ static inline struct cons_t* make_cons(void* car, void* cdr){
   c->cdr = cdr;
   return c;
 }
-#define cons(x,y) make_cons(x,y);
-#define xcar(c) ((struct cons_t*)c->car)
-#define xcdr(c) ((struct cons_t*)c->cdr)
+#define CONS(x,y) make_cons(x,y);
+#define XCAR(c) ((struct cons_t*)c->car)
+#define XCDR(c) ((struct cons_t*)c->cdr)
 
-#define xsetcar(c,x) ((struct cons_t*)c->car = (void*)x)
-#define xsetcdr(c,x) ((struct cons_t*)c->cdr = (void*)x)
+#define XSETCAR(c,x) ((struct cons_t*)c->car = (void*)x)
+#define XSETCDR(c,x) ((struct cons_t*)c->cdr = (void*)x)
 
-#define xcaar(c) xcar(xcar(c))
-#define xcadr(d) xcar(xcdr(c))
-#define xcdar(c) xcdr(xcar(c))
-#define xcddr(d) xcdr(xcdr(c))
+#define XCAAR(c) XCAR(XCAR(c))
+#define XCADR(d) XCAR(XCDR(c))
+#define XCDAR(c) XCDR(XCAR(c))
+#define XCDDR(d) XCDR(XCDR(c))
 /*
-  really basic fifo queue (code in c_util.c)
+  Really basic fifo queue (code in c_util.c)
 */
 struct queue {
   struct queue_node *head;
@@ -526,6 +529,69 @@ void mergesort_u64(uint64_t *input, size_t len);
 void qsort_u64(uint64_t *input, size_t len);
 void insertion_sort_u64(uint64_t *input, size_t len);
 void heapsort_u64(uint64_t *input, size_t len);
+/*
+  Random numbers, etc.
+  The random number generator provided here is a xorshift+ generator,
+  from 'Vigna, Sebastiano (April 2014).
+         "Further scramblings of Marsaglia's xorshift generators".'
+  It is fast, passes most statistical tests for randomness, has
+  a 128 bit period, and requires very little code.
+
+  The mersenne twister is probably faster for large quantities of
+  random numbers, and has a much longer period, but the code is
+  also much much more complicated. 
+*/
+//you can't return an array in C so this needs to be a struct
+typedef struct  util_rand_state util_rand_state;
+struct util_rand_state {
+  uint64_t state[2];
+};
+//returns 64bit integers unifornly distributed between 0-2^64-1
+uint64_t util_rand(void);
+uint64_t util_rand_r(util_rand_state state);
+//double precison numbers in the range [0,1), with 53 bit precision
+double util_drand(void);
+double util_drand_r(util_rand_state state);
+//Return a random signed integer in the range min-max. This is actually
+//a bit more complicated than it initally seems, as using mod results
+//in an uneven distribution
+int64_t util_rand_range_r(int64_t min, int64_t max, util_rand_state state);
+int64_t util_rand_range(int64_t min, int64_t max);
+//returns the current random state, this is a copy, so changing it
+//won't modify the internal state
+util_rand_state util_get_rand_state(void);
+//sets the random state to state and returns the old state
+util_rand_state util_set_rand_state(util_rand_state state);
+//automatically generates a radnom state using a known form of randomness,
+//usually either /dev/urandom or the current time.
+util_rand_state util_auto_rand_state(void);
+//initializes the random state
+void util_srand(uint64_t a, uint64_t b);
+void util_srand_auto(void);//calls util_auto_rand_state to get the state
+
+//macros used to set how util_auto_rand_state works
+#ifndef USE_SEED_URANDOM
+#define USE_SEED_URANDOM 0
+#endif
+#ifndef USE_SEED_TIME
+#define USE_SEED_TIME 1
+#endif
+
+void shuffle_array(void **arr, size_t len);
+/*
+  Basic hash function, never know when you need a hash function.
+*/
+#define fnv_prime_64 1099511628211UL
+#define fnv_offset_basis_64 14695981039346656037UL
+static uint64_t fnv_hash(const void *key, size_t keylen){
+  const uint8_t *raw_data=(const uint8_t *)key;
+  size_t i;
+  uint64_t hash=fnv_offset_basis_64;
+  for(i=0; i < keylen; i++){
+    hash = (hash ^ raw_data[i])*fnv_prime_64;
+  }
+  return hash;
+}
 /*
   Functionally identical to asprintf, but uses alloca to allocate
   memory on the stack instead of using malloc.

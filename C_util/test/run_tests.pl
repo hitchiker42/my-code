@@ -2,7 +2,7 @@
 use v5.18.0;
 use File::Temp qw(tempfile);
 no warnings "experimental";
-my @tests = ("test_hash","test_sort","test_rbtree");
+my @tests = ("test_hash","test_sort","test_rbtree","test_btree");
 sub rand_strings {
     my ($outfile, $len,$min,$max) = @_;
     $len = $len || 100;

@@ -1,5 +1,12 @@
 #ifndef _SVECTOR_H_
 #define _SVECTOR_H_
+#if (defined __LIBCUTIL__)
+#include "C_util.h"
+#endif
+/*
+  This file and svector.c can be used without the rest of the 
+  library if necessary.
+*/
 #include <stdlib.h>
 #include <string.h>
 /*

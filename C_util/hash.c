@@ -74,17 +74,6 @@ static inline hentry* make_hentry(void *key, size_t key_sz, uint64_t hv,
 static void rehash(htable *ht);
 static void maybe_rehash(htable *ht);
 
-#define fnv_prime_64 1099511628211UL
-#define fnv_offset_basis_64 14695981039346656037UL
-static uint64_t fnv_hash(const void *key, size_t keylen){
-  const uint8_t *raw_data=(const uint8_t *)key;
-  size_t i;
-  uint64_t hash=fnv_offset_basis_64;
-  for(i=0; i < keylen; i++){
-    hash = (hash ^ raw_data[i])*fnv_prime_64;
-  }
-  return hash;
-}
 static int bool_memcmp(const void *x, const void *y,
                        size_t x_sz, size_t y_sz){
   if(x_sz != y_sz){

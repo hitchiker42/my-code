@@ -6,15 +6,27 @@
 #if !(defined NDEBUG)
 #define DEBUG_PRINTF(fmt,...)                   \
   fprintf(stderr,fmt,##__VA_ARGS__)
-#define HERE()                                          \
-  fprintf(stderr,"file: %s, line: %d, function: %s\n", \
-          __FILE__,__LINE__,__func__)
+#define DEBUG_PRINTF_ONCE(fmt,...)              \
+  ({static int printed;                         \
+    if(!printed){                               \
+      printed = 1;                              \
+      fprintf(stderr,fmt,##__VA_ARGS__);        \
+    };})
 #define HERE_FMT(fmt,...)                               \
   fprintf(stderr,"file: %s, line: %d, function: %s\n" fmt, \
           __FILE__,__LINE__,__func__,##__VA_ARGS__)
-#define HERE_STR(str)                           \
-  fprintf(stderr,"file: %s, line: %d, function: %s\n%s",        \
-          __FILE__,__LINE__,__func__,str)
+#define HERE() HERE_FMT("")
+#define HERE_STR(str) HERE_FMT("%s",str)
+
+#define HERE_FMT_ONCE(fmt,...)                                  \
+  ({static int printed;                                         \
+    if(!printed){                                               \
+      printed = 1;                                              \
+      fprintf(stderr,"file: %s, line: %d, function: %s\n" fmt,  \
+              __FILE__,__LINE__,__func__,##__VA_ARGS__);        \
+    };})
+#define HERE_ONCE() HERE_FMT_ONCE("")
+#define HERE_STR_ONCE(str) HERE_FMT_ONCE("%s",str)
 //I got these from the linux kernel
 #define WARN(cond,fmt,...)                      \
   ({if(cond){                                   \
@@ -85,14 +97,14 @@
 #define BREAKPOINT() raise(SIGTRAP)
 //we don't need to include this if debugging is disabled
 #include <execinfo.h>
-static void print_backtrace(int ATTRIBUTE_UNUSED signo){
+static void print_backtrace(int __attribute__((unused)) signo){
   #define BACKTRACE_BUF_SIZE 128
   void *buffer[BACKTRACE_BUF_SIZE];
   int stack_entries = backtrace(buffer, BACKTRACE_BUF_SIZE);
   //just write the backtrace straight to stderr
   backtrace_symbols_fd(buffer, stack_entries, STDERR_FILENO);
 }
-static ATTRIBUTE_UNUSED void enable_backtraces(void){
+static __attribute__((unused)) void enable_backtraces(void){
   struct sigaction act;
   act.sa_handler = print_backtrace;
   act.sa_flags = SA_RESETHAND;

@@ -1,10 +1,13 @@
 #include "svector.h"
+#include <signal.h>
+#include <stdio.h>
 #ifndef XMALLOC
 #define XMALLOC
 static inline void* xmalloc(size_t sz){
   void *mem = malloc(sz);
   if(!mem && sz != 0){
-    oom_fun();
+    fputs("Out of memory\n",stderr);
+    raise(SIGABRT);
   }
   return mem;
 }
@@ -116,7 +119,7 @@ svector svector_sort(svector *svec, int(*cmp)(void*,void*),
   if(svec->len < 64){
     insertion_sort_generic(arr, len, cmp);
   } else if(stable){
-    mergesort_generic(arr, tmp, len, cmp);
+    mergesort_generic(arr, len, cmp);
   } else {
     qsort_generic(arr, len, cmp);
   }

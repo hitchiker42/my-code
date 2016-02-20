@@ -2,22 +2,30 @@
 /*
   Utility functions
 */
+  
 //Allocate/free a node, the tree structure is passed since in the future
 //it may contain metadata
 btree_node *allocate_node(btree *tree){
   btree_node *node;
   posix_memalign((void**)&node, PAGE_SIZE, PAGE_SIZE);
+  node->n_keys = 0;
   return node;
 }
 void free_node(btree *tree, btree_node *node){
   free(node);
 }
+btree *make_btree(void){
+  btree *tree = xmalloc(sizeof(btree));
+  tree->root = allocate_node(tree);
+  set_leaf(tree->root);
+  return tree;
+}
 /*
   Copy the key at src_index in src to dest_index in dest.
   This is just to save typing.
 */
-static void copy_key(btree_node *src, int src_index,
-                     btree_node *dest, int dest_index){
+static void copy_key(btree_node *dest, int dest_index,
+                     btree_node *src, int src_index){
   dest->keys[dest_index] = src->keys[src_index];
   dest->values[dest_index] = src->values[src_index];
   return;
@@ -57,13 +65,15 @@ void *btree_lookup(btree *tree, uint64_t key){
   at the given index.
 */
 static void node_create_space(btree_node *node, int index){
-  memmove(node->keys + (index+1), node->keys + (index+2),
-          index*sizeof(node->keys[0]));
-  memmove(node->values + (index+1), node->values + (index+2),
-          index*sizeof(node->values[0]));
-  if(!is_leaf(node)){
-    memmove(node->children + (index+1), node->children + (index+2),
-            index*sizeof(node->children[0]));
+  if(index < node->n_keys){
+    memmove(node->keys + (index+1), node->keys + (index),
+            (node->n_keys-index)*sizeof(node->keys[0]));
+    memmove(node->values + (index+1), node->values + (index),
+            (node->n_keys-index)*sizeof(node->values[0]));
+    if(!is_leaf(node)){
+      memmove(node->children + (index+1), node->children + (index),
+              ((node->n_keys+1)-index)*sizeof(node->children[0]));
+    }
   }
   node->n_keys++;
 }
@@ -75,25 +85,34 @@ static void btree_split_child(btree *tree, btree_node *node, int split){
   btree_node *child2 = allocate_node(tree);
   child2->parent_leaf = child->parent_leaf;
   child2->n_keys = btree_min_degree-1;
-  memcpy(child2->keys, child->keys+(btree_min_degree-1),
+  memcpy(child2->keys, child->keys+(btree_min_degree),
          (btree_min_degree-1)*sizeof(child->keys[0]));
-  memcpy(child2->values, child->values+(btree_min_degree-1),
+  memcpy(child2->values, child->values+(btree_min_degree),
          (btree_min_degree-1)*sizeof(child->values[0]));
   if(!is_leaf(child)){
-    memcpy(child2->children, child->children+(btree_min_degree-1),
-           (btree_min_degree-1)*sizeof(child->children[0]));
+    memcpy(child2->children, child->children+(btree_min_degree),
+           (btree_min_degree)*sizeof(child->children[0]));
   }
   child->n_keys = btree_min_degree-1;
-  node_create_space(node, split);
-  node->children[split] = child2;
+  memmove(node->keys + (split+1), node->keys + (split),
+            (node->n_keys-split)*sizeof(node->keys[0]));
+  memmove(node->values + (split+1), node->values + (split),
+          (node->n_keys-split)*sizeof(node->values[0]));
+  memmove(node->children + (split+2), node->children + (split+1),
+          ((node->n_keys+1)-split)*sizeof(node->children[0]));
+//  node_create_space(node, split);
+  node->children[split+1] = child2;
   copy_key(node, split, child, btree_min_degree-1);
+  node->n_keys++;
   //write node, child, child2 to disk
+
 }
 /*
   Split the root into two children, leaving the root with only 1 key
   and 2 children.
 */
 static void btree_split_root(btree *tree){
+  DEBUG_PRINTF("Splitting root\n");
   btree_node *child1 = allocate_node(tree);
   btree_node *child2 = allocate_node(tree);
   child1->n_keys = child2->n_keys = (btree_min_degree-1);
@@ -117,6 +136,10 @@ static void btree_split_root(btree *tree){
            btree_min_degree*sizeof(child1->children[0]));
     memcpy(child2->children, tree->root->children+btree_min_degree,
            btree_min_degree*sizeof(child2->children[0]));
+  } else {
+    set_leaf(child1);
+    set_leaf(child2);
+    unset_leaf(tree->root);
   }
   copy_key(tree->root, 0, tree->root, btree_min_degree-1);
   tree->root->children[0] = child1;
@@ -150,6 +173,7 @@ void btree_insert(btree *tree, uint64_t key, void *value){
       //read node->children[i] from disk && split it if it's full
       if(node->children[i]->n_keys == ((2*btree_min_degree)-1)){
         btree_split_child(tree, node, i);
+        assert(node->children[i+1]);
         if(key > node->keys[i]){
           i++;
         }
@@ -195,6 +219,7 @@ static void merge_nodes(btree *tree, btree_node *a, btree_node *b){
 */
 static void merge_children(btree *tree, btree_node *parent,
                            btree_node *child1, btree_node *child2, int i){
+  DEBUG_PRINTF("Merging children\n");
   //move the key at index i in parent into child1
   copy_key(child1, btree_min_degree-1, parent, i);
   //remove the key at index i from parent
@@ -252,6 +277,7 @@ static void *remove_from_internal(btree *tree, btree_node *node,  int i){
   return NULL.
 */
 void *btree_delete(btree *tree, uint64_t key){
+  DEBUG_PRINTF("Deleting node\n");
   int i;
   btree_node *node = tree->root;
   while(1){

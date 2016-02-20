@@ -496,6 +496,144 @@ void float_sleep_full(double sleep_time){
   } while (err == -1);
   return;
 }
+/*
+  Basic xorshift algorithm (has some linear artifacts)
+  uint32_t xorshift(uint32_t state[4]){
+    uint32_t tmp = state[0];
+    tmp ^= tmp << 11;
+    tmp ^= tmp >> 8;
+    memmove(state, state+1, 3*sizeof(uint32_t));//shift the state vector
+    state[3] ^= state[3] >> 19;
+    state[4] ^= tmp;
+    return state[4];
+  }
+  Slighly better version, still has some issues (also only 64 bit state)
+  uint64_t xorshift_star(uint64_t state[1]){
+    state[0] ^= state[0] >> 12;
+    state[0] ^= state[0] << 25;
+    state[0] ^= state[0] >> 27;
+    return state[0] * 2685821657736338717ul;
+  }
+*/
+static util_rand_state internal_rand_state;
+//The version we use is called xorshift+
+uint64_t util_rand_r(util_rand_state state){
+  uint64_t x = state.state[0];
+  const uint64_t y = state.state[1];
+  state.state[0] = y;
+  x ^= x << 23;
+  state.state[1] = (x ^ y) ^ (x >> 17) ^ (y >> 26);
+  return state.state[1] + y;
+}
+uint64_t util_rand(){
+  return util_rand_r(internal_rand_state);
+}
+/*
+  There's an obvious way to do this (util_rand() % (max-min) + min), and
+  a correct way to do this, which is what follows.
+
+  Effictively we restrict the range to be a multiple of (max-min) and
+  if rand returns a number outside this range we discard it and try again.
+
+  This is slower, but not by all that much. In most cases the first number
+  we generate will work, and in the worst case we still have a 50% chance
+  of getting a number on the first try;
+*/
+int64_t util_rand_range_r(int64_t min, int64_t max, util_rand_state state){
+  if(min > max){
+    errno = ERANGE;
+    return 0;
+  }
+  uint64_t true_max = max-min;
+  uint64_t n_buckets = UINT64_MAX/true_max;
+  uint64_t limit = n_buckets * true_max;
+  uint64_t r;
+  do {
+    r = util_rand_r(state);
+  } while(r > limit);
+  return ((r % true_max) + min);
+}  
+int64_t util_rand_range(int64_t min, int64_t max){
+  return util_rand_range_r(min, max, internal_rand_state);
+}  
+//This is 2^-64
+static const double int_to_float_multiplier =  (1.0/18446744073709551616.0);
+double util_drand_r(util_rand_state state){
+  return util_rand_r(state)*int_to_float_multiplier;
+}
+double util_drand(void){
+  return util_drand_r(internal_rand_state);
+}
+util_rand_state util_get_rand_state(void){
+  util_rand_state ret = internal_rand_state;
+  return ret;
+}
+util_rand_state util_set_rand_state(util_rand_state state){
+  util_rand_state ret = internal_rand_state;
+  internal_rand_state = state;
+  return ret;
+}
+util_rand_state util_auto_rand_state(void){
+  util_rand_state state;
+#if (defined USE_SEED_URANDOM) && (USE_SEED_URANDOM > 0)
+  int fd = open("/dev/urandom", O_RDWR);
+  if(fd > 0){
+    int err = read(fd, state.state, 2*sizeof(uint64_t));
+    if(err == 16){
+      return state;
+    }
+    close(fd);
+  }
+#endif
+#if (defined USE_SEED_TIME) && (USE_SEED_TIME > 0)
+  struct timespec ts = get_current_time();
+  state.state[0] =  ts.tv_sec;
+  state.state[1] = ts.tv_nsec;
+  return state;
+#endif
+//It's better than leaving it 0
+  state.state[0] = 0x8a5cd789635d2dffUL;
+  state.state[1] = 0x121fd2155c472f96UL;
+  return state;
+}
+void util_srand(uint64_t a, uint64_t b){
+  internal_rand_state.state[0] = a;
+  internal_rand_state.state[1] = b;
+  return;
+}
+void util_srand_auto(){
+  util_rand_state tmp = util_auto_rand_state();
+  internal_rand_state = tmp;
+  return;
+}    
+void shuffle_array(void **arr, size_t n){
+  if(n <= 1){//avoid underflow if n==1
+    return;
+  }
+  //be threadsafe
+  util_rand_state state = util_get_rand_state();
+  size_t i;
+  for(i=0;i<n-1;i++){
+    size_t j = util_rand_range_r(0, n-i, state);
+    SWAP(arr[i], arr[i+j]);
+  }
+}
+/*
+  Could add this, effectively fills an array by setting successive
+  elements with the results of calling fn, then shuffles it, but only
+  loops over the data once.
+  void** rand_array(size_t n, void*(*fn)(void*), void *userdata){
+    void **ret = xmalloc(n*sizeof(void*));
+    size_t i;
+    for(i=0;i<n;i++){
+      size_t j = util_rand_range(0, i);
+      SWAP(ret[i], ret[j]);
+      a[j] = fn(userdata);
+    }
+*/
+
+//need to do a check for start > stop, or start < 0 and stop == 0,
+//both of which should work, but currently don't
 int *iota(int start, int stop, int step){
   if(stop == 0 && step == 0){
     stop = start;
