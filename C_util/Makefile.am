@@ -13,5 +13,5 @@ test_test_hash_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3
 test_test_rbtree_LDADD = libcutil.la
 test_test_rbtree_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3
 test_test_btree_LDADD = libcutil.la
-test_test_btree_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3
+test_test_btree_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3 
 TESTS: tests/run_test.pl

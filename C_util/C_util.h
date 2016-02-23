@@ -44,6 +44,7 @@ extern "C" {
 #endif
 
 //Conditional definitions of debugging macros/enabling backtraces
+//This can be included standalone if you just need debuging macros
 #include "debug.h"
 
 /* typedefs */
@@ -84,6 +85,7 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
     __typeof(_y) y = _y;                        \
     x>y ? x : y;})
 
+#define ARRAY_LEN(a) sizeof(a)/sizeof(a[0])
 #define TO_BOOLEAN(val) (val ? 1 : 0)
 #define IS_POW_OF_2(num) (!(num & (num-1)))
 #define NEXT_POW_OF_2(num)                              \
@@ -147,7 +149,16 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define DOWNCASE_ASCII(c) (c > 0x40 && c < 0x5B ? c | 0x20 : c)
 #define UPCASE_ASCII(c) (c > 0x60 && c < 0x7B ? c & (~0x20) : c)
 #define CHAR_TO_NUMBER(c) (assert(c >= 0x30 && c <= 0x39), c - 0x30)
-#define ARRAY_LEN(a) sizeof(a)/sizeof(a[0])
+//this might be defined in debug.h, so only conditionally define it
+#ifndef ORDINAL_SUFFIX
+#define ORDINAL_SUFFIX(num)                     \
+  ({char *suffix = "th";                        \
+    if(num == 1){suffix = "st";}                \
+    if(num == 2){suffix = "nd";}                \
+    if(num == 3){suffix = "rd";};               \
+    suffix;})
+#endif
+
 /*
   Some more math constants beyond those defined in math.h
 */
@@ -228,6 +239,9 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define ATTRIBUTE_NORETURN __attribute__((noreturn))
 #define ATTRIBUTE_UNUSED __attribute__((unused))
 #define ATTRIBUTE_ALIGNED(align) __attribute__((aligned(align)))
+#define BUILTIN_EXPECT(expr, expected) __builtin_expect(expr, expected);
+#define EXPR_LIKELY(expr) __builtin_expect(expr, 1)
+#define EXPR_UNLIKELY(expr) __builtin_expect(expr, 0)
 /*
   Always inline can be used to define fast generic versions of
   functions paramaterized by function pointers.

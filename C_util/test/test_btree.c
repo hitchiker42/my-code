@@ -60,11 +60,13 @@ int check_tree(btree *tree){
 }
 int check_node(btree_node *node, uint64_t min, uint64_t max){
   if(node->n_keys < min_keys){
-    HERE_FMT("Too few keys in a node");
+    HERE_FMT_ONCE("Too few keys in a node\n");
+    BREAKPOINT();
     return -1;
   }
   if(node->n_keys > max_keys){
-    HERE_FMT("Too many keys in a node");
+    HERE_FMT_ONCE("Too many keys in a node\n");
+    BREAKPOINT();
     return -1;
   }
   if(is_leaf(node)){
@@ -80,6 +82,10 @@ int check_internal(btree_node *node, uint64_t min, uint64_t max){
   max = node->keys[0];
   for(i=0;i<node->n_keys+1;i++){
     WARN_ON_ONCE(min > max);
+    if(max > true_max){
+      HERE();
+      BREAKPOINT();
+    }
     if(leaf_status != is_leaf(node->children[i])){
       HERE_FMT("All leaves are not the same depth");
       return -1;
@@ -114,6 +120,19 @@ int check_leaf(btree_node *node, uint64_t min, uint64_t max){
   }
   return 0;
 }
+uint64_t count_num_keys(btree_node *node){
+  if(is_leaf(node)){
+    return node->n_keys;
+  } else {
+    int i;
+    uint64_t acc = node->n_keys;
+    for(i=0;i<=node->n_keys;i++){
+      acc += count_num_keys(node->children[i]);
+    }
+    return acc;
+  }
+}
+      
 int test_btree(string **values, int n){
   int i;
   btree *tree = make_btree();
@@ -122,22 +141,34 @@ int test_btree(string **values, int n){
   //nfor now I'm just using sequential ints for keys
   DEBUG_PRINTF("Testing btree insertion\n");
   for(i=0;i<n;i++){
-    WARN_ON_ONCE(check_tree(tree) < 0);
+    assert(check_tree(tree) >= 0);
     indices[i] = i;
     hashes[i] = fnv_hash(values[i]->mem, values[i]->len);
-    btree_insert(tree, hashes[i], values[i]);
+    btree_insert(tree, hashes[indices[i]], values[i]);
   }
-  WARN_ON_ONCE(check_tree(tree) < 0);
+  assert(check_tree(tree) >= 0);
   shuffle_array((void**)indices, n);
   DEBUG_PRINTF("Testing btree lookup\n");
   for(i=0;i<n;i++){
     string *str = btree_lookup(tree, hashes[indices[i]]);
     WARN_ON_ONCE(!string_ptr_eq(str, values[indices[i]]));
   }
-  DEBUG_PRINTF("Testing btree deletion\n");
+  DEBUG_PRINTF("Testing btree deletion\n");  
   for(i=0;i<n;i++){
-    WARN_ON_ONCE(check_tree(tree) < 0);
-    btree_delete(tree, hashes[indices[i]]);
+    uint64_t num_keys = count_num_keys(tree->root);
+    if(num_keys != (n-i)){
+      DEBUG_PRINTF("Tree has %lu keys, expected %lu\n",
+                   num_keys, n-i);
+      exit(1);
+    }
+    assert(check_tree(tree) >= 0);
+    if(btree_lookup(tree, hashes[indices[i]])){
+      if(!btree_delete(tree, hashes[indices[i]])){
+        exit(1);
+      }
+    } else {
+      DEBUG_PRINTF("Couldn't find key %lu\n",indices[i]);
+    }
   }
   WARN_ON(check_tree(tree) < 0);
   WARN_ON(tree->root->n_keys != 0);
