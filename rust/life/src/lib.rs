@@ -1,50 +1,79 @@
-#![feature(unique, alloc, heap_api)]
-use std::ptr::{Unique, self};
-use std::mem;
-use alloc::heap::EMPTY;
-impl<T> IndexMut<usize> for Unique<T> {
-    fn index_mut(self, index: usize){
-        self.offset(index)
+#![allow(dead_code, unused_parens)]
+#![feature(unique, alloc, heap_api, zero_one, pattern)]
+mod grid;
+mod ncurses;
+//mod sdl;
+mod util;//will move to its own crate eventually
+mod game {
+use grid::Grid;
+#[repr(C)]
+pub enum EdgeRules {
+    edge_dead,
+    edge_alive,
+    edge_wrap,
+    edge_grow,
+}
+pub struct LifeRules {
+    life_min: i32,
+    life_max: i32,
+    birth_min: i32,
+    birth_max: i32,
+    edge_rule: EdgeRules,
+}
+pub struct LifeGame {
+    pub grid: Grid<u8>,
+    pub grid_step: Grid<u8>,
+    pub rules: LifeRules,
+}
+impl LifeRules {
+    pub fn new(lmin: i32, lmax: i32, 
+               bmin: i32, bmax: i32, rule: EdgeRules ) -> Self {
+        LifeRules {life_min: lmin, life_max: lmax,
+                   birth_min: bmin, birth_max: bmax, edge_rule: rule}
     }
 }
-struct Grid {
-    mem: Unique<&u8>,
-    size: u64,//= to rows*cols
-    rows: u32,
-    cols: u32,
-}
-impl Grid {
-    fn new(rows: u32, cols: u32) -> Self {
-        let size: u64 = rows * cols;//total size might not fit in a u32
-        unsafe {
-            let align = mem::align_of::<&u8>;
-            let ptr = heap::allocate(size, align);
-            if ptr.is_null() {
-                exit(-1111);
+impl LifeGame {
+    pub fn new(rows: u32, cols: u32) -> Self {
+        LifeGame {grid: Grid::new(rows, cols), grid_step: Grid::new(rows, cols),
+                  rules: LifeRules::new(2, 3, 3, 3, EdgeRules::edge_wrap)}
+    }
+    pub fn rows(&self) -> u32 {
+        self.grid.rows
+    }
+    pub fn cols(&self) -> u32 {
+        self.grid.cols
+    }
+    //Currently this just assumes all cells on the edge are dead
+    fn count_neighbors(&self, x: u32, y: u32) -> i32 {
+        let cols = self.grid.cols;
+        let indices = [((y-1)*cols, x-1), ((y-1)*cols, x), ((y-1)*cols, x+1),
+                       (y*cols, x-1),     (y*cols, x+1),
+                       ((y+1)*cols, x-1), ((y+1)*cols, x), ((y+1)*cols, x+1)];
+        return indices.into_iter()
+                      .map(|x| self.grid.get(x.0, x.1))
+                      .fold(0, |acc, x| acc + x.unwrap_or(0) as i32);
+    }
+    pub fn step_world(&self) {
+        let (mut i,mut j) = (0u32,0u32);
+        while(i < self.grid.rows) {
+            while(j < self.grid.cols) {
+                let neighbors = self.count_neighbors(i,j);
+                let val = self.grid.read(i,j);
+                if(val == 1 &&
+                   neighbors < self.rules.life_min || 
+                   neighbors > self.rules.life_max){
+                    self.grid_step.write(0, i, j);
+                } else if(val ==  0 &&
+                          neighbors >= self.rules.birth_min &&
+                          neighbors <= self.rules.birth_max){
+                    self.grid_step.write(1, i, j);
+                } else {
+                    self.grid_step.write(val, i, j);
+                }
+                j += 1;
             }
-            write_bytes(ptr, 0, size);//zero memory
-            Grid {mem: Unique::new(ptr), size: size, rows: rows, cols: cols}
-        }
-    }
-    fn read(&self, x:u32, y:u32) -> Option<u8> {
-        let idx: u64 = (x * self.cols) + y;
-        if idx < self.size {
-            unsafe {Some(self.mem[idx])}
-        } else {
-            None
-        }
-    }
-    fn write(&self, val: u8, x:u32, y:u32) {
-        let idx: u64 = (x * self.cols) + y;
-        if idx < self.size {
-            unsafe {self.mem[idx] = val}
+            i += 1;
         }
     }
 }
-// struct LifeGrid {
-//     grid: &Grid,
-//     grid_step: &Grid
-// };
-
-// impl LifeGrid {
-//     fn new(rows: i32, cols: i32){
+}

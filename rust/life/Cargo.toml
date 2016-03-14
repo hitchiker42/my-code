@@ -4,4 +4,8 @@ version = "0.1.0"
 authors = ["Tucker DiNapoli <t.dinapoli42@gmail.com>"]
 
 [dependencies]
-#sdl2="*"
+libc="0.2.8"
+sdl2="*"
+rand="*"
+ncurses="*"
+gl="*"
