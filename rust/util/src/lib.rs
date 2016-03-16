@@ -1,3 +1,5 @@
+#[crate_type = "lib"]
+#[crate_name = "util"]
 #![allow(dead_code, unused_parens, non_camel_case_types)]
 extern crate libc;
 //use std;

@@ -1,10 +1,12 @@
 #![allow(dead_code, unused_parens)]
 #![feature(unique, alloc, heap_api, zero_one)]
-extern crate util;//will move to its own crate eventually
+#[macro_use]
+extern crate util;
 mod grid;
 pub mod ncurses;
 //mod sdl;
 pub mod game {
+use util::debug::*;
 use grid::Grid;
 #[repr(C)]
 pub enum EdgeRules {
@@ -77,6 +79,7 @@ impl LifeGame {
         self.grid.swap(&self.grid_step);
     }
 }
+
 /// Runs the game without displaying the grid
 /// prints information useful for debugging
 pub fn debug() -> ! {

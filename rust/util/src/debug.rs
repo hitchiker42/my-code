@@ -16,3 +16,10 @@ macro_rules! here {
                format!($($arg)*))
     }
 }
+#[macro_export]
+macro_rules! debug_fmt {
+    ($($arg :tt)*) => {
+        #[cfg(debug_assertions)]
+        write!(io::stderr(), format!($($arg)*))
+    }
+
