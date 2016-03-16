@@ -1,6 +1,9 @@
 extern crate ncurses as ncurses_lib;
 use self::ncurses_lib::*;
 use game::*;
+use util::time;
+use util::c::libc;
+use std::mem;
 //mod game;
 static mut term_rows: i32 = 24;
 static mut term_cols: i32 = 80;
@@ -24,11 +27,21 @@ pub fn draw(game: &LifeGame, win: WINDOW){
     }
     wrefresh(win);
 }
-pub fn run(game: &LifeGame, win_opt: Option<WINDOW>){
+pub fn run_life(game: &LifeGame, win_opt: Option<WINDOW>) -> ! {
     let win = win_opt.unwrap_or(stdscr);
     nodelay(win, true);
     curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
     loop {
-//        thread::sleep(
+        time::float_sleep(0.2);
+        draw(game, win);
+        game.step_world();
     }
 }
+pub fn main() -> ! {
+    init();
+    let game = unsafe { LifeGame::new(term_rows as u32, term_cols as u32) };
+    game.grid.randomize();
+//    unsafe { libc::atexit(mem::transmute(ncurses_lib::ll::endwin)) };
+    run_life(&game, None);
+}
+    

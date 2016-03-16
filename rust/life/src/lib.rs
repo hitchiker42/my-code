@@ -1,10 +1,10 @@
 #![allow(dead_code, unused_parens)]
-#![feature(unique, alloc, heap_api, zero_one, pattern)]
+#![feature(unique, alloc, heap_api, zero_one)]
+extern crate util;//will move to its own crate eventually
 mod grid;
-mod ncurses;
+pub mod ncurses;
 //mod sdl;
-mod util;//will move to its own crate eventually
-mod game {
+pub mod game {
 use grid::Grid;
 #[repr(C)]
 pub enum EdgeRules {
@@ -54,9 +54,9 @@ impl LifeGame {
                       .fold(0, |acc, x| acc + x.unwrap_or(0) as i32);
     }
     pub fn step_world(&self) {
-        let (mut i,mut j) = (0u32,0u32);
-        while(i < self.grid.rows) {
-            while(j < self.grid.cols) {
+        let (mut i,mut j) = (1u32,1u32);
+        while(i < (self.grid.rows-1)) {
+            while(j < (self.grid.cols-1)) {
                 let neighbors = self.count_neighbors(i,j);
                 let val = self.grid.read(i,j);
                 if(val == 1 &&
@@ -74,6 +74,10 @@ impl LifeGame {
             }
             i += 1;
         }
+        self.grid.swap(&self.grid_step);
     }
 }
+/// Runs the game without displaying the grid
+/// prints information useful for debugging
+pub fn debug() -> ! {
 }
