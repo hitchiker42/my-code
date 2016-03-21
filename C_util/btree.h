@@ -57,19 +57,18 @@ struct btree {
 
 #define bptree_min_degree (PAGE_SIZE/32)
 struct bptree_node {
-  uint64_t n_keys;
+  size_t n_keys;
+  size_t page_no;
   uint64_t parent_leaf;
   uint64_t keys[(2*bptree_min_degree)-1];
   union {
+    //may need to treat these as integers not pointers
     bptree_node *children[2*bptree_min_degree];//internal node
     struct {//leaf node
       void *values[(2*bptree_min_degree)-1];
       bptree_node *next;//pointer to next leaf node
     };
   };
-};
-struct bptree {
-  bptree_node *root;
 };
 /*
   For now I'm only doing insertion, lookup and deletion.
@@ -79,27 +78,6 @@ btree* make_btree(void);
 void btree_insert(btree *tree, uint64_t key, void *value);
 void *btree_lookup(btree *tree, uint64_t key);
 void *btree_delete(btree *tree, uint64_t key);
-
-/*
-void *bptree_find_add_hv(bptree *tree, uint64_t hv, void *value);
-static void *bptree_find_add(bptree *tree, uint8_t *key, 
-                            size_t key_sz, void *value){
-  uint64_t hv = bptree_hash(key, key_sz);
-  return bptree_find_add_hv(tree, hv, value);
-}
-
-void *bptree_lookup_hv(bptree *tree, uint64_t hv);
-static void *bptree_lookup(bptree *tree, uint8_t *key, size_t key_sz){
-  uint64_t hv = bptree_hash(key, key_sz);
-  return bptree_lookup_hv(tree, hv);
-}
-
-void *bptree_delete_hv(bptree *tree, uint64_t hv);
-void *bptree_delete(bptree *tree, uint8_t *key, size_t key_sz){
-  uint64_t hv = bptree_hash(key, key_sz);
-  return bptree_delete_hv(tree, hv);
-}
-*/
 #ifdef __cplusplus
 }
 #endif

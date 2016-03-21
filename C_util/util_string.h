@@ -46,6 +46,11 @@ struct string {
   };
 };
 
+#define STRING_FMT(s) (int)s.len, s.str
+//make a string from a c string literal
+#define make_string_lit(s)                      \
+  ({string ret = {.str = s, .sz = sizeof(s)-1}; \
+    ret;})
 static string make_string(uint8_t *str, int len){
   string ret = {.mem = str, .sz = len};
   return ret;
@@ -147,7 +152,40 @@ static int string_search(string a, string b){
   }
   return -1;
 }
-  
+uint8_t *boyer_moore(uint8_t *str, uint32_t len,
+                     uint8_t *pat, uint32_t patlen);
+uint8_t **boyer_moore_all(uint8_t *str, uint32_t len,
+                          uint8_t *pat, uint32_t patlen, int *n_matches);
+static int boyer_moore_string(string str, string pat){
+  uint8_t *match = boyer_moore(str.mem, str.len, pat.mem, pat.len);
+  if(!match){
+    return -1;
+  } else {
+    return (int)(match - str.mem);
+  }
+}
+/*
+  Seperate 'input' into tokens using the set of bytes in 'delim' to delimit
+  the tokens.
+
+  The tokens and size arguments work similarly to the 'getline' function.
+  If tokens is NULL and *size is 0, a buffer is allocated and stored in
+  *tokens and *size is set to its size. If tokens is not NULL *size
+  is taken to be its size and if necessary it will be reallocated
+  (and size updated to reflect the new size).
+
+  Returns the number of tokens parsed (aka the number of elements stored in tokens).
+
+  The values stored in tokens point into the input string, so it should not be
+  modified.
+*/
+int tokenize(string input, string delim,
+             string **tokens, int *size);
+//convience function to tokenize a whitespace delimited string
+static inline int tokenize_ws(string input, string **tokens, int *size){
+  string ws_str = make_string_lit(" \n\t");
+  return tokenize(input, ws_str, tokens, size);
+}
 /*
   Create an optionally null terminated copy of str on the stack
 */

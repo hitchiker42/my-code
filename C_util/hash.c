@@ -6,6 +6,9 @@
 
   Most write operations on the hash table can be done atomically using
   cmpxchg, only a rehash requires fully locking the table.
+
+  TODO: Refactor, there is a lot of similar code for looking up entries
+  and such that could be consolidated.
 */
 
 typedef struct hashtable htable;
@@ -432,6 +435,28 @@ void* hashtable_find(htable *ht, void *key, size_t key_sz){
   return NULL;
 }
 
+int hashtable_exists(htable *ht, void *key, size_t key_sz){
+  uint64_t hv = ht->hash(key, key_sz);
+  uint32_t index = hv % ht->size;
+  inc_hashtable_threadcount(ht);
+  /*
+    bucket = head of linked list, entry = current entry
+   */
+  hentry *entry, *bucket;
+  bucket = ht->table[index];
+  entry = bucket;
+  while(entry){
+    if(entry->hv == hv){
+      if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
+        void *retval = atomic_load(&entry->value);
+        atomic_dec(&ht->num_threads_using);
+        return 1;
+      }
+    }
+    entry = entry->next;
+  }
+  return 0;
+}
 void *hashtable_remove(htable *ht, void *key, size_t key_sz){
   void *ret = NULL;
   inc_hashtable_threadcount(ht);
@@ -489,17 +514,33 @@ void *hashtable_remove(htable *ht, void *key, size_t key_sz){
   return ret;
 #endif
 }
-void hashtable_iter(struct hashtable *ht, void(*fun)(void*,size_t,void*)){
+#define HTABLE_ITERATE(ht, body)                \
+  ({int i;                                      \
+    hentry *entry;                              \
+    for(i=0;i<ht->size;i++){                    \
+      entry = ht->table[i];                     \
+      while(entry){                             \
+        body;                                   \
+        entry = entry->next;                    \
+      }                                         \
+    };})
+void hashtable_iter(struct hashtable *ht, 
+                    void(*fun)(void*,size_t,void*,void*), void *userdata){
   inc_hashtable_threadcount(ht);
-  int i;
-  hentry *entry;
-  for(i=0;i<ht->size;i++){
-    entry = ht->table[i];
-    while(entry){
-      fun(entry->key, entry->key_sz, entry->value);
-      entry = entry->next;
-    }
-  }
+  HTABLE_ITERATE(ht, fun(entry->key, entry->key_sz, entry->value, userdata));
+  atomic_dec(&ht->num_threads_using);
+}
+void keys_iter(struct hashtable *ht,
+               void(*fun)(void*,size_t,void*), void *userdata){
+  inc_hashtable_threadcount(ht);
+  HTABLE_ITERATE(ht, fun(entry->key, entry->key_sz, userdata));
+  atomic_dec(&ht->num_threads_using);
+}
+void values_iter(struct hashtable *ht,
+               void(*fun)(void*, void*), void *userdata){
+  inc_hashtable_threadcount(ht);
+  HTABLE_ITERATE(ht, fun(entry->value, userdata));
+  atomic_dec(&ht->num_threads_using);
 }
 void hashtable_bucket_counts(struct hashtable *ht, FILE* out){
   inc_hashtable_threadcount(ht);
@@ -524,6 +565,7 @@ void hashtable_bucket_counts(struct hashtable *ht, FILE* out){
   start using the table after it has been called.
 */
 void destroy_hashtable(struct hashtable *ht){
+  if(!ht){return;}
 #ifdef ATOMIC_HASHTABLE
   if(atomic_load(&ht->rehash_pending)){
     sem_wait(&ht->sem);

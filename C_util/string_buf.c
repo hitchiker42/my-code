@@ -63,7 +63,7 @@ void string_buf_flush(string_buf *buf){
   if(buf->buf == buf->bufptr){
     return;
   } else {
-    string_buf_flush_force(buf);
+    string_buf_force_flush(buf);
   }
 }
 /*
@@ -96,7 +96,7 @@ void string_buf_append_strn_copy(string_buf *buf,
   user to manually specify the length, but formatted output is 
   going to be slow no matter what so we may as well be safe.
 */
-void string_buf_vsprintf(string_buf *buf, const char *fmt, va_list ap){
+void string_buf_vsnprintf(string_buf *buf, const char *fmt, va_list ap){
   va_list ap2;
   va_copy(ap2, ap);
   int nbytes = vsnprintf(NULL, 0, fmt, ap2);
@@ -108,7 +108,7 @@ void string_buf_vsprintf(string_buf *buf, const char *fmt, va_list ap){
     if((nbytes+1) > ((STRING_BUF_SIZE - (buf->bufptr - buf->buf)))){
       string_buf_flush(buf);
     }
-    vsnprintf(buf->bufptr, nbytes+1, fmt, ap);
+    vsnprintf((char*)buf->bufptr, nbytes+1, fmt, ap);
     buf->bufptr += nbytes;
     return;
   } else {
@@ -139,9 +139,9 @@ string string_buf_to_string(string_buf *buf){
   //  buf->bufptr = buf->buf;
   if(buf->segments_start == NULL){
     //if we never flushed the buffer this is much easier
-    char *mem = xmalloc(buflen);
+    uint8_t *mem = xmalloc(buflen);
     memcpy(mem, buf->buf, buflen);
-    return make_string(mem, buflen, 0);
+    return make_string(mem, buflen);
   } else {
     uint32_t len = buflen + buf->total_len;
     char *str_mem = xmalloc(len*sizeof(char));
@@ -156,7 +156,7 @@ string string_buf_to_string(string_buf *buf){
       free(tmp);
     } while(segment != NULL);
     memcpy(strptr, buf->buf, buflen);
-    return make_string(str_mem, len);
+    return make_string((uint8_t*)str_mem, len);
   }
 }
 string *string_buf_to_string_ptr(string_buf *buf){

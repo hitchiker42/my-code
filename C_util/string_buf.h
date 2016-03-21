@@ -1,7 +1,7 @@
 #ifndef _STRING_BUF_H
 #define _STRING_BUF_H
 #include "C_util.h"
-#include "string.h"
+#include "util_string.h"
 /*
 
   There are a few major functions of string buffers:
@@ -38,7 +38,7 @@ struct string_buf {
   if you want, but if you need to you're probably using them wrong.
 */
 #define make_string_buf()                               \
-  ({sl_string_buf *buf = alloca(sizeof(sl_string_buf)); \
+  ({string_buf *buf = alloca(sizeof(string_buf)); \
     string_buf_init(buf);                               \
     buf;})
 #define string_buf_alloca() make_string_buf()
@@ -77,6 +77,10 @@ static inline void string_buf_append_char(string_buf *buf, char c){
 static inline void string_buf_append_cstr(string_buf *buf, char *str){
   string_buf_append_strn(buf, str, strlen(str));
 }
+static inline void string_buf_append_cstrn(string_buf *buf, 
+                                           char *str, uint32_t n){
+  string_buf_append_strn(buf, str, n);
+}
 static inline void string_buf_append_cstr_copy(string_buf *buf, char *str){
   string_buf_append_strn_copy(buf, str, strlen(str));
 }
@@ -85,16 +89,16 @@ static inline void string_buf_append_cstrn_copy(string_buf *buf,
   string_buf_append_strn_copy(buf, str, n);
 }
 static inline void string_buf_append_string(string_buf *buf, string str){
-  string_buf_append_strn(buf, str.mem, str.sz);
+  string_buf_append_strn(buf, str.str, str.sz);
 }
 
 static inline void string_buf_append_string_copy(string_buf *buf, string str){
-  string_buf_append_strn_copy(buf, str.mem, str.sz);
+  string_buf_append_strn_copy(buf, str.str, str.sz);
 }
 static inline char string_buf_unread_char(string_buf *buf){
   //assumes that the last thing appended to buf was a single character
   //If this is not the case it results in undefined behavior
-  return buf->bufptr--;
+  return *buf->bufptr--;
 }
 //needs to be a macro for sizeof to work
 #define string_buf_append_string_literal(buf, str)      \

@@ -307,7 +307,7 @@ uint32_t memspn_table(const uint8_t *str, uint32_t len,
                       const uint8_t accept[256]){
   unsigned int i=0;
   //this is for speed, but I'm not sure how much it's worth it
-  while(i+4 < len){
+  while(i+4 <= len){
     if(!accept[str[i]]){return i;}
     if(!accept[str[i+1]]){return i+1;}
     if(!accept[str[i+2]]){return i+2;}
@@ -324,7 +324,7 @@ uint32_t memspn_table(const uint8_t *str, uint32_t len,
 uint32_t memcspn_table(const uint8_t *str, uint32_t len,
                        const uint8_t reject[256]){
   unsigned int i=0;
-  while(i+4 < len){
+  while(i+4 <= len){
     if(reject[str[i]]){return i;}
     if(reject[str[i+1]]){return i+1;}
     if(reject[str[i+2]]){return i+2;}
@@ -517,16 +517,16 @@ void float_sleep_full(double sleep_time){
 */
 static util_rand_state internal_rand_state;
 //The version we use is called xorshift+
-uint64_t util_rand_r(util_rand_state state){
-  uint64_t x = state.state[0];
-  const uint64_t y = state.state[1];
-  state.state[0] = y;
+uint64_t util_rand_r(util_rand_state *state){
+  uint64_t x = state->state[0];
+  const uint64_t y = state->state[1];
+  state->state[0] = y;
   x ^= x << 23;
-  state.state[1] = (x ^ y) ^ (x >> 17) ^ (y >> 26);
-  return state.state[1] + y;
+  state->state[1] = (x ^ y) ^ (x >> 17) ^ (y >> 26);
+  return state->state[1] + y;
 }
 uint64_t util_rand(){
-  return util_rand_r(internal_rand_state);
+  return util_rand_r(&internal_rand_state);
 }
 /*
   There's an obvious way to do this (util_rand() % (max-min) + min), and
@@ -539,7 +539,7 @@ uint64_t util_rand(){
   we generate will work, and in the worst case we still have a 50% chance
   of getting a number on the first try;
 */
-int64_t util_rand_range_r(int64_t min, int64_t max, util_rand_state state){
+int64_t util_rand_range_r(int64_t min, int64_t max, util_rand_state *state){
   if(min > max){
     errno = ERANGE;
     return 0;
@@ -554,23 +554,23 @@ int64_t util_rand_range_r(int64_t min, int64_t max, util_rand_state state){
   return ((r % true_max) + min);
 }  
 int64_t util_rand_range(int64_t min, int64_t max){
-  return util_rand_range_r(min, max, internal_rand_state);
+  return util_rand_range_r(min, max, &internal_rand_state);
 }  
 //This is 2^-64
 static const double int_to_float_multiplier =  (1.0/18446744073709551616.0);
-double util_drand_r(util_rand_state state){
+double util_drand_r(util_rand_state *state){
   return util_rand_r(state)*int_to_float_multiplier;
 }
 double util_drand(void){
-  return util_drand_r(internal_rand_state);
+  return util_drand_r(&internal_rand_state);
 }
 util_rand_state util_get_rand_state(void){
   util_rand_state ret = internal_rand_state;
   return ret;
 }
-util_rand_state util_set_rand_state(util_rand_state state){
+util_rand_state util_set_rand_state(util_rand_state *state){
   util_rand_state ret = internal_rand_state;
-  internal_rand_state = state;
+  internal_rand_state = *state;
   return ret;
 }
 util_rand_state util_auto_rand_state(void){
@@ -614,7 +614,7 @@ void shuffle_array(void **arr, size_t n){
   util_rand_state state = util_get_rand_state();
   size_t i;
   for(i=0;i<n-1;i++){
-    size_t j = util_rand_range_r(0, n-i, state);
+    size_t j = util_rand_range_r(0, n-i, &state);
     SWAP(arr[i], arr[i+j]);
   }
 }

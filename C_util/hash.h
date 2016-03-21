@@ -103,6 +103,15 @@ static void* hashtable_find_string(struct hashtable *ht, char *str){
   return hashtable_find(ht, str, strlen(str));
 }
 /*
+  Similar to hashtable_find, but mearly checks for existance, resolves
+  the ambiguity of a NULL return from hashtable_find. For an atomic hashtable
+  the return value may not be accurate.
+*/
+int hashtable_exists(struct hashtable *ht, void *key, size_t sz);
+static int hashtable_exists_string(struct hashtable *ht, char *str){
+  return hashtable_exists(ht, str, strlen(str));
+}
+/*
   Call the provided function on every key/value pair in the hashtable ht.
   The key shouldn't be modified, and any changes to the value (assuming
   it's actually a pointer) will modify the value in the table, so be
@@ -113,8 +122,17 @@ static void* hashtable_find_string(struct hashtable *ht, char *str){
   to wait for all threads to finish using the table, since this function is
   O(N) whereas all the others are O(1) it could cause a lot of wasted cycles.
   It will still work, but it'll be awful for performance
+
+  fun has the prototype: 
+    void fun(void *key, size_t key_sz, void *value, void *userdata);
 */
-void hashtable_iter(struct hashtable *ht, void(*fun)(void*,size_t,void*));
+void hashtable_iter(struct hashtable *ht, 
+                    void(*fun)(void*,size_t,void*,void*), void *userdata);
+//These work the way you'd expect
+void keys_iter(struct hashtable *ht,
+               void(*fun)(void*,size_t,void*), void *userdata);
+void values_iter(struct hashtable *ht,
+               void(*fun)(void*, void*), void *userdata);
 /*
   Print the number of entries in each bucket in ht to out.
   Useful for profiling hash functions.

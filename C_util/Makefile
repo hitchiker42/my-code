@@ -15,6 +15,7 @@
 
 
 
+
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
     false; \
@@ -89,7 +90,7 @@ POST_UNINSTALL = :
 build_triplet = x86_64-unknown-linux-gnu
 host_triplet = x86_64-unknown-linux-gnu
 check_PROGRAMS = test/test_sort$(EXEEXT) test/test_hash$(EXEEXT) \
-	test/test_rbtree$(EXEEXT)
+	test/test_rbtree$(EXEEXT) test/test_btree$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -99,7 +100,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
-	$(am__configure_deps) $(am__DIST_COMMON)
+	$(am__configure_deps) $(include_HEADERS) $(am__DIST_COMMON)
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
@@ -133,25 +134,32 @@ am__uninstall_files_from_dir = { \
     || { echo " ( cd '$$dir' && rm -f" $$files ")"; \
          $(am__cd) "$$dir" && rm -f $$files; }; \
   }
-am__installdirs = "$(DESTDIR)$(libdir)"
+am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libcutil_la_LIBADD =
-am_libcutil_la_OBJECTS = C_util.lo svector.lo sorting.lo heap.lo \
-	utf8.lo hash.lo rbtree.lo
+am__objects_1 = libcutil_la-C_util.lo libcutil_la-svector.lo \
+	libcutil_la-sorting.lo libcutil_la-heap.lo libcutil_la-utf8.lo \
+	libcutil_la-hash.lo libcutil_la-rbtree.lo libcutil_la-btree.lo \
+	libcutil_la-string_buf.lo libcutil_la-util_string.lo
+am_libcutil_la_OBJECTS = $(am__objects_1)
 libcutil_la_OBJECTS = $(am_libcutil_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
 am__v_lt_ = $(am__v_lt_$(AM_DEFAULT_VERBOSITY))
 am__v_lt_0 = --silent
 am__v_lt_1 = 
-test_test_hash_SOURCES = test/test_hash.c
+test_test_btree_SOURCES = test/test_btree.c
 am__dirstamp = $(am__leading_dot)dirstamp
-test_test_hash_OBJECTS = test/test_hash.$(OBJEXT)
+test_test_btree_OBJECTS = test/test_test_btree-test_btree.$(OBJEXT)
+test_test_btree_DEPENDENCIES = libcutil.la
+test_test_hash_SOURCES = test/test_hash.c
+test_test_hash_OBJECTS = test/test_test_hash-test_hash.$(OBJEXT)
 test_test_hash_DEPENDENCIES = libcutil.la
 test_test_rbtree_SOURCES = test/test_rbtree.c
-test_test_rbtree_OBJECTS = test/test_rbtree.$(OBJEXT)
+test_test_rbtree_OBJECTS =  \
+	test/test_test_rbtree-test_rbtree.$(OBJEXT)
 test_test_rbtree_DEPENDENCIES = libcutil.la
 test_test_sort_SOURCES = test/test_sort.c
-test_test_sort_OBJECTS = test/test_sort.$(OBJEXT)
+test_test_sort_OBJECTS = test/test_test_sort-test_sort.$(OBJEXT)
 test_test_sort_DEPENDENCIES = libcutil.la
 AM_V_P = $(am__v_P_$(V))
 am__v_P_ = $(am__v_P_$(AM_DEFAULT_VERBOSITY))
@@ -187,15 +195,16 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libcutil_la_SOURCES) test/test_hash.c test/test_rbtree.c \
-	test/test_sort.c
-DIST_SOURCES = $(libcutil_la_SOURCES) test/test_hash.c \
+SOURCES = $(libcutil_la_SOURCES) test/test_btree.c test/test_hash.c \
 	test/test_rbtree.c test/test_sort.c
+DIST_SOURCES = $(libcutil_la_SOURCES) test/test_btree.c \
+	test/test_hash.c test/test_rbtree.c test/test_sort.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
+HEADERS = $(include_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) \
 	$(LISP)config.h.in
 # Read a list of newline-separated strings from the standard input,
@@ -366,11 +375,23 @@ top_build_prefix =
 top_builddir = .
 top_srcdir = .
 AM_CPPFLAGS = -O2 -g $(CFLAGS_EXTRA) -std=gnu11 -Wall -Wno-unused
+SOURCE_FILES = C_util.c svector.c sorting.c heap.c utf8.c hash.c \
+		rbtree.c btree.c string_buf.c util_string.c
+
+HEADER_FILES = C_util.h debug.h svector.h hash.h string_buf.h util_string.h
 lib_LTLIBRARIES = libcutil.la
-libcutil_la_SOURCES = C_util.c svector.c sorting.c heap.c utf8.c hash.c rbtree.c
+libcutil_la_SOURCES = $(SOURCE_FILES)
+libcutil_la_CPPFLAGS = $(AM_CPPFLAGS) -D__LIBCUTIL__
+include_HEADERS = $(HEADER_FILES)
+# There has got to be a better way to do this
 test_test_sort_LDADD = libcutil.la
+test_test_sort_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3
 test_test_hash_LDADD = libcutil.la
+test_test_hash_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3
 test_test_rbtree_LDADD = libcutil.la
+test_test_rbtree_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3
+test_test_btree_LDADD = libcutil.la
+test_test_btree_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3 
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -477,19 +498,25 @@ test/$(am__dirstamp):
 test/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) test/$(DEPDIR)
 	@: > test/$(DEPDIR)/$(am__dirstamp)
-test/test_hash.$(OBJEXT): test/$(am__dirstamp) \
+test/test_test_btree-test_btree.$(OBJEXT): test/$(am__dirstamp) \
+	test/$(DEPDIR)/$(am__dirstamp)
+
+test/test_btree$(EXEEXT): $(test_test_btree_OBJECTS) $(test_test_btree_DEPENDENCIES) $(EXTRA_test_test_btree_DEPENDENCIES) test/$(am__dirstamp)
+	@rm -f test/test_btree$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_test_btree_OBJECTS) $(test_test_btree_LDADD) $(LIBS)
+test/test_test_hash-test_hash.$(OBJEXT): test/$(am__dirstamp) \
 	test/$(DEPDIR)/$(am__dirstamp)
 
 test/test_hash$(EXEEXT): $(test_test_hash_OBJECTS) $(test_test_hash_DEPENDENCIES) $(EXTRA_test_test_hash_DEPENDENCIES) test/$(am__dirstamp)
 	@rm -f test/test_hash$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_test_hash_OBJECTS) $(test_test_hash_LDADD) $(LIBS)
-test/test_rbtree.$(OBJEXT): test/$(am__dirstamp) \
+test/test_test_rbtree-test_rbtree.$(OBJEXT): test/$(am__dirstamp) \
 	test/$(DEPDIR)/$(am__dirstamp)
 
 test/test_rbtree$(EXEEXT): $(test_test_rbtree_OBJECTS) $(test_test_rbtree_DEPENDENCIES) $(EXTRA_test_test_rbtree_DEPENDENCIES) test/$(am__dirstamp)
 	@rm -f test/test_rbtree$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_test_rbtree_OBJECTS) $(test_test_rbtree_LDADD) $(LIBS)
-test/test_sort.$(OBJEXT): test/$(am__dirstamp) \
+test/test_test_sort-test_sort.$(OBJEXT): test/$(am__dirstamp) \
 	test/$(DEPDIR)/$(am__dirstamp)
 
 test/test_sort$(EXEEXT): $(test_test_sort_OBJECTS) $(test_test_sort_DEPENDENCIES) $(EXTRA_test_test_sort_DEPENDENCIES) test/$(am__dirstamp)
@@ -503,16 +530,20 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-include ./$(DEPDIR)/C_util.Plo
-include ./$(DEPDIR)/hash.Plo
-include ./$(DEPDIR)/heap.Plo
-include ./$(DEPDIR)/rbtree.Plo
-include ./$(DEPDIR)/sorting.Plo
-include ./$(DEPDIR)/svector.Plo
-include ./$(DEPDIR)/utf8.Plo
-include test/$(DEPDIR)/test_hash.Po
-include test/$(DEPDIR)/test_rbtree.Po
-include test/$(DEPDIR)/test_sort.Po
+include ./$(DEPDIR)/libcutil_la-C_util.Plo
+include ./$(DEPDIR)/libcutil_la-btree.Plo
+include ./$(DEPDIR)/libcutil_la-hash.Plo
+include ./$(DEPDIR)/libcutil_la-heap.Plo
+include ./$(DEPDIR)/libcutil_la-rbtree.Plo
+include ./$(DEPDIR)/libcutil_la-sorting.Plo
+include ./$(DEPDIR)/libcutil_la-string_buf.Plo
+include ./$(DEPDIR)/libcutil_la-svector.Plo
+include ./$(DEPDIR)/libcutil_la-utf8.Plo
+include ./$(DEPDIR)/libcutil_la-util_string.Plo
+include test/$(DEPDIR)/test_test_btree-test_btree.Po
+include test/$(DEPDIR)/test_test_hash-test_hash.Po
+include test/$(DEPDIR)/test_test_rbtree-test_rbtree.Po
+include test/$(DEPDIR)/test_test_sort-test_sort.Po
 
 .c.o:
 	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -538,6 +569,132 @@ include test/$(DEPDIR)/test_sort.Po
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LTCOMPILE) -c -o $@ $<
 
+libcutil_la-C_util.lo: C_util.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-C_util.lo -MD -MP -MF $(DEPDIR)/libcutil_la-C_util.Tpo -c -o libcutil_la-C_util.lo `test -f 'C_util.c' || echo '$(srcdir)/'`C_util.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-C_util.Tpo $(DEPDIR)/libcutil_la-C_util.Plo
+#	$(AM_V_CC)source='C_util.c' object='libcutil_la-C_util.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-C_util.lo `test -f 'C_util.c' || echo '$(srcdir)/'`C_util.c
+
+libcutil_la-svector.lo: svector.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-svector.lo -MD -MP -MF $(DEPDIR)/libcutil_la-svector.Tpo -c -o libcutil_la-svector.lo `test -f 'svector.c' || echo '$(srcdir)/'`svector.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-svector.Tpo $(DEPDIR)/libcutil_la-svector.Plo
+#	$(AM_V_CC)source='svector.c' object='libcutil_la-svector.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-svector.lo `test -f 'svector.c' || echo '$(srcdir)/'`svector.c
+
+libcutil_la-sorting.lo: sorting.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-sorting.lo -MD -MP -MF $(DEPDIR)/libcutil_la-sorting.Tpo -c -o libcutil_la-sorting.lo `test -f 'sorting.c' || echo '$(srcdir)/'`sorting.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-sorting.Tpo $(DEPDIR)/libcutil_la-sorting.Plo
+#	$(AM_V_CC)source='sorting.c' object='libcutil_la-sorting.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-sorting.lo `test -f 'sorting.c' || echo '$(srcdir)/'`sorting.c
+
+libcutil_la-heap.lo: heap.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-heap.lo -MD -MP -MF $(DEPDIR)/libcutil_la-heap.Tpo -c -o libcutil_la-heap.lo `test -f 'heap.c' || echo '$(srcdir)/'`heap.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-heap.Tpo $(DEPDIR)/libcutil_la-heap.Plo
+#	$(AM_V_CC)source='heap.c' object='libcutil_la-heap.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-heap.lo `test -f 'heap.c' || echo '$(srcdir)/'`heap.c
+
+libcutil_la-utf8.lo: utf8.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-utf8.lo -MD -MP -MF $(DEPDIR)/libcutil_la-utf8.Tpo -c -o libcutil_la-utf8.lo `test -f 'utf8.c' || echo '$(srcdir)/'`utf8.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-utf8.Tpo $(DEPDIR)/libcutil_la-utf8.Plo
+#	$(AM_V_CC)source='utf8.c' object='libcutil_la-utf8.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-utf8.lo `test -f 'utf8.c' || echo '$(srcdir)/'`utf8.c
+
+libcutil_la-hash.lo: hash.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-hash.lo -MD -MP -MF $(DEPDIR)/libcutil_la-hash.Tpo -c -o libcutil_la-hash.lo `test -f 'hash.c' || echo '$(srcdir)/'`hash.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-hash.Tpo $(DEPDIR)/libcutil_la-hash.Plo
+#	$(AM_V_CC)source='hash.c' object='libcutil_la-hash.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-hash.lo `test -f 'hash.c' || echo '$(srcdir)/'`hash.c
+
+libcutil_la-rbtree.lo: rbtree.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-rbtree.lo -MD -MP -MF $(DEPDIR)/libcutil_la-rbtree.Tpo -c -o libcutil_la-rbtree.lo `test -f 'rbtree.c' || echo '$(srcdir)/'`rbtree.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-rbtree.Tpo $(DEPDIR)/libcutil_la-rbtree.Plo
+#	$(AM_V_CC)source='rbtree.c' object='libcutil_la-rbtree.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-rbtree.lo `test -f 'rbtree.c' || echo '$(srcdir)/'`rbtree.c
+
+libcutil_la-btree.lo: btree.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-btree.lo -MD -MP -MF $(DEPDIR)/libcutil_la-btree.Tpo -c -o libcutil_la-btree.lo `test -f 'btree.c' || echo '$(srcdir)/'`btree.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-btree.Tpo $(DEPDIR)/libcutil_la-btree.Plo
+#	$(AM_V_CC)source='btree.c' object='libcutil_la-btree.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-btree.lo `test -f 'btree.c' || echo '$(srcdir)/'`btree.c
+
+libcutil_la-string_buf.lo: string_buf.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-string_buf.lo -MD -MP -MF $(DEPDIR)/libcutil_la-string_buf.Tpo -c -o libcutil_la-string_buf.lo `test -f 'string_buf.c' || echo '$(srcdir)/'`string_buf.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-string_buf.Tpo $(DEPDIR)/libcutil_la-string_buf.Plo
+#	$(AM_V_CC)source='string_buf.c' object='libcutil_la-string_buf.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-string_buf.lo `test -f 'string_buf.c' || echo '$(srcdir)/'`string_buf.c
+
+libcutil_la-util_string.lo: util_string.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-util_string.lo -MD -MP -MF $(DEPDIR)/libcutil_la-util_string.Tpo -c -o libcutil_la-util_string.lo `test -f 'util_string.c' || echo '$(srcdir)/'`util_string.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-util_string.Tpo $(DEPDIR)/libcutil_la-util_string.Plo
+#	$(AM_V_CC)source='util_string.c' object='libcutil_la-util_string.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-util_string.lo `test -f 'util_string.c' || echo '$(srcdir)/'`util_string.c
+
+test/test_test_btree-test_btree.o: test/test_btree.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_btree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_btree-test_btree.o -MD -MP -MF test/$(DEPDIR)/test_test_btree-test_btree.Tpo -c -o test/test_test_btree-test_btree.o `test -f 'test/test_btree.c' || echo '$(srcdir)/'`test/test_btree.c
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_btree-test_btree.Tpo test/$(DEPDIR)/test_test_btree-test_btree.Po
+#	$(AM_V_CC)source='test/test_btree.c' object='test/test_test_btree-test_btree.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_btree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_btree-test_btree.o `test -f 'test/test_btree.c' || echo '$(srcdir)/'`test/test_btree.c
+
+test/test_test_btree-test_btree.obj: test/test_btree.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_btree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_btree-test_btree.obj -MD -MP -MF test/$(DEPDIR)/test_test_btree-test_btree.Tpo -c -o test/test_test_btree-test_btree.obj `if test -f 'test/test_btree.c'; then $(CYGPATH_W) 'test/test_btree.c'; else $(CYGPATH_W) '$(srcdir)/test/test_btree.c'; fi`
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_btree-test_btree.Tpo test/$(DEPDIR)/test_test_btree-test_btree.Po
+#	$(AM_V_CC)source='test/test_btree.c' object='test/test_test_btree-test_btree.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_btree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_btree-test_btree.obj `if test -f 'test/test_btree.c'; then $(CYGPATH_W) 'test/test_btree.c'; else $(CYGPATH_W) '$(srcdir)/test/test_btree.c'; fi`
+
+test/test_test_hash-test_hash.o: test/test_hash.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_hash_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_hash-test_hash.o -MD -MP -MF test/$(DEPDIR)/test_test_hash-test_hash.Tpo -c -o test/test_test_hash-test_hash.o `test -f 'test/test_hash.c' || echo '$(srcdir)/'`test/test_hash.c
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_hash-test_hash.Tpo test/$(DEPDIR)/test_test_hash-test_hash.Po
+#	$(AM_V_CC)source='test/test_hash.c' object='test/test_test_hash-test_hash.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_hash_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_hash-test_hash.o `test -f 'test/test_hash.c' || echo '$(srcdir)/'`test/test_hash.c
+
+test/test_test_hash-test_hash.obj: test/test_hash.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_hash_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_hash-test_hash.obj -MD -MP -MF test/$(DEPDIR)/test_test_hash-test_hash.Tpo -c -o test/test_test_hash-test_hash.obj `if test -f 'test/test_hash.c'; then $(CYGPATH_W) 'test/test_hash.c'; else $(CYGPATH_W) '$(srcdir)/test/test_hash.c'; fi`
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_hash-test_hash.Tpo test/$(DEPDIR)/test_test_hash-test_hash.Po
+#	$(AM_V_CC)source='test/test_hash.c' object='test/test_test_hash-test_hash.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_hash_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_hash-test_hash.obj `if test -f 'test/test_hash.c'; then $(CYGPATH_W) 'test/test_hash.c'; else $(CYGPATH_W) '$(srcdir)/test/test_hash.c'; fi`
+
+test/test_test_rbtree-test_rbtree.o: test/test_rbtree.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_rbtree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_rbtree-test_rbtree.o -MD -MP -MF test/$(DEPDIR)/test_test_rbtree-test_rbtree.Tpo -c -o test/test_test_rbtree-test_rbtree.o `test -f 'test/test_rbtree.c' || echo '$(srcdir)/'`test/test_rbtree.c
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_rbtree-test_rbtree.Tpo test/$(DEPDIR)/test_test_rbtree-test_rbtree.Po
+#	$(AM_V_CC)source='test/test_rbtree.c' object='test/test_test_rbtree-test_rbtree.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_rbtree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_rbtree-test_rbtree.o `test -f 'test/test_rbtree.c' || echo '$(srcdir)/'`test/test_rbtree.c
+
+test/test_test_rbtree-test_rbtree.obj: test/test_rbtree.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_rbtree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_rbtree-test_rbtree.obj -MD -MP -MF test/$(DEPDIR)/test_test_rbtree-test_rbtree.Tpo -c -o test/test_test_rbtree-test_rbtree.obj `if test -f 'test/test_rbtree.c'; then $(CYGPATH_W) 'test/test_rbtree.c'; else $(CYGPATH_W) '$(srcdir)/test/test_rbtree.c'; fi`
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_rbtree-test_rbtree.Tpo test/$(DEPDIR)/test_test_rbtree-test_rbtree.Po
+#	$(AM_V_CC)source='test/test_rbtree.c' object='test/test_test_rbtree-test_rbtree.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_rbtree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_rbtree-test_rbtree.obj `if test -f 'test/test_rbtree.c'; then $(CYGPATH_W) 'test/test_rbtree.c'; else $(CYGPATH_W) '$(srcdir)/test/test_rbtree.c'; fi`
+
+test/test_test_sort-test_sort.o: test/test_sort.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_sort_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_sort-test_sort.o -MD -MP -MF test/$(DEPDIR)/test_test_sort-test_sort.Tpo -c -o test/test_test_sort-test_sort.o `test -f 'test/test_sort.c' || echo '$(srcdir)/'`test/test_sort.c
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_sort-test_sort.Tpo test/$(DEPDIR)/test_test_sort-test_sort.Po
+#	$(AM_V_CC)source='test/test_sort.c' object='test/test_test_sort-test_sort.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_sort_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_sort-test_sort.o `test -f 'test/test_sort.c' || echo '$(srcdir)/'`test/test_sort.c
+
+test/test_test_sort-test_sort.obj: test/test_sort.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_sort_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_sort-test_sort.obj -MD -MP -MF test/$(DEPDIR)/test_test_sort-test_sort.Tpo -c -o test/test_test_sort-test_sort.obj `if test -f 'test/test_sort.c'; then $(CYGPATH_W) 'test/test_sort.c'; else $(CYGPATH_W) '$(srcdir)/test/test_sort.c'; fi`
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_sort-test_sort.Tpo test/$(DEPDIR)/test_test_sort-test_sort.Po
+#	$(AM_V_CC)source='test/test_sort.c' object='test/test_test_sort-test_sort.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_sort_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_sort-test_sort.obj `if test -f 'test/test_sort.c'; then $(CYGPATH_W) 'test/test_sort.c'; else $(CYGPATH_W) '$(srcdir)/test/test_sort.c'; fi`
+
 mostlyclean-libtool:
 	-rm -f *.lo
 
@@ -547,6 +704,27 @@ clean-libtool:
 
 distclean-libtool:
 	-rm -f libtool config.lt
+install-includeHEADERS: $(include_HEADERS)
+	@$(NORMAL_INSTALL)
+	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
+	if test -n "$$list"; then \
+	  echo " $(MKDIR_P) '$(DESTDIR)$(includedir)'"; \
+	  $(MKDIR_P) "$(DESTDIR)$(includedir)" || exit 1; \
+	fi; \
+	for p in $$list; do \
+	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
+	  echo "$$d$$p"; \
+	done | $(am__base_list) | \
+	while read files; do \
+	  echo " $(INSTALL_HEADER) $$files '$(DESTDIR)$(includedir)'"; \
+	  $(INSTALL_HEADER) $$files "$(DESTDIR)$(includedir)" || exit $$?; \
+	done
+
+uninstall-includeHEADERS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(include_HEADERS)'; test -n "$(includedir)" || list=; \
+	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
+	dir='$(DESTDIR)$(includedir)'; $(am__uninstall_files_from_dir)
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique
@@ -773,9 +951,9 @@ distcleancheck: distclean
 check-am: all-am
 	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-am
-all-am: Makefile $(LTLIBRARIES) config.h
+all-am: Makefile $(LTLIBRARIES) $(HEADERS) config.h
 installdirs:
-	for dir in "$(DESTDIR)$(libdir)"; do \
+	for dir in "$(DESTDIR)$(libdir)" "$(DESTDIR)$(includedir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-am
@@ -834,7 +1012,7 @@ info: info-am
 
 info-am:
 
-install-data-am:
+install-data-am: install-includeHEADERS
 
 install-dvi: install-dvi-am
 
@@ -882,7 +1060,7 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-libLTLIBRARIES
+uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES
 
 .MAKE: all check-am install-am install-strip
 
@@ -896,13 +1074,14 @@ uninstall-am: uninstall-libLTLIBRARIES
 	distuninstallcheck dvi dvi-am html html-am info info-am \
 	install install-am install-data install-data-am install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
-	install-html-am install-info install-info-am \
-	install-libLTLIBRARIES install-man install-pdf install-pdf-am \
-	install-ps install-ps-am install-strip installcheck \
-	installcheck-am installdirs maintainer-clean \
+	install-html-am install-includeHEADERS install-info \
+	install-info-am install-libLTLIBRARIES install-man install-pdf \
+	install-pdf-am install-ps install-ps-am install-strip \
+	installcheck installcheck-am installdirs maintainer-clean \
 	maintainer-clean-generic mostlyclean mostlyclean-compile \
 	mostlyclean-generic mostlyclean-libtool pdf pdf-am ps ps-am \
-	tags tags-am uninstall uninstall-am uninstall-libLTLIBRARIES
+	tags tags-am uninstall uninstall-am uninstall-includeHEADERS \
+	uninstall-libLTLIBRARIES
 
 .PRECIOUS: Makefile
 

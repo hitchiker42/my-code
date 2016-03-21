@@ -1,6 +1,8 @@
 #ifndef _C_UTIL_H_
 #define _C_UTIL_H_
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,6 +48,9 @@ extern "C" {
 //Conditional definitions of debugging macros/enabling backtraces
 //This can be included standalone if you just need debuging macros
 #include "debug.h"
+//svectors, aka simple dynamic arrays, the header doesn't need anything from
+//the rest of this file, so it can be included here.
+#include "svector.h"
 
 /* typedefs */
 typedef unsigned int uint;
@@ -178,6 +183,62 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 //todo: figure out how to font-lock these in emacs
 #define unless(cond) if(!(cond))
 #define until(cond) while(!(cond))
+
+#define DOTIMES(var, count)                     \
+  for(ssize_t var = 0; var < count; var++)
+
+/*
+  This is rather complex internally, but it should `just work`.
+  The outer for loop is the part that actually loops, the inner loop only gets
+  executed once per iteration of the outer loop. The _once_ variable has two
+  purposes, it insures that the inner loop gets executed once and only once per
+  iteration, and it allows breaking out of the inner loop to break the entire loop.
+  
+  These are the values once has over the course of a normal loop:
+  start outer loop: once = 1;
+  start inner loop: once = 1; step inner loop: once = 0; inner loop terminates
+  step outer loop: once = 1; check count and execute inner loop.
+
+  and when breaking out of the inner loop:
+  start outer loop: once = 1;
+  start inner loop: once = 1; break;
+  step outer loop: once = 0; outer loop terminates;
+  
+
+  Something like: for(int i=0;i<size;i++){__typeof(arr[0]) var = arr[i]; ...
+  would work, but would require the user to put a closing brace and no opening 
+  brace, which would be weird. This way FOR_EACH behaves identically to a regular
+  for loop in terms of syntax.
+*/
+//these 2 use an explicitly named index
+#define FOR_EACH_EXPLICIT(var, idx, arr, size)                          \
+  for(ssize_t idx = 0, _once_ = 1;                                      \
+      _once_ && idx < size; _once_ = !_once_, idx++)                    \
+    for(__typeof(arr[0]) var = arr[_i_]; _once_; _once = !_once_)
+
+//same as above
+#define FOR_EACH_PTR_EXPLICIT(var, idx, arr, size)                      \
+  for(ssize_t idx = 0, _once_ = 1;                                      \
+      _once_ && idx < size; _once_ = !_once_, idx++)                    \
+    for(__typeof(&(arr[0])) var = &(arr[_i_]); _once_; _once = !_once_)
+//these use an effectively anonymous index
+#define for_each(var, arr, size) FOR_EACH_EXPLICIT(var, _i_, arr, size)
+#define for_each_ptr(var, arr, size) FOR_EACH_PTR_EXPLICIT(var, _i_, arr, size)
+
+//these 4 use i/j as the index
+#define FOR_EACH(var, arr, size) FOR_EACH_EXPLICIT(var, i, arr, size)
+#define FOR_EACH_PTR(var, arr, size) FOR_EACH_PTR_EXPLICIT(var, i, arr, size)
+
+#define FOR_EACH_2(var, arr, size) FOR_EACH_EXPLICIT(var, j, arr, size)
+#define FOR_EACH_PTR_2(var, arr, size) FOR_EACH_PTR_EXPLICIT(var, j, arr, size)
+    
+    
+//Given pointer to a struct element, the struct name, and the element name
+//return a pointer to the struct the element is contained in 
+//(from the linux kernel)
+#define container_of(ptr, type, member) ({              \
+const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
+    (type *)( (char *)__mptr - offsetof(type,member) ); })
 
 //preprocessor tricks/macro overloading
 
@@ -418,6 +479,7 @@ uint32_t memcspn(const uint8_t *buf, uint32_t len,
   These do the same thing as strspn and friends, but expect a prepopulated
   table, rather than creating a table each time.
 */
+
 uint32_t strspn_table(const uint8_t *str, const uint8_t accept[256]);
 uint32_t strcspn_table(const uint8_t *str, const uint8_t reject[256]);
 uint32_t memspn_table(const uint8_t *buf, uint32_t len,
@@ -556,26 +618,26 @@ void heapsort_u64(uint64_t *input, size_t len);
   also much much more complicated. 
 */
 //you can't return an array in C so this needs to be a struct
-typedef struct  util_rand_state util_rand_state;
+typedef struct util_rand_state util_rand_state;
 struct util_rand_state {
   uint64_t state[2];
 };
 //returns 64bit integers unifornly distributed between 0-2^64-1
 uint64_t util_rand(void);
-uint64_t util_rand_r(util_rand_state state);
+uint64_t util_rand_r(util_rand_state *state);
 //double precison numbers in the range [0,1), with 53 bit precision
 double util_drand(void);
-double util_drand_r(util_rand_state state);
+double util_drand_r(util_rand_state *state);
 //Return a random signed integer in the range min-max. This is actually
 //a bit more complicated than it initally seems, as using mod results
 //in an uneven distribution
-int64_t util_rand_range_r(int64_t min, int64_t max, util_rand_state state);
+int64_t util_rand_range_r(int64_t min, int64_t max, util_rand_state *state);
 int64_t util_rand_range(int64_t min, int64_t max);
 //returns the current random state, this is a copy, so changing it
 //won't modify the internal state
 util_rand_state util_get_rand_state(void);
-//sets the random state to state and returns the old state
-util_rand_state util_set_rand_state(util_rand_state state);
+//sets the internal random state to state and returns the old value
+util_rand_state util_set_rand_state(util_rand_state *state);
 //automatically generates a radnom state using a known form of randomness,
 //usually either /dev/urandom or the current time.
 util_rand_state util_auto_rand_state(void);
@@ -631,6 +693,16 @@ static void oom_fun(void){
 #define XMALLOC
 static inline void* xmalloc(size_t sz){
   void *mem = malloc(sz);
+  if(!mem && sz != 0){
+    oom_fun();
+  }
+  return mem;
+}
+#endif
+#ifndef XREALLOC
+#define XREALLOC
+static inline void* xrealloc(void *ptr, size_t sz){
+  void *mem = xrealloc(ptr, sz);
   if(!mem && sz != 0){
     oom_fun();
   }

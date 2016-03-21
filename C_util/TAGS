@@ -1,0 +1,1833 @@
+
+/home/tucker/Repo/my-code/C_util/C_util.c,2683
+char * __attribute__((const)) filemode_bits_to_string(6,70
+off_t file_len_by_fd(28,533
+off_t file_len_by_name(33,625
+off_t file_len_by_FILE(38,738
+int regular_filep_fd(47,980
+int regular_filep_filename(52,1082
+int regular_filep_FILE(57,1216
+char* read_file_to_string_fd(60,1295
+char* read_file_to_string_FILE(70,1508
+char* read_file_to_string_filename(80,1735
+int __regular_filep(86,1923
+static int test_access(98,2301
+static int filetest_core(149,3664
+int filetest_filename(191,4686
+int filetest_fd(201,4974
+int filetest_FILE(211,5237
+void* mmap_file(217,5400
+void *mmap_filename(mmap_filename228,5713
+void *mmap_anon(mmap_anon238,5950
+uint32_t strspn_table(280,6971
+uint32_t strcspn_table(295,7452
+uint32_t memspn_table(306,7776
+uint32_t memcspn_table(324,8327
+uint32_t memspn(341,8810
+uint32_t memcspn(350,9062
+void *memdup(memdup359,9317
+struct queue_node 365,9433
+  struct queue_node *next;next366,9453
+  struct queue_node *prev;prev367,9480
+  void *data;data368,9507
+struct queue* make_queue(370,9524
+void queue_push(374,9621
+void *queue_pop(queue_pop388,9911
+int queue_is_empty(404,10243
+#define NANO_SCALE 407,10314
+#define NANO_SCALE_FLOAT 408,10344
+#define MICRO_SCALE 409,10373
+#define MICRO_SCALE_FLOAT 410,10401
+struct timespec float_to_timespec(412,10432
+double timespec_to_float(421,10690
+int64_t float_to_nsec(424,10789
+double nsec_to_float(427,10862
+int64_t timespec_to_nsec(434,11070
+struct timespec nsec_to_timespec(437,11161
+struct timespec timeval_to_timespec(444,11305
+struct timespec get_current_time(451,11480
+double float_time(463,11737
+int64_t nano_time(467,11809
+double float_sleep(471,11880
+void float_sleep_full(485,12246
+static util_rand_state internal_rand_state;518,13133
+uint64_t util_rand_r(520,13218
+uint64_t util_rand(528,13452
+int64_t util_rand_range_r(542,13985
+int64_t util_rand_range(556,14340
+static const double int_to_float_multiplier 560,14470
+double util_drand_r(561,14547
+double util_drand(564,14646
+util_rand_state util_get_rand_state(567,14717
+util_rand_state util_set_rand_state(571,14821
+util_rand_state util_auto_rand_state(576,14973
+void util_srand(599,15593
+void util_srand_auto(604,15718
+void shuffle_array(609,15835
+int *iota(iota637,16650
+static const char *nibble_strings[nibble_strings654,16987
+char* binary_int_to_string(657,17148
+#define is_binary_digit(677,17580
+#define is_oct_digit(678,17630
+static const uint8_t valid_digits[valid_digits679,17677
+static int max_length_per_base[max_length_per_base684,17955
+static inline int char_to_number(689,18143
+long parse_integer(700,18398
+#define TO_NUMBER(721,18931
+#define DO_CASE(760,20410
+
+/home/tucker/Repo/my-code/C_util/C_util.h,3861
+#define _C_UTIL_H_2,19
+#define _GNU_SOURCE3,38
+#define HAVE_C1113,273
+#define PAGE_SIZE 40,893
+#define PAGE_SIZE 42,926
+typedef unsigned int uint;54,1283
+typedef unsigned long ulong;55,1310
+typedef int(*cmp_fun)cmp_fun63,1636
+typedef void(*sort_fn)sort_fn67,1708
+typedef void(*int_sort_fn)int_sort_fn68,1757
+#define SWAP(70,1865
+#define ARR_SWAP(75,2083
+#define MIN(80,2306
+#define MAX(85,2525
+#define ARRAY_LEN(91,2745
+#define TO_BOOLEAN(92,2789
+#define IS_POW_OF_2(93,2827
+#define NEXT_POW_OF_2(94,2871
+#define LOG_2(96,2989
+#define IDIV_CEIL(99,3169
+#define SIGN(107,3511
+#define NEG(108,3537
+#define ABS(109,3559
+#define SIGNBIT(113,3752
+#define SIGNBIT_N(119,4029
+#define BITNEG(123,4203
+#define BITABS(125,4296
+#define get_byte(127,4344
+#define GET_BIT(129,4435
+#define SET_BIT(131,4522
+#define UNSET_BIT(133,4600
+#define FLIP_BIT(135,4679
+#define BITCAST(142,4969
+#define DOWNCASE_ASCII(152,5359
+#define UPCASE_ASCII(153,5423
+#define CHAR_TO_NUMBER(154,5488
+#define ORDINAL_SUFFIX(157,5648
+#define FLOAT_CONST(168,5984
+#define M_PIf 169,6035
+#define M_TAUf 170,6062
+#define M_SQRT2_2 171,6091
+#define M_TAU 172,6146
+#define M_SQRT3 173,6167
+#define CLAMP(176,6250
+#define STEP(178,6334
+#define unless(182,6448
+#define until(183,6481
+#define CAT(188,6599
+#define PRIMITIVE_CAT(189,6636
+#define CAT3(190,6670
+#define PRIMITIVE_CAT3(191,6716
+#define CAT4(192,6760
+#define PRIMITIVE_CAT4(193,6812
+#define MACROEXPAND(194,6864
+#define STRINGIFY(195,6901
+#define GET_MACR0_1(202,7282
+#define GET_MACRO_2(203,7333
+#define GET_MACRO_3(204,7387
+#define GET_MACRO_4(205,7444
+#define GET_MACRO_5(206,7504
+#define GET_MACRO_6(207,7567
+#define GET_MACRO_7(208,7633
+#define GET_MACRO_8(209,7702
+#define GET_MACRO(210,7774
+#define __NARG__(214,7997
+#define __NARG_I_(215,8054
+#define __ARG_N(216,8098
+#define __RSEQ_N(223,8531
+#define VFUNC(230,8978
+#define VA_FUNC(234,9141
+#define ATTRIBUTE(239,9303
+#define UNREACHABLE(240,9355
+#define ATRIBUTE_NORETURN(241,9401
+#define ATTRIBUTE_NORETURN 242,9455
+#define ATTRIBUTE_UNUSED 243,9508
+#define ATTRIBUTE_ALIGNED(244,9557
+#define BUILTIN_EXPECT(245,9622
+#define EXPR_LIKELY(246,9695
+#define EXPR_UNLIKELY(247,9747
+#define ALWAYS_INLINE 269,10595
+#define always_inline 271,10706
+#define thread_local 275,10794
+#define thread_local 277,10835
+typedef struct cons_t cons_t;284,10935
+struct cons_t 285,10965
+  void *car;car286,10981
+  void *cdr;cdr287,10994
+static inline struct cons_t* make_cons(289,11010
+#define CONS(295,11170
+#define XCAR(296,11204
+#define XCDR(297,11245
+#define XSETCAR(299,11287
+#define XSETCDR(300,11344
+#define XCAAR(302,11402
+#define XCADR(303,11433
+#define XCDAR(304,11464
+#define XCDDR(305,11495
+struct queue 309,11577
+  struct queue_node *head;head310,11592
+  struct queue_node *tail;tail311,11619
+typedef struct heap binary_heap;321,11965
+struct heap 322,11998
+  void **heap;heap323,12012
+  int (*cmp)cmp324,12027
+  int len;325,12054
+  int mem;326,12065
+#define get_access_mode(349,12725
+#define generic_file_macro(379,13939
+#define file_len(386,14373
+#define regular_filep(388,14461
+#define read_file_to_string(390,14559
+#define filetest(392,14686
+#define memdupa(433,16218
+#define IOTA(509,18706
+#define IOTA1(510,18740
+#define IOTA2(512,18810
+#define IOTA3(514,18884
+typedef struct  util_rand_state util_rand_state;562,20780
+struct util_rand_state 563,20829
+  uint64_t state[state564,20854
+#define USE_SEED_URANDOM 591,22103
+#define USE_SEED_TIME 594,22159
+#define fnv_prime_64 601,22306
+#define fnv_offset_basis_64 602,22343
+static uint64_t fnv_hash(603,22394
+#define asprintf_alloca(616,22765
+static void oom_fun(628,23267
+#define XMALLOC634,23372
+static inline void* xmalloc(635,23388
+#define ZMALLOC644,23535
+static inline void* zmalloc(645,23551
+
+/home/tucker/Repo/my-code/C_util/C_util.lo,18
+pic_object=8,185
+
+/home/tucker/Repo/my-code/C_util/C_util.o,19
+JKYJK139,32805
+
+/home/tucker/Repo/my-code/C_util/Makefile,3421
+am__is_gnu_make 18,592
+am__make_running_with_option 29,821
+         exit 34,1039
+  esac;35,1059
+  has_opt=36,1069
+  sane_makeflags=37,1085
+    sane_makeflags=39,1149
+        bs=43,1235
+        sane_makeflags=44,1252
+    esac;46,1356
+  fi;47,1368
+  skip_next=48,1376
+  strip_trailopt 49,1394
+    test $$skip_next 54,1520
+    case $$flg in 55,1581
+        -*I) strip_trailopt 'I'; skip_next=57,1629
+        -*O) strip_trailopt 'O'; skip_next=59,1716
+        -*l) strip_trailopt 'l'; skip_next=61,1803
+      -[dEDm]) skip_next=63,1890
+      -[JT]) skip_next=64,1923
+    esac;65,1954
+      *$$target_option*) has_opt=67,1986
+      *$$target_option*) has_opt=yes; break;67,1986
+    esac;68,2034
+  done;69,2046
+  test $$has_opt 70,2056
+am__make_dryrun = (target_option=n; $(71,2079
+am__nobase_list 120,4012
+am__base_list 127,4417
+am__installdirs 136,4767
+am__v_GEN_1 168,6101
+am__v_CC_1 186,6757
+am__v_CCLD_1 194,7058
+am__tagged_files 204,7436
+  { items[items211,7726
+  { items[$$0] = 1; nonempty 211,7726
+am__define_uniq_tagged_files 217,8000
+  unique=219,8065
+    if test -f "$$i"; then echo $$i;220,8097
+    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i;$$i220,8097
+    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi;220,8097
+  done | $(221,8165
+  else 245,9117
+am__post_remove_distdir 246,9130
+AMTAR 255,9567
+AM_DEFAULT_VERBOSITY 256,9587
+AUTOHEADER 259,9700
+AUTOMAKE 260,9784
+AWK 261,9869
+INSTALL_PROGRAM 286,10326
+INSTALL_SCRIPT 287,10355
+INSTALL_STRIP_PROGRAM 288,10383
+MANIFEST_TOOL 299,10682
+am__untar 332,11414
+bindir 333,11443
+build 334,11471
+datarootdir 341,11620
+docdir 342,11650
+dvidir 343,11697
+exec_prefix 344,11716
+host 345,11740
+includedir 351,11866
+infodir 352,11897
+install_sh 353,11927
+libdir 354,12003
+libexecdir 355,12031
+localedir 356,12067
+localstatedir 357,12101
+mandir 358,12131
+mkdir_p 359,12159
+prefix 362,12228
+sbindir 365,12298
+sharedstatedir 366,12328
+srcdir 367,12359
+target_alias 369,12397
+	      $(400,13406
+	    list2=447,14902
+	  else 448,14930
+	  else :; fi;448,14930
+	done;449,14947
+	  $(MKDIR_P) "$(DESTDIR)$(libdir)" || exit 452,15029
+	  $(454,15216
+	  $(461,15482
+	locs=`for p in $$list; do echo $$p;469,15833
+	      sort -u`u471,15945
+	  echo rm -f $${$$473,15989
+	  rm -f $${$$474,16015
+libcutil.la: $(477,16040
+	echo " rm -f" $$list;486,16470
+test/$($488,16509
+	  if test -f $$file || test -d $$file; then d=759,36241
+	  if test -f $$file || test -d $$file; then d=.; else d=759,36241
+	  if test -f $$file || test -d $$file; then d=.; else d=$(srcdir); fi;759,36241
+	    dir=761,36348
+	      find "$(distdir)/$$file" -type d ! -perm -700 -exec chmod u+rwx rwx763,36445
+	    fi;764,36525
+	      cp -fpR $(srcdir)/$$file "$(distdir)$$dir" || exit 766,36602
+	      find "$(distdir)/$$file" -type d ! -perm -700 -exec chmod u+rwx rwx767,36665
+	    fi;768,36745
+	    cp -fpR $$d/$$file "$(distdir)$$dir" || exit 769,36756
+	    || exit 773,36903
+	  fi;774,36921
+		-exec chmod u+rwx,rwx778,37016
+	tardir=784,37284
+	$(789,37495
+	$(793,37621
+	$(797,37748
+	      } || { rm -rf "$$dc_destdir"; exit 870,40480
+	  && $(872,40560
+	  list='$(DIST_ARCHIVES)'; for i in $$list; do echo $$i;879,40798
+	  exit 889,41213
+	        fi 895,41435
+	        exit 897,41496
+	  exit 901,41648
+	       exit 906,41832
+	$(908,41871
+	@$(921,42198
+	  $(926,42333
+
+/home/tucker/Repo/my-code/C_util/Makefile.am,17
+AM_CPPFLAGS 1,0
+
+/home/tucker/Repo/my-code/C_util/Makefile.in,2754
+VPATH 17,567
+am__make_running_with_option 29,813
+         exit 34,1031
+  esac;35,1051
+  has_opt=36,1061
+  sane_makeflags=37,1077
+    sane_makeflags=39,1141
+        bs=43,1227
+        sane_makeflags=44,1244
+    esac;46,1348
+  fi;47,1360
+  skip_next=48,1368
+  strip_trailopt 49,1386
+    test $$skip_next 54,1512
+    case $$flg in 55,1573
+        -*I) strip_trailopt 'I'; skip_next=57,1621
+        -*O) strip_trailopt 'O'; skip_next=59,1708
+        -*l) strip_trailopt 'l'; skip_next=61,1795
+      -[dEDm]) skip_next=63,1882
+      -[JT]) skip_next=64,1915
+    esac;65,1946
+      *$$target_option*) has_opt=67,1978
+      *$$target_option*) has_opt=yes; break;67,1978
+    esac;68,2026
+  done;69,2038
+  test $$has_opt 70,2048
+am__make_dryrun = (target_option=n; $(71,2071
+am__nobase_list 120,3981
+am__base_list 127,4386
+am__installdirs 136,4736
+am__v_GEN_1 168,6049
+am__v_CC_1 186,6701
+am__v_CCLD_1 194,6995
+am__tagged_files 204,7373
+  { items[items211,7663
+  { items[$$0] = 1; nonempty 211,7663
+am__define_uniq_tagged_files 217,7937
+  unique=219,8002
+    if test -f "$$i"; then echo $$i;220,8034
+    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i;$$i220,8034
+    if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi;220,8034
+  done | $(221,8102
+  else 245,9054
+am__post_remove_distdir 246,9067
+	      $(400,13144
+	    list2=447,14640
+	  else 448,14668
+	  else :; fi;448,14668
+	done;449,14685
+	  $(MKDIR_P) "$(DESTDIR)$(libdir)" || exit 452,14767
+	  $(454,14954
+	  $(461,15220
+	locs=`for p in $$list; do echo $$p;469,15571
+	      sort -u`u471,15683
+	  echo rm -f $${$$473,15727
+	  rm -f $${$$474,15753
+libcutil.la: $(477,15778
+	echo " rm -f" $$list;486,16208
+test/$($488,16247
+	  if test -f $$file || test -d $$file; then d=759,39597
+	  if test -f $$file || test -d $$file; then d=.; else d=759,39597
+	  if test -f $$file || test -d $$file; then d=.; else d=$(srcdir); fi;759,39597
+	    dir=761,39704
+	      find "$(distdir)/$$file" -type d ! -perm -700 -exec chmod u+rwx rwx763,39801
+	    fi;764,39881
+	      cp -fpR $(srcdir)/$$file "$(distdir)$$dir" || exit 766,39958
+	      find "$(distdir)/$$file" -type d ! -perm -700 -exec chmod u+rwx rwx767,40021
+	    fi;768,40101
+	    cp -fpR $$d/$$file "$(distdir)$$dir" || exit 769,40112
+	    || exit 773,40259
+	  fi;774,40277
+		-exec chmod u+rwx,rwx778,40372
+	tardir=784,40640
+	$(789,40851
+	$(793,40977
+	$(797,41104
+	      } || { rm -rf "$$dc_destdir"; exit 870,43836
+	  && $(872,43916
+	  list='$(DIST_ARCHIVES)'; for i in $$list; do echo $$i;879,44154
+	  exit 889,44569
+	        fi 895,44791
+	        exit 897,44852
+	  exit 901,45004
+	       exit 906,45188
+	$(908,45227
+	@$(921,45554
+	  $(926,45689
+
+/home/tucker/Repo/my-code/C_util/TAGS,115
+/home/tucker/Repo/my-code/C_util/C_util.c,c2,2
+  struct queue_node *prev;prev31,989
+  void *data;data32,1030
+
+/home/tucker/Repo/my-code/C_util/aclocal.m4,18
+m4_ifndef(14,528
+
+/home/tucker/Repo/my-code/C_util/atomic.h,2914
+#define __ATOMIC_H__6,167
+#define HAVE_C118,251
+#define _Atomic 10,284
+typedef _Atomic int8_t atomic_int8_t;14,406
+typedef _Atomic uint8_t atomic_uint8_t;15,444
+typedef _Atomic int16_t atomic_int16_t;16,484
+typedef _Atomic uint16_t atomic_uint16_t;17,524
+typedef _Atomic int32_t atomic_int32_t;18,566
+typedef _Atomic uint32_t atomic_uint32_t;19,606
+typedef _Atomic int64_t atomic_int64_t;20,648
+typedef _Atomic uint64_t atomic_uint64_t;21,688
+#define ATOMIC_ORDER_RW 24,769
+#define ATOMIC_ORDER_RD 25,810
+#define ATOMIC_ORDER_WR 26,851
+#define atomic_compare_exchange(27,892
+#define atomic_compare_exchange_explicit(29,1003
+  memory_order_relaxed 36,1235
+  memory_order_relaxed = __ATOMIC_RELAXED,36,1235
+  memory_order_consume 37,1278
+  memory_order_consume = __ATOMIC_CONSUME,37,1278
+  memory_order_acquire 38,1321
+  memory_order_acquire = __ATOMIC_ACQUIRE,38,1321
+  memory_order_release 39,1364
+  memory_order_release = __ATOMIC_RELEASE,39,1364
+  memory_order_acq_rel 40,1407
+  memory_order_acq_rel = __ATOMIC_ACQ_REL,40,1407
+  memory_order_seq_cst 41,1450
+  memory_order_seq_cst = __ATOMIC_SEQ_CST41,1450
+} memory_order;42,1492
+#define ATOMIC_ORDER_RW 43,1508
+#define ATOMIC_ORDER_RD 44,1549
+#define ATOMIC_ORDER_WR 45,1590
+#define atomic_load(46,1631
+#define atomic_store(48,1724
+#define atomic_exchange(50,1820
+#define atomic_compare_exchange(52,1927
+#define atomic_load_explicit(56,2142
+#define atomic_store_explicit(58,2222
+#define atomic_exchange_explicit(60,2305
+#define atomic_compare_exchange_explicit(62,2389
+#define atomic_fetch_add(65,2580
+#define atomic_fetch_sub(67,2692
+#define atomic_fetch_and(69,2804
+#define atomic_fetch_xor(71,2916
+#define atomic_fetch_or(73,3028
+#define atomic_fetch_add_explicit(76,3140
+#define atomic_fetch_sub_explicit(78,3251
+#define atomic_fetch_and_explicit(80,3362
+#define atomic_fetch_xor_explicit(82,3473
+#define atomic_fetch_or_explicit(84,3584
+#define atomic_add(100,4204
+#define atomic_inc(102,4310
+#define atomic_sub(104,4416
+#define atomic_dec(106,4522
+#define atomic_and(108,4628
+#define atomic_xor(110,4734
+#define atomic_or(112,4840
+#define atomic_add_explicit(115,4946
+#define atomic_inc_explicit(117,5052
+#define atomic_sub_explicit(119,5158
+#define atomic_dec_explicit(121,5264
+#define atomic_and_explicit(123,5370
+#define atomic_xor_explicit(125,5476
+#define atomic_or_explicit(127,5582
+#define atomic_load_ptr(134,5837
+#define atomic_store_ptr(136,5927
+#define atomic_exchange_ptr(138,6023
+#define atomic_cmpxchg_ptr(140,6124
+#define atomic_cmpxchg(151,6616
+#define atomic_cmpxchg_explicit(155,6839
+#define atomic_pre_inc(161,7162
+#define atomic_pre_dec(163,7234
+#define atomic_xadd(165,7307
+#define atomic_post_inc(167,7387
+#define atomic_post_dec(169,7465
+#define atomic_write(171,7544
+#define atomic_read(172,7597
+#define spin_pause(178,7754
+#define spin_pasue(180,7808
+
+/home/tucker/Repo/my-code/C_util/bptree.c,811
+struct bptree_record 3,75
+  uint32_t offset;4,98
+  uint32_t size;5,117
+  void *data;data6,134
+struct bptree_node 8,151
+  uint32_t n_keys;9,172
+  uint32_t page_no;10,191
+  uint32_t parent;11,211
+  uint32_t is_leaf;12,230
+  uint64_t keys[keys14,328
+    uint32_t children[children17,435
+      void *values[values19,518
+      bptree_node *next;next20,563
+struct bptree 27,679
+  bptree_node *root;root28,695
+  void *mem_base;mem_base29,716
+  void *data_base;data_base30,734
+  char filename[filename31,753
+  uint32_t n_nodes;36,905
+  uint32_t n_pages;37,925
+  uint32_t data_size;38,945
+  uint32_t pagesize;46,1313
+  uint32_t *free_pages;free_pages52,1515
+  uint32_t n_free_pages;53,1539
+static inline void* compute_page_address(58,1647
+static inline uint32_t allocate_node(62,1793
+
+/home/tucker/Repo/my-code/C_util/bptree.h,292
+#define __BPTREE_H__2,21
+struct bptree 9,130
+  bptree_node *root;root10,146
+  void *mem_base;mem_base11,167
+  char filename[filename12,185
+  size_t n_nodes;13,207
+  size_t n_pages;14,225
+  size_t pagesize;15,243
+  int *free_pages;free_pages19,432
+  size_t num_free_pages;20,451
+
+/home/tucker/Repo/my-code/C_util/btree.c,714
+btree_node *allocate_node(allocate_node8,147
+void free_node(14,299
+btree *make_btree(make_btree17,362
+static void copy_key(27,599
+static void remove_key(35,916
+void *btree_lookup(btree_lookup45,1288
+static void node_create_space(70,1811
+static void btree_split_child(86,2376
+static void btree_split_root(117,3671
+void btree_insert(157,5102
+static void *remove_from_node(remove_from_node197,6350
+static void merge_nodes(207,6626
+static void merge_children(229,7577
+static void *remove_from_leaf(remove_from_leaf253,8539
+static void *remove_from_internal(remove_from_internal263,8844
+static void *btree_delete_internal(btree_delete_internal314,10675
+void *btree_delete(btree_delete403,14307
+
+/home/tucker/Repo/my-code/C_util/btree.h,895
+#define __BTREE_H__2,20
+typedef struct btree btree;15,371
+typedef struct bptree bptree;16,399
+typedef struct btree_node btree_node;17,429
+typedef struct bptree_node bptree_node;18,467
+#define btree_parent(25,805
+#define bptree_parent(26,874
+#define is_leaf(27,945
+#define set_leaf(28,991
+#define unset_leaf(29,1039
+#define btree_min_degree 31,1142
+struct btree_node 44,1623
+  uint64_t n_keys;45,1643
+  uint64_t parent_leaf;46,1662
+  uint64_t keys[keys48,1790
+  void *values[values49,1831
+  btree_node *children[children50,1871
+struct btree 54,2020
+  btree_node *root;root55,2035
+#define bptree_min_degree 58,2059
+struct bptree_node 59,2100
+  size_t n_keys;60,2121
+  size_t page_no;61,2138
+  uint64_t parent_leaf;62,2156
+  uint64_t keys[keys63,2180
+    bptree_node *children[children66,2287
+      void *values[values68,2374
+      bptree_node *next;next69,2419
+
+/home/tucker/Repo/my-code/C_util/btree.lo,18
+pic_object=8,184
+
+/home/tucker/Repo/my-code/C_util/btree.o,37
+H9ÏsH9túrëH9H9ÏsH9túrëH28,2054
+
+/home/tucker/Repo/my-code/C_util/cblas_util.h,3302
+#define _CBLAS_UTIL_H_14,460
+#define SINLINE 24,639
+#define UNDEF_ZMALLOC26,685
+#define ZMALLOC(27,707
+#define column_major_order 29,747
+#define row_major_order 30,788
+typedef struct cblas_svector cblas_svector;31,826
+typedef cblas_svector cblas_svec;32,870
+typedef struct cblas_dvector cblas_dvector;33,904
+typedef cblas_svector cblas_dvec;34,948
+typedef struct cblas_smatrix cblas_smatrix;35,982
+typedef cblas_smatrix cblas_smat;36,1026
+typedef struct cblas_dmatrix cblas_dmatrix;37,1060
+typedef cblas_dmatrix cblas_dmat;38,1104
+enum cblas_type 39,1138
+enum cblas_type {cblas_float,cblas_float39,1138
+enum cblas_type {cblas_float, cblas_double,39,1138
+enum cblas_type {cblas_float, cblas_double, cblas_complex}cblas_complex39,1138
+struct cblas_svector 40,1198
+  float *data;data41,1221
+  int n;42,1236
+  int inc;43,1245
+struct cblas_dvector 45,1271
+  double *data;data46,1294
+  int n;47,1310
+  int inc;48,1319
+struct cblas_smatrix 54,1423
+  float *data;data55,1446
+  int order;56,1461
+  int m;57,1474
+  int n;58,1483
+  int lda;59,1492
+struct cblas_dmatrix 61,1506
+  double *data;data62,1529
+  int order;63,1545
+  int m;64,1558
+  int n;65,1567
+  int lda;66,1576
+SINLINE cblas_svec make_svec_simple(72,1704
+SINLINE cblas_dvec make_dvec_simple(77,1838
+SINLINE cblas_svec make_svec(83,2016
+SINLINE cblas_dvec make_dvec(88,2154
+SINLINE cblas_smat make_smat_square(94,2348
+SINLINE cblas_dmat make_dmat_square(100,2516
+SINLINE cblas_smat make_smat_square_col(107,2743
+SINLINE cblas_dmat make_dmat_square_col(113,2915
+SINLINE cblas_smat make_smat(120,3141
+SINLINE cblas_dmat make_dmat(126,3326
+SINLINE cblas_smat make_smat_col(133,3568
+SINLINE cblas_dmat make_dmat_col(139,3757
+SINLINE float sdot(159,4323
+SINLINE double ddot(164,4464
+SINLINE double sddot(168,4605
+SINLINE cblas_svec ssmul(176,4781
+SINLINE cblas_dvec dsmul(180,4888
+SINLINE cblas_svec saxpy(187,5048
+SINLINE cblas_dvec daxpy(193,5207
+SINLINE float snrm2(202,5466
+SINLINE double dnrm2(205,5552
+SINLINE float snrm1(212,5742
+SINLINE double dnrm1(215,5827
+SINLINE void srot(224,6142
+SINLINE void drot(229,6308
+SINLINE void srot_by(239,6640
+SINLINE void drot_by(246,6829
+SINLINE cblas_svec* smvmul(259,7126
+SINLINE cblas_dvec* dmvmul(267,7436
+SINLINE cblas_svec* smvmul_t(278,7817
+SINLINE cblas_svec* dmvmul_t(286,8123
+#define scross_add(298,8485
+SINLINE cblas_smat* sger(299,8527
+#define dcross_add(307,8792
+SINLINE cblas_dmat* dger(308,8834
+SINLINE cblas_smat sgemm(321,9186
+SINLINE cblas_dmat dgemm(329,9579
+enum gemm_trans 341,10125
+  gemm_trans_none 342,10143
+  gemm_trans_none = 0x0,x0342,10143
+  gemm_trans_A 343,10168
+  gemm_trans_A = 0x1,x1343,10168
+  gemm_trans_B 344,10190
+  gemm_trans_B = 0x2,x2344,10190
+  gemm_trans_AB 345,10212
+  gemm_trans_AB = 0x3x3345,10212
+SINLINE cblas_smat sgemm_t(347,10237
+SINLINE cblas_dmat dgemm_t(357,10787
+SINLINE cblas_svec* smvmul_new(374,11443
+SINLINE cblas_dvec* dmvmul_new(388,11903
+SINLINE cblas_smat* sgemm_new(402,12363
+SINLINE cblas_dmat dgemm_new(418,12898
+SINLINE cblas_smat *make_smat_idenity(make_smat_idenity435,13435
+SINLINE cblas_smat *make_dmat_idenity(make_dmat_idenity443,13630
+SINLINE cblas_smat* scross(453,13827
+SINLINE cblas_dmat* dcross(459,14039
+#undef ZMALLOC469,14342
+
+/home/tucker/Repo/my-code/C_util/config.h,686
+#define DEBUG 5,147
+#define HAVE_DLFCN_H 8,224
+#define HAVE_INTTYPES_H 11,308
+#define HAVE_LIBM 14,388
+#define HAVE_LIBPTHREAD 17,474
+#define HAVE_MEMORY_H 20,559
+#define HAVE_STDINT_H 23,642
+#define HAVE_STDLIB_H 26,725
+#define HAVE_STRINGS_H 29,809
+#define HAVE_STRING_H 32,893
+#define HAVE_SYS_STAT_H 35,978
+#define HAVE_SYS_TYPES_H 38,1066
+#define HAVE_UNISTD_H 41,1152
+#define LT_OBJDIR 44,1255
+#define PACKAGE 50,1350
+#define PACKAGE_BUGREPORT 53,1455
+#define PACKAGE_NAME 56,1532
+#define PACKAGE_STRING 59,1622
+#define PACKAGE_TARNAME 62,1719
+#define PACKAGE_URL 65,1801
+#define PACKAGE_VERSION 68,1870
+#define STDC_HEADERS 71,1957
+#define VERSION 74,2013
+
+/home/tucker/Repo/my-code/C_util/config.h.in,660
+#undef DEBUG4,88
+#undef HAVE_DLFCN_H7,159
+#undef HAVE_INTTYPES_H10,240
+#undef HAVE_LIBM13,317
+#undef HAVE_LIBPTHREAD16,400
+#undef HAVE_MEMORY_H19,482
+#undef HAVE_STDINT_H22,562
+#undef HAVE_STDLIB_H25,642
+#undef HAVE_STRINGS_H28,723
+#undef HAVE_STRING_H31,804
+#undef HAVE_SYS_STAT_H34,886
+#undef HAVE_SYS_TYPES_H37,971
+#undef HAVE_UNISTD_H40,1054
+#undef LT_OBJDIR43,1154
+#undef NDEBUG46,1196
+#undef PACKAGE49,1233
+#undef PACKAGE_BUGREPORT52,1328
+#undef PACKAGE_NAME55,1401
+#undef PACKAGE_STRING58,1481
+#undef PACKAGE_TARNAME61,1563
+#undef PACKAGE_URL64,1635
+#undef PACKAGE_VERSION67,1700
+#undef STDC_HEADERS70,1779
+#undef VERSION73,1832
+
+/home/tucker/Repo/my-code/C_util/config.log,745
+#define PACKAGE_NAME 671,24579
+#define PACKAGE_TARNAME 672,24609
+#define PACKAGE_VERSION 673,24642
+#define PACKAGE_STRING 674,24673
+#define PACKAGE_BUGREPORT 675,24710
+#define PACKAGE_URL 676,24739
+#define PACKAGE 677,24762
+#define VERSION 678,24787
+#define STDC_HEADERS 679,24810
+#define HAVE_SYS_TYPES_H 680,24833
+#define HAVE_SYS_STAT_H 681,24860
+#define HAVE_STDLIB_H 682,24886
+#define HAVE_STRING_H 683,24910
+#define HAVE_MEMORY_H 684,24934
+#define HAVE_STRINGS_H 685,24958
+#define HAVE_INTTYPES_H 686,24983
+#define HAVE_STDINT_H 687,25009
+#define HAVE_UNISTD_H 688,25033
+#define HAVE_DLFCN_H 689,25057
+#define LT_OBJDIR 690,25080
+#define HAVE_LIBPTHREAD 691,25107
+#define HAVE_LIBM 692,25133
+#define DEBUG 693,25153
+
+/home/tucker/Repo/my-code/C_util/config.status,3077
+debug=7,199
+DUALCASE=18,404
+  NULLCMD=21,530
+as_nl=36,816
+  as_echo=47,1350
+  as_echo=50,1469
+    as_echo_body=54,1603
+	arg=63,1858
+      esac;64,1901
+    as_echo_n=68,1995
+  PATH_SEPARATOR=76,2185
+  (PATH='/bin;/bin'; FPATH=77,2204
+    (PATH=78,2268
+    (PATH='/bin:/bin'; FPATH=78,2268
+      PATH_SEPARATOR=79,2332
+IFS=89,2619
+  *) as_save_IFS=95,2766
+  *) as_save_IFS=$IFS; IFS=95,2766
+  as_myself=109,3134
+as_fn_set_status 158,4525
+as_fn_exit 166,4691
+as_fn_unset 176,4822
+as_unset=180,4866
+  as_fn_append 193,5320
+    as_val=207,5703
+  as_fn_arith 210,5734
+  as_expr=219,5908
+  as_basename=225,6028
+  as_dirname=231,6153
+as_cr_letters=256,6565
+  xy)  ECHO_C=267,6895
+       ECHO_T=269,6968
+  esac;270,6988
+  ECHO_N=272,7000
+    as_ln_s=284,7264
+    as_ln_s=292,7657
+  as_mkdir_p=351,8901
+as_test_x=365,9169
+    ac_option=462,12032
+    ac_cs_recheck=471,12225
+    $as_echo "$ac_cs_version"; exit 473,12318
+    $as_echo "$ac_cs_config"; exit 475,12410
+    debug=477,12495
+    *\'*) ac_optarg=481,12579
+    ac_need_defaults=485,12757
+    *\'*) ac_optarg=489,12863
+    ac_need_defaults=492,12993
+    $as_echo "$ac_cs_usage"; exit 498,13189
+    ac_cs_silent=501,13346
+     ac_need_defaults=508,13526
+ac_configure_extra_args=514,13579
+  ac_configure_extra_args=518,13647
+  CONFIG_SHELL=525,13893
+AMDEP_TRUE=542,14120
+      eval "lt_$var=\\\"\`\$ECHO \"\$$var\" | \$SED \"\$sed_quote_subst\"\`\\\"" ## exclude from sc_prohibit_nested_quotes707,20799
+      eval "lt_$var=\\\"\`\$ECHO \"\$$var\" | \$SED -e \"\$double_quote_subst\" -e \"\$sed_quote_subst\" -e \"\$delay_variable_subst\"\`\\\"" ## exclude from sc_prohibit_nested_quotes719,21510
+ac_aux_dir=727,21770
+    PACKAGE=736,21982
+    "depfiles") CONFIG_COMMANDS=750,22222
+    "libtool") CONFIG_COMMANDS=751,22285
+    "Makefile") CONFIG_FILES=752,22346
+  tmp=787,23621
+  tmp=791,23709
+ac_tmp=794,23837
+ac_cr=802,24050
+  eval ac_cr=807,24290
+  ac_cs_awk_cr=811,24429
+  line 948,28234
+  for (i = 2; i < nfields;952,28322
+    key 953,28356
+BEGIN 981,29160
+  line 1009,29997
+  } else 1014,30097
+  split(1018,30163
+  :[FHLC]) ac_mode=$ac_tag; continue;1046,30953
+  case $ac_mode$ac_tag in1048,30999
+  :[FH]-) ac_tag=1051,31109
+  :[FH]*) ac_tag=1052,31132
+  ac_save_IFS=1054,31177
+    ac_file_inputs=1065,31318
+	   *) test -f "$srcdir/$ac_f" && ac_f=1076,31661
+      case $ac_f in *\'*) ac_f=1080,31808
+    configure_input=1087,32131
+      configure_input=1091,32277
+       ac_sed_conf_input=1098,32585
+    *) ac_sed_conf_input=1100,32679
+    esac1106,32860
+  ac_dir=1110,32884
+  as_dir=1133,33328
+  ac_builddir=1134,33362
+  ac_dir_suffix=1139,33464
+  *)  ac_top_build_prefix=1144,33736
+  esac 1145,33787
+ac_abs_top_builddir=1147,33802
+    ac_srcdir=1158,34114
+    ac_top_srcdir=1159,34151
+    ac_srcdir=1162,34232
+ac_abs_srcdir=1166,34380
+  *) ac_INSTALL=1177,34544
+  ac_MKDIR_P=1179,34599
+    trap "$RM \"$cfgfile\$cfgfile1430,42051
+GREP=1518,44888
+func_cc_basename 1916,56612
+  COLLECT_NAMES=1941,57276
+ltmain=1949,57343
+
+/home/tucker/Repo/my-code/C_util/configure,73
+   function prototypes 3533,106220
+   function prototypes 12717,378910
+
+/home/tucker/Repo/my-code/C_util/configure.ac,15
+AC_PREREQ(1,0
+
+/home/tucker/Repo/my-code/C_util/cons.c,110
+#define POP(2,20
+cons_t split(6,181
+static cons_t* merge_cons(18,473
+static cons_t* mergesort_cons(37,878
+
+/home/tucker/Repo/my-code/C_util/debug.h,1292
+#define _DEBUG_H_2,18
+#define DEBUG_PRINTF(7,131
+#define DEBUG_PRINTF_ONCE(9,217
+#define HERE_FMT(15,476
+#define HERE(18,647
+#define HERE_STR(19,675
+#define HERE_FMT_ONCE(21,717
+#define HERE_ONCE(28,1122
+#define HERE_STR_ONCE(29,1160
+#define ORDINAL_SUFFIX(31,1212
+#define HERE_COUNTER(38,1477
+#define WARN(44,1826
+#define WARN_ON(48,1985
+#define WARN_ONCE(52,2144
+#define WARN_ON_ONCE(60,2503
+#define ERROR(69,2888
+#define ERROR_ON(74,3097
+#define TRAP(79,3306
+#define TRAP_ON(84,3515
+#undef assert94,3930
+#define assert_simple(97,4036
+#define assert_msg(100,4229
+#define assert_fmt(104,4488
+#define assert(108,4747
+#define BREAKPOINT(112,4954
+static void print_backtrace(115,5069
+  #define BACKTRACE_BUF_SIZE 116,5133
+static __attribute__((unused)) void enable_backtraces(122,5375
+#define DEBUG_PRINTF(131,5636
+#define HERE(132,5666
+#define HERE_FMT(133,5681
+#define HERE_STR(134,5707
+#define HERE_COUNTER(135,5729
+#define WARN_ON(136,5752
+#define WARN_ON_ONCE(137,5773
+#define WARN(138,5799
+#define WARN_ONCE(139,5817
+#define ERROR(140,5840
+#define ERROR_ON(141,5859
+#define TRAP(142,5881
+#define TRAP_ON(143,5899
+#define BREAKPOINT(144,5920
+#undef assert146,5955
+#define assert(147,5969
+static ATTRIBUTE_UNUSED void enable_backtraces(149,5996
+
+/home/tucker/Repo/my-code/C_util/hash.c,1430
+typedef struct hashtable htable;11,259
+typedef struct hash_entry hentry;12,292
+struct hash_entry 13,326
+  void *key;key14,346
+  size_t key_sz;15,359
+  uint64_t hv;16,376
+  void *value;value17,391
+  struct hash_entry *next;next18,406
+#define atomic_inc(21,461
+#define atomic_dec(22,485
+#define atomic_cmpxchg(23,509
+#define atomic_compare_exchange(24,539
+#define atomic_load(25,578
+#define inc_hashtable_threadcount(26,608
+typedef struct freelist_entry fl_entry;32,756
+struct freelist_entry 33,796
+  void *data;data34,820
+  fl_entry *next;next35,834
+static inline void inc_hashtable_threadcount(40,1032
+static inline hentry* make_hentry(64,1847
+static int bool_memcmp(77,2252
+htable *make_hashtable(make_hashtable85,2436
+htable *make_hashtable_default(make_hashtable_default99,2908
+static void rehash_internal(102,2984
+static void rehash(129,3705
+static void maybe_rehash(149,4263
+static void rehash(159,4604
+static void maybe_rehash(162,4661
+void* hashtable_find_add(169,4791
+int hashtable_add(222,6157
+void* hashtable_set(279,7598
+void* hashtable_update(343,9284
+void* hashtable_find(412,11218
+void *hashtable_remove(hashtable_remove435,11803
+void hashtable_iter(492,13334
+void hashtable_bucket_counts(504,13630
+void destroy_hashtable(526,14215
+static inline void freelist_push(550,14691
+static inline void* freelist_pop(561,14972
+static inline void* freelist_pop_unsafe(575,15268
+
+/home/tucker/Repo/my-code/C_util/hash.h,776
+#define __HASH_H__2,19
+typedef uint64_t(*hash_fun_t)hash_fun_t13,218
+typedef int(*hash_cmp_fun_t)hash_cmp_fun_t14,269
+struct hashtable 15,338
+  struct hash_entry **table;table16,357
+  uint32_t size;17,386
+  uint32_t entries;18,432
+  hash_fun_t hash;19,483
+  hash_cmp_fun_t cmp;20,502
+  float load_factor;21,524
+  atomic_int32_t rehash_pending;23,569
+  atomic_int32_t num_threads_using;24,602
+  atomic_int32_t num_threads_waiting;25,638
+  sem_t sem;26,676
+  void *freelist;freelist27,689
+static void * hashtable_find_add_string(44,1276
+static int hashtable_add_string(57,1857
+static void* hashtable_set_string(67,2263
+static void* hashtable_update_string(84,3153
+static void* hashtable_remove_string(93,3526
+static void* hashtable_find_string(102,3868
+
+/home/tucker/Repo/my-code/C_util/hash.lo,18
+pic_object=8,183
+
+/home/tucker/Repo/my-code/C_util/hash.o,18
+XX24,14378
+
+/home/tucker/Repo/my-code/C_util/heap.c,397
+#define heap_left_child(2,20
+#define heap_right_child(3,55
+#define heap_parent(4,91
+static void sift_down(10,301
+static void sift_up(30,831
+static void heapify(38,1083
+int cmp_default(44,1240
+binary_heap *make_new_heap(make_new_heap47,1293
+void destroy_heap(58,1641
+void heap_add(62,1715
+void* heap_pop(70,1948
+binary_heap *heap_sort(heap_sort77,2171
+void heap_sort_generic(89,2416
+
+/home/tucker/Repo/my-code/C_util/heap.h,166
+#define _MY_HEAP_H2,19
+typedef struct heap binary_heap;6,97
+struct heap 7,130
+  void **heap;heap8,144
+  int (*cmp)cmp9,159
+  int len;10,186
+  int mem;11,197
+
+/home/tucker/Repo/my-code/C_util/heap.lo,18
+pic_object=8,183
+
+/home/tucker/Repo/my-code/C_util/libcutil.la,14
+dlname=8,196
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-C_util.lo,18
+pic_object=8,197
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-C_util.o,19
+JKYJK139,32805
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-btree.lo,18
+pic_object=8,196
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-btree.o,72
+H9ÏsH9túrëH9H9ÏsH9túrëH43,3022
+HcÃL9dÅwïDkHcÃL9dÅwïD45,3140
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-hash.lo,18
+pic_object=8,195
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-hash.o,18
+XX24,14378
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-heap.lo,18
+pic_object=8,195
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-rbtree.lo,18
+pic_object=8,197
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-sorting.lo,18
+pic_object=8,198
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-svector.lo,18
+pic_object=8,198
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-utf8.lo,18
+pic_object=8,195
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-utf8.o,16
+tYXgy=17,11475
+
+/home/tucker/Repo/my-code/C_util/libtool,4186
+available_tags=33,1463
+macro_version=41,1636
+func_cc_basename 483,14647
+PROGRAM=530,16408
+: ${$554,16997
+scriptversion=565,17285
+DUALCASE=615,19147
+  NULLCMD=618,19273
+_G_user_locale=628,19602
+  PATH_SEPARATOR=652,20200
+  (PATH='/bin;/bin'; FPATH=653,20219
+    (PATH=654,20283
+    (PATH='/bin:/bin'; FPATH=654,20283
+      PATH_SEPARATOR=655,20347
+func_executable_p 669,20579
+func_path_progs 685,21112
+  _G_sed_script=727,22451
+    _G_sed_script=729,22572
+  SED=762,23626
+  func_check_prog_grep 769,23814
+  GREP=797,24760
+: ${$810,25158
+: ${$811,25174
+: ${$812,25198
+: ${$813,25220
+: ${$814,25242
+: ${$815,25260
+: ${$816,25277
+: ${$817,25296
+: ${$818,25312
+: ${$819,25328
+sed_dirname=826,25449
+exit_cmd=890,28047
+     progdir=915,28823
+     _G_IFS=920,28959
+       IFS=923,29035
+opt_dry_run=941,29465
+    : ${$1034,32765
+    : ${$1035,32797
+        : ${$1040,32942
+    && _G_HAVE_PLUSEQ_OP=1050,33240
+  func_append 1063,33529
+  func_append_quoted 1085,33919
+func_append_uniq 1105,34514
+    && _G_HAVE_ARITH_OP=1124,34931
+    func_arith_result=1131,35042
+  func_arith 1134,35084
+  _b=1151,35512
+# time-stamp-pattern: "10/scriptversion=scriptversion1865,55262
+   -W,W1953,58650
+   -W, --warnings=warnings1953,58650
+lo2o=2585,76473
+      *.lo) func_lo2o_result=2592,76603
+      *.lo) func_lo2o_result=${1%.lo}.$objext $objext2592,76603
+      *   ) func_lo2o_result=2593,76652
+    func_xform_result=2603,76917
+  func_lo2o 2607,77001
+  func_xform 2612,77074
+func_fatal_configuration 2623,77341
+func_config 2634,77596
+func_features 2654,78079
+func_enable_tag 2677,78617
+func_check_version_match 2719,79778
+libtool_options_prep 2755,81080
+libtool_parse_options 2806,82416
+libtool_validate_options 2905,85422
+magic=2969,87235
+func_generated_by_libtool_p 2993,87840
+func_lalib_p 3002,88110
+func_lalib_unsafe_p 3015,88630
+func_ltwrapper_script_p 3035,89104
+func_ltwrapper_executable_p 3045,89406
+func_ltwrapper_scriptname 3059,89787
+func_ltwrapper_p 3070,90204
+func_execute_cmds 3080,90485
+func_source 3101,91031
+func_mode_compile 3763,111709
+  test compile 4108,120940
+func_mode_help 4111,121003
+      s/^Usage:.*--mode=mode4325,128795
+test execute 4462,132128
+func_mode_finish 4466,132214
+# define LT_DLSYM_CONST5108,149611
+# define LT_DLSYM_CONST5111,149727
+# define LT_DLSYM_CONST 5113,149757
+#define STREQ(5116,149795
+  const char *name;name5265,154990
+  void *address;address5266,155010
+} lt_dlsymlist;5267,155027
+static void lt_syminit(5274,155197
+lt_${my_prefix}_LTX_preloaded_symbols[_LTX_preloaded_symbols5286,155608
+static const void *lt_preloaded_setup(lt_preloaded_setup5308,156200
+sed_quote_subst=5727,169341
+  NULLCMD=5732,169486
+BIN_SH=5740,169751
+  generated_by_libtool_version=5752,170167
+    file=5757,170391
+    ECHO=5769,170613
+func_lt_dump_args 5815,172062
+func_exec_program_core 5826,172316
+func_exec_program 5859,173237
+  thisdir=5879,173609
+    destdir=5885,173855
+      [\\\\/]* | [A-Za-z]:[\\\\/]*) thisdir=5890,174051
+      *) thisdir=5891,174112
+    file=5895,174175
+      thisdir=5905,174565
+    $objdir )   thisdir=5910,174741
+  absdir=5915,174829
+    file=5928,175237
+    { $RM \"\$progdir/\$program\program5949,175711
+      $MV \"\$progdir/\$file\" \"\$progdir/\$program\program5950,175746
+  program=5955,175857
+    PATH=5972,176298
+  lt_debugprintf (__FILE__, __LINE__, "libtool wrapper 6292,184947
+EOF6370,187377
+  for (i = 0; i < newargc;6390,188062
+  newargz 6402,188332
+  rval 6403,188369
+EOF6413,188696
+EOF6419,188824
+xmalloc 6427,188871
+xstrdup 6437,189017
+base_name 6444,189151
+check_executable 6461,189490
+make_executable 6478,189818
+find_executable 6500,190350
+chase_symlinks 6605,193006
+strendzap 6664,194282
+lt_debugprintf 6684,194567
+lt_error_core 6697,194857
+lt_fatal 6710,195174
+nonnull 6719,195384
+nonempty 6725,195460
+lt_setenv 6731,195542
+lt_extend_str 6754,196108
+lt_update_exe_path 6781,196724
+lt_update_lib_path 6802,197347
+#define SHELL_SPECIAL_CHARS 6844,198956
+#define SHELL_SPACE_CHARS 6845,199116
+prepare_spawn 6847,199278
+EOF6933,200962
+void lt_dump_script 6938,201006
+
+/home/tucker/Repo/my-code/C_util/memset_N.S,446
+name:name14,460
+.Lalign16:.Lalign1657,1676
+.L128_or_less:.L128_or_less68,1868
+.Lless_than_64:.Lless_than_6483,2328
+.Lless_than_16:.Lless_than_1692,2531
+.L16_or_less:.L16_or_less95,2583
+.L8_16:.L8_1696,2597
+.L4_7:.L4_797,2605
+.Lret:.Lret98,2612
+.Lmemset64_main:.Lmemset64_main136,3355
+.Lalign64:.Lalign64153,3737
+.Lalign64_after:.Lalign64_after160,3818
+.Lloop:.Lloop165,4015
+.Lmemset_64_small:.Lmemset_64_small193,4784
+
+/home/tucker/Repo/my-code/C_util/rbtree.c,1587
+#define rb_set_black(16,567
+#define rb_set_red(17,620
+#define rb_set_color(18,672
+#define rb_is_red(20,784
+#define rb_is_black(21,835
+#define rb_is_black_safe(22,890
+static inline void rb_set_parent(32,1334
+static inline void rb_set_parent_color(35,1438
+static inline rb_node* make_rb_node(38,1554
+static inline void rb_change_child(50,1977
+static inline void rb_rotate_set_parents(63,2309
+void rb_insert(75,2798
+static void rb_insert_node(98,3293
+void rb_delete(210,6652
+void rb_delete_custom(218,6833
+void* rb_delete_node(232,7171
+void rb_recolor(334,9945
+static inline void rb_traverse_recurse(498,14980
+void rb_traverse(506,15275
+static inline void rb_traverse_postorder_recurse(511,15427
+void rb_traverse_postorder(519,15762
+static inline void rb_traverse_preorder_recurse(524,15944
+void rb_traverse_preorder(532,16276
+rb_node *rb_lookup(rb_lookup536,16455
+static inline rb_node *rb_min(rb_min561,16961
+static inline rb_node *rb_max(rb_max567,17072
+rb_node *rb_first(rb_first573,17185
+rb_node *rb_last(rb_last580,17302
+rb_node *rb_next(rb_next587,17418
+rb_node *rb_prev(rb_prev599,17670
+void destroy_rbtree(611,17919
+static void destroy_custom_fun(615,18039
+void destroy_rbtree_custom(619,18140
+static int default_cmp(623,18288
+rb_tree *make_empty_rbtree(make_empty_rbtree632,18423
+static inline void print_rbtree_recurse(638,18587
+static void default_print_val(653,18995
+void print_rbtree_sexp(658,19181
+void print_rbtree(666,19562
+rb_tree *construct_rbtree(construct_rbtree687,20097
+static void construct_rbtree_recurse(699,20375
+
+/home/tucker/Repo/my-code/C_util/rbtree.h,581
+#define __RBTREE_H__2,21
+#define RB_RED 6,81
+#define RB_BLACK 7,98
+typedef struct rb_node rb_node;9,169
+typedef struct rb_tree rb_tree;10,201
+struct rb_tree 15,326
+  rb_node *root;root16,343
+  cmp_fun cmp;17,360
+  size_t sz;18,375
+struct rb_node 23,560
+  unsigned long parent_color;29,768
+    rb_node *children[children31,808
+      rb_node *left;left33,847
+      rb_node *right;right34,868
+  void *data;data37,902
+#define rb_parent(44,1129
+#define rb_color(45,1203
+static inline void *rb_node_value(rb_node_value47,1264
+static inline int rb_remove(61,1766
+
+/home/tucker/Repo/my-code/C_util/rbtree.lo,18
+pic_object=8,185
+
+/home/tucker/Repo/my-code/C_util/sorting.c,1072
+#define NEED_XMALLOC1,0
+typedef void(*sort_fn)sort_fn3,41
+typedef void(*int_sort_fn)int_sort_fn4,90
+typedef int(*cmp_fun)cmp_fun7,225
+static int cmp_gt(9,309
+static int cmp_lt(12,364
+#define INSERTION_SORT_THRESHOLD 17,516
+always_inline void __insertion_sort_generic(36,877
+void insertion_sort_u64(49,1191
+void insertion_sort_generic(52,1303
+#define MEDIAN(55,1418
+always_inline int qsort_partition(66,1878
+void qsort_generic(96,2587
+void qsort_u64(106,2917
+always_inline void merge(148,4019
+static void mergesort_internal(166,4387
+void mergesort_generic(178,4807
+static void mergesort_internal_u64(185,5071
+void mergesort_u64(200,5554
+#define heap_left_child(208,5779
+#define heap_right_child(209,5816
+#define heap_parent(210,5854
+static void sift_down(211,5887
+static void heapify(230,6294
+void heapsort_u64(237,6454
+void radix_sort_u8_u64(260,7396
+#define set_index(286,8310
+void radix_sort_compact_u64(358,9688
+void radix_sort_keys(398,10674
+#define get_word(442,11853
+void radix_sort_u16_u64(444,11948
+void radix_sort_u64(501,13287
+
+/home/tucker/Repo/my-code/C_util/sorting.lo,18
+pic_object=8,186
+
+/home/tucker/Repo/my-code/C_util/sorting.s,5607
+.LCOLDB0:.LCOLDB03,59
+.LHOTB0:.LHOTB05,76
+sift_down:sift_down8,129
+.LFB71:.LFB719,140
+.L11:.L1118,277
+.L7:.L727,433
+.L5:.L538,642
+.L1:.L141,674
+.LFE71:.LFE7144,702
+.LCOLDE0:.LCOLDE047,765
+.LHOTE0:.LHOTE049,782
+.LC1:.LC151,834
+.LCOLDB2:.LCOLDB254,892
+.LHOTB2:.LHOTB256,909
+oom_fun:oom_fun59,960
+.LFB55:.LFB5560,969
+.LFE55:.LFE5574,1197
+.LCOLDE2:.LCOLDE277,1256
+.LHOTE2:.LHOTE279,1273
+.LCOLDB3:.LCOLDB381,1307
+.LHOTB3:.LHOTB383,1324
+insertion_sort_u64:insertion_sort_u6487,1413
+.LFB61:.LFB6188,1433
+.L29:.L29100,1608
+.L27:.L27109,1741
+.L24:.L24116,1853
+.L19:.L19122,1950
+.L21:.L21127,2024
+.L17:.L17133,2114
+.L26:.L26139,2194
+.L28:.L28145,2282
+.L14:.L14147,2297
+.L25:.L25149,2312
+.LFE61:.LFE61154,2374
+.LCOLDE3:.LCOLDE3157,2455
+.LHOTE3:.LHOTE3159,2472
+.LCOLDB4:.LCOLDB4161,2506
+.LHOTB4:.LHOTB4163,2523
+mergesort_internal_u64:mergesort_internal_u64166,2589
+.LFB69:.LFB69167,2613
+.L51:.L51210,3381
+.L34:.L34214,3438
+.L32:.L32216,3459
+.L39:.L39232,3693
+.L38:.L38237,3755
+.L50:.L50264,4206
+.L53:.L53269,4281
+.L52:.L52284,4543
+.LFE69:.LFE69293,4670
+.LCOLDE4:.LCOLDE4296,4759
+.LHOTE4:.LHOTE4298,4776
+.LCOLDB5:.LCOLDB5300,4810
+.LHOTB5:.LHOTB5302,4827
+insertion_sort_generic:insertion_sort_generic306,4924
+.LFB62:.LFB62307,4948
+.L61:.L61345,5609
+.L63:.L63351,5705
+.L62:.L62365,5939
+.L71:.L71375,6111
+.L72:.L72381,6194
+.L73:.L73387,6290
+.L68:.L68408,6645
+.LFE62:.LFE62411,6674
+.LCOLDE5:.LCOLDE5414,6763
+.LHOTE5:.LHOTE5416,6780
+.LCOLDB6:.LCOLDB6418,6814
+.LHOTB6:.LHOTB6420,6831
+mergesort_internal:mergesort_internal423,6893
+.LFB67:.LFB67424,6913
+.L95:.L95471,7753
+.L78:.L78476,7829
+.L76:.L76478,7850
+.L83:.L83496,8118
+.L82:.L82501,8180
+.L94:.L94524,8573
+.L97:.L97546,8959
+.L96:.L96555,9092
+.LFE67:.LFE67565,9234
+.LCOLDE6:.LCOLDE6568,9315
+.LHOTE6:.LHOTE6570,9332
+.LCOLDB7:.LCOLDB7572,9366
+.LHOTB7:.LHOTB7574,9383
+qsort_generic:qsort_generic578,9462
+.LFB64:.LFB64579,9477
+.L109:.L109606,9966
+.L100:.L100619,10185
+.L101:.L101624,10254
+.L112:.L112638,10490
+.L103:.L103640,10512
+.L104:.L104658,10817
+.L105:.L105674,11098
+.LFE64:.LFE64694,11455
+.LCOLDE7:.LCOLDE7697,11526
+.LHOTE7:.LHOTE7699,11543
+.LCOLDB8:.LCOLDB8701,11577
+.LHOTB8:.LHOTB8703,11594
+qsort_u64:qsort_u64707,11665
+.LFB65:.LFB65708,11676
+.L124:.L124728,12025
+.L115:.L115739,12203
+.L116:.L116744,12268
+.L127:.L127754,12429
+.L118:.L118756,12451
+.L119:.L119768,12635
+.L120:.L120779,12811
+.LFE65:.LFE65794,13068
+.LCOLDE8:.LCOLDE8797,13131
+.LHOTE8:.LHOTE8799,13148
+.LCOLDB9:.LCOLDB9801,13182
+.LHOTB9:.LHOTB9803,13199
+mergesort_generic:mergesort_generic807,13286
+.LFB68:.LFB68808,13305
+.L129:.L129838,13819
+.LFE68:.LFE68857,14134
+.LCOLDE9:.LCOLDE9860,14213
+.LHOTE9:.LHOTE9862,14230
+.LCOLDB10:.LCOLDB10864,14264
+.LHOTB10:.LHOTB10866,14282
+mergesort_u64:mergesort_u64870,14362
+.LFB70:.LFB70871,14377
+.L138:.L138899,14856
+.LFE70:.LFE70917,15162
+.LCOLDE10:.LCOLDE10920,15233
+.LHOTE10:.LHOTE10922,15251
+.LCOLDB11:.LCOLDB11924,15286
+.LHOTB11:.LHOTB11926,15304
+heapsort_u64:heapsort_u64930,15382
+.LFB73:.LFB73931,15396
+.L147:.L147945,15626
+.L148:.L148956,15785
+.LFE73:.LFE73974,16080
+.LCOLDE11:.LCOLDE11977,16149
+.LHOTE11:.LHOTE11979,16167
+.LCOLDB12:.LCOLDB12981,16202
+.LHOTB12:.LHOTB12983,16220
+radix_sort_u8_u64:radix_sort_u8_u64987,16308
+.LFB74:.LFB74988,16327
+.L175:.L1751037,17263
+.L156:.L1561068,17820
+.L154:.L1541081,18035
+.L158:.L1581145,19355
+.L157:.L1571158,19523
+.L168:.L1681162,19581
+.L159:.L1591168,19679
+.L160:.L1601185,19987
+.L161:.L1611201,20272
+.L162:.L1621219,20586
+.L163:.L1631237,20900
+.L164:.L1641255,21214
+.L166:.L1661274,21551
+.L167:.L1671293,21888
+.LFE74:.LFE741307,22128
+.LCOLDE12:.LCOLDE121310,22207
+.LHOTE12:.LHOTE121312,22225
+.LCOLDB13:.LCOLDB131314,22260
+.LHOTB13:.LHOTB131316,22278
+radix_sort_compact_u64:radix_sort_compact_u641320,22376
+.LFB75:.LFB751321,22400
+.L194:.L1941357,23032
+.L193:.L1931389,23654
+.L197:.L1971396,23768
+.L195:.L1951402,23846
+.L198:.L1981405,23891
+.L196:.L1961419,24104
+.L199:.L1991430,24267
+.L200:.L2001436,24353
+.L201:.L2011445,24489
+.L203:.L2031458,24722
+.L202:.L2021467,24846
+.L204:.L2041483,25118
+.LFE75:.LFE751488,25187
+.LCOLDE13:.LCOLDE131491,25276
+.LHOTE13:.LHOTE131493,25294
+.LCOLDB14:.LCOLDB141495,25329
+.LHOTB14:.LHOTB141497,25347
+radix_sort_keys:radix_sort_keys1501,25431
+.LFB76:.LFB761502,25448
+.L219:.L2191541,26135
+.L218:.L2181574,26776
+.L222:.L2221581,26891
+.L220:.L2201587,26970
+.L223:.L2231590,27015
+.L221:.L2211604,27230
+.L224:.L2241615,27397
+.L225:.L2251620,27472
+.L226:.L2261631,27644
+.L228:.L2281646,27935
+.L227:.L2271655,28069
+.L229:.L2291673,28380
+.LFE76:.LFE761678,28449
+.LCOLDE14:.LCOLDE141681,28524
+.LHOTE14:.LHOTE141683,28542
+.LCOLDB15:.LCOLDB151685,28577
+.LHOTB15:.LHOTB151687,28595
+radix_sort_u16_u64:radix_sort_u16_u641691,28685
+.LFB77:.LFB771692,28705
+.L261:.L2611729,29371
+.L246:.L2461746,29673
+.L244:.L2441754,29793
+.L248:.L2481791,30492
+.L247:.L2471804,30660
+.L254:.L2541808,30717
+.L249:.L2491813,30792
+.L250:.L2501828,31048
+.L252:.L2521844,31313
+.L253:.L2531860,31590
+.LFE77:.LFE771874,31837
+.LCOLDE15:.LCOLDE151877,31918
+.LHOTE15:.LHOTE151879,31936
+.LCOLDB16:.LCOLDB161881,31971
+.LHOTB16:.LHOTB161883,31989
+radix_sort_u64:radix_sort_u641887,32071
+.LFB78:.LFB781888,32087
+.LFE78:.LFE781892,32149
+.LCOLDE16:.LCOLDE161895,32222
+.LHOTE16:.LHOTE161897,32240
+
+/home/tucker/Repo/my-code/C_util/stream.c,59
+#define ROUND_TO_PAGE_SIZE(14,544
+int mmap_resize(20,775
+
+/home/tucker/Repo/my-code/C_util/stream.h,1125
+#define __STREAM_H__2,21
+enum stream_type 8,125
+  mem_stream 9,144
+  string_stream 10,162
+  file_stream 11,231
+  fd_stream 12,250
+  mmap_stream 13,267
+  stream_type_max 14,286
+struct stream 21,449
+  size_t size;22,465
+  uint8_t type;23,480
+  uint8_t mode;24,496
+  uint16_t pad;25,531
+struct mem_stream 33,785
+  size_t size;35,814
+  uint8_t type;36,829
+  uint8_t mode;37,845
+  uint16_t pad;38,880
+  uint8_t *buf;buf41,934
+  uint8_t *bufptr;bufptr42,950
+  size_t len;43,969
+struct fd_stream 56,1463
+  size_t size;57,1482
+  uint8_t type;58,1497
+  uint8_t mode;59,1513
+  uint16_t pad;60,1548
+  int fd;63,1602
+  char *filename;filename64,1612
+  off_t offset;65,1630
+  uint8_t *read_buf;read_buf67,1647
+  uint8_t *read_buf_ptr;read_buf_ptr68,1668
+  uint8_t *write_buf;write_buf70,1694
+  uint8_t *write_buf_ptr;write_buf_ptr71,1716
+struct mmap_stream 79,2005
+  size_t size;80,2026
+  uint8_t type;81,2041
+  uint8_t mode;82,2057
+  uint16_t pad;83,2092
+  uint8_t *buf;buf87,2173
+  uint8_t *bufptr;bufptr88,2189
+  size_t len;89,2208
+  int fd;91,2223
+  char *filename;filename92,2233
+
+/home/tucker/Repo/my-code/C_util/string_buf.c,743
+typedef struct string_segment string_segment;15,637
+struct string_segment 16,683
+  const char *str;str17,707
+  string_segment *next;next18,726
+  uint32_t len;19,750
+string_segment *make_string_segment(make_string_segment21,769
+static inline void string_buf_append_string_segment(29,1046
+static void string_buf_force_flush(50,1730
+void string_buf_flush(62,2118
+void string_buf_append_strn(73,2379
+void string_buf_append_strn_copy(81,2779
+void string_buf_vsprintf(99,3453
+void string_buf_sprintf(121,4173
+string string_buf_to_string(137,4725
+string *string_buf_to_string_ptr(string_buf_to_string_ptr162,5521
+const char *string_buf_to_cstr(string_buf_to_cstr169,5686
+string_buf *malloc_string_buf(malloc_string_buf177,5856
+
+/home/tucker/Repo/my-code/C_util/string_buf.h,1399
+#define _STRING_BUF_H2,22
+#define STRING_BUF_SIZE 26,1176
+typedef struct string_buf string_buf;28,1211
+struct string_buf 29,1249
+  uint8_t buf[buf30,1269
+  uint8_t *bufptr;bufptr31,1301
+  struct string_segment *segments_start;segments_start32,1320
+  struct string_segment *segments_end;segments_end33,1361
+  uint32_t total_len;34,1400
+#define make_string_buf(40,1610
+#define string_buf_alloca(44,1795
+#define string_buf_init(45,1841
+#define string_buf_reinit(49,2038
+static inline void string_buf_append_char(64,2688
+static inline void string_buf_append_cstr(77,3191
+static inline void string_buf_append_cstr_copy(80,3313
+static inline void string_buf_append_cstrn_copy(83,3445
+static inline void string_buf_append_string(87,3628
+static inline void string_buf_append_string_copy(91,3753
+static inline char string_buf_unread_char(94,3887
+#define string_buf_append_string_literal(100,4146
+#define string_buf_from_x(114,4696
+#define string_buf_from_string(119,4882
+#define string_buf_from_char(120,4953
+#define string_buf_from_cstr(121,5016
+#define buf_append(129,5303
+#define buf_append_str(130,5366
+#define buf_append_char(131,5433
+#define buf_append_cstr(132,5499
+#define buf_append_cstrn(133,5565
+#define buf_append_str_lit(134,5638
+#define buf_append_literal(135,5718
+#define buf_sprintf(136,5798
+#define buf_delete_char(137,5877
+#define buf_to_str(139,5939
+
+/home/tucker/Repo/my-code/C_util/svector.c,559
+#define XMALLOC5,76
+static inline void* xmalloc(6,92
+typedef struct svector svector;15,265
+inline svector make_svector(16,297
+inline svector copy_svector(21,444
+svector init_svector(29,688
+svector svector_reverse(36,862
+svector svector_reverse_inplace(45,1077
+int svector_find(52,1230
+int svector_search(61,1395
+int svector_search2(70,1573
+void* svector_reduce(80,1796
+static inline svector svector_map_internal(88,1978
+svector svector_map(96,2210
+svector svector_map_inplace(101,2390
+void svector_mapc(104,2498
+svector svector_sort(111,2635
+
+/home/tucker/Repo/my-code/C_util/svector.h,568
+#define _SVECTOR_H_2,20
+struct svector 16,287
+  void **data;data17,304
+  int len;18,319
+  int size;19,330
+#define svector_check_size(24,398
+#define svector_data(31,851
+#define svector_len(37,1066
+#define SVECTOR_POP(41,1259
+static inline void *svector_pop(svector_pop43,1340
+#define SVECTOR_PUSH(46,1428
+static inline void svector_push(49,1604
+#define SVECTOR_REF(54,1746
+static inline void* svector_ref(56,1838
+#define SVECTOR_SET(59,1934
+static inline void svector_set(61,2032
+#define SVECTOR_SWAP(64,2131
+static inline void svector_swap(69,2359
+
+/home/tucker/Repo/my-code/C_util/svector.lo,18
+pic_object=8,186
+
+/home/tucker/Repo/my-code/C_util/svector.o,9
+s5,2916
+
+/home/tucker/Repo/my-code/C_util/tree,27
+(0x2f33bbae x2f33bbae1,0
+
+/home/tucker/Repo/my-code/C_util/utf8.c,647
+static inline int utf8_lead_char(21,867
+static inline int utf8_cont_char(24,950
+inline int utf8_char_size(61,2200
+uint32_t utf8_decode_char(81,2610
+int utf8_isutf32(144,3814
+utf8_char_str utf8_encode_char(151,4036
+uint32_t utf8_nth_char(199,5415
+const char *utf8_nth_ptr(utf8_nth_ptr219,5888
+const char* utf8_strchr(239,6344
+const char* utf8_rstrchr(253,6627
+uint32_t utf8_byte_pos_to_char_pos(272,7123
+uint32_t utf8_char_pos_to_byte_pos(287,7473
+utf8_str_iter* make_string_iter(303,7897
+sl_char string_iter_next(309,8042
+sl_char string_iter_prev(334,8704
+sl_char string_iter_next_n(354,9166
+sl_char string_iter_prev_n(392,10332
+
+/home/tucker/Repo/my-code/C_util/utf8.h,337
+#define _SL_UTF8_H_7,207
+#define is_ascii(15,342
+typedef union utf8_char_str utf8_char_str;17,377
+union utf8_char_str 21,618
+  uint64_t val;22,640
+  char str[str23,656
+typedef struct utf8_str_iter utf8_str_iter;59,2410
+struct utf8_str_iter 60,2454
+  sl_string str;61,2477
+  uint32_t chars_read;62,2494
+  uint32_t pos;63,2517
+
+/home/tucker/Repo/my-code/C_util/utf8.lo,18
+pic_object=8,183
+
+/home/tucker/Repo/my-code/C_util/utf8.o,16
+tYXgy=17,11475
+
+/home/tucker/Repo/my-code/C_util/util_string.c,249
+static int32_t* gen_delta1_table(13,373
+static int is_suffix_a_prefix(31,816
+static int suffix_length(41,1183
+static int32_t* gen_delta2_table(63,2064
+uint8_t *boyer_moore(boyer_moore90,3020
+uint8_t **boyer_moore_all(boyer_moore_all134,4080
+
+/home/tucker/Repo/my-code/C_util/util_string.h,1275
+#define __UTIL_STRING_H__2,26
+typedef struct string string;12,291
+enum string_encoding 14,327
+  NO_ENCODING 15,350
+  ASCII_ENCODING,16,395
+  UTF8_ENCODING,17,413
+  UTF16_ENCODING,18,430
+  UTF32_ENCODING19,448
+struct string 25,565
+    uint8_t *mem;mem27,591
+    uint8_t *ascii;ascii28,609
+    uint8_t *utf8;utf829,629
+    uint16_t *utf16;utf1630,648
+    uint32_t *utf32;utf3231,669
+  uint32_t sz;33,695
+  uint8_t encoding;34,754
+  uint8_t copy_on_write;35,774
+struct string 38,809
+    uint8_t *mem;mem40,835
+    char *str;str41,853
+    int64_t sz;44,883
+    int64_t len;45,899
+static string make_string(49,925
+static string* make_string_ptr(53,1031
+static string string_from_cstr(59,1178
+static char *string_to_cstr(string_to_cstr63,1295
+static int string_cmp(69,1444
+static int string_ptr_cmp(76,1601
+static int string_eq(83,1771
+static int string_ptr_eq(86,1871
+static string string_cat(89,1982
+static string string_ncat(99,2281
+#define STRING_CATN(109,2543
+#define STRING_NCATN(111,2635
+static string sub_string(113,2697
+static string copy_string(118,2880
+static int string_index(125,3092
+static int string_search(136,3301
+static int boyer_moore_string(154,3775
+#define string_dupa(166,4052
+#define string_to_cstra(172,4315
+
+/home/tucker/Repo/my-code/C_util/stamp-h1,0
+
+/home/tucker/Repo/my-code/C_util/sorting.o,0
+
+/home/tucker/Repo/my-code/C_util/rbtree.o,0
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-svector.o,0
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-sorting.o,0
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-rbtree.o,0
+
+/home/tucker/Repo/my-code/C_util/libcutil_la-heap.o,0
+
+/home/tucker/Repo/my-code/C_util/hp-check.log,0
+
+/home/tucker/Repo/my-code/C_util/heap.o,0

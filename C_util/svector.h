@@ -2,30 +2,35 @@
 #define _SVECTOR_H_
 #if (defined __LIBCUTIL__)
 #include "C_util.h"
-#endif
+#else
 /*
   This file and svector.c can be used without the rest of the 
   library if necessary.
 */
 #include <stdlib.h>
 #include <string.h>
+#endif
 /*
   TODO: create a 'template' for a typed svector
 */
+typedef struct svector svector;
 struct svector {
   void **data;
   int len;
   int size;
 };
 /*
-  Ensure svector vec can hold sz more elements
+  Ensure svector vec can hold sz more elements.
+  Used to go into an infinite loop for a svector with size 0, but I fixed that
+
+  This doesn't check the return value of realloc.
 */
 #define svector_check_size(svec,sz)                                     \
   ({struct svector *tmp = svec;                                         \
     int needed = tmp->len + sz;                                         \
     while(tmp->size <= needed){                                         \
-      tmp->data = realloc(tmp->data, tmp->size*2*sizeof(void*));        \
-      tmp->size*=2;                                                     \
+      tmp->size = (tmp->size >= 1 ? tmp->size*2 : 2);                   \
+      tmp->data = realloc(tmp->data, tmp->size*sizeof(void*));          \
     };})
 #define svector_data(x) (x.data)
 /*
@@ -43,7 +48,7 @@ static inline void *svector_pop(struct svector *vec){
   return vec->data[--vec->len];
 }
 #define SVECTOR_PUSH(elt, vec)                                          \
-  svector_check_size(&vec);                                             \
+  svector_check_size(&vec, 1);                                            \
   vec.data[vec.len++] = elt
 static inline void svector_push(void *elt, struct svector* vec){
   svector_check_size(vec,1);
