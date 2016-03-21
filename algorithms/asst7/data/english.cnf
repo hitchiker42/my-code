@@ -1,0 +1,18 @@
+NP chris 0.14
+VP V NP 0.393
+PP P NP 1.0
+NP N N 0.09
+VP run 0.386
+N fish 1.0
+NP NP PP 0.24
+NP fish 0.14
+V fish 1.0
+S NP VP 1.0
+NP ART N 0.55
+ADDEDB NP PP 0.22
+VP fish 0.386
+VP V ADDEDB 1.0
+ART the 1.0
+P about 1.0
+V run 1.0
+N chris 1.0

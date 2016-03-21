@@ -13,8 +13,7 @@
 #include <string.h>
 #include <assert.h>
 #include "parser.h"
-#include "cyk.h"
-#include "rdp.h"
+
 
 /**
    index of the start symbol in the symbol table
@@ -206,9 +205,10 @@ void read_rules(FILE* f){
 }
 
 void usage(void){
-    printf("usage: ./parser grammar.cnf <alg>\n");
+    printf("usage: ./parser grammar.cnf <alg> [input]\n");
     printf("<alg> may be either rdp (recursive descent parser) or cyk,\n");
     printf("which is the name of the dynamic programming parsing algorithm\n");
+    exit(0);
 }
 
 /*
@@ -235,7 +235,7 @@ void cleanup_rules(void){
 int main(int argc, const char * argv[])
 {
     FILE* f;
-    if(argc != 3){
+    if(argc > 4 || argc < 3){
         usage();
     }
     f = fopen(argv[1], "r");
@@ -244,7 +244,9 @@ int main(int argc, const char * argv[])
         fprintf(stderr, "Error - no such file %s", argv[1]);
         return 1;
     }
-    
+
+    if(strcmp(argv[2], "rdp") == 0){
+          
     read_rules(f);
 /*
     print_words();
@@ -253,10 +255,18 @@ int main(int argc, const char * argv[])
 */
     read_input();
 
-    if(strcmp(argv[2], "rdp") == 0)
-v        rdp_parse();
-    else if(strcmp(argv[2], "cyk") == 0)
-        cyk_parse();
+      DEBUG_PRINTF("Running rescursive decent parser on %s\n", argv[1]);
+      rdp_parse();
+    }
+    else if(strcmp(argv[2], "cyk") == 0){
+      DEBUG_PRINTF("Running cyk parser on %s\n", argv[1]);
+      FILE *in = stdin;
+      if(argc == 4){
+        in = fopen(argv[3], "r");
+        if(!in){perror("fopen");return 1;}
+      }
+      cyk_parse(f, in, stdout);
+    }
     else
         usage();
 

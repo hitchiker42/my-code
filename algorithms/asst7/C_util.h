@@ -1,8 +1,13 @@
 #ifndef _C_UTIL_H_
 #define _C_UTIL_H_
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #ifdef __cplusplus
 extern "C" {
+#endif
+#if defined(__HAVE_CONFIG_H__)
+#include "config.h"
 #endif
 //check for C11
 #if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)  && \
@@ -17,11 +22,11 @@ extern "C" {
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
-#include <execinfo.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <math.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +36,7 @@ extern "C" {
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
+
 #if !(defined PAGE_SIZE)
 #if (defined PAGESIZE)
 #define PAGE_SIZE PAGESIZE
@@ -39,16 +45,22 @@ extern "C" {
 #endif
 #endif
 
-//Conditional definitions of debugging macros
+//Conditional definitions of debugging macros/enabling backtraces
+//This can be included standalone if you just need debuging macros
 #include "debug.h"
+//svectors, aka simple dynamic arrays, the header doesn't need anything from
+//the rest of this file, so it can be included here.
+#include "svector.h"
 
 /* typedefs */
 typedef unsigned int uint;
 typedef unsigned long ulong;
 /*
-  Type of comparision functions for the sorting functions.
-  Should return true if the arguments are correctly ordered, and false
-  if they are not.
+  Type of comparision functions.
+  For sorting functions should return true if the arguments
+  are correctly ordered, and false if they are not.
+  For data structures should return -1, 0 or 1 if the first argument is
+  less than, equal to, or greater than the second argument, respectively.
 */
 typedef int(*cmp_fun)(void*,void*);
 /*
@@ -56,7 +68,7 @@ typedef int(*cmp_fun)(void*,void*);
 */
 typedef void(*sort_fn)(void**, size_t, cmp_fun);
 typedef void(*int_sort_fn)(uint64_t*, size_t);
-/* Macros*/
+/* Macros, no macro evaluates its arguments more than once*/
 #define SWAP(x,y)                               \
   __extension__                                 \
   ({__typeof(x) __temp = x;                     \
@@ -77,18 +89,21 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
   ({__typeof(_x) x = _x;                        \
     __typeof(_y) y = _y;                        \
     x>y ? x : y;})
+
+#define ARRAY_LEN(a) sizeof(a)/sizeof(a[0])
+#define IS_TRUE(val) (val ? 1 : 0)
 #define IS_POW_OF_2(num) (!(num & (num-1)))
 #define NEXT_POW_OF_2(num)                              \
     (1UL << ((sizeof(num)*CHAR_BIT) - __builtin_clzl(num)))
 #define LOG_2(num)                                      \
     ((sizeof(num)*CHAR_BIT) - (__builtin_clzl(num)+1))
-//The nearest integer to x/y, where x and y are integers
+//The nearest integer greater than x/y, where x and y are integers
 #define IDIV_CEIL(x,y)                          \
   __extension__                                 \
   ({__typeof(x) quot, rem, _x = x;              \
     __typeof(y) _y = y;                         \
     quot = x/y; rem = x % y;                    \
-    (quot + (rem !=  0));})
+    (quot + (rem != 0));})
 
 //these 3 macros should work the same on floating point numbers
 #define SIGN(x) ((x) < 0)
@@ -139,40 +154,53 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define DOWNCASE_ASCII(c) (c > 0x40 && c < 0x5B ? c | 0x20 : c)
 #define UPCASE_ASCII(c) (c > 0x60 && c < 0x7B ? c & (~0x20) : c)
 #define CHAR_TO_NUMBER(c) (assert(c >= 0x30 && c <= 0x39), c - 0x30)
-#define ARRAY_LEN(a) sizeof(a)/sizeof(a[0])
+//this might be defined in debug.h, so only conditionally define it
+#ifndef ORDINAL_SUFFIX
+#define ORDINAL_SUFFIX(num)                     \
+  ({char *suffix = "th";                        \
+    if(num == 1){suffix = "st";}                \
+    if(num == 2){suffix = "nd";}                \
+    if(num == 3){suffix = "rd";};               \
+    suffix;})
+#endif
+
 /*
   Some more math constants beyond those defined in math.h
 */
 #define FLOAT_CONST(double_val) CAT(double_val, f)
 #define M_PIf CAT(M_PI, f)
 #define M_TAUf CAT(M_TAU, f)
-
-#define CLAMP(x, min, max) MAX(MIN(x, max),min)
-
 #define M_SQRT2_2  0.5743491774985175  /* sqrt(2)/2 */
 #define M_TAU 2*M_PI
 #define M_SQRT3 1.7320508075688772 /* sqrt(3) */
 
+//Bound x to the range [min,max]
+#define CLAMP(x, min, max) max(min(x, max),min)
+//Return 0 if x < edge, otherwise 1
+#define STEP(edge, x) (x < edge ? 0 : 1)
+
 //Control structures
-//TODO: Figure out how to font-lock these in emacs
+//todo: figure out how to font-lock these in emacs
 #define unless(cond) if(!(cond))
 #define until(cond) while(!(cond))
 
-//Macro overloading
+//preprocessor tricks/macro overloading
 
-//overload w/upto 8 args, each overload can be uniquely named
-//Usage, For a macro FOO with 3 variants, FOO3, FOO2 and FOO1 define as
-//#define FOO(...) GET_MACRO(3, __VA_ARGS__, FOO3, FOO2, FOO1)(__VA_ARGS__)
-//However unless there's a reason to name the variants uniquely, rather than
-//above (i.e FOO1, FOO2, FOO3), it's better to use VFUNC
+//Macros to use in place of '#' and '##'
 #define CAT(a,b) PRIMITIVE_CAT(a, b)
 #define PRIMITIVE_CAT(a,b) a ## b
-#define CAT3(a,b,c) PRIMITIVE_CAT3(a, b, c)
-#define PRIMITIVE_CAT3(a,b,c) a ## b ## c
-#define CAT4(a,b,c,d) PRIMITIVE_CAT4(a, b, c, d)
-#define PRIMITIVE_CAT4(a,b,c,d) a ## b ## c ## d
+#define CAT3(a, b, c) PRIMITIVE_CAT3(a, b, c)
+#define PRIMITIVE_CAT3(a, b, c) a ## b ##cC
+#define CAT4(a, b, c, d) PRIMITIVE_CAT4(a, b, c, d)
+#define PRIMITIVE_CAT4(a, b, c, d) a ## b ## c ## d
 #define MACROEXPAND(...) __VA_ARGS__
 #define STRINGIFY(...) #__VA_ARGS__
+//Overload w/upto 8 args, each overload can be uniquely named
+//Usage, for a macro foo with 3 variants, foo3, foo2 and foo1 define as
+//#define foo(...) GET_MACRO(3, __VA_ARGS__, FOO3, FOO2, FOO1)(__VA_ARGS__)
+//however unless there's a reason to name the variants uniquely, rather than
+//above (i.e foo1, foo2, foo3), it's better to use vfunc
+
 #define GET_MACR0_1(_1,NAME,...) MACROEXPAND(NAME)
 #define GET_MACRO_2(_1,_2,NAME,...) MACROEXPAND(NAME)
 #define GET_MACRO_3(_1,_2,_3,NAME,...) MACROEXPAND(NAME)
@@ -181,10 +209,10 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define GET_MACRO_6(_1,_2,_3,_4,_5,_6,NAME,...) MACROEXPAND(NAME)
 #define GET_MACRO_7(_1,_2,_3,_4,_5,_6,_7,NAME,...) MACROEXPAND(NAME)
 #define GET_MACRO_8(_1,_2,_3,_4,_5,_6,_7,_8,NAME,...) MACROEXPAND(NAME)
-#define GET_MACRO(n,...) GET_MACRO_##n(__VA_ARGS__)
+#define GET_MACRO(N,...) GET_MACRO_##N(__VA_ARGS__)
 // overload w/upto 63 args, all overloads must be of the form
 // base_n, where n is the number of args
-//__NARG__ in effect, computes the number of arguments passed to it
+//__narg__ in effect, computes the number of arguments passed to it
 #define __NARG__(...)  __NARG_I_(__VA_ARGS__,__RSEQ_N())
 #define __NARG_I_(...) __ARG_N(__VA_ARGS__)
 #define __ARG_N(_1, _2, _3, _4, _5, _6, _7, _8, _9,_10,         \
@@ -193,24 +221,32 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
                 _31,_32,_33,_34,_35,_36,_37,_38,_39,_40,        \
                 _41,_42,_43,_44,_45,_46,_47,_48,_49,_50,        \
                 _51,_52,_53,_54,_55,_56,_57,_58,_59,_60,        \
-                _61,_62,_63,N,...) N
+                _61,_62,_63,n,...) n
 #define __RSEQ_N() 63, 62, 61, 60, 59, 58, 57, 56, 55, 54, 53,  \
                    52, 51, 50, 49, 48, 47, 46, 45, 44, 43, 42,  \
                    41, 40, 39, 38, 37, 36, 35, 34, 33, 32, 31,  \
                    30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20,  \
                    19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9,   \
                    8, 7, 6, 5, 4, 3, 2, 1, 0
-// expands into func##n(__VA_ARGS__) where n is the number of arguments
+// Expands into func##n(__va_args__) where n is the number of arguments
 #define VFUNC(func, ...) CAT(func, __NARG__(__VA_ARGS__))(__VA_ARGS__)
+
+// Calls the variadic function func with the number of arguments as
+// its first argument.
+#define VA_FUNC(func, ...) func(__NARG__(__VA_ARGS__), __VA_ARGS__)
+//I could add a preprocessor loop, if I was feeling evil
 /*
   Macros for some C extensions
 */
-#define ATTRIBUTE(...) __attribute__((__VA_ARGS__))
+#define ATTRIBUTE(...) __attribute__((__va_args__))
 #define UNREACHABLE() __builtin_unreachable()
 #define ATRIBUTE_NORETURN() __attribute__((noreturn))
 #define ATTRIBUTE_NORETURN __attribute__((noreturn))
 #define ATTRIBUTE_UNUSED __attribute__((unused))
 #define ATTRIBUTE_ALIGNED(align) __attribute__((aligned(align)))
+#define BUILTIN_EXPECT(expr, expected) __builtin_expect(expr, expected);
+#define EXPR_LIKELY(expr) __builtin_expect(expr, 1)
+#define EXPR_UNLIKELY(expr) __builtin_expect(expr, 0)
 /*
   Always inline can be used to define fast generic versions of
   functions paramaterized by function pointers.
@@ -225,7 +261,7 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
     sort_u64(uint64_t *arr, size_t len){
       __sort_generic((void**)arr, len, cmp_lt)
     }
-  Since __sort_generic the compiler will generate sort_u64 using
+    Since __sort_generic the compiler will generate sort_u64 using
   a simple less than comparision, rather than making a function call
   to compare things. If __sort_generic isn't declared always_inline
   the compiler will only do this with O3 level optimization.
@@ -235,16 +271,17 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 //always inline functions are almost always static
 #define always_inline static ALWAYS_INLINE
+
 #ifndef thread_local
 #if (defined HAVE_C11)
-#define thread_local _Thread_local
+#define thread_local _thread_local
 #else
 #define thread_local __thread
 #endif
 #endif
-/* Data Structures */
+/* data structures */
 /*
-  Really simple linked list
+  really simple linked list
 */
 typedef struct cons_t cons_t;
 struct cons_t {
@@ -269,7 +306,7 @@ static inline struct cons_t* make_cons(void* car, void* cdr){
 #define XCDAR(c) XCDR(XCAR(c))
 #define XCDDR(d) XCDR(XCDR(c))
 /*
-  really basic FIFO queue
+  Really basic fifo queue (code in c_util.c)
 */
 struct queue {
   struct queue_node *head;
@@ -281,8 +318,8 @@ void queue_push(struct queue *q, void *data);
 //the queue use queue_is_empty to check if the queue is empty.
 void *queue_pop(struct queue *q);
 int queue_is_empty(struct queue *q);
-/* Data Structures */
-//#include "svector.h"
+
+//binary heap (code in heap.c)
 typedef struct heap binary_heap;
 struct heap {
   void **heap;
@@ -299,6 +336,17 @@ void destroy_heap(binary_heap *heap);
 //void heapify(binary_heap *heap);
 //void sift_up(binary_heap *heap, int index);
 //void sift_down(binary_heap *heap, long root, long end);
+
+/*
+  Further data structures, with their own headers:
+  svector.h: Simple dynamic array/vector
+  rbtree.h: red/black tree
+  hash.h: (optionally threadsafe) hashtable
+*/
+
+/*
+  Filesystem abstractions (admittedly not very complex abstractions) 
+*/
 
 #define get_access_mode(mode) (mode & O_ACCMODE)
 /*
@@ -346,8 +394,13 @@ int filetest_FILE(FILE *file, char test);
 #define filetest(x, test)                       \
   generic_file_macro(filetest_, x, test)
 
+/* 
+   TODO: streams (adapt from scilisp code)
+*/
 
-
+/*
+  Wrappers for mmap
+*/
 //mmap the file given by fd, return a pointer to the maping and
 //if sz is not NULL store the size of the mapping in it.
 //You almost alawys want the size (you need it to unmap the file)
@@ -358,6 +411,9 @@ void *mmap_filename(const char *file, int shared, int prot, size_t *sz);
   mmap an anonymous region of memory size bytes long and return a pointer to it
 */
 void* mmap_anon(size_t size);
+/*
+  Byte array versions of string functions
+*/
 /* Akin to strspn/strcspn for byte arrays */
 uint32_t memspn(const uint8_t *buf, uint32_t len,
                 const uint8_t *accept, uint32_t len2);
@@ -374,20 +430,22 @@ uint32_t memspn_table(const uint8_t *buf, uint32_t len,
 uint32_t memcspn_table(const uint8_t *buf, uint32_t len,
                        const uint8_t reject[256]);
 
+//same as strdup/strdupa
 void *memdup(const void *src, size_t sz);
 #define memdupa(src, sz)                        \
   __extension__                                 \
   ({const uint8_t *dest = alloca(sz);           \
     memcpy(dest, src, sz);                      \
     dest;})
+
 /*
   Functions for dealing with time, functions which return a time use
   clock_gettime if available, and gettimeofday otherwise.
 
   There are 3 formats of time used here:
     double precision floating point numbers, in seconds
-    nano seconds since the epoch, as a 64 bit integer
-    struct timespec, nano seconds since the epoch with nanoseconds
+    nanoseconds since the epoch, as a 64 bit integer
+    struct timespec, nanoseconds since the epoch with nanoseconds
       and seconds stored in seperate integers
 */
 /*
@@ -416,15 +474,16 @@ int64_t timespec_to_nsec(struct timespec);
 
 //one function to turn a stuct timeval into a supported type
 struct timespec timeval_to_timespec(struct timeval tv);
+
 /*
-  convert a number of seconds in floating point format to a timespec
+  sleep for the numbor of seconds indicated by sleep time.
+  float_sleep will return the ammount of time remaning if interupted
+  float_sleep_full will always sleep for at least sleep_time
+    seconds even if interupted.
 */
 double float_sleep(double sleep_time);
-/*
-  sleep for the numbor of seconds indicated by sleep time, will always
-  sleep for at least sleep_time seconds even if interupted.
-*/
 void float_sleep_full(double sleep_time);
+
 /*
   Parse an integer in the given base, mostly the same as strtol
   but leading 0s are ignored instead of indicating octal.
@@ -490,32 +549,83 @@ void qsort_u64(uint64_t *input, size_t len);
 void insertion_sort_u64(uint64_t *input, size_t len);
 void heapsort_u64(uint64_t *input, size_t len);
 /*
+  Random numbers, etc.
+  The random number generator provided here is a xorshift+ generator,
+  from 'Vigna, Sebastiano (April 2014).
+         "Further scramblings of Marsaglia's xorshift generators".'
+  It is fast, passes most statistical tests for randomness, has
+  a 128 bit period, and requires very little code.
+
+  The mersenne twister is probably faster for large quantities of
+  random numbers, and has a much longer period, but the code is
+  also much much more complicated. 
+*/
+//you can't return an array in C so this needs to be a struct
+typedef struct  util_rand_state util_rand_state;
+struct util_rand_state {
+  uint64_t state[2];
+};
+//returns 64bit integers unifornly distributed between 0-2^64-1
+uint64_t util_rand(void);
+uint64_t util_rand_r(util_rand_state state);
+//double precison numbers in the range [0,1), with 53 bit precision
+double util_drand(void);
+double util_drand_r(util_rand_state state);
+//Return a random signed integer in the range min-max. This is actually
+//a bit more complicated than it initally seems, as using mod results
+//in an uneven distribution
+int64_t util_rand_range_r(int64_t min, int64_t max, util_rand_state state);
+int64_t util_rand_range(int64_t min, int64_t max);
+//returns the current random state, this is a copy, so changing it
+//won't modify the internal state
+util_rand_state util_get_rand_state(void);
+//sets the random state to state and returns the old state
+util_rand_state util_set_rand_state(util_rand_state state);
+//automatically generates a radnom state using a known form of randomness,
+//usually either /dev/urandom or the current time.
+util_rand_state util_auto_rand_state(void);
+//initializes the random state
+void util_srand(uint64_t a, uint64_t b);
+void util_srand_auto(void);//calls util_auto_rand_state to get the state
+
+//macros used to set how util_auto_rand_state works
+#ifndef USE_SEED_URANDOM
+#define USE_SEED_URANDOM 0
+#endif
+#ifndef USE_SEED_TIME
+#define USE_SEED_TIME 1
+#endif
+
+void shuffle_array(void **arr, size_t len);
+/*
+  Basic hash function, never know when you need a hash function.
+*/
+#define fnv_prime_64 1099511628211UL
+#define fnv_offset_basis_64 14695981039346656037UL
+static uint64_t fnv_hash(const void *key, size_t keylen){
+  const uint8_t *raw_data=(const uint8_t *)key;
+  size_t i;
+  uint64_t hash=fnv_offset_basis_64;
+  for(i=0; i < keylen; i++){
+    hash = (hash ^ raw_data[i])*fnv_prime_64;
+  }
+  return hash;
+}
+/*
   Functionally identical to asprintf, but uses alloca to allocate
   memory on the stack instead of using malloc.
  */
 #define asprintf_alloca(fmt, ...)                                       \
-  __extension__ ({size_t sz = sprintf(NULL, fmt, 0, ##__VA_ARGS__);     \
+  __extension__ ({size_t sz = snprintf(NULL, fmt, 0, ##__VA_ARGS__);    \
       char *str = alloca(sz);                                           \
       snprintf(str, sz, fmt, ##__VA_ARGS__);                            \
       str;})
+/*
+  Malloc wrappers, which call a given function if out of memory, which
+  by default prints an error message and aborts.
 
-static void print_backtrace(int ATTRIBUTE_UNUSED signo){
-  #define BACKTRACE_BUF_SIZE 128
-  void *buffer[BACKTRACE_BUF_SIZE];
-  int stack_entries = backtrace(buffer, BACKTRACE_BUF_SIZE);
-  //just write the backtrace straight to stderr
-  backtrace_symbols_fd(buffer, stack_entries, STDERR_FILENO);
-}
-static ATTRIBUTE_UNUSED void enable_backtraces(void){
-  struct sigaction act;
-  act.sa_handler = print_backtrace;
-  act.sa_flags = SA_RESETHAND;
-  sigaction(SIGSEGV, &act, NULL);
-  sigaction(SIGABRT, &act, NULL);
-  sigaction(SIGINT, &act, NULL);
-}
-
-//#if (defined NEED_XMALLOC) || (defined NEED_MALLOC) || (defined NEED_ZMALLOC)
+  xmalloc wraps malloc, and zmalloc wraps calloc.
+*/
 #ifndef OOM_FUN
 static void oom_fun(void){
   fputs("Out of memory\n",stderr);

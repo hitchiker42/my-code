@@ -1,0 +1,500 @@
+
+C_util.h,5209
+#define _C_UTIL_H__C_UTIL_H_2,19
+#define _GNU_SOURCE_GNU_SOURCE4,58
+#define HAVE_C11HAVE_C1115,300
+#define PAGE_SIZE PAGE_SIZE42,920
+#define PAGE_SIZE PAGE_SIZE44,953
+typedef unsigned int uint;uint56,1310
+typedef unsigned long ulong;ulong57,1337
+typedef int(*cmp_fun)(void*,void*);cmp_fun65,1663
+typedef void(*sort_fn)(void**, size_t, cmp_fun);sort_fn69,1735
+typedef void(*int_sort_fn)(uint64_t*, size_t);int_sort_fn70,1784
+#define SWAP(SWAP72,1892
+#define ARR_SWAP(ARR_SWAP77,2110
+#define MIN(MIN82,2333
+#define MAX(MAX87,2552
+#define ARRAY_LEN(ARRAY_LEN93,2772
+#define IS_TRUE(IS_TRUE94,2816
+#define IS_POW_OF_2(IS_POW_OF_295,2851
+#define NEXT_POW_OF_2(NEXT_POW_OF_296,2895
+#define LOG_2(LOG_298,3013
+#define IDIV_CEIL(IDIV_CEIL101,3193
+#define SIGN(SIGN109,3535
+#define NEG(NEG110,3561
+#define ABS(ABS111,3583
+#define SIGNBIT(SIGNBIT115,3776
+#define SIGNBIT_N(SIGNBIT_N121,4053
+#define BITNEG(BITNEG125,4227
+#define BITABS(BITABS127,4320
+#define get_byte(get_byte129,4368
+#define GET_BIT(GET_BIT131,4459
+#define SET_BIT(SET_BIT133,4546
+#define UNSET_BIT(UNSET_BIT135,4624
+#define FLIP_BIT(FLIP_BIT137,4703
+#define BITCAST(BITCAST144,4993
+#define DOWNCASE_ASCII(DOWNCASE_ASCII154,5383
+#define UPCASE_ASCII(UPCASE_ASCII155,5447
+#define CHAR_TO_NUMBER(CHAR_TO_NUMBER156,5512
+#define ORDINAL_SUFFIX(ORDINAL_SUFFIX159,5672
+#define FLOAT_CONST(FLOAT_CONST170,6008
+#define M_PIf M_PIf171,6059
+#define M_TAUf M_TAUf172,6086
+#define M_SQRT2_2 M_SQRT2_2173,6115
+#define M_TAU M_TAU174,6170
+#define M_SQRT3 M_SQRT3175,6191
+#define CLAMP(CLAMP178,6274
+#define STEP(STEP180,6358
+#define unless(unless184,6472
+#define until(until185,6505
+#define CAT(CAT190,6623
+#define PRIMITIVE_CAT(PRIMITIVE_CAT191,6660
+#define CAT3(CAT3192,6694
+#define PRIMITIVE_CAT3(PRIMITIVE_CAT3193,6740
+#define CAT4(CAT4194,6784
+#define PRIMITIVE_CAT4(PRIMITIVE_CAT4195,6836
+#define MACROEXPAND(MACROEXPAND196,6888
+#define STRINGIFY(STRINGIFY197,6925
+#define GET_MACR0_1(GET_MACR0_1204,7306
+#define GET_MACRO_2(GET_MACRO_2205,7357
+#define GET_MACRO_3(GET_MACRO_3206,7411
+#define GET_MACRO_4(GET_MACRO_4207,7468
+#define GET_MACRO_5(GET_MACRO_5208,7528
+#define GET_MACRO_6(GET_MACRO_6209,7591
+#define GET_MACRO_7(GET_MACRO_7210,7657
+#define GET_MACRO_8(GET_MACRO_8211,7726
+#define GET_MACRO(GET_MACRO212,7798
+#define __NARG__(__NARG__216,8021
+#define __NARG_I_(__NARG_I_217,8078
+#define __ARG_N(__ARG_N218,8122
+#define __RSEQ_N(__RSEQ_N225,8555
+#define VFUNC(VFUNC232,9002
+#define VA_FUNC(VA_FUNC236,9165
+#define ATTRIBUTE(ATTRIBUTE241,9327
+#define UNREACHABLE(UNREACHABLE242,9379
+#define ATRIBUTE_NORETURN(ATRIBUTE_NORETURN243,9425
+#define ATTRIBUTE_NORETURN ATTRIBUTE_NORETURN244,9479
+#define ATTRIBUTE_UNUSED ATTRIBUTE_UNUSED245,9532
+#define ATTRIBUTE_ALIGNED(ATTRIBUTE_ALIGNED246,9581
+#define BUILTIN_EXPECT(BUILTIN_EXPECT247,9646
+#define EXPR_LIKELY(EXPR_LIKELY248,9719
+#define EXPR_UNLIKELY(EXPR_UNLIKELY249,9771
+#define ALWAYS_INLINE ALWAYS_INLINE271,10619
+#define always_inline always_inline273,10730
+#define thread_local thread_local277,10818
+#define thread_local thread_local279,10859
+typedef struct cons_t cons_t;cons_t286,10959
+struct cons_t {cons_t287,10989
+  void *car;car288,11005
+  void *cdr;cdr289,11018
+static inline struct cons_t* make_cons(void* car, void* cdr){make_cons291,11034
+#define CONS(CONS297,11194
+#define XCAR(XCAR298,11228
+#define XCDR(XCDR299,11269
+#define XSETCAR(XSETCAR301,11311
+#define XSETCDR(XSETCDR302,11368
+#define XCAAR(XCAAR304,11426
+#define XCADR(XCADR305,11457
+#define XCDAR(XCDAR306,11488
+#define XCDDR(XCDDR307,11519
+struct queue {queue311,11601
+  struct queue_node *head;head312,11616
+  struct queue_node *tail;tail313,11643
+typedef struct heap binary_heap;binary_heap323,11989
+struct heap {heap324,12022
+  void **heap;heap325,12036
+  int (*cmp)(void*,void*);cmp326,12051
+  int len;len327,12078
+  int mem;mem328,12089
+#define get_access_mode(get_access_mode351,12749
+#define generic_file_macro(generic_file_macro381,13963
+#define file_len(file_len388,14397
+#define regular_filep(regular_filep390,14485
+#define read_file_to_string(read_file_to_string392,14583
+#define filetest(filetest394,14710
+#define memdupa(memdupa435,16242
+#define IOTA(IOTA511,18730
+#define IOTA1(IOTA1512,18764
+#define IOTA2(IOTA2514,18834
+#define IOTA3(IOTA3516,18908
+typedef struct  util_rand_state util_rand_state;util_rand_state564,20804
+struct util_rand_state {util_rand_state565,20853
+  uint64_t state[2];state566,20878
+#define USE_SEED_URANDOM USE_SEED_URANDOM593,22127
+#define USE_SEED_TIME USE_SEED_TIME596,22183
+#define fnv_prime_64 fnv_prime_64603,22330
+#define fnv_offset_basis_64 fnv_offset_basis_64604,22367
+static uint64_t fnv_hash(const void *key, size_t keylen){fnv_hash605,22418
+#define asprintf_alloca(asprintf_alloca618,22789
+static void oom_fun(void){oom_fun630,23291
+#define XMALLOCXMALLOC636,23396
+static inline void* xmalloc(size_t sz){xmalloc637,23412
+#define ZMALLOCZMALLOC646,23559
+static inline void* zmalloc(size_t sz){zmalloc647,23575
+
+cyk.c,87
+void cyk_parse(void){cyk_parse26,455
+void malloc_check(void* p){malloc_check31,561
+
+debug.h,1803
+#define _DEBUG_H__DEBUG_H_2,18
+#define DEBUG_PRINTF(DEBUG_PRINTF7,131
+#define DEBUG_PRINTF_ONCE(DEBUG_PRINTF_ONCE9,217
+#define HERE_FMT(HERE_FMT15,476
+#define HERE(HERE18,647
+#define HERE_STR(HERE_STR19,675
+#define HERE_FMT_ONCE(HERE_FMT_ONCE21,717
+#define HERE_ONCE(HERE_ONCE28,1122
+#define HERE_STR_ONCE(HERE_STR_ONCE29,1160
+#define ORDINAL_SUFFIX(ORDINAL_SUFFIX31,1212
+#define HERE_COUNTER(HERE_COUNTER38,1477
+#define WARN(WARN44,1826
+#define WARN_ON(WARN_ON48,1985
+#define WARN_ONCE(WARN_ONCE52,2144
+#define WARN_ON_ONCE(WARN_ON_ONCE60,2503
+#define ERROR(ERROR69,2888
+#define ERROR_ON(ERROR_ON74,3097
+#define TRAP(TRAP79,3306
+#define TRAP_ON(TRAP_ON84,3515
+#undef assertassert94,3930
+#define assert_simple(assert_simple97,4036
+#define assert_msg(assert_msg100,4229
+#define assert_fmt(assert_fmt104,4488
+#define assert(assert108,4747
+#define BREAKPOINT(BREAKPOINT112,4954
+static void print_backtrace(int __attribute__((unused)) signo){print_backtrace115,5069
+  #define BACKTRACE_BUF_SIZE BACKTRACE_BUF_SIZE116,5133
+static __attribute__((unused)) void enable_backtraces(void){enable_backtraces122,5375
+#define DEBUG_PRINTF(DEBUG_PRINTF131,5636
+#define HERE(HERE132,5666
+#define HERE_FMT(HERE_FMT133,5681
+#define HERE_STR(HERE_STR134,5707
+#define HERE_COUNTER(HERE_COUNTER135,5729
+#define WARN_ON(WARN_ON136,5752
+#define WARN_ON_ONCE(WARN_ON_ONCE137,5773
+#define WARN(WARN138,5799
+#define WARN_ONCE(WARN_ONCE139,5817
+#define ERROR(ERROR140,5840
+#define ERROR_ON(ERROR_ON141,5859
+#define TRAP(TRAP142,5881
+#define TRAP_ON(TRAP_ON143,5899
+#define BREAKPOINT(BREAKPOINT144,5920
+#undef assertassert146,5955
+#define assert(assert147,5969
+static ATTRIBUTE_UNUSED void enable_backtraces(void){enable_backtraces149,5996
+
+harness.py,1832
+import osos3,24
+import syssys4,34
+import argparseargparse5,45
+import subprocesssubprocess7,62
+import rere8,80
+a = argparse.ArgumentParser(description='validate parses for parsing assignment')a11,109
+arguments = a.parse_args()arguments18,691
+command = [arguments.bin, arguments.grammar, "cyk"]command21,745
+sentence = open(arguments.sen, "r")sentence23,825
+student_p = subprocess.Popen(command, stdin=sentence, stdout=subprocess.PIPE)student_p24,861
+student_output = student_p.communicate()[0]student_output27,974
+    student_output = re.sub("\.|\d+", "", student_output)student_output30,1042
+student_output = student_output.split('\n')student_output33,1129
+command = [arguments.ref, arguments.grammar, "cyk"]command34,1173
+sentence = open(arguments.sen, "r")sentence35,1225
+reference_p = subprocess.Popen(command, stdin=sentence, stdout=subprocess.PIPE)reference_p36,1261
+reference_output = reference_p.communicate()[0]reference_output39,1378
+    reference_output = re.sub("\.|\d+", "", reference_output)reference_output42,1524
+reference_output = reference_output.split('\n')reference_output43,1586
+    new_reference = []new_reference60,2290
+        probability = (re.findall("\d+.\d+", reference_parse))probability63,2435
+            reference_parse = re.sub("\.|\d+","", reference_parse)reference_parse65,2522
+    new_reference = sorted(new_reference, key=lambda o:o[1])new_reference67,2664
+    probability = new_reference[0]probability69,2753
+    probability = probability[1]probability70,2788
+    student_parse = re.sub("\.|\d","", student_output[0])student_parse72,2863
+    matches = [i for i, v in enumerate(new_reference) if v[0] == student_parse]matches73,2921
+    matches = matches[0]matches74,3001
+    student_prob = (new_reference[matches])[1]student_prob75,3026
+
+hash.c,2476
+typedef struct hashtable htable;htable11,259
+typedef struct hash_entry hentry;hentry12,292
+struct hash_entry {hash_entry13,326
+  void *key;key14,346
+  size_t key_sz;key_sz15,359
+  uint64_t hv;hv16,376
+  void *value;value17,391
+  struct hash_entry *next;next18,406
+#define atomic_inc(atomic_inc21,461
+#define atomic_dec(atomic_dec22,485
+#define atomic_cmpxchg(atomic_cmpxchg23,509
+#define atomic_compare_exchange(atomic_compare_exchange24,539
+#define atomic_load(atomic_load25,578
+#define inc_hashtable_threadcount(inc_hashtable_threadcount26,608
+typedef struct freelist_entry fl_entry;fl_entry32,756
+struct freelist_entry {freelist_entry33,796
+  void *data;data34,820
+  fl_entry *next;next35,834
+static inline void inc_hashtable_threadcount(htable *ht){inc_hashtable_threadcount40,1032
+static inline hentry* make_hentry(void *key, size_t key_sz, uint64_t hv,make_hentry64,1847
+static int bool_memcmp(const void *x, const void *y,bool_memcmp77,2252
+htable *make_hashtable(uint32_t size, float load_factor,make_hashtable85,2436
+htable *make_hashtable_default(){make_hashtable_default99,2908
+static void rehash_internal(htable *ht){rehash_internal102,2984
+static void rehash(htable *ht){rehash129,3705
+static void maybe_rehash(htable *ht){maybe_rehash149,4263
+static void rehash(htable *ht){rehash159,4604
+static void maybe_rehash(htable *ht){maybe_rehash162,4661
+void* hashtable_find_add(htable *ht, void *key, size_t key_sz, void *value){hashtable_find_add169,4791
+int hashtable_add(htable *ht, void *key, size_t key_sz, void *value){hashtable_add222,6157
+void* hashtable_set(htable *ht, void *key, size_t key_sz, void *value){hashtable_set279,7598
+void* hashtable_update(htable *ht, void *key, size_t key_sz,hashtable_update343,9284
+void* hashtable_find(htable *ht, void *key, size_t key_sz){hashtable_find412,11218
+void *hashtable_remove(htable *ht, void *key, size_t key_sz){hashtable_remove435,11803
+void hashtable_iter(struct hashtable *ht, void(*fun)(void*,size_t,void*)){hashtable_iter492,13334
+void hashtable_bucket_counts(struct hashtable *ht, FILE* out){hashtable_bucket_counts504,13630
+void destroy_hashtable(struct hashtable *ht){destroy_hashtable526,14215
+static inline void freelist_push(htable *ht, void *data){freelist_push550,14691
+static inline void* freelist_pop(htable *ht){freelist_pop561,14972
+static inline void* freelist_pop_unsafe(htable *ht){freelist_pop_unsafe575,15268
+
+hash.h,1309
+#define __HASH_H____HASH_H__2,19
+typedef uint64_t(*hash_fun_t)(const void*,size_t);hash_fun_t13,218
+typedef int(*hash_cmp_fun_t)(const void*,const void*,size_t,size_t);hash_cmp_fun_t14,269
+struct hashtable {hashtable15,338
+  struct hash_entry **table;table16,357
+  uint32_t size;//number of elements in tablesize17,386
+  uint32_t entries;//number of actual hash entriesentries18,432
+  hash_fun_t hash;hash19,483
+  hash_cmp_fun_t cmp;cmp20,502
+  float load_factor;load_factor21,524
+  atomic_int32_t rehash_pending;rehash_pending23,569
+  atomic_int32_t num_threads_using;num_threads_using24,602
+  atomic_int32_t num_threads_waiting;num_threads_waiting25,638
+  sem_t sem;sem26,676
+  void *freelist;freelist27,689
+static void * hashtable_find_add_string(struct hashtable *ht,hashtable_find_add_string44,1276
+static int hashtable_add_string(struct hashtable *ht,hashtable_add_string57,1857
+static void* hashtable_set_string(struct hashtable *ht,hashtable_set_string67,2263
+static void* hashtable_update_string(struct hashtable *ht, char *key,hashtable_update_string84,3153
+static void* hashtable_remove_string(struct hashtable *ht, char *str){hashtable_remove_string93,3526
+static void* hashtable_find_string(struct hashtable *ht, char *str){hashtable_find_string102,3868
+
+Makefile,197
+CC=gccCC1,0
+CFLAGS= -std=c11 -Wall -Wno-unused -O2 -g -D_GNU_SOURCE -IutilCFLAGS2,7
+PARSER_SOURCES = parser.c rdp.c my_parser.c util/hash.c util/svector.c util/string_buf.cPARSER_SOURCES6,97
+
+my_parser.c,2962
+#define STRING_BUF_MACROSSTRING_BUF_MACROS3,38
+typedef struct hashtable hashtable;hashtable6,113
+typedef struct mem_stream mem_stream;mem_stream7,149
+struct mem_stream {mem_stream8,187
+  uint8_t *mem;mem9,207
+  size_t sz;sz10,223
+  size_t off;off11,236
+int stream_at_end(mem_stream *stream){stream_at_end13,253
+void free_stream(mem_stream *stream){free_stream16,331
+string stream_next_word(mem_stream *stream){stream_next_word20,422
+string stream_next_line(mem_stream *stream){stream_next_line34,841
+mem_stream *FILE_to_stream(FILE *f){FILE_to_stream42,1102
+int tokenize(string line, string *tokens){tokenize53,1381
+typedef struct grammar grammar;grammar66,1658
+typedef struct symbol symbol;symbol67,1690
+typedef struct non_terminal_rule non_terminal_rule;non_terminal_rule68,1720
+typedef struct terminal_rule terminal_rule;terminal_rule69,1772
+struct non_terminal_rule {non_terminal_rule70,1816
+  double prob;prob71,1843
+  string lhs;lhs72,1858
+  string rhs1;rhs173,1872
+  string rhs2;rhs274,1887
+struct terminal_rule {terminal_rule76,1905
+  double prob;prob77,1928
+  string lhs;lhs78,1943
+  string rhs;rhs79,1957
+struct grammar {grammar81,1974
+  non_terminal_rule *non_terminals;non_terminals82,1991
+  terminal_rule *terminals;terminals83,2027
+  hashtable *symbol_table;symbol_table84,2055
+  int num_non_terminals;num_non_terminals85,2082
+  int num_terminals;num_terminals86,2107
+non_terminal_rule *make_non_terminal(string lhs, string rhs,make_non_terminal88,2131
+terminal_rule *make_terminal(string lhs, string rhs, double prob){make_terminal97,2418
+void add_symbol(hashtable *symbol_table, string symbol,add_symbol106,2740
+grammar* parse_grammar(FILE *f){parse_grammar115,2973
+struct node {node183,5168
+  int32_t left;left184,5182
+  int32_t right;right185,5198
+  double prob;prob186,5215
+    struct node *next;next188,5240
+    string *terminal;terminal189,5263
+struct node *make_node(int l, int r, double prob, void *next){make_node192,5293
+struct grid {grid204,5661
+  struct node *nodes;nodes205,5675
+  int32_t len1;len1206,5697
+  int32_t len2;len2207,5713
+  int32_t len3;len3208,5729
+#define grid_val(grid_val211,5801
+struct node *grid_read(struct grid *g, int i, int j, int k){grid_read214,5911
+void grid_write(struct grid *g, int i, int j, int k, struct node val){grid_write217,6035
+int grid_index(struct grid *g, int i, int j, int k){grid_index222,6250
+struct grid *make_grid(int len1, int len2, int len3){make_grid225,6351
+static inline int find_symbol_index(hashtable *symbol_table, string sym){find_symbol_index234,6656
+void build_parse_tree_rec(struct grid *g, int start,build_parse_tree_rec242,7019
+string build_parse_tree(struct grid *g, int start, string *symbol_list){build_parse_tree271,8062
+int tokenize_input(string input, string **tokens){tokenize_input278,8270
+struct svector parse(grammar *gr, string input){parse287,8568
+
+parser.c,900
+int start_index = -1;start_index21,320
+const rule* rule_list = NULL;rule_list27,416
+const word_rule* word_list = NULL;word_list31,528
+int rule_count = 0;rule_count35,591
+int word_count = 0;word_count39,654
+int input_length = 0;input_length43,722
+char* tokenized_input [MAX_INPUT] = {NULL};tokenized_input47,796
+char input[MAX_CHARS] = {0};input51,869
+char* symbol_table[MAX_SYMBOLS] = {NULL};symbol_table56,921
+int symbol_count = 0;symbol_count60,1020
+void print_words(void){print_words66,1089
+void print_rules(void){print_rules76,1344
+void read_input(){read_input88,1661
+int find_symbol_index(const char* looking_for){find_symbol_index112,2195
+void print_symbols(){print_symbols127,2556
+void read_rules(FILE* f){read_rules137,2776
+void usage(void){usage207,4787
+void cleanup_rules(void){cleanup_rules216,5064
+int main(int argc, const char * argv[])main234,5433
+
+parser.h,943
+#define PARSER_HPARSER_H2,17
+#define LINEMAX LINEMAX7,81
+#undef MAX_INPUTMAX_INPUT9,118
+#define MAX_INPUT MAX_INPUT11,142
+#define MAX_CHARS MAX_CHARS12,165
+#define MAX_SYMBOLS MAX_SYMBOLS13,189
+typedef struct r {r26,410
+    double probability;probability27,429
+    const char* lhs;lhs28,453
+    const char* rhs1;rhs129,474
+    const char* rhs2;rhs230,496
+    const struct r* next;next31,518
+} rule;rule32,544
+typedef struct wr{wr42,700
+    double probability;probability43,719
+    const char*  lhs;lhs44,743
+    const char* word;word45,765
+    const struct wr* next;next46,787
+} word_rule;word_rule47,814
+struct parser {parser54,1022
+  const rule *rule_list;rule_list55,1038
+  const word_rule **word_list;word_list56,1063
+  string *tokens;tokens57,1094
+  int rule_count;rule_count58,1112
+  int word_count;word_count59,1130
+  int num_tokens;num_tokens60,1148
+#define RDP_MAX RDP_MAX63,1172
+
+rdp.c,675
+    int start_ix;start_ix30,506
+    int end_ix;end_ix31,524
+    int subparse_count;subparse_count32,540
+    char** subparses;subparses33,564
+    double* probabilities;probabilities34,586
+    void** rules;rules35,613
+} rdp_node;rdp_node36,631
+void print(rdp_node* n){print38,644
+void add_rdp_nodes(rdp_node* recipient, rdp_node* victim){add_rdp_nodes56,1231
+void mult_rdp_nodes(rdp_node* recipient, rdp_node* victim, const char* nt){mult_rdp_nodes116,3125
+void junk_rdp_node(rdp_node* junk){junk_rdp_node185,5485
+rdp_node parse(const char* nt, const int start, const int end, const rule* parent){parse193,5673
+void rdp_parse(void){rdp_parse321,10385
+
+rdp.h,73
+#define Parser_rdp_hParser_rdp_h16,265
+#define RDP_MAX RDP_MAX18,287
+
+string_buf.c,1228
+typedef struct string_segment string_segment;string_segment15,637
+struct string_segment {string_segment16,683
+  const char *str;str17,707
+  string_segment *next;next18,726
+  uint32_t len;len19,750
+string_segment *make_string_segment(const char *str, uint32_t len){make_string_segment21,769
+static inline void string_buf_append_string_segment(string_buf *buf,string_buf_append_string_segment29,1046
+static void string_buf_force_flush(string_buf *buf){string_buf_force_flush50,1730
+void string_buf_flush(string_buf *buf){string_buf_flush62,2118
+void string_buf_append_strn(string_buf *buf,string_buf_append_strn73,2379
+void string_buf_append_strn_copy(string_buf *buf,string_buf_append_strn_copy81,2779
+void string_buf_vsprintf(string_buf *buf, const char *fmt, va_list ap){string_buf_vsprintf99,3453
+void string_buf_sprintf(string_buf *buf, const char *fmt, ...){string_buf_sprintf121,4180
+string string_buf_to_string(string_buf *buf){string_buf_to_string137,4732
+string *string_buf_to_string_ptr(string_buf *buf){string_buf_to_string_ptr162,5538
+const char *string_buf_to_cstr(string_buf *buf, uint32_t *len){string_buf_to_cstr169,5703
+string_buf *malloc_string_buf(){malloc_string_buf177,5873
+
+strmap.c,982
+typedef struct Pair Pair;Pair38,1219
+typedef struct Bucket Bucket;Bucket40,1246
+struct Pair {Pair42,1277
+	char *key;key43,1291
+	char *value;value44,1303
+struct Bucket {Bucket47,1321
+	unsigned int count;count48,1337
+	Pair *pairs;pairs49,1358
+struct StrMap {StrMap52,1376
+	unsigned int count;count53,1392
+	Bucket *buckets;buckets54,1413
+StrMap * sm_new(unsigned int capacity)sm_new60,1537
+void sm_delete(StrMap *map)sm_delete78,1871
+int sm_get(const StrMap *map, const char *key, char *out_buf, unsigned int n_out_buf)sm_get108,2274
+int sm_exists(const StrMap *map, const char *key)sm_exists139,2837
+int sm_put(StrMap *map, const char *key, const char *value)sm_put160,3159
+int sm_get_count(const StrMap *map)sm_get_count246,5463
+int sm_enum(const StrMap *map, sm_enum_func enum_func, const void *obj)sm_enum275,5839
+static Pair * get_pair(Bucket *bucket, const char *key)get_pair309,6392
+static unsigned long hash(const char *str)hash335,6791
+
+strmap.h,186
+#define _STRMAP_H__STRMAP_H_37,1217
+typedef struct StrMap StrMap;StrMap47,1318
+typedef void(*sm_enum_func)(const char *key, const char *value, const void *obj);sm_enum_func66,1793
+
+svector.c,1236
+#define XMALLOCXMALLOC5,76
+static inline void* xmalloc(size_t sz){xmalloc6,92
+typedef struct svector svector;svector15,265
+inline svector make_svector(int size){make_svector16,297
+inline svector copy_svector(const svector *svec){copy_svector21,444
+svector init_svector(int size, int len, const void *data){init_svector29,688
+svector svector_reverse(const svector *svec){svector_reverse36,862
+svector svector_reverse_inplace(svector *svec){svector_reverse_inplace45,1077
+int svector_find(const struct svector *svec, void *elt){svector_find52,1230
+int svector_search(const struct svector *svec, int(*test)(void*)){svector_search61,1395
+int svector_search2(const struct svector *svec,svector_search270,1573
+void* svector_reduce(const svector *vec, void*(*f)(void*,void*)){svector_reduce80,1796
+static inline svector svector_map_internal(const svector *vec,svector_map_internal88,1978
+svector svector_map(const svector *vec, void*(*f)(void*)){svector_map96,2210
+svector svector_map_inplace(svector *vec, void*(*f)(void*)){svector_map_inplace101,2390
+void svector_mapc(const svector *vec, void(*f)(void*)){svector_mapc104,2498
+svector svector_sort(svector *svec, int(*cmp)(void*,void*),svector_sort111,2635
+
+svector.h,966
+#define _SVECTOR_H__SVECTOR_H_2,20
+typedef struct svector svector;svector16,287
+struct svector {svector17,319
+  void **data;data18,336
+  int len;len19,351
+  int size;size20,362
+#define svector_check_size(svector_check_size25,430
+#define svector_data(svector_data32,883
+#define svector_len(svector_len38,1098
+#define SVECTOR_POP(SVECTOR_POP42,1291
+static inline void *svector_pop(struct svector *vec){svector_pop44,1372
+#define SVECTOR_PUSH(SVECTOR_PUSH47,1460
+static inline void svector_push(void *elt, struct svector* vec){svector_push50,1638
+#define SVECTOR_REF(SVECTOR_REF55,1780
+static inline void* svector_ref(const struct svector *vec, int idx){svector_ref57,1872
+#define SVECTOR_SET(SVECTOR_SET60,1968
+static inline void svector_set(struct svector *vec, int idx, void *elt){svector_set62,2066
+#define SVECTOR_SWAP(SVECTOR_SWAP65,2165
+static inline void svector_swap(struct svector *vec, int i, int j){svector_swap70,2393

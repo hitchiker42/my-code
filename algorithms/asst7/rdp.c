@@ -6,8 +6,8 @@
 #include <string.h>
 #include <stdbool.h>
 #include "parser.h"
-#include "rdp.h"
-#include "cyk.h"
+
+
 
 
 
@@ -35,7 +35,7 @@ typedef struct {
     void** rules;
 } rdp_node;
 
-void print(rdp_node* n){
+static void print(rdp_node* n){
     fprintf(stderr, "start %d end %d subparses: %d\n", n->start_ix, n->end_ix, n->subparse_count);
     for(int i = 0; i < n->subparse_count; i++){
         assert(n != NULL);
@@ -53,7 +53,7 @@ void print(rdp_node* n){
 /**
  Adds the contents of victim to recipient
  */
-void add_rdp_nodes(rdp_node* recipient, rdp_node* victim){
+static void add_rdp_nodes(rdp_node* recipient, rdp_node* victim){
     if(recipient->start_ix != victim->start_ix){
         fprintf(stderr, "rec start %d vic start %d\n", recipient->start_ix, victim->start_ix);
         assert(false);
@@ -74,12 +74,9 @@ void add_rdp_nodes(rdp_node* recipient, rdp_node* victim){
   */  
     assert(n_items > 0);
     
-    char** new_subparses = malloc(sizeof(char*) * n_items);
-    const rule** new_rules = malloc(sizeof(rule*) * n_items);
-    double* new_probabilities = malloc(sizeof(double*) * n_items);
-    malloc_check(new_subparses);
-    malloc_check(new_probabilities);
-    malloc_check(new_rules);
+    char** new_subparses = xmalloc(sizeof(char*) * n_items);
+    const rule** new_rules = xmalloc(sizeof(rule*) * n_items);
+    double* new_probabilities = xmalloc(sizeof(double*) * n_items);
 
     assert(recipient != NULL);
 
@@ -116,20 +113,17 @@ void add_rdp_nodes(rdp_node* recipient, rdp_node* victim){
 /**
  combines two rdp_nodes
  */
-void mult_rdp_nodes(rdp_node* recipient, rdp_node* victim, const char* nt){
+static void mult_rdp_nodes(rdp_node* recipient, rdp_node* victim, const char* nt){
     /* make sure they're adjacent to eachother */
     assert(recipient->end_ix == victim->start_ix - 1);
     assert(recipient->subparse_count > 0);
     assert(victim->subparse_count > 0);
     
     int n_items = recipient->subparse_count * victim->subparse_count;
-    char** new_subparses = malloc(sizeof(char*) * n_items);
-    double* new_probabilities = malloc(sizeof(double*) * n_items);
-    const rule** const new_rules = malloc(sizeof(rule*) * n_items);
-    
-    malloc_check(new_subparses);
-    malloc_check(new_probabilities);
-    malloc_check(new_rules);
+    char** new_subparses = xmalloc(sizeof(char*) * n_items);
+    double* new_probabilities = xmalloc(sizeof(double*) * n_items);
+    const rule** const new_rules = xmalloc(sizeof(rule*) * n_items);
+
 
 /*
     fprintf(stderr, "mult rec :");
@@ -143,8 +137,7 @@ void mult_rdp_nodes(rdp_node* recipient, rdp_node* victim, const char* nt){
             new_length += strlen(recipient->subparses[i]);
             const rule* r = recipient->rules[i];
             new_length += strlen(r->lhs) + 5;
-            char* new_string = malloc(new_length);
-            malloc_check(new_string);
+            char* new_string = xmalloc(new_length);
             
             if(strcmp(nt, r->lhs) != 0){
                 fprintf(stderr, "error using %s->%s %s to produce %s\n",
@@ -189,7 +182,7 @@ void mult_rdp_nodes(rdp_node* recipient, rdp_node* victim, const char* nt){
 /**
  deletes a rdp_node
  */
-void junk_rdp_node(rdp_node* junk){
+static void junk_rdp_node(rdp_node* junk){
     for(int i = 0; i < junk->subparse_count; i++){
         free(junk->subparses[i]);
     }
@@ -197,7 +190,8 @@ void junk_rdp_node(rdp_node* junk){
     free(junk->probabilities);
 }
 
-rdp_node parse(const char* nt, const int start, const int end, const rule* parent){
+static rdp_node parse(const char* nt, const int start, 
+                      const int end, const rule* parent){
     assert(start <= end);
     rdp_node to_return;
     to_return.start_ix = start;
@@ -227,16 +221,13 @@ rdp_node parse(const char* nt, const int start, const int end, const rule* paren
                     current_word = current_word->next;
                     continue;
                 }
-                char* copy = malloc(strlen(current_word->word) + strlen(nt) + 3);
-                malloc_check(copy);
+                char* copy = xmalloc(strlen(current_word->word) + strlen(nt) + 3);
+
                 sprintf(copy, "%s(%s)", nt, current_word->word);
-                to_return.subparses = malloc(sizeof(char*));
-                to_return.probabilities = malloc(sizeof(double));
-                to_return.rules = malloc(sizeof(void*));
-                malloc_check(to_return.subparses);
-                malloc_check(to_return.probabilities);
-                malloc_check(to_return.rules);
-                
+                to_return.subparses = xmalloc(sizeof(char*));
+                to_return.probabilities = xmalloc(sizeof(double));
+                to_return.rules = xmalloc(sizeof(void*));
+
                 to_return.subparses[0] = copy;
                 to_return.probabilities[0] = current_word->probability;
                 to_return.rules[0] = (void*) parent;

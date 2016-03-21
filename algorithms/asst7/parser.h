@@ -1,9 +1,14 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+#include "C_util.h"
+
 #include <stdlib.h>
 
 #define LINEMAX 100
+#ifdef MAX_INPUT
+#undef MAX_INPUT
+#endif
 #define MAX_INPUT 1000
 #define MAX_CHARS 10000
 #define MAX_SYMBOLS 500
@@ -46,15 +51,9 @@ typedef struct wr{
    used to search for the index of a particular non terminal symbol.
  */
 int find_symbol_index(const char* looking_for);
-
-struct parser {
-  const rule *rule_list;
-  const word_rule **word_list;
-  string *tokens;
-  int rule_count;
-  int word_count;
-  int num_tokens;
-};
   
+#define RDP_MAX 20
 
+void rdp_parse(void);
+void cyk_parse(FILE* grammar_file, FILE* in, FILE* out);
 #endif

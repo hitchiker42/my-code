@@ -1,0 +1,15 @@
+NP fish 1
+NP NP PP 1
+VP VP ADDEDB 1
+N fish 1
+ADDEDB NP NP .5
+ART the .5
+NP ART N .3
+S NP VP .2
+VP V NP .1
+PP P NP 1
+V fish 1
+VP fish 1
+NP N N 1
+VP NP PP 1
+P about 1
