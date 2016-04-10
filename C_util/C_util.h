@@ -97,6 +97,9 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
     (1UL << ((sizeof(num)*CHAR_BIT) - __builtin_clzl(num)))
 #define LOG_2(num)                                      \
     ((sizeof(num)*CHAR_BIT) - (__builtin_clzl(num)+1))
+#define LOG_2_FLOOR(num) LOG_2(num)
+#define LOG_2_CEIL(num)                                 \
+  ((sizeof(num)*CHAR_BIT) - (__builtin_clzl(num)+IS_POW_OF_2(num)))
 //The nearest integer greater than x/y, where x and y are integers
 #define IDIV_CEIL(x,y)                          \
   __extension__                                 \
@@ -138,7 +141,7 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
   ((val) ^= (1ul << (bit)))
 /*
   You need to use a union to do this to avoid breaking strict aliasing.
-  Also the standard *(type*)&val idom is technically undefined behavior,
+  Also the standard *(type*)&val idiom is technically undefined behavior,
   though pretty much every C compiler will do what you want.
 */
 #define BITCAST(val, type)                      \
@@ -186,6 +189,7 @@ typedef void(*int_sort_fn)(uint64_t*, size_t);
 
 #define DOTIMES(var, count)                     \
   for(ssize_t var = 0; var < count; var++)
+
 
 /*
   This is rather complex internally, but it should `just work`.
@@ -290,7 +294,51 @@ const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
 // Calls the variadic function func with the number of arguments as
 // its first argument.
 #define VA_FUNC(func, ...) func(__NARG__(__VA_ARGS__), __VA_ARGS__)
-//I could add a preprocessor loop, if I was feeling evil
+/*
+  Map a macro over a set of args, how this works is rather complicated, but it
+  does work.
+*/
+#define EVAL0(...) __VA_ARGS__
+#define EVAL1(...) EVAL0 (EVAL0 (EVAL0 (__VA_ARGS__)))
+#define EVAL2(...) EVAL1 (EVAL1 (EVAL1 (__VA_ARGS__)))
+#define EVAL3(...) EVAL2 (EVAL2 (EVAL2 (__VA_ARGS__)))
+#define EVAL4(...) EVAL3 (EVAL3 (EVAL3 (__VA_ARGS__)))
+#define EVAL(...)  EVAL4 (EVAL4 (EVAL4 (__VA_ARGS__)))
+
+#define MAP_END(...)
+#define MAP_OUT
+
+#define MAP_GET_END() 0, MAP_END
+#define MAP_NEXT0(test, next, ...) next MAP_OUT
+#define MAP_NEXT1(test, next) MAP_NEXT0 (test, next, 0)
+#define MAP_NEXT(test, next)  MAP_NEXT1 (MAP_GET_END test, next)
+
+#define MAP0(f, x, peek, ...) f(x) MAP_NEXT (peek, MAP1) (f, peek, __VA_ARGS__)
+#define MAP1(f, x, peek, ...) f(x) MAP_NEXT (peek, MAP0) (f, peek, __VA_ARGS__)
+#define MAP(f, ...) EVAL (MAP1 (f, __VA_ARGS__, (), 0))
+/*
+  This could also be done with X macros
+*/
+#define STRINGIFY_W_COMMA(arg) #arg,
+/*
+  Generate an enum, an array containing the enum values as strings and a function
+  to convert an enum value to a string.
+*/
+#define GEN_ENUM(name, ...)                                             \
+  enum name {__VA_ARGS__};                                              \
+  const char *CAT(name, _strings)[] = {MAP(STRINGIFY_W_COMMA, __VA_ARGS__) ""};    \
+  const char *CAT(name, _to_string)(enum name x){return CAT(name, _strings[x]);}
+/*
+  Same as above but allows the user to set the value of the first enum member.
+*/
+#define GEN_ENUM_OFFSET(name, offset, x, ...)                           \
+  enum name {x = ofsets, __VA_ARGS__};                                  \
+  const char *CAT(name, _strings)[] = {STRINGIFY(x),                    \
+                                       MAP(STRINGIFY_W_COMMA, __VA_ARGS__) ""}; \
+  const char *CAT(name, _to_string)(enum name x){return CAT(name, _strings[x]);}
+
+
+
 /*
   Macros for some C extensions
 */
@@ -317,12 +365,12 @@ const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
     sort_u64(uint64_t *arr, size_t len){
       __sort_generic((void**)arr, len, cmp_lt)
     }
-    Since __sort_generic the compiler will generate sort_u64 using
-  a simple less than comparision, rather than making a function call
-  to compare things. If __sort_generic isn't declared always_inline
-  the compiler will only do this with O3 level optimization.
+    Since __sort_generic is always inline the compiler will generate 
+  sort_u64 using a simple less than comparision, rather than making a 
+  function call to compare things. If __sort_generic isn't declared 
+  always_inline the compiler will only do this with O3 level optimization.
 
-  __attribute__((always_inline)) by itself causes compiler warnings
+  __attribute__((always_inline)) without a normal inline causes compiler warnings
 */
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 //always inline functions are almost always static
@@ -539,8 +587,16 @@ struct timespec timeval_to_timespec(struct timeval tv);
     seconds even if interupted.
 */
 double float_sleep(double sleep_time);
-void float_sleep_full(double sleep_time);
-
+void floatsleep_full(double sleep_time);
+/*
+  Wrappers around strto[u]l, they take an extra argument which
+  is a pointer to put the result in, and they return 0/1 to
+  indicate an error. 0 is stored in result on error.
+*/
+int strtol_checked(const char *nptr, char **endptr,
+                   int base, long *result);
+int strtoul_checked(const char *nptr, char **endptr,
+                    int base, unsigned long *result);
 /*
   Parse an integer in the given base, mostly the same as strtol
   but leading 0s are ignored instead of indicating octal.
@@ -550,6 +606,8 @@ void float_sleep_full(double sleep_time);
 
   This function actually does the string to integer convesrion itself,
   i.e it doesn't call strtol.
+
+  This probably needs to be tested.
 */
 long parse_integer(char *str, char **endptr,
   int len, int base, int *err);
@@ -702,7 +760,7 @@ static inline void* xmalloc(size_t sz){
 #ifndef XREALLOC
 #define XREALLOC
 static inline void* xrealloc(void *ptr, size_t sz){
-  void *mem = xrealloc(ptr, sz);
+  void *mem = realloc(ptr, sz);
   if(!mem && sz != 0){
     oom_fun();
   }

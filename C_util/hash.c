@@ -25,7 +25,7 @@ struct hash_entry {
 #define atomic_dec(ptr)
 #define atomic_cmpxchg(a,b,c)
 #define atomic_compare_exchange(a,b,c)
-#define atomic_load(ptr) *ptr
+#define atomic_load(ptr) *(ptr)
 #define inc_hashtable_threadcount(ht)
 #else
 /*
@@ -425,9 +425,13 @@ void* hashtable_find(htable *ht, void *key, size_t key_sz){
   while(entry){
     if(entry->hv == hv){
       if(ht->cmp(key, entry->key, key_sz, entry->key_sz)){
+#ifdef ATOMIC_HASHTABLE
         void *retval = atomic_load(&entry->value);
         atomic_dec(&ht->num_threads_using);
         return retval;
+#else
+        return entry->value;
+#endif
       }
     }
     entry = entry->next;

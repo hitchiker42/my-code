@@ -587,8 +587,8 @@ util_rand_state util_auto_rand_state(void){
 #endif
 #if (defined USE_SEED_TIME) && (USE_SEED_TIME > 0)
   struct timespec ts = get_current_time();
-  state.state[0] =  ts.tv_sec;
-  state.state[1] = ts.tv_nsec;
+  state.state[1] =  ts.tv_sec ^ ts.tv_nsec;
+  state.state[0] = ts.tv_nsec;
   return state;
 #endif
 //It's better than leaving it 0
@@ -599,11 +599,12 @@ util_rand_state util_auto_rand_state(void){
 void util_srand(uint64_t a, uint64_t b){
   internal_rand_state.state[0] = a;
   internal_rand_state.state[1] = b;
+  //  DEBUG_PRINTF("Initializing random state to %#0lx, %#0lx\n", a, b);
   return;
 }
 void util_srand_auto(){
   util_rand_state tmp = util_auto_rand_state();
-  internal_rand_state = tmp;
+  util_srand(tmp.state[0], tmp.state[1]);
   return;
 }    
 void shuffle_array(void **arr, size_t n){
@@ -631,6 +632,28 @@ void shuffle_array(void **arr, size_t n){
       a[j] = fn(userdata);
     }
 */
+int strtol_checked(const char *nptr, char **endptr, int base, long *result){
+  errno = 0;
+  long tmp = strtol(nptr, endptr, base);
+  if(errno != 0){
+    *result = 0;
+    return 1;
+  } else {
+    *result = tmp;
+    return 0;
+  }
+}
+int strtoul_checked(const char *nptr, char **endptr, int base, unsigned long *result){
+  errno = 0;
+  unsigned long tmp = strtoul(nptr, endptr, base);
+  if(errno != 0){
+    *result = 0;
+    return 1;
+  } else {
+    *result = tmp;
+    return 0;
+  }
+}
 
 //need to do a check for start > stop, or start < 0 and stop == 0,
 //both of which should work, but currently don't

@@ -146,7 +146,7 @@ static __attribute__((unused)) void enable_backtraces(void){
 #undef assert
 #define assert(...)
 #endif
-static ATTRIBUTE_UNUSED void enable_backtraces(void){
+static __attribute__((unused)) void enable_backtraces(void){
   return;
 }
 #endif

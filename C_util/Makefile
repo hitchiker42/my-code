@@ -90,7 +90,8 @@ POST_UNINSTALL = :
 build_triplet = x86_64-unknown-linux-gnu
 host_triplet = x86_64-unknown-linux-gnu
 check_PROGRAMS = test/test_sort$(EXEEXT) test/test_hash$(EXEEXT) \
-	test/test_rbtree$(EXEEXT) test/test_btree$(EXEEXT)
+	test/test_rbtree$(EXEEXT) test/test_btree$(EXEEXT) \
+	test/test_fib_heap$(EXEEXT)
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -140,7 +141,8 @@ libcutil_la_LIBADD =
 am__objects_1 = libcutil_la-C_util.lo libcutil_la-svector.lo \
 	libcutil_la-sorting.lo libcutil_la-heap.lo libcutil_la-utf8.lo \
 	libcutil_la-hash.lo libcutil_la-rbtree.lo libcutil_la-btree.lo \
-	libcutil_la-string_buf.lo libcutil_la-util_string.lo
+	libcutil_la-string_buf.lo libcutil_la-util_string.lo \
+	libcutil_la-fib_heap.lo
 am_libcutil_la_OBJECTS = $(am__objects_1)
 libcutil_la_OBJECTS = $(am_libcutil_la_OBJECTS)
 AM_V_lt = $(am__v_lt_$(V))
@@ -151,6 +153,10 @@ test_test_btree_SOURCES = test/test_btree.c
 am__dirstamp = $(am__leading_dot)dirstamp
 test_test_btree_OBJECTS = test/test_test_btree-test_btree.$(OBJEXT)
 test_test_btree_DEPENDENCIES = libcutil.la
+test_test_fib_heap_SOURCES = test/test_fib_heap.c
+test_test_fib_heap_OBJECTS =  \
+	test/test_test_fib_heap-test_fib_heap.$(OBJEXT)
+test_test_fib_heap_DEPENDENCIES = libcutil.la
 test_test_hash_SOURCES = test/test_hash.c
 test_test_hash_OBJECTS = test/test_test_hash-test_hash.$(OBJEXT)
 test_test_hash_DEPENDENCIES = libcutil.la
@@ -195,10 +201,12 @@ AM_V_CCLD = $(am__v_CCLD_$(V))
 am__v_CCLD_ = $(am__v_CCLD_$(AM_DEFAULT_VERBOSITY))
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(libcutil_la_SOURCES) test/test_btree.c test/test_hash.c \
-	test/test_rbtree.c test/test_sort.c
+SOURCES = $(libcutil_la_SOURCES) test/test_btree.c \
+	test/test_fib_heap.c test/test_hash.c test/test_rbtree.c \
+	test/test_sort.c
 DIST_SOURCES = $(libcutil_la_SOURCES) test/test_btree.c \
-	test/test_hash.c test/test_rbtree.c test/test_sort.c
+	test/test_fib_heap.c test/test_hash.c test/test_rbtree.c \
+	test/test_sort.c
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -228,7 +236,8 @@ CTAGS = ctags
 CSCOPE = cscope
 AM_RECURSIVE_TARGETS = cscope
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in \
-	$(top_srcdir)/build-aux/ar-lib $(top_srcdir)/build-aux/compile \
+	$(srcdir)/test/Makefile.am $(top_srcdir)/build-aux/ar-lib \
+	$(top_srcdir)/build-aux/compile \
 	$(top_srcdir)/build-aux/config.guess \
 	$(top_srcdir)/build-aux/config.sub \
 	$(top_srcdir)/build-aux/depcomp \
@@ -376,7 +385,7 @@ top_builddir = .
 top_srcdir = .
 AM_CPPFLAGS = -O2 -g $(CFLAGS_EXTRA) -std=gnu11 -Wall -Wno-unused
 SOURCE_FILES = C_util.c svector.c sorting.c heap.c utf8.c hash.c \
-		rbtree.c btree.c string_buf.c util_string.c
+		rbtree.c btree.c string_buf.c util_string.c fib_heap.c
 
 HEADER_FILES = C_util.h debug.h svector.h hash.h string_buf.h util_string.h
 lib_LTLIBRARIES = libcutil.la
@@ -391,7 +400,9 @@ test_test_hash_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3
 test_test_rbtree_LDADD = libcutil.la
 test_test_rbtree_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3
 test_test_btree_LDADD = libcutil.la
-test_test_btree_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3 
+test_test_btree_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3
+test_test_fib_heap_LDADD = libcutil.la
+test_test_fib_heap_CPPFLAGS = $(AM_CPPFLAGS) -Og -g3 
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -399,7 +410,7 @@ all: config.h
 .SUFFIXES: .c .lo .o .obj
 am--refresh: Makefile
 	@:
-$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
+$(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(srcdir)/test/Makefile.am $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
@@ -421,6 +432,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $@ $(am__depfiles_maybe)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $@ $(am__depfiles_maybe);; \
 	esac;
+$(srcdir)/test/Makefile.am $(am__empty):
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	$(SHELL) ./config.status --recheck
@@ -504,6 +516,12 @@ test/test_test_btree-test_btree.$(OBJEXT): test/$(am__dirstamp) \
 test/test_btree$(EXEEXT): $(test_test_btree_OBJECTS) $(test_test_btree_DEPENDENCIES) $(EXTRA_test_test_btree_DEPENDENCIES) test/$(am__dirstamp)
 	@rm -f test/test_btree$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(test_test_btree_OBJECTS) $(test_test_btree_LDADD) $(LIBS)
+test/test_test_fib_heap-test_fib_heap.$(OBJEXT): test/$(am__dirstamp) \
+	test/$(DEPDIR)/$(am__dirstamp)
+
+test/test_fib_heap$(EXEEXT): $(test_test_fib_heap_OBJECTS) $(test_test_fib_heap_DEPENDENCIES) $(EXTRA_test_test_fib_heap_DEPENDENCIES) test/$(am__dirstamp)
+	@rm -f test/test_fib_heap$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(test_test_fib_heap_OBJECTS) $(test_test_fib_heap_LDADD) $(LIBS)
 test/test_test_hash-test_hash.$(OBJEXT): test/$(am__dirstamp) \
 	test/$(DEPDIR)/$(am__dirstamp)
 
@@ -532,6 +550,7 @@ distclean-compile:
 
 include ./$(DEPDIR)/libcutil_la-C_util.Plo
 include ./$(DEPDIR)/libcutil_la-btree.Plo
+include ./$(DEPDIR)/libcutil_la-fib_heap.Plo
 include ./$(DEPDIR)/libcutil_la-hash.Plo
 include ./$(DEPDIR)/libcutil_la-heap.Plo
 include ./$(DEPDIR)/libcutil_la-rbtree.Plo
@@ -541,6 +560,7 @@ include ./$(DEPDIR)/libcutil_la-svector.Plo
 include ./$(DEPDIR)/libcutil_la-utf8.Plo
 include ./$(DEPDIR)/libcutil_la-util_string.Plo
 include test/$(DEPDIR)/test_test_btree-test_btree.Po
+include test/$(DEPDIR)/test_test_fib_heap-test_fib_heap.Po
 include test/$(DEPDIR)/test_test_hash-test_hash.Po
 include test/$(DEPDIR)/test_test_rbtree-test_rbtree.Po
 include test/$(DEPDIR)/test_test_sort-test_sort.Po
@@ -639,6 +659,13 @@ libcutil_la-util_string.lo: util_string.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-util_string.lo `test -f 'util_string.c' || echo '$(srcdir)/'`util_string.c
 
+libcutil_la-fib_heap.lo: fib_heap.c
+	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT libcutil_la-fib_heap.lo -MD -MP -MF $(DEPDIR)/libcutil_la-fib_heap.Tpo -c -o libcutil_la-fib_heap.lo `test -f 'fib_heap.c' || echo '$(srcdir)/'`fib_heap.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcutil_la-fib_heap.Tpo $(DEPDIR)/libcutil_la-fib_heap.Plo
+#	$(AM_V_CC)source='fib_heap.c' object='libcutil_la-fib_heap.lo' libtool=yes \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcutil_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o libcutil_la-fib_heap.lo `test -f 'fib_heap.c' || echo '$(srcdir)/'`fib_heap.c
+
 test/test_test_btree-test_btree.o: test/test_btree.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_btree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_btree-test_btree.o -MD -MP -MF test/$(DEPDIR)/test_test_btree-test_btree.Tpo -c -o test/test_test_btree-test_btree.o `test -f 'test/test_btree.c' || echo '$(srcdir)/'`test/test_btree.c
 	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_btree-test_btree.Tpo test/$(DEPDIR)/test_test_btree-test_btree.Po
@@ -652,6 +679,20 @@ test/test_test_btree-test_btree.obj: test/test_btree.c
 #	$(AM_V_CC)source='test/test_btree.c' object='test/test_test_btree-test_btree.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_btree_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_btree-test_btree.obj `if test -f 'test/test_btree.c'; then $(CYGPATH_W) 'test/test_btree.c'; else $(CYGPATH_W) '$(srcdir)/test/test_btree.c'; fi`
+
+test/test_test_fib_heap-test_fib_heap.o: test/test_fib_heap.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_fib_heap_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_fib_heap-test_fib_heap.o -MD -MP -MF test/$(DEPDIR)/test_test_fib_heap-test_fib_heap.Tpo -c -o test/test_test_fib_heap-test_fib_heap.o `test -f 'test/test_fib_heap.c' || echo '$(srcdir)/'`test/test_fib_heap.c
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_fib_heap-test_fib_heap.Tpo test/$(DEPDIR)/test_test_fib_heap-test_fib_heap.Po
+#	$(AM_V_CC)source='test/test_fib_heap.c' object='test/test_test_fib_heap-test_fib_heap.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_fib_heap_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_fib_heap-test_fib_heap.o `test -f 'test/test_fib_heap.c' || echo '$(srcdir)/'`test/test_fib_heap.c
+
+test/test_test_fib_heap-test_fib_heap.obj: test/test_fib_heap.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_fib_heap_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_fib_heap-test_fib_heap.obj -MD -MP -MF test/$(DEPDIR)/test_test_fib_heap-test_fib_heap.Tpo -c -o test/test_test_fib_heap-test_fib_heap.obj `if test -f 'test/test_fib_heap.c'; then $(CYGPATH_W) 'test/test_fib_heap.c'; else $(CYGPATH_W) '$(srcdir)/test/test_fib_heap.c'; fi`
+	$(AM_V_at)$(am__mv) test/$(DEPDIR)/test_test_fib_heap-test_fib_heap.Tpo test/$(DEPDIR)/test_test_fib_heap-test_fib_heap.Po
+#	$(AM_V_CC)source='test/test_fib_heap.c' object='test/test_test_fib_heap-test_fib_heap.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_fib_heap_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o test/test_test_fib_heap-test_fib_heap.obj `if test -f 'test/test_fib_heap.c'; then $(CYGPATH_W) 'test/test_fib_heap.c'; else $(CYGPATH_W) '$(srcdir)/test/test_fib_heap.c'; fi`
 
 test/test_test_hash-test_hash.o: test/test_hash.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(test_test_hash_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT test/test_test_hash-test_hash.o -MD -MP -MF test/$(DEPDIR)/test_test_hash-test_hash.Tpo -c -o test/test_test_hash-test_hash.o `test -f 'test/test_hash.c' || echo '$(srcdir)/'`test/test_hash.c
@@ -1085,7 +1126,8 @@ uninstall-am: uninstall-includeHEADERS uninstall-libLTLIBRARIES
 
 .PRECIOUS: Makefile
 
-TESTS: tests/run_test.pl
+
+TESTS: test/run_test.pl
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

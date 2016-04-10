@@ -34,16 +34,16 @@ int is_sorted(uint64_t *input, size_t len){
   }
   return 1;
 }
-int strtoul_checked(char *str, ulong *ret, char **endptr){
-  errno = 0;
-  ulong temp = strtoul(str, endptr, 0);
-  if(errno != 0){
-    return errno;
-  } else {
-    *ret = temp;
-    return 0;
-  }
-}
+/* int strtoul_checked(char *str, ulong *ret, char **endptr){ */
+/*   errno = 0; */
+/*   ulong temp = strtoul(str, endptr, 0); */
+/*   if(errno != 0){ */
+/*     return errno; */
+/*   } else { */
+/*     *ret = temp; */
+/*     return 0; */
+/*   } */
+/* } */
 ulong *read_arr(int len, char *str){
   ulong *arr = zmalloc(len*sizeof(unsigned long));
   char *strptr = str;
@@ -122,7 +122,7 @@ int main(int argc, char *argv[]){
     argv++;
   }
   ulong len;
-  int err = strtoul_checked(argv[1], &len, NULL);
+  int err = strtoul_checked(argv[1], NULL, 0, &len);
   if(err){
     perror("strtoul");
     exit(1);
