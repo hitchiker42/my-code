@@ -2,7 +2,15 @@
 void __attribute__((noreturn)) start_server(const char *hostname, uint16_t port){
   pid_t pid = fork();
   if(pid == 0){
-    run_server(hostname, port);
+    fprintf(stderr, "Running server as process %ld\n", getpid());
+    char buf[128];
+    sprintf(buf, "echo_%d.log", getpid());
+    if(!freopen(buf, "w", stderr)){
+      perror("freopen");
+      exit(EXIT_FAILURE);
+    }
+    setvbuf(stderr, NULL, _IOLBF, 0);
+    run_server(port);
   } else {
     exit(EXIT_SUCCESS);
   }

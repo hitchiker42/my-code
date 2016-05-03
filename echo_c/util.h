@@ -141,7 +141,7 @@ typedef unsigned long ulong;
     suffix;})
 
 /*
-  Some more math constants beyond those defined in math.h, 
+  Some more math constants beyond those defined in math.h,
   as well as single precision versions of some existing constants
 */
 #define FLOAT_CONST(double_val) CAT(double_val, f)
@@ -191,15 +191,51 @@ typedef unsigned long ulong;
 
 #define FOR_EACH_2(var, arr, size) FOR_EACH_EXPLICIT(var, j, arr, size)
 #define FOR_EACH_PTR_2(var, arr, size) FOR_EACH_PTR_EXPLICIT(var, j, arr, size)
-    
-    
+
+
 //Given pointer to a struct element, the struct name, and the element name
-//return a pointer to the struct the element is contained in 
+//return a pointer to the struct the element is contained in
 //(from the linux kernel)
 #define container_of(ptr, type, member) ({                      \
       const typeof( ((type *)0)->member ) *__mptr = (ptr);	\
       (type *)( (char *)__mptr - offsetof(type,member) ); })
 
+//Call the function fn with the provided arguments and if it sets errno
+//call perror with the name of the function and then exit. This is mostly
+//useful for calling functions which wrap syscalls and need to succed for
+//the program to continue
+#define syscall_checked(fn,...)                 \
+  ({__typeof(fn(__VA_ARGS__)) ret;              \
+    errno = 0;                                  \
+    ret = fn(__VA_ARGS__);                      \
+    if(errno != 0){                             \
+      perror(#fn);                              \
+      exit(EXIT_FAILURE);                       \
+    }                                           \
+    ret;})
+#define syscall_checked_nonvoid(fn, arg, ...)   \
+  ({__typeof(fn(arg, ##__VA_ARGS__)) ret;       \
+    errno = 0;                                  \
+    ret = fn(arg, ##__VA_ARGS__);               \
+    if(errno != 0){                             \
+      perror(#fn);                              \
+      exit(EXIT_FAILURE);                       \
+    }                                           \
+    ret;})
+/*#define syscall_checked(fn, ...)                      \
+  ({(__NARG__(__VA_ARGS__) > 0) ?                       \
+      syscall_checked_nonvoid(fn, __VA_ARGS__) :        \
+      syscall_checked_void(fn);})*/
+//doesn't work
+#define syscall_checked_ret(err_ret, fn, ...)   \
+  ({__typeof(fn(##__VA_ARGS__)) ret;            \
+    errno = 0;                                  \
+    ret fn(##__VA_ARGS__);                      \
+    if(errno != 0){                             \
+      perror(#fn);                              \
+      return err_ret;                           \
+    }                                           \
+    ret;})
 //preprocessor tricks/macro overloading
 
 //Macros to use in place of '#' and '##'
@@ -367,14 +403,14 @@ static inline void* zmalloc(size_t sz){
   return mem;
 }
 /*
-  Dynamically resizable array, functions are avaiable in lower and uppercase 
+  Dynamically resizable array, functions are avaiable in lower and uppercase
   forms, lowercase take pointers and are generally functions, uppercase take
   literal values and are always macros.
 */
 typedef struct svector svector;
 struct svector {
   union {
-    void **data;    
+    void **data;
     uint8_t *bytes;
   };
   //len and size are implicily in terms of either bytes or void*'s depending on
@@ -404,13 +440,6 @@ struct svector {
   svectors, uppercase are macros and take literal svectors. Functions can't take
   literal svectors since they often need to be modified.
 */
-static struct svector make_svector(int sz){
-  svector ret;
-  ret.len = 0;
-  ret.size = sz;
-  ret.bytes = xmalloc(sz);
-  return ret;
-}
 #define svector_data(x) (x->data)
 #define SVECTOR_DATA(x) (x.data)
 
@@ -420,6 +449,11 @@ static struct svector make_svector(int sz){
 #define svector_len(x) (x->len)
 #define SVECTOR_LEN(x) (x.len)
 
+static svector make_svector(size_t sz){
+  svector ret = {.len = 0, .size = sz,
+                 .bytes = xmalloc(sz)};
+  return ret;
+}
 #define SVECTOR_POP(vec)                        \
   (vec.data[--vec.len])
 #define SVECTOR_POP_BYTE(vec)                   \
@@ -465,7 +499,21 @@ static inline void svector_multipush_bytes(svector *vec,
   memcpy(vec->data + vec->len, elts, len*sizeof(uint8_t));
   vec->len += len;
 }
-  
+
+#define SVECTOR_RESERVE(vec, nelts)      \
+  svector_check_size(&vec, nelts)
+#define SVECTOR_RESERVE_BYTES(vec, nbytes)      \
+  svector_check_size_bytes(&vec, nbytes)
+static inline void svector_reserve(svector *vec, int nelts){
+  svector_check_size(vec, nelts);
+}
+static inline void svector_reserve_bytes(svector *vec, int nbytes){
+  svector_check_size_bytes(vec, nbytes);
+}
+#define SVECTOR_EMPTY(vec) (vec.len = 0)
+static inline void svector_empty(svector *vec){
+  vec->len = 0;
+}
 //is an lvalue
 #define SVECTOR_REF(vec, idx)                   \
   (vec.data[idx])
