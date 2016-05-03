@@ -40,6 +40,19 @@ int connect_client(const char *server, uint16_t port, double maxwait){
   }
   return -1;
 }
+ssize_t svector_getline(svector *vec, FILE *in){
+  int c;
+  ssize_t start_len = svector_len(vec);
+  while((c = fgetc(in)) != EOF){
+    svector_push_byte((unsigned char)c, vec);
+    if(c == '\n'){
+      break;
+    }
+  }
+  return svector_len(vec) - start_len;
+}
+    
+  
 //Read lines from the interactive input 'in' until EOF,
 //send them to the server, read the same line back and write it to out
 void __attribute__(noreturn) echo_interactive(int sock, FILE *in, FILE *out){
@@ -106,8 +119,8 @@ void __attribute__(noreturn) echo_file(int sock, FILE *in, FILE *out,
   
   
   
-void __attrtibute__(noreturn) run(const char *server, uint16_t port,
-                                  FILE *in, FILE *out){
+void __attrtibute__(noreturn) run_client(const char *server, uint16_t port,
+                                         FILE *in, FILE *out){
   int sock = connect_client(server, port, 0);//Don't try more that once
   if(sock < 0){
     exit(EXIT_FAILURE);

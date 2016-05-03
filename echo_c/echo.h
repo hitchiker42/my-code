@@ -7,6 +7,8 @@ extern "C" {
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netdb.h>
+static const char *default_host = "localhost";
+static const uint16_t default_port = 21012;
 //wrapper around getaddrinfo which basically acts the same as gethostbyname
 static struct addrinfo *getaddrbyname(const char *name){
   struct addrinfo *ret;
@@ -18,7 +20,9 @@ static struct addrinfo *getaddrbyname(const char *name){
   }
   return ret;
 }
-
+void __attribute__((noreturn)) run_server(const char *hostname, uint16_t port);
+void __attribute__((noreturn)) run_client(const char *server, uint16_t port,
+                                         FILE *in, FILE *out);
 #ifdef __cplusplus
 }
 #endif

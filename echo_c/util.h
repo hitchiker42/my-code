@@ -373,7 +373,13 @@ static inline void* zmalloc(size_t sz){
 */
 typedef struct svector svector;
 struct svector {
-  void **data;
+  union {
+    void **data;    
+    uint8_t *bytes;
+  };
+  //len and size are implicily in terms of either bytes or void*'s depending on
+  //the function used, so you need to be careful if mixing byte functions and
+  //regular functions.
   int len;
   int size;
 };
@@ -383,56 +389,126 @@ struct svector {
 
   This doesn't check the return value of realloc.
 */
-#define svector_check_size(svec,sz)                             \
-  ({struct svector *tmp = svec;                                 \
-    int needed = tmp->len + sz;                                 \
-    while(tmp->size <= needed){                                 \
-      tmp->size = (tmp->size >= 1 ? tmp->size*2 : 2);           \
-      tmp->data = realloc(tmp->data, tmp->size*sizeof(void*));  \
+#define svector_check_size_typed(svec, sz, type)                        \
+  ({struct svector *tmp = svec;                                         \
+    int needed = tmp->len + sz;                                         \
+    while(tmp->size <= needed){                                         \
+      tmp->size = (tmp->size >= 1 ? tmp->size*2 : 2);                   \
+      tmp->data = realloc(tmp->data, tmp->size*sizeof(type));           \
     };})
-#define SVECTOR_DATA(x) (x.data)
-#define SVECTOR_LEN(x) (x.len)
+#define svector_check_size(svec, sz) svector_check_size_typed(svec, sz, void*)
+#define svector_check_size_bytes(svec, sz)      \
+  svector_check_size_typed(svec, sz, uint8_t)
+/*
+  Functions come in two versions, lowercase are functions and take pointers to
+  svectors, uppercase are macros and take literal svectors. Functions can't take
+  literal svectors since they often need to be modified.
+*/
+static struct svector make_svector(int sz){
+  svector ret;
+  ret.len = 0;
+  ret.size = sz;
+  ret.bytes = xmalloc(sz);
+  return ret;
+}
 #define svector_data(x) (x->data)
-#define svector_len(x) (x->len)
+#define SVECTOR_DATA(x) (x.data)
 
-static struct svector make_svector(int size){
-  void **tmp = xmalloc(size * sizeof(void*));
-  return (struct svector){.data = tmp, .len = 0, .size = size};
-} 
+#define svector_bytes(x) (x->bytes)
+#define SVECTOR_BYTES(x) (x.bytes)
+
+#define svector_len(x) (x->len)
+#define SVECTOR_LEN(x) (x.len)
+
 #define SVECTOR_POP(vec)                        \
   (vec.data[--vec.len])
-static inline void *svector_pop(struct svector *vec){
+#define SVECTOR_POP_BYTE(vec)                   \
+  (vec.bytes[--vec.len])
+static inline void* svector_pop(struct svector *vec){
   return vec->data[--vec->len];
 }
+static inline uint8_t svector_pop_byte(struct svector *vec){
+  return vec->bytes[--vec->len];
+}
+
 #define SVECTOR_PUSH(elt, vec)                  \
   svector_check_size(&vec, 1);                  \
+  vec.data[vec.len++] = elt
+#define SVECTOR_PUSH_BYTE(elt, vec)             \
+  svector_check_size_bytes(&vec, 1);   \
   vec.data[vec.len++] = elt
 static inline void svector_push(void *elt, struct svector* vec){
   svector_check_size(vec,1);
   vec->data[vec->len++] = elt;
 }
+static inline void svector_push_byte(uint8_t elt, struct svector* vec){
+  svector_check_size_bytes(vec,1);
+  vec->bytes[vec->len++] = elt;
+}
+
+#define SVECTOR_MULTIPUSH(vec, elts, nelts)                 \
+  svector_check_size(&vec, nelts);                              \
+  memcpy(vec.data + vec.len, elts, nelts*sizeof(void*));        \
+  vec.len += nelts
+#define SVECTOR_MULTIPUSH_BYTES(vec, elts, nelts)           \
+  svector_check_size_bytes(&vec, nelts);                        \
+  memcpy(vec.data + vec.len, elts, nelts*sizeof(uint8_t));      \
+  vec.len += nelts
+static inline void svector_multipush(svector *vec, void **elts, size_t len){
+  svector_check_size(vec, len);
+  memcpy(vec->data + vec->len, elts, len*sizeof(void*));
+  vec->len += len;
+}
+static inline void svector_multipush_bytes(svector *vec,
+                                           uint8_t *elts, size_t len){
+  svector_check_size_bytes(vec, len);
+  memcpy(vec->data + vec->len, elts, len*sizeof(uint8_t));
+  vec->len += len;
+}
+  
 //is an lvalue
 #define SVECTOR_REF(vec, idx)                   \
   (vec.data[idx])
+#define SVECTOR_REF_BYTE(vec, idx)                   \
+  (vec.bytes[idx])
 static inline void* svector_ref(const struct svector *vec, int idx){
   return vec->data[idx];
 }
+static inline uint8_t svector_ref_byte(const struct svector *vec, int idx){
+  return vec->bytes[idx];
+}
+
 #define SVECTOR_SET(vec, idx, elt)              \
   (vec.data[idx] = elt)
+#define SVECTOR_SET_BYTE(vec, idx, elt)              \
+  (vec.bytes[idx] = elt)
 static inline void svector_set(struct svector *vec, int idx, void *elt){
   vec->data[idx] = elt;
 }
+static inline void svector_set_byte(struct svector *vec, int idx, uint8_t elt){
+  vec->bytes[idx] = elt;
+}
+
 #define SVECTOR_SWAP(vec, i, j)                 \
   __extension__                                 \
   ({__typeof(vec.data[i]) __temp = vec.data[i]; \
     vec.data[i] = vec.data[j];                  \
     vec.data[j] = __temp;})
+#define SVECTOR_SWAP_BYTES(vec, i, j)           \
+  __extension__                                 \
+  ({__typeof(vec.bytes[i]) __temp = vec.bytes[i]; \
+    vec.bytes[i] = vec.bytes[j];                  \
+    vec.bytes[j] = __temp;})
 static inline void svector_swap(struct svector *vec, int i, int j){
   void *temp = vec->data[i];
   vec->data[i] = vec->data[j];
   vec->data[j] = temp;
 }
-
+static inline void svector_swap_bytes(struct svector *vec, int i, int j){
+  uint8_t temp = vec->bytes[i];
+  vec->bytes[i] = vec->bytes[j];
+  vec->bytes[j] = temp;
+}
 /*
   Time functions, these are useful often enough to include.
 */
