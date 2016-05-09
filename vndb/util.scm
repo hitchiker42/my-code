@@ -74,6 +74,11 @@
   (string-join strings ""))
 
 ;;;;Utility Functions
+;;;Sequence functions
+(define (car-safe obj)
+  (if (pair? obj) (car obj) '()))
+(define (cdr-safe obj)
+  (if (pair? obj) (cdr obj) '()))
 ;;;String Functions
 (define (string-split str delim)
   "Split string into substrings delimited by delim.
@@ -116,6 +121,20 @@ bit in the integer is the first bit in the bitvector"
   (let ((ptr (bytevector->pointer bv start)))
     (pointer->bytevector ptr len)))
 
+;;;Networking
+(define (get-ip-addr host)
+  "Convert a hostname into an ipv4 ip address"
+  (sockaddr:addr (addrinfo:addr (car (getaddrinfo host)))))
+(define* (connect-utf8-tcp host port)
+  (when (string? host)
+    (set! host (get-ip-addr host)))
+  (let ((sock (socket PF_INET SOCK_STREAM 0)))
+    (connect sock AF_INET host port)
+    (set-port-encoding! sock "UTF-8")
+    sock))
+
+
+;;;Predicates
 ;;This should be a macro but its too hard to make it work
 (define (equal-any? val args)
   (if (not (pair? args))
@@ -126,6 +145,10 @@ bit in the integer is the first bit in the bitvector"
               (set! retval #t)
               break))
         retval)))
+;;Define read syntax for hashtable literals of the form:
+;;#,(hash (key value)...)
+;;This is global so doesn't need to be exported, but instead
+;;needs to be evalueated when this module is loaded
 (eval-when (load)
   (use-modules (srfi srfi-10))
   (define-reader-ctor 'hash
