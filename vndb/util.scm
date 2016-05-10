@@ -2,9 +2,11 @@
   #:use-module (rnrs bytevectors)
   #:use-module (rnrs io ports)
   #:use-module (system foreign)
+  #:use-module (ice-9 hash-table)
   #:export (progn list* prog1 typecase as-list pop push concat incf decf
                   concat-lit string-split string-strip print pprint
-                  integer->bitvector bytevector-slice equal-any?))
+                  integer->bitvector bytevector-slice equal-any? foreach
+                  keyword->symbol->string list->hashtable))
                    
                   
 
@@ -72,6 +74,9 @@
 ;;constants without looking ugly or suffering a performance penalty
 (define-macro (concat-lit . strings)
   (string-join strings ""))
+(define-macro (foreach var seq . body)
+  `(for-each (lambda (x) (let ((,var x))
+                      ,@body)) ,seq))
 
 ;;;;Utility Functions
 ;;;Sequence functions
@@ -117,9 +122,22 @@ bit in the integer is the first bit in the bitvector"
 
 (define-inlinable (bytevector-slice bv start len)
   "Return a view into the bytevector bv starting at index 'start' for 'len' bytes"
-  (if (> (+ start len) (bytevector-length bv)) (throw 'out-of-range))
+  (if (or (> 0 start) (> 0 len)
+          (> (+ start len) (bytevector-length bv)))
+      (scm-error 'out-of-range "bytevector-slice"
+                 "bv-len:~a, start:~a len:~a"
+                 (list (bytevector-length bv) start len) #f))
   (let ((ptr (bytevector->pointer bv start)))
     (pointer->bytevector ptr len)))
+(define-inlinable (bytevector->string bv start len)
+  (utf8->string (bytevector-slice bv start len)))
+(define (keyword->symbol->string key)
+  "Return a string representation of the symbol with the same name as key"
+  (symbol->string (keyword->symbol key)))
+;; (define (list->hash-table ls)
+;;   "Convert the list ls into a hash table.
+;; elements of the list should have the form (key value)")
+
 
 ;;;Networking
 (define (get-ip-addr host)
