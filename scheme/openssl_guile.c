@@ -121,7 +121,7 @@ BIO* connect_tls(const char *host, const char *port){
   ({SCM scm_key = scm_from_utf8_symbol(key);                    \
     SCM scm_msg = scm_from_utf8_string(msg);                    \
     scm_error_scm(scm_key, scm_from_utf8_string(__func__),      \
-                  scm_msg, SCM_BOOL_F, SCM_BOOL_F);});          \
+                  scm_msg, SCM_BOOL_F, SCM_BOOL_F);});
 //We make a bio scheme type to avoid worrying about the bio closing
 //the socket or anything like that, just make sure to hang on to the
 //bio object as long as the connection is active. We call it tls rather

@@ -6,9 +6,10 @@
   ;;Most stuff I export using define-pubilc, these are mostly macros
   ;;and inlineable procedures
   #:export (progn list* prog1 typecase dolist as-list pop push concat
-            incf decf concat-lit car-safe cdr-safe bytevector-slice
-            bytevector->string equal-any? print-hash-table build-hash-table
-            hash-table keyword->symbol->string list->hashtable))
+            incf decf concat-lit car-safe cdr-safe thunk
+            bytevector->string bytevector-memcpy equal-any?
+            print-hash-table build-hash-table hash-table
+            keyword->symbol->string list->hashtable))
 
 ;;;;Macros
 ;;; Symbol aliases
@@ -26,6 +27,8 @@
 
 (define-syntax-rule (dolist (var list) exp exp* ...)
   (for-each (lambda (x) (let ((var x)) exp exp* ...)) list))
+(define-syntax-rule (thunk exp ...)
+  (lambda () exp ...))
 
 ;;For what it's worth I tried to do this with syntax-case
 ;;The fact I need to do so much symbol manipulation means
@@ -40,8 +43,10 @@
                     (list* (list (string->symbol
                                   (concat (symbol->string (car x)) "?")) val)
                            (cdr x)))) clauses)))))
-(define-syntax-rule (define-public* (name args ...) . body)
-  (begin (define* (name args ...) body) (export name)))
+;;Using define-syntax makes docstrings not work
+(define-macro (define-public* def . body)
+  (let ((name (car def)))
+    `(begin (define* ,def ,@body) (export ,name))))
 ;;;Function-like macros
 (define-syntax-rule (as-list x)
   ;;  "If x is not a list return (list x) otherwise return x"
@@ -56,7 +61,11 @@
   (set! y (1+ y)))
 (define-syntax-rule (concat string strings ...)
   (string-join (list string strings ...) ""))
-
+(define-syntax-rule (concat-path string strings ...)
+  (string-join (list string strings ...) file-name-separator-string))
+(define-syntax-rule (assert expr)
+  (when (not expr)
+    (throw 'assert (format #f "~s" 'expr))))
 ;;Concatenate strings at macroexpansion time, allows writing long string
 ;;constants without looking ugly or suffering a performance penalty
 
@@ -112,11 +121,20 @@ Returns a list of substrings"
   "display obj on port, followed by a newline"
   (display obj port)
   (newline port))
+(define-public* (print-err obj)
+  "write obj to the current error port, followed by a newline"
+  (let ((port (current-error-port)))
+    (write obj port)
+    (newline port)))
 (define-public (read-from-string str)
   (with-input-from-string str (lambda () (read))))
 (define-public (read-from-string-and-eval! str)
   (with-input-from-string str (lambda () (read-and-eval!))))
-;;;Type conversions/Value creation
+(define-public (read-from-file filename)
+  (with-input-from-file filename (lambda () (read))))
+(define-public (read-from-file-and-eval filename)
+  (with-input-from-file filename (lambda () (read-and-eval!))))
+;;;Low level operations
 (define-public (integer->bitvector n)
   "Convert an integer to a bitvector such that the most significant
 bit in the integer is the first bit in the bitvector"
@@ -128,16 +146,76 @@ bit in the integer is the first bit in the bitvector"
       (decf bit))
     vec))
 
-(define-inlinable (bytevector-slice bv start len)
+(define-public* (bytevector-slice bv start #:optional (end (bytevector-length bv)))
   "Return a view into the bytevector bv starting at index 'start' for 'len' bytes"
-  (when (> (+ start len) (bytevector-length bv))
-    (scm-error 'out-of-range "bytevector-slice"
-               "bv-len:~a, start:~a len:~a"
-               (list (bytevector-length bv) start len) #f))
+  (when (> end (bytevector-length bv))
+    (scm-error 'out-of-range "bytevector-slice" "invalid length" #f #f))
   (let ((ptr (bytevector->pointer bv start)))
-    (pointer->bytevector ptr len)))
-(define-inlinable (bytevector->string bv start len)
-  (utf8->string (bytevector-slice bv start len)))
+    (pointer->bytevector ptr (- end start))))
+
+;;Define a scheme function name which provides a thin wrapper over the
+;;C function of the same name (with - replaced by _ first).
+(define-syntax-rule (gen-c-wrapper name ret-type arg-types)
+  (define-public name
+    (pointer->procedure
+     ret-type
+     (dynamic-func
+      (string-map (lambda (x) (if (eq? x #\-) #\_ x))
+                  (symbol->string 'name)) (dynamic-link))
+     arg-types)))
+(gen-c-wrapper scm-gc-malloc-pointerless '* (list size_t '*))
+(gen-c-wrapper scm-gc-malloc '* (list size_t '*))
+(gen-c-wrapper scm-gc-realloc '* (list '* size_t size_t '*))
+(gen-c-wrapper memcpy '* (list '* '* size_t))
+(gen-c-wrapper memset '* (list '* int size_t))
+
+(define-public (gc-malloc-pointerless sz)
+  (scm-gc-malloc-pointerless sz (string->pointer "bytevector")))
+(define-public (gc-malloc sz)
+  (scm-gc-malloc sz (string->pointer "bytevector")))
+(define-public (gc-realloc ptr old-sz new-sz)
+  (scm-gc-realloc ptr old-sz new-sz (string->pointer "bytevector")))
+;; (define-macro (gc-realloc! ptr old-sz new-sz)
+;;   `(set! ',ptr
+;;     (scm-gc-realloc ,ptr old-sz new-sz (string->pointer "bytevector"))))
+(define-public (pointer-offset ptr offset)
+  ;;I love that guile let's me do pointer arithmetic in scheme
+  (let ((addr (pointer-address ptr)))
+    (make-pointer (+ addr offset))))
+
+(define (bytevector-memcpy-explicit dest dest-offset src src-offset len)
+  (when (or (< (bytevector-length dest) (+ dest-offset len))
+            (< (bytevector-length src) (+ src-offset len)))
+    (scm-error 'out-of-range "bytevector-memcpy" "invalid length" #f #f))
+  (let ((dest-ptr (bytevector->pointer dest dest-offset))
+        (src-ptr (bytevector->pointer src src-offset)))
+    (memcpy dest-ptr src-ptr len)))
+;;syntax-rules is kinda awesome, I could write this with define-macro
+;;but it'd have a lot of (if (pair? src) ...) (if (pair? dest) ...)
+(define-syntax bytevector-memcpy
+  (syntax-rules ()
+    ((_ (dest dest-offset) (src src-offset) len)
+     (bytevector-memcpy-explicit dest dest-offset src src-offset len))
+    ((_ dest (src src-offset) len)
+     (bytevector-memcpy (dest 0) (src src-offset) len))
+    ((_ (dest dest-offset) src len)
+     (bytevector-memcpy (dest dest-offset) (src 0) len))
+    ((_ dest src len)
+     (bytevector-memcpy (dest 0) (src 0) len))
+    ((_ dest src)
+     (let ((len (min (bytevector-length src) (bytevector-length dest))))
+       (bytevector-memcpy dest src len)))))
+;;Kind of a misleading name, it doesn't extend bv, it creates a new bytevector
+;;sz bytes longer than bv, with the same initial contents as bv
+(define-public (bytevector-extend bv sz)
+  (let* ((old-length (bytevector-length bv))
+         (new-length (+ old-length sz))
+         (ptr (gc-malloc-pointerless new-length)))
+    (memcpy ptr (bytevector->pointer bv) old-length)
+    (memset (pointer-offset ptr old-length) 0 sz)
+    (pointer->bytevector ptr new-length)))
+(define-inlinable (bytevector->string bv start end)
+  (utf8->string (bytevector-slice bv start end)))
 (define (keyword->symbol->string key)
   "Return a string representation of the symbol with the same name as key"
   (symbol->string (keyword->symbol key)))
@@ -186,10 +264,15 @@ bit in the integer is the first bit in the bitvector"
              (format port "\n\t(~s\n\t" key)
              (print-ht val port)
              (display ")" port))
-           (format port "\n\t(~s ~s)" key val))) ht)
+           (format port "\n\t(~s '~s)" key val))) ht)
     (display ")" port))
   (display "\n" port))
-
+(define-public (hash-table-size ht)
+  (hash-count (const #t) ht))
+(define-public (hash-map-keys->list ht f)
+  (hash-map->list (lambda (key val) (f key)) ht))
+(define-public (hash-map-values->list ht f)
+  (hash-map->list (lambda (key val) (f key)) ht))
 (eval-when (eval load compile expand)
   (use-modules (srfi srfi-10))
   (define-reader-ctor 'hash
