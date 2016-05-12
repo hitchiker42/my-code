@@ -3,18 +3,14 @@
 ;;If we don't load the extension lib when compiling we get warnings
 (eval-when (compile load eval)
   (add-to-load-path (getcwd))
+  ;;I could check for the .so file and compile it if I can't find it
+  ;;but that seems a bit silly
   (load-extension
    (string-join (list (getcwd) "libguile-openssl")
                 file-name-separator-string) "init_openssl"))
 (use-modules (rnrs bytevectors) (ice-9 receive) (ice-9 regex) (json)
              (srfi srfi-1) (ice-9 hash-table) (rnrs io ports) (util))
-(define *vndb-cache-file* (concat (getcwd) "/vndb.cache"))
-(define (read-cache) (read-from-file-and-eval *vndb-cache-file*))
-(define (write-cache) (with-output-to-file *vndb-cache-file*
-                        (lambda () (print-hash-table *vndb-cache*))))
-(define *vndb-cache* (read-cache))
-(define (vnlist-cache) (hash-ref *vndb-cache* "vnlist"))
-(define (vn-cache) (hash-ref *vndb-cache* "VNs"))
+;;Constants
 (define *vndb-port* 19534)
 (define *vndb-tls-port* 19535)
 ;;The equivalent using gethostbyname
@@ -25,11 +21,23 @@
                        (addrinfo:addr
                         (car (getaddrinfo *vndb-hostname* #f)))))
 (define *client-name* "vndb-scm")
-(define *client-version* 0.1)
+(define *client-version* 0.2)
 
-;;These next 3 are global variables, I know it's bad practice to use them
-;;but this is an application just for me and it makes life so much eaiser
+;;Global variables, I use a bunch of these but I have no intent to make
+;;this multithreaded so it's fine
 
+;;Currently the cache is fairly small, so writing/reading it to/from
+;;disk is quick, I'm not sure for how long though
+(define *vndb-cache-file* (concat (getcwd) "/vndb.cache"))
+(define (read-cache) (read-from-file-and-eval *vndb-cache-file*))
+(define (write-cache) (with-output-to-file *vndb-cache-file*
+                        (lambda () (print-hash-table *vndb-cache*))))
+(define (write-cache-backup)
+  (with-output-to-file (concat *vndb-cache-file* ".bkup")
+                        (lambda () (print-hash-table *vndb-cache*))))
+(define *vndb-cache* (read-cache))
+(define (vnlist-cache) (hash-ref *vndb-cache* "vnlist"))
+(define (vn-cache) (hash-ref *vndb-cache* "VNs"))
 (define *vndb-socket* #f)
 (define *vndb-tls* #f);;tls session
 ;;read upto 4k at at timex
@@ -41,18 +49,14 @@
                    (json (object ("protocol" 1)
                                  ("client" ,*client-name*)
                                  ("clientver" ,*client-version*)))) "\x04"))
-;;Utility functions specific to this program/module
-(define (alist->json alist)
-  (let ((ht (alist->hash-table alist)))
-    (scm->json ht)))
-(define (alist->json-string alist)
-  (let ((ht (alist->hash-table alist)))
-    (scm->json-string ht)))
+
 (define (vndb-send msg)
   (if *vndb-tls*
       (tls-send *vndb-tls* msg)
       (send *vndb-socket* msg)))
-
+;;Read from conn into msgbuf using fn until the last byte read is
+;;eq to delim, delim needs to be a byte, if it's a character this
+;;will never return
 (define (recv-delim fn conn msgbuf delim)
   ;;optimize the case where we get the whole message in one try
   (let ((nbytes (fn conn msgbuf)))
@@ -70,28 +74,16 @@
           (bytevector-slice buf 0 buflen)))))
 
 (define (vndb-recv!)
-  (let ((responce
+  (let ((response
          (if *vndb-tls* (recv-delim tls-recv! *vndb-tls* *output-buf* 4)
              (recv-delim recv! *vndb-socket* *output-buf* 4))))
-    (if (and (> (bytevector-length responce) 5)
-             (equal? "error" (utf8->string (bytevector-slice responce 0 5))))
-             (throw 'vndb-error (utf8->string (bytevector-slice responce 5)))
-             (utf8->string responce))))
-;;         (utf8->string (bytevector-copy (bytevector-slice *output-buf* 0 nbytes))))))
-
-;; (define (vndb-recv!)
-;;   "Read from sock into buf, raise an error of type vndb-error
-;; in case of an 'error' response"
-;;   ;;What this needs to do is:
-;;   ;;(while (not (eq? (bytevector-ref *output-buf* (1- nbytes)) ?x04))
-;;   ;;       (set! nbytes (recv ...))
-;;   ;;       (cp *output-buf* to string))
-;;   (let ((nbytes (if *vndb-tls*
-;;                     (tls-recv! *vndb-tls* *output-buf*)
-;;                     (recv! *vndb-socket* *output-buf*))))
-;;     (if (equal? "error" (utf8->string (bytevector-slice *output-buf* 0 5)))
-;;         (throw 'vndb-error (utf8->string (bytevector-slice *output-buf* 0 nbytes)))
-;;         (utf8->string (bytevector-copy (bytevector-slice *output-buf* 0 nbytes))))))
+    (if (and (> (bytevector-length response) 5)
+             (equal? "error" (utf8->string (bytevector-slice response 0 5))))
+        (begin
+          (format (current-error-port) "throwing vndb-error ~s"
+                  (utf8->string (bytevector-slice response 5)))
+          (throw 'vndb-error (utf8->string (bytevector-slice response 5))))
+             (utf8->string response))))
 
 (define (vndb-connect)
   (set! *vndb-socket* (socket PF_INET SOCK_STREAM 0))
@@ -106,7 +98,7 @@
 (define (vndb-login-anon)
   (vndb-send login-anon-cmd)
   (vndb-recv!))
-;;This should use tls
+
 (define (vndb-login-user username password)
   (let ((cmd (scm->json-string
               (json (object ("protocol" 1)
@@ -122,7 +114,7 @@
              (vndb-login-user username password))
       (begin (vndb-connect)
              (vndb-login-anon))))
-;;The form of the responce of the dbstats command is "dbstats json-obj"
+;;The form of the response of the dbstats command is "dbstats json-obj"
 ;;which is why we skip the first 8 bytes of response
 (define (vndb-dbstats)
   (vndb-send "dbstats\x04")
@@ -140,7 +132,8 @@
 ;;               (push (acc l '() (if (eq? sep 'and) 'or 'and)) filter)
 ;;               (push l filter))))))
 
-(define* (vndb-get type vndb-filter #:optional (flags '("basic"))
+;;TODO: if possible check the cache before making a request
+(define* (vndb-get type vndb-filter #:optional (flags "basic")
                    #:key page results sort reverse #:rest options)
   ;;Process filter, flags and options into strings
   ;;(when (list? filter) (set! filter (vndb-filter filter)))
@@ -154,21 +147,29 @@
                     (list (cons "page" page) (cons "results" results)
                           (cons "sort" sort) (cons "reverse" reverse)))))))
       (set! options ""))
-  (set! flags (string-join flags ","))
   (let ((cmd
          (format #f "get ~a ~a ~a ~a\x04" type flags vndb-filter options)))
     (print cmd)
   (vndb-send cmd)
   (substring (vndb-recv!) 8)))
+
+;;Haven't tested this yet
 (define (vndb-set type id fields)
   (let ((cmd (format #f "set ~a ~a ~a\x04" type id
                      (scm->json-string (alist->hash-table fields)))))
     (vndb-send cmd)
     (vndb-recv!)))
-;;The api doesn't allow filtering the vnlist by date added so we need
-;;to get the whole thing every time
-;;Each time we update the vnlist we remember the time, so to update the
-;;list we use a filter (added > time)
+;;Collect all the results from a vndb get command
+(define (catch-vndb-err err-type err-msg)
+  (format (current-error-port) "Caught error ~a" err-msg)
+  (let ((err (json-string->scm err-msg)))
+    (if (equal? "throttled" (hash-ref err "id"))
+        (begin
+          (format (current-error-port)
+                  "Vndb server throttled (type = ~s), waiting ~s seconds\n"
+                  (hash-ref err "type") (hash-ref err "fullwait"))
+          (sleep (ceiling (hash-ref err "fullwait"))))
+        (throw err-type err-msg))))
 (define-macro (vndb-get-all what filter flags num-results . body)
   `(let ((page 1) (loop #t)) ;;these are delibrately accessable from the body code
      (while loop
@@ -181,18 +182,11 @@
             (incf page)
             ;;loop if there are more entries
             (set! loop (hash-ref response "more"))))
-        (lambda (json-err)
-          (let ((err (json-string->scm json-err)))
-            (if (equal? "throttled" (hash-ref err "id"))
-                (begin
-                  (format (current-error-port)
-                          "Vndb server throttled (type = ~s), waiting ~s seconds\n"
-                          (hash-ref err "type") (hash-ref err "fullwait"))
-                  (sleep (ceiling (hash-ref err "fullwait"))))
-                (throw 'vndb-error json-err))))))))
+        catch-vndb-err))))
 (define (get-vnlist)
-  (vndb-get-all "vnlist" "(uid = 0)" '("basic") 100
-                (map cache-vnlist! (hash-ref response "items"))))
+  (vndb-get-all "vnlist" "(uid = 0)" "basic" 100
+                (map cache-vnlist! (hash-ref response "items")))
+  (write-cache))
 
 ;; The error handling bit of the macro above may not work, so I'm leaving
 ;; the original code here
@@ -220,14 +214,45 @@
 ;;                   (sleep (ceiling (hash-ref err "fullwait"))))
 ;;                 (throw 'vndb-error json-err))))))))
 (define (get-vnlist-vns)
+  "Add all vns currently in the vnlist cache to the vn cache,
+if they're not already cached"
   (let* ((vn-cache (vn-cache))
          (vn-list (filter (lambda (x) (not (hash-ref vn-cache x)))
                           (hash-map-keys->list (vnlist-cache) identity))))
     (vndb-get-all "vn" (format #f "(id = [~a])"
                                (string-join (map number->string vn-list) ","))
-                  '("basic") 25
+                  "basic" 25
                   (map cache-vn! (hash-ref response "items")))))
-            
+
+;;Checks if id is in the cache, with all the fields specified by flags
+(define* (check-vn-cache id #:optional (flags "basic"))
+  (let ((entry (hash-ref (vn-cache) id)))
+    (if entry
+        (if (equal? flags "basic") #t
+            (let ((flags (map string-strip (string-split flags #\,))))
+              ;;inefficient but it should be fast enough
+              (fold (lambda (x y) (and x y)) #t
+                    (map (lambda (flag)
+                           (case-equal flag
+                             ("details" (hash-ref entry "links"))
+                             ("anime" (hash-ref entry "anime"))
+                             ("relations" (hash-ref entry "relations"))
+                             ("tags" (hash-ref entry "tags"))
+                             ("stats" (hash-ref entry "rating"))
+                             ("screens" (hash-ref entry "screens"))))
+                         flags))))
+        #f)))
+
+(define* (vndb-get-vns-by-id ids #:optional (flags "basic"))
+  "Look up a list of vns by their ids, using cache entries if possible"
+  (let ((needed (filter (compose not check-vn-cache) ids)))
+    (unless (null? needed)
+      (vndb-get-all "vn" (format #f "(id = [~a])"
+                                 (string-join (map number->string needed) ","))
+                    flags 25
+                    (map cache-vn! (hash-ref response "items")))))
+  (let ((vn-cache (vn-cache)))
+    (map (lambda (x) (hash-ref vn-cache x)) ids)))
 
 ;;Some functions to parse returned data
 (define (vnlist-get-vns vnlist)
@@ -238,7 +263,7 @@ a filter to select those vns in a \"get vn\" command"
     (format #f "(id = [~a])" (string-join (map number->string vn-ids) ","))))
 (define (get-items str)
   "Return a list of hashtables containing the items in str,
-which is a responce from a \"get\" \"foo\" command"
+which is a response from a \"get\" \"foo\" command"
   (hash-ref (json-string->scm str) "items"))
 
 ;;;Functions to access the cache

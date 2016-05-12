@@ -5,12 +5,13 @@
   #:use-module (ice-9 hash-table)
   ;;Most stuff I export using define-pubilc, these are mostly macros
   ;;and inlineable procedures
-  #:export (progn list* prog1 typecase dolist as-list pop push concat
-            incf decf concat-lit car-safe cdr-safe thunk
-            bytevector->string bytevector-memcpy equal-any?
-            print-hash-table build-hash-table hash-table
+  #:export (progn list* prog1 typecase dolist as-list pop! push concat
+            incf decf concat-lit car-safe cdr-safe cl-car cl-cdr
+            thunk case-equal bytevector->string bytevector-memcpy
+            equal-any? print-hash-table build-hash-table hash-table
             keyword->symbol->string list->hashtable))
 
+(define null '())
 ;;;;Macros
 ;;; Symbol aliases
 (define-syntax progn
@@ -24,9 +25,15 @@
 (define-syntax-rule (prog1 first rest ...)
   ;;"Evaluate first and rest sequentally, return the value of first"
   (let ((ret first)) (begin rest ...) ret))
-
 (define-syntax-rule (dolist (var list) exp exp* ...)
   (for-each (lambda (x) (let ((var x)) exp exp* ...)) list))
+;; This should let you break out of a dolist, but it doesn't
+;; (let ((ls list))
+;;   (let ((var (pop! ls)))
+;;     (while (not (null? var))
+;;       exp exp* ...
+;;       (set! var (pop! ls))))))
+
 (define-syntax-rule (thunk exp ...)
   (lambda () exp ...))
 
@@ -38,11 +45,26 @@
     `(let ((,val ,expr))
        (cond
         ,@(map (lambda (x)
-                (if (eq? #t (car x))
-                    (list* #t (cdr x))
+                (if (eq? 'else (car x))
+                    (list* 'else (cdr x))
                     (list* (list (string->symbol
                                   (concat (symbol->string (car x)) "?")) val)
                            (cdr x)))) clauses)))))
+(define-macro (case-equal expr . clauses)
+  ;;Like case but compare with equal, also allow the car of
+  ;;each clause to be an atom instead of a list
+  (let ((val (gensym)))
+    ;;Don't evaluate expr more than once
+    `(let ((,val ,expr))
+       (cond
+        ,@(map (lambda (x)
+                 (if (eq? 'else (car x))
+                     (list* 'else (cdr x))
+                     (list* (if (list? (car x))
+                                   `(or ,@(map (lambda (x)
+                                                 `(equal? ,expr ,x)) (car x)))
+                                   `(equal? ,expr ,(car x)))
+                            (cdr x)))) clauses)))))
 ;;Using define-syntax makes docstrings not work
 (define-macro (define-public* def . body)
   (let ((name (car def)))
@@ -52,7 +74,7 @@
   ;;  "If x is not a list return (list x) otherwise return x"
   (if (list? x) x (list x)))
 (define-syntax-rule (pop! ls)
-  (prog1 (car ls) (set! ls (cdr ls))))
+  (prog1 (cl-car ls) (set! ls (cl-cdr ls))))
 (define-syntax-rule (push elt place)
   (set! place (cons elt place)))
 (define-syntax-rule (decf y)
@@ -94,9 +116,15 @@
 (define-inlinable (car-safe obj)
   "If obj is a pair return (car obj) otherwise return '()"
   (if (pair? obj) (car obj) '()))
+(define-inlinable (cl-car ls)
+  "if ls is null? return null, otherwise return (car ls)"
+  (if (null? ls) ls (car ls)))
 (define-inlinable (cdr-safe obj)
   "If obj is a pair return (cdr obj) otherwise return '()"
   (if (pair? obj) (cdr obj) '()))
+(define-inlinable (cl-cdr ls)
+  "if ls is null? return null, otherwise return (cdr ls)"
+  (if (null? ls) ls (cdr ls)))
 ;;;String Functions
 (define-public (string-split str delim)
   "Split string into substrings delimited by delim.
@@ -273,6 +301,10 @@ bit in the integer is the first bit in the bitvector"
   (hash-map->list (lambda (key val) (f key)) ht))
 (define-public (hash-map-values->list ht f)
   (hash-map->list (lambda (key val) (f key)) ht))
+(define-public (hash-ref-multi ht . ref)
+  (let acc ((ht ht) (ref ref))
+    (if (null? ref) ht
+        (acc (hash-ref ht (car ref)) (cdr ref)))))
 (eval-when (eval load compile expand)
   (use-modules (srfi srfi-10))
   (define-reader-ctor 'hash
