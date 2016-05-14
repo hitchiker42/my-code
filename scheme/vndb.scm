@@ -6,8 +6,8 @@
   ;;I could check for the .so file and compile it if I can't find it
   ;;but that seems a bit silly
   (load-extension
-   (string-join (list (getcwd) "libguile-openssl")
-                file-name-separator-string) "init_openssl"))
+   (string-join (list (getcwd) "libguile-vndb")
+                file-name-separator-string) "init_vndb"))
 (use-modules (rnrs bytevectors) (ice-9 receive) (ice-9 regex) (json)
              (srfi srfi-1) (ice-9 hash-table) (rnrs io ports) (util))
 ;;Constants
@@ -29,6 +29,17 @@
 ;;Currently the cache is fairly small, so writing/reading it to/from
 ;;disk is quick, I'm not sure for how long though
 (define *vndb-cache-file* (concat (getcwd) "/vndb.cache"))
+(define *vndb-tags-file* (concat (getcwd) "/vndb.tags"))
+(define (update-tags-file)
+  (use-modules (web client) (ice-9 popen))
+  (let* ((tags-gz (receive (response body)
+                      (http-get "http://vndb.org/api/tags.json.gz") body))
+         (tags-json)) ;untar tags file and read it into a buffer
+    ;;parse the json into a scheme hashtable and write it to *vndb-tags-file*
+    ()))
+                    
+               
+;;TODO: read/write the cache to/from disk in a seperate thread
 (define (read-cache) (read-from-file-and-eval *vndb-cache-file*))
 (define (write-cache) (with-output-to-file *vndb-cache-file*
                         (lambda () (print-hash-table *vndb-cache*))))
@@ -38,6 +49,9 @@
 (define *vndb-cache* (read-cache))
 (define (vnlist-cache) (hash-ref *vndb-cache* "vnlist"))
 (define (vn-cache) (hash-ref *vndb-cache* "VNs"))
+
+(define *vndb-tags* (read-from-file-and-eval *vndb-tags-file*))
+
 (define *vndb-socket* #f)
 (define *vndb-tls* #f);;tls session
 ;;read upto 4k at at timex
@@ -159,8 +173,9 @@
                      (scm->json-string (alist->hash-table fields)))))
     (vndb-send cmd)
     (vndb-recv!)))
-;;Collect all the results from a vndb get command
 (define (catch-vndb-err err-type err-msg)
+  "Catch a vndb-error, if it's a throttled error wait until we can
+make more queries, otherwise throw the error again"
   (format (current-error-port) "Caught error ~a" err-msg)
   (let ((err (json-string->scm err-msg)))
     (if (equal? "throttled" (hash-ref err "id"))
@@ -170,6 +185,7 @@
                   (hash-ref err "type") (hash-ref err "fullwait"))
           (sleep (ceiling (hash-ref err "fullwait"))))
         (throw err-type err-msg))))
+;;Collect all the results from a vndb get command
 (define-macro (vndb-get-all what filter flags num-results . body)
   `(let ((page 1) (loop #t)) ;;these are delibrately accessable from the body code
      (while loop
@@ -255,6 +271,8 @@ if they're not already cached"
     (map (lambda (x) (hash-ref vn-cache x)) ids)))
 
 ;;Some functions to parse returned data
+
+;;This should probably be removed
 (define (vnlist-get-vns vnlist)
   "Given a response from the \"get vnlist\" command return
 a filter to select those vns in a \"get vn\" command"
@@ -267,8 +285,6 @@ which is a response from a \"get\" \"foo\" command"
   (hash-ref (json-string->scm str) "items"))
 
 ;;;Functions to access the cache
-;;Todo add a function/macro to do a multilevel hash query i.e:
-;;(hash-ref-multi ht '("VNs" 1)) -> (hash-ref (hash-ref "VNs") 1)
 (define (cache-vn! vn-ht)
   "Store a vn (represented as a scheme hash table) into the cache"
   (let ((id (hash-ref vn-ht "id")))
@@ -277,6 +293,7 @@ which is a response from a \"get\" \"foo\" command"
   "Cache all the vns returned in a given response from the server"
   (for-each cache-vn! (get-items response)))
 (define (cache-vnlist! vnlist-ht)
+  "Cache all the vnlist entries in the given hash table"
   (let ((id (hash-ref vnlist-ht "vn")))
     (hash-set! (vnlist-cache) id vnlist-ht)))
 (define (cache-lookup-vn id)
@@ -298,3 +315,31 @@ which is a response from a \"get\" \"foo\" command"
   (hash-map->list (lambda (key val) key) (vnlist-cache)))
 (define (cache-lookup-vnlist id)
    (hash-ref (hash-ref *vndb-cache* "vnlist") id))
+
+;;Higher level procedures for searching for vns
+(define (vnlist-search re)
+  "Search the names of vns in the vnlist and return any
+than match the regular expression re"
+  ;;Assumes all vns in the vnlist are in the cache
+
+  ;;Make sure the regexp is precompiled
+  (when (not (regexp? re))
+    (set! re (make-regexp re)))
+  (let ((matches '())
+        (vnlist-cache (vnlist-cache))
+        (vn-cache (vn-cache)))
+    ;;This could be really slow, and I can probably optimize it if necessary
+    (hash-for-each
+     (lambda (key val)
+       (let* ((vn (hash-ref vn-cache key))
+              (title (hash-ref vn "title"))
+              (original (hash-ref vn "original"))
+              (aliases (hash-ref vn "aliases")))
+         (when (or (and (string? title) (regexp-exec re title))
+                   (and (string? original) (regexp-exec re original))
+                   (and (string? aliases)
+                        (for-each (lambda (x) (regexp-exec re x))
+                                  (string-split aliases "\n"))))
+           (push! vn matches))))
+     vnlist-cache)
+    matches))

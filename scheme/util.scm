@@ -5,7 +5,7 @@
   #:use-module (ice-9 hash-table)
   ;;Most stuff I export using define-pubilc, these are mostly macros
   ;;and inlineable procedures
-  #:export (progn list* prog1 typecase dolist as-list pop! push concat
+  #:export (progn list* prog1 typecase dolist as-list pop! push! concat
             incf decf concat-lit car-safe cdr-safe cl-car cl-cdr
             thunk case-equal bytevector->string bytevector-memcpy
             equal-any? print-hash-table build-hash-table hash-table
@@ -75,7 +75,7 @@
   (if (list? x) x (list x)))
 (define-syntax-rule (pop! ls)
   (prog1 (cl-car ls) (set! ls (cl-cdr ls))))
-(define-syntax-rule (push elt place)
+(define-syntax-rule (push! elt place)
   (set! place (cons elt place)))
 (define-syntax-rule (decf y)
   (set! y (1- y)))

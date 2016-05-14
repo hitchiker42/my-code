@@ -1,3 +1,6 @@
+libguile-vndb.so: vndb_guile.c
+	gcc `pkg-config --libs --cflags openssl guile-2.0 zlib`\
+	  -shared -O2 -g -fPIC -o $@ $^
 libguile-openssl.so: openssl_guile.c
 	gcc `pkg-config --libs --cflags openssl guile-2.0`\
 	  -shared -O2 -g -fPIC -o $@ $^
