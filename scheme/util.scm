@@ -9,7 +9,8 @@
             incf decf concat-lit car-safe cdr-safe cl-car cl-cdr aref vref
             thunk case-equal bytevector->string bytevector-memcpy
             equal-any? print-hash-table build-hash-table hash-table
-            keyword->symbol->string list->hashtable))
+            keyword->symbol->string list->hashtable)
+  #:replace (string-split length))
 
 (define null '())
 ;;;;Macros
@@ -29,6 +30,12 @@
   (let ((ret first)) (begin rest ...) ret))
 (define-syntax-rule (dolist (var list) exp exp* ...)
   (for-each (lambda (x) (let ((var x)) exp exp* ...)) list))
+(define-syntax-rule (dotimes (var count) exp exp* ...)
+  (let ((var 0))
+    (while (< var count)
+      exp exp* ...
+      (incf var))))
+
 ;; This should let you break out of a dolist, but it doesn't
 ;; (let ((ls list))
 ;;   (let ((var (pop! ls)))
@@ -124,22 +131,98 @@
 (define-inlinable (cl-cdr ls)
   "if ls is null? return null, otherwise return (cdr ls)"
   (if (null? ls) ls (cdr ls)))
+
+(define-syntax nested-macro
+  (lambda (x)
+    (syntax-case x ()
+      ((_ defn body ...)
+       #`(define-macro defn
+           (quasiquote body ...))))))
+;;It was really hard to get this working correctly
+(define-syntax define-sequence-macro
+  ;;Define a macro which statically dispatches on seq
+  (lambda (x)
+    (syntax-case x ()
+      ((_ (defn seq args ...)
+          list-expr string-expr array-expr error-expr)      
+       #`(define-macro (defn seq args ...)
+           (cond
+            ((list? seq) (quasiquote list-expr))
+            ((string? seq) (quasiquote string-expr))
+            ((array? seq) (quasiquote array-expr))
+            (else (quasiquote error-expr))))))))
+(define-public (seq-type-error name idx what)
+  (scm-error 'wrong-type-arg name
+             "Wrong type argument in position ~S: ~S"
+             (list idx what) (list what)))
+;;The thing is, static dispatch isn't super useful in a dynamic language
+(define-macro (length arg)
+  (let ((seq (gensym)))
+    `(let ((,seq ,arg))
+       (cond
+        ((list? ,seq) ((@ (guile) length) ,seq))
+        ((string? ,seq) (string-length ,seq))
+        ((array? ,seq) (apply values (array-dimensions ,seq)))
+        (else (seq-type-error "length" 1 ,seq))))))
+(define-macro (elt arg idx)
+  (let ((seq (gensym)))
+    `(let ((,seq ,arg))
+       (cond
+        ((list? ,seq) (list-ref ,seq ,idx))
+        ((string? ,seq) (string-ref ,seq ,idx))
+        ((array? ,seq) (array-ref ,seq ,idx))
+        (else (seq-type-error "elt" 1 ,seq))))))
+(define (length-eq? . seqs)
+  "Return #t if all seqs have the same length, otherwise return #f"
+  (let ((len (length (pop! seqs)))
+        (seq (pop! seqs)))
+    (not
+     (while (not (null? seq))
+       (when (not (eq? (length seq) len)) (break))
+       (set! seq (pop! seqs))))))
+;;The way I do this is pretty lazy, but eh
+(define-public (map-seq type f . seqs)
+  (if (apply length-eq? seqs)
+      (let ((proc (lambda (i)
+                    (apply f (map (lambda (x) (elt x i)) seqs))))
+            (len (length (car seqs))))
+        (case type
+          ((list) (let ((ls '()))
+                     (dotimes (i len) (push! (proc i) ls))
+                     (reverse! ls)))
+          ((vector) (let ((vec (make-vector len)))
+                       (array-index-map! vec proc) vec))
+          (else (error))))))
 ;;;String Functions
-(define-public (string-split str delim)
+(define (string-split str delim)
   "Split string into substrings delimited by delim.
 Returns a list of substrings"
-  (let acc ((index 0)
-            (output '()))
-    (let ((temp (string-index str delim (1+ index))))
-      (if temp
-          (acc temp (cons (substring str index temp) output))
-          (reverse! (cons (substring str index) output))))))
+  (when (string? delim)
+    (if (eq? 1 (string-length delim))
+        (set! delim (string->char delim))
+        (set! delim (string->char-set delim))))
+  ((@ (guile) string-split) str delim))
 (define-public (string-strip str)
   "returns a copy of str with leading and trailing whitespace removed"
   (let ((start (string-skip str char-set:whitespace))
         (end (string-skip-right str char-set:whitespace)))
     (substring str start (1+ end))))
 ;;;IO functions
+(define-public* (print-hash-table ht #:optional (port (current-output-port)))
+  ;;Use a named let for recursion so we can print a newline at the
+  ;;end, but not for any intermediate values
+  (let print-ht ((ht ht) (port port) (indent "    "))
+    (display "#,(hash" port)
+    (hash-for-each
+     (lambda (key val)
+       (if (hash-table? val)
+           (begin
+             (format port "\n~a(~s\n~a" indent key indent)
+             (print-ht val port (concat indent "    "))
+             (display ")" port))
+           (format port "\n~a(~s '~s)" indent key val))) ht)
+    (display ")" port))
+  (display "\n" port))
 (define-public* (print obj #:optional (port (current-output-port)))
   "write obj to port, followed by a newline"
   (write obj port)
@@ -246,6 +329,9 @@ bit in the integer is the first bit in the bitvector"
 (define (keyword->symbol->string key)
   "Return a string representation of the symbol with the same name as key"
   (symbol->string (keyword->symbol key)))
+(define (string->char str)
+  "Equivlent to (string-ref str 0)"
+  (string-ref str 0))
 ;; (define (list->hash-table ls)
 ;;   "Convert the list ls into a hash table.
 ;; elements of the list should have the form (key value)")
@@ -279,25 +365,6 @@ bit in the integer is the first bit in the bitvector"
   (if x #t #f))
 (define-public (false? x)
   (not x))
-;;Define read syntax for hashtable literals of the form:
-;;#,(hash (key value)...)
-;;This is global so doesn't need to be exported, but instead
-;;needs to be evalueated when this module is loaded
-(define* (print-hash-table ht #:optional (port (current-output-port)))
-  ;;Use a named let for recursion so we can print a newline at the
-  ;;end, but not for any intermediate values
-  (let print-ht ((ht ht) (port port) (indent "    "))
-    (display "#,(hash" port)
-    (hash-for-each
-     (lambda (key val)
-       (if (hash-table? val)
-           (begin
-             (format port "\n~a(~s\n~a" indent key indent)
-             (print-ht val port (concat indent "    "))
-             (display ")" port))
-           (format port "\n~a(~s '~s)" indent key val))) ht)
-    (display ")" port))
-  (display "\n" port))
 (define-public (hash-table-size ht)
   (hash-count (const #t) ht))
 (define-public (hash-table-merge a b)
@@ -312,10 +379,20 @@ bit in the integer is the first bit in the bitvector"
   (let acc ((ht ht) (ref ref))
     (if (null? ref) ht
         (acc (hash-ref ht (car ref)) (cdr ref)))))
+(define-public (hash-update! ht key proc)
+  "Set the value of key in ht to the result of calling proc
+with the current value of key"
+  (hash-set! ht key
+             (proc (hash-ref ht key))))
 (define-public* (array-map f #:rest arrs)
   (let ((ret (apply make-array #f (array-rank (car arrs)))))
     (apply array-map! ret f arrs)
     ret))
+;;Define read syntax for hashtable literals of the form:
+;;#,(hash (key value)...)
+;;This is global so doesn't need to be exported, but instead
+;;needs to be evalueated when this module is loaded
+
 (eval-when (eval load compile expand)
   (use-modules (srfi srfi-10))
   (define-reader-ctor 'hash

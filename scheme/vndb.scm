@@ -9,7 +9,8 @@
    (string-join (list (getcwd) "libguile-vndb")
                 file-name-separator-string) "init_vndb"))
 (use-modules (rnrs bytevectors) (rnrs io ports) (ice-9 receive) (ice-9 regex)
-             (ice-9 hash-table) (ice-9 futures) (srfi srfi-1) (json) (util))
+             (ice-9 hash-table) (ice-9 futures) (srfi srfi-1)
+             (web client)(json) (util))
 ;;Constants
 (define *vndb-port* 19534)
 (define *vndb-tls-port* 19535)
@@ -44,8 +45,10 @@
 (define (vnlist-cache) (hash-ref *vndb-cache* "vnlist"))
 (define (vn-cache) (hash-ref *vndb-cache* "VNs"))
 
-(define *vndb-tags* (read-from-file-and-eval *vndb-tags-file*))
-(define *vndb-traits* (read-from-file-and-eval *vndb-traits-file*))
+(define *vndb-tags*
+  (false-if-exception (read-from-file-and-eval *vndb-tags-file*)))
+(define *vndb-traits*
+  (false-if-exception (read-from-file-and-eval *vndb-traits-file*)))
 
 (define *vndb-socket* #f)
 (define *vndb-tls* #f);;tls session
@@ -209,7 +212,7 @@ make more queries, otherwise throw the error again"
                    (for-each (lambda (x)
                                (hash-set! ret (hash-ref x "id") x)) r))
            ret)))
-                
+
 
 ;; The error handling bit of the macro above may not work, so I'm leaving
 ;; the original code here
@@ -339,44 +342,108 @@ which is a response from a \"get\" \"foo\" command"
 ;;If I wrote macros to generate these functions they would be nearly as long
 ;;and much less readable
 (define (download-tags-file)
-  (use-modules (web client))
   (receive (response body) (http-get "http://vndb.org/api/tags.json.gz")
     (put-bytevector (open-file "tags.json.gz" "w") body)))
 (define (download-traits-file)
-  (use-modules (web client))
   (receive (response body) (http-get "http://vndb.org/api/traits.json.gz")
     (put-bytevector (open-file "traits.json.gz" "w") body)))
-
+;;Optimally I'd make an array of tags indexed by id, and have
+;;a hashtable which translated names to ids,
 (define (parse-vndb-data-file infile outfile)
   (let ((buf (gunzip-bytevector
               (get-bytevector-all (open-file infile "r"))
               (* 1024 1024))))
     (let* ((data (json-string->scm (utf8->string buf)))
-           (data-by-id
-            (let ((tmp (make-hash-table (length data))))
-              (for-each (lambda (x) (hash-set! tmp (hash-ref x "id") x)) data) tmp))
            (data-by-name
             (let ((tmp (make-hash-table (length data))))
               (for-each (lambda (x)
                           (hash-set! tmp (string-downcase
-                                         (hash-ref x "name")) x)) data) tmp))
+                                          (hash-ref x "name")) x)) data) tmp))
+           (data-by-id
+            (let ((tmp (make-hash-table (length data))))
+              (for-each (lambda (x)
+                          (hash-set! tmp (hash-ref x "id") x))
+;;                                     (string-downcase (hash-ref x "name"))))
+                          data) tmp))
+
            (ht (make-hash-table 2)))
       (hash-set! ht "by id" data-by-id)
       (hash-set! ht "by name" data-by-name)
       (with-output-to-file outfile (lambda () (print-hash-table ht)))
       ht)))
+;;I'm not really worried about the processing time for creating duplicate
+;;hash tables for ids and names, but about the fact that it uses excessive
+;;storage, so it's find to make both and delete one here.
 (define (parse-tags-file)
-  (set! *vndb-tags* (parse-vndb-data-file "tags.json.gz" "vndb.tags")))
+  (let* ((tags (parse-vndb-data-file "tags.json.gz" "vndb.tags"))
+         (by-id (hash-ref tags "by id"))
+         (ht (make-hash-table)))
+    (hash-for-each (lambda (key val)
+                     (hash-set! ht key
+                      (string-downcase (hash-ref val "name")))) by-id)
+    (hash-set! tags "by id" ht)
+    (set! *vndb-tags* tags)))
+;;Tags are unique (i.e there is no tag x where (name x) == (name y)
+;;and (id x) != (id y)), This is not true for traits, (i.e there are
+;;mutiple traits named green (hair color, eye color, etc..)), so we
+;;need to make a unique name
+
+(define (get-unique-trait-name by-id id)
+  (let acc ((id id) (names '()))
+    (let* ((trait (hash-ref by-id id))
+           (parents (hash-ref trait "parents"))
+           (name (string-downcase (hash-ref trait "name"))))
+      (if (null? parents)
+          (string-join (cons name names) ",")
+          (acc (car parents)
+               (cons name names))))))
+;;should basically work for tags as well
+(define (build-trait-tree traits)
+  (let* ((n 2200);;should be high enough to cover all traits
+         (vec (make-vector n))
+         (i 0))
+    (array-index-map! vec (lambda (i) (hash-ref traits i)))
+    (while (< i n)
+      (let ((trait (vref vec i))
+            (parents #f))
+        (when (not trait) (incf i) (continue))
+        (set! parents (hash-ref trait "parents"))
+        (for-each
+         (lambda (x)
+           (let ((parent (vref vec x)))
+             (hash-set! parent "children"
+                       (cons i (hash-ref parent "children" '())))))
+         parents)
+        (incf i)))
+    vec))
 (define (parse-traits-file)
-  (set! *vndb-traits* (parse-vndb-data-file "traits.json.gz" "vndb.traits")))
+  (let* ((traits (parse-vndb-data-file "traits.json.gz" "vndb.traits"))
+         (by-id (hash-ref traits "by id"))
+         (ht (make-hash-table))
+         (get-unique-trait-name
+          (lambda (x) (get-unique-trait-name by-id x))))
+    ;;Ideally I would make this a tree with each trait having a number
+    ;;of children, instead of this
+    (hash-for-each (lambda (key val)
+                     (hash-set! ht (get-unique-trait-name key) val)) by-id)
+    (hash-set! traits "by name" ht)
+    (set! *vndb-traits* traits)))
 
 (define (lookup-tag name) (print-hash-table (get-tag-by-name name)))
 (define (get-tag-by-name name) (hash-ref-multi *vndb-tags* "by name" name))
-(define (get-tag-by-id id) (hash-ref-multi *vndb-tags* "by id" id))
+(define (get-tag-by-id id)
+  (get-tag-by-name (hash-ref-multi *vndb-tags* "by id" id)))
+;;The tag id's are not contiunous, presumably some tags have been deleted
+;;over time. This code returns a list of all the ids that are not assigned
+;; (filter identity (map
+;;                   (lambda (x) (if (get-tag-by-id x) #f x))
+;;                   (iota (reduce max #f
+;;                                 (hash-map-keys->list
+;;                                  (hash-ref *vndb-tags* "by id") identity)))))
 
 (define (lookup-trait name) (print-hash-table (get-trait-by-name name)))
-(define (get-trait-by-name name) (hash-ref-multi *vndb-traits* "by name" name))
 (define (get-trait-by-id id) (hash-ref-multi *vndb-traits* "by id" id))
+(define (get-trait-by-name name) (hash-ref-multi *vndb-traits* "by name" name))
 
 ;;Higher level procedures for searching for vns
 (define (vnlist-search re)
