@@ -6,7 +6,7 @@
   ;;Most stuff I export using define-pubilc, these are mostly macros
   ;;and inlineable procedures
   #:export (progn list* prog1 typecase dolist as-list pop! push! concat
-            incf decf concat-lit car-safe cdr-safe cl-car cl-cdr
+            incf decf concat-lit car-safe cdr-safe cl-car cl-cdr aref vref
             thunk case-equal bytevector->string bytevector-memcpy
             equal-any? print-hash-table build-hash-table hash-table
             keyword->symbol->string list->hashtable))
@@ -20,6 +20,8 @@
 (define-syntax list*
 ;;  "Alias for cons*"
   (identifier-syntax cons*))
+(define-syntax aref (identifier-syntax array-ref))
+(define-syntax vref (identifier-syntax vector-ref))
 
 ;;;Control structures
 (define-syntax-rule (prog1 first rest ...)
@@ -96,21 +98,18 @@
 (define-macro (concat-lit . strings)
   (string-join strings ""))
 
-;;These are needed for using #, to read hashtables, but are useful
-;;on their own
-(define-syntax build-hash-table
-  (syntax-rules ()
-    ((_ table (key value) rest ...)
-     (begin
-       (hash-set! table key value)
-       (build-hash-table table rest ...)))
-    ((_ table)
-     table)))
-
-(define-syntax-rule (hash-table (key value) ...)
-  (let ((table (make-hash-table)))
-    (build-hash-table table (key value) ...)))
-
+;;These used to be defined really elegently using syntax-rules,
+;;pattern matching and recursion, but that caused a stack overflow when
+;;reading large hash tables (apperently macros aren't tail recursive)
+(define-macro (build-hash-table table . rest)
+  `(begin
+     (when ',rest
+       (for-each (lambda (x) (hash-set! ,table (car x) (cdr x))) ',rest))
+     ,table))
+(define-macro (hash-table . rest)
+  (let ((table (gensym)))
+    `(let ((,table (make-hash-table)))
+       (build-hash-table ,table ,@rest))))
 ;;;;Utility Functions
 ;;;Sequence functions
 (define-inlinable (car-safe obj)
@@ -267,15 +266,19 @@ bit in the integer is the first bit in the bitvector"
 
 ;;;Predicates
 ;;This should be a macro but its too hard to make it work
-(define (equal-any? val args)
+(define-public (equal-any? val args)
   (if (not (pair? args))
       (equal? val args)
       (let ((retval #f))
         (while (pair? args)
-          (if (equal? val (pop args))
+          (if (equal? val (pop! args))
               (set! retval #t)
               break))
         retval)))
+(define-public (true? x)
+  (if x #t #f))
+(define-public (false? x)
+  (not x))
 ;;Define read syntax for hashtable literals of the form:
 ;;#,(hash (key value)...)
 ;;This is global so doesn't need to be exported, but instead
@@ -283,20 +286,24 @@ bit in the integer is the first bit in the bitvector"
 (define* (print-hash-table ht #:optional (port (current-output-port)))
   ;;Use a named let for recursion so we can print a newline at the
   ;;end, but not for any intermediate values
-  (let print-ht ((ht ht) (port port))
+  (let print-ht ((ht ht) (port port) (indent "    "))
     (display "#,(hash" port)
     (hash-for-each
      (lambda (key val)
        (if (hash-table? val)
            (begin
-             (format port "\n\t(~s\n\t" key)
-             (print-ht val port)
+             (format port "\n~a(~s\n~a" indent key indent)
+             (print-ht val port (concat indent "    "))
              (display ")" port))
-           (format port "\n\t(~s '~s)" key val))) ht)
+           (format port "\n~a(~s '~s)" indent key val))) ht)
     (display ")" port))
   (display "\n" port))
 (define-public (hash-table-size ht)
   (hash-count (const #t) ht))
+(define-public (hash-table-merge a b)
+  (hash-for-each (lambda (key value)
+                   (unless (hash-ref a key)
+                     (hash-set! a key value))) b))
 (define-public (hash-map-keys->list ht f)
   (hash-map->list (lambda (key val) (f key)) ht))
 (define-public (hash-map-values->list ht f)
@@ -305,6 +312,10 @@ bit in the integer is the first bit in the bitvector"
   (let acc ((ht ht) (ref ref))
     (if (null? ref) ht
         (acc (hash-ref ht (car ref)) (cdr ref)))))
+(define-public* (array-map f #:rest arrs)
+  (let ((ret (apply make-array #f (array-rank (car arrs)))))
+    (apply array-map! ret f arrs)
+    ret))
 (eval-when (eval load compile expand)
   (use-modules (srfi srfi-10))
   (define-reader-ctor 'hash

@@ -8,8 +8,8 @@
   (load-extension
    (string-join (list (getcwd) "libguile-vndb")
                 file-name-separator-string) "init_vndb"))
-(use-modules (rnrs bytevectors) (ice-9 receive) (ice-9 regex) (json)
-             (srfi srfi-1) (ice-9 hash-table) (rnrs io ports) (util))
+(use-modules (rnrs bytevectors) (rnrs io ports) (ice-9 receive) (ice-9 regex)
+             (ice-9 hash-table) (ice-9 futures) (srfi srfi-1) (json) (util))
 ;;Constants
 (define *vndb-port* 19534)
 (define *vndb-tls-port* 19535)
@@ -30,15 +30,9 @@
 ;;disk is quick, I'm not sure for how long though
 (define *vndb-cache-file* (concat (getcwd) "/vndb.cache"))
 (define *vndb-tags-file* (concat (getcwd) "/vndb.tags"))
-(define (update-tags-file)
-  (use-modules (web client) (ice-9 popen))
-  (let* ((tags-gz (receive (response body)
-                      (http-get "http://vndb.org/api/tags.json.gz") body))
-         (tags-json)) ;untar tags file and read it into a buffer
-    ;;parse the json into a scheme hashtable and write it to *vndb-tags-file*
-    ()))
-                    
-               
+(define *vndb-traits-file* (concat (getcwd) "/vndb.traits"))
+
+
 ;;TODO: read/write the cache to/from disk in a seperate thread
 (define (read-cache) (read-from-file-and-eval *vndb-cache-file*))
 (define (write-cache) (with-output-to-file *vndb-cache-file*
@@ -51,6 +45,7 @@
 (define (vn-cache) (hash-ref *vndb-cache* "VNs"))
 
 (define *vndb-tags* (read-from-file-and-eval *vndb-tags-file*))
+(define *vndb-traits* (read-from-file-and-eval *vndb-traits-file*))
 
 (define *vndb-socket* #f)
 (define *vndb-tls* #f);;tls session
@@ -203,6 +198,18 @@ make more queries, otherwise throw the error again"
   (vndb-get-all "vnlist" "(uid = 0)" "basic" 100
                 (map cache-vnlist! (hash-ref response "items")))
   (write-cache))
+(define* (get-vn filter #:optional (flags "basic"))
+  (let ((results '()))
+    (vndb-get-all "vn" filter flags 25
+                  (begin (map cache-vn! (hash-ref response "items"))
+                         (push! (hash-ref response "items")  results)))
+         (write-cache)
+         (let ((ret (make-hash-table)))
+           (dolist (r results)
+                   (for-each (lambda (x)
+                               (hash-set! ret (hash-ref x "id") x)) r))
+           ret)))
+                
 
 ;; The error handling bit of the macro above may not work, so I'm leaving
 ;; the original code here
@@ -233,11 +240,12 @@ make more queries, otherwise throw the error again"
   "Add all vns currently in the vnlist cache to the vn cache,
 if they're not already cached"
   (let* ((vn-cache (vn-cache))
-         (vn-list (filter (lambda (x) (not (hash-ref vn-cache x)))
+         (flags "basic,details,tags,stats")
+         (vn-list (filter (lambda (x) (not (check-vn-cache x flags)))
                           (hash-map-keys->list (vnlist-cache) identity))))
     (vndb-get-all "vn" (format #f "(id = [~a])"
                                (string-join (map number->string vn-list) ","))
-                  "basic" 25
+                  flags 25
                   (map cache-vn! (hash-ref response "items")))))
 
 ;;Checks if id is in the cache, with all the fields specified by flags
@@ -247,7 +255,8 @@ if they're not already cached"
         (if (equal? flags "basic") #t
             (let ((flags (map string-strip (string-split flags #\,))))
               ;;inefficient but it should be fast enough
-              (fold (lambda (x y) (and x y)) #t
+              (if
+               (fold (lambda (x y) (and x y)) #t
                     (map (lambda (flag)
                            (case-equal flag
                              ("details" (hash-ref entry "links"))
@@ -256,7 +265,8 @@ if they're not already cached"
                              ("tags" (hash-ref entry "tags"))
                              ("stats" (hash-ref entry "rating"))
                              ("screens" (hash-ref entry "screens"))))
-                         flags))))
+                         flags))
+               #t #f)))
         #f)))
 
 (define* (vndb-get-vns-by-id ids #:optional (flags "basic"))
@@ -296,6 +306,17 @@ which is a response from a \"get\" \"foo\" command"
   "Cache all the vnlist entries in the given hash table"
   (let ((id (hash-ref vnlist-ht "vn")))
     (hash-set! (vnlist-cache) id vnlist-ht)))
+(define* (empty-cache! #:optional force)
+  (when (not force)
+    (write "Really empty the cache (y/n): ")
+    (if (eq? (read-char) #\y)
+        (set! force #t)))
+  (when force
+    (with-output-to-file *vndb-cache-file*
+      (lambda () (let ((ht (make-hash-table)))
+                   (hash-set! ht "VNs" (make-hash-table))
+                   (hash-set! ht "vnlist" (make-hash-table))
+                   (print-hash-table ht))))))
 (define (cache-lookup-vn id)
   (hash-ref (hash-ref *vndb-cache* "VNs") id))
 ;;When converting a string to json all non ascii unicode characters
@@ -311,10 +332,51 @@ which is a response from a \"get\" \"foo\" command"
      (hash-ref (hash-ref *vndb-cache* "VNs") id) #:pretty 1))))
 (define (cache-list-vns)
   (hash-map->list (lambda (key val) key) (vn-cache)))
-(define (vnlist-list-vns)
+(define (cache-list-vnlist)
   (hash-map->list (lambda (key val) key) (vnlist-cache)))
 (define (cache-lookup-vnlist id)
-   (hash-ref (hash-ref *vndb-cache* "vnlist") id))
+  (hash-ref (hash-ref *vndb-cache* "vnlist") id))
+;;If I wrote macros to generate these functions they would be nearly as long
+;;and much less readable
+(define (download-tags-file)
+  (use-modules (web client))
+  (receive (response body) (http-get "http://vndb.org/api/tags.json.gz")
+    (put-bytevector (open-file "tags.json.gz" "w") body)))
+(define (download-traits-file)
+  (use-modules (web client))
+  (receive (response body) (http-get "http://vndb.org/api/traits.json.gz")
+    (put-bytevector (open-file "traits.json.gz" "w") body)))
+
+(define (parse-vndb-data-file infile outfile)
+  (let ((buf (gunzip-bytevector
+              (get-bytevector-all (open-file infile "r"))
+              (* 1024 1024))))
+    (let* ((data (json-string->scm (utf8->string buf)))
+           (data-by-id
+            (let ((tmp (make-hash-table (length data))))
+              (for-each (lambda (x) (hash-set! tmp (hash-ref x "id") x)) data) tmp))
+           (data-by-name
+            (let ((tmp (make-hash-table (length data))))
+              (for-each (lambda (x)
+                          (hash-set! tmp (string-downcase
+                                         (hash-ref x "name")) x)) data) tmp))
+           (ht (make-hash-table 2)))
+      (hash-set! ht "by id" data-by-id)
+      (hash-set! ht "by name" data-by-name)
+      (with-output-to-file outfile (lambda () (print-hash-table ht)))
+      ht)))
+(define (parse-tags-file)
+  (set! *vndb-tags* (parse-vndb-data-file "tags.json.gz" "vndb.tags")))
+(define (parse-traits-file)
+  (set! *vndb-traits* (parse-vndb-data-file "traits.json.gz" "vndb.traits")))
+
+(define (lookup-tag name) (print-hash-table (get-tag-by-name name)))
+(define (get-tag-by-name name) (hash-ref-multi *vndb-tags* "by name" name))
+(define (get-tag-by-id id) (hash-ref-multi *vndb-tags* "by id" id))
+
+(define (lookup-trait name) (print-hash-table (get-trait-by-name name)))
+(define (get-trait-by-name name) (hash-ref-multi *vndb-traits* "by name" name))
+(define (get-trait-by-id id) (hash-ref-multi *vndb-traits* "by id" id))
 
 ;;Higher level procedures for searching for vns
 (define (vnlist-search re)
@@ -343,3 +405,4 @@ than match the regular expression re"
            (push! vn matches))))
      vnlist-cache)
     matches))
+;;(update-tags-file)

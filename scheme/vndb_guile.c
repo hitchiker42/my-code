@@ -115,7 +115,7 @@ BIO* connect_tls(const char *host, const char *port){
   BIO_free_all(bio);
   SSL_CTX_free(ctx);
   return NULL;
-}  
+}
 //Scheme stuff
 #include <guile/2.0/libguile.h>
 //Wrapper around code to raise a scheme error, handles conversion of
@@ -174,7 +174,7 @@ SCM scm_tls_recv_x(SCM tls_smob, SCM buf){
   char *bufptr = (char*)SCM_BYTEVECTOR_CONTENTS(buf);
   return scm_from_int(BIO_read(bio, bufptr, buflen));
 }
-  
+
 
 
 //host is a string, port can be either a string or an integer
@@ -221,30 +221,42 @@ SCM scm_connect_tls(SCM host, SCM port){
   return scm_new_smob(tls_tag, (scm_t_bits)bio);
 }
 
+#include <zlib.h>
 SCM scm_gunzip_buf(SCM scm_buf, SCM scm_outlen){
   //this should typecheck buf for us
-  size_t buflen = scm_C_bytevector_length(buf);
-  uint8_t *buf = (uint8_t*)SCM_BYTEVECTOR_CONTENTS(buf);
+  size_t buflen = scm_c_bytevector_length(scm_buf);
+  uint8_t *buf = (uint8_t*)SCM_BYTEVECTOR_CONTENTS(scm_buf);
   size_t outlen = scm_to_size_t(scm_outlen);
-  uint8_t *out = scm_gc_malloc_pointerless(outlen);
-  
+  uint8_t *out = scm_gc_malloc_pointerless(outlen, SCM_GC_BYTEVECTOR);
+
   z_stream stream = {.next_in = buf, .avail_in = buflen,
                      .next_out = out, .avail_out = outlen,
                      .zalloc = NULL, .zfree = NULL, .opaque = NULL};
-  inflateInit(&stream);
+  //15 | 16 means use 15 bits for the decompression window, and only accept
+  //gzip compressed buffers
+  inflateInit2(&stream, 15 | 16);
   int status = inflate(&stream, Z_FINISH);
   if(status != Z_STREAM_END){ //the output buffer was too small
     //Do something useful here, for now this just makes sure that
     //we don't cause any errors
-    free(out);
-    return SCM_BOOL_F;
+    fprintf(stderr, "Return value was %d, expecting %d\n",
+            status, Z_FINISH);
+    scm_gc_free(out, outlen, SCM_GC_BYTEVECTOR);
+    SCM ret = scm_from_utf8_string(stream.msg);
+    inflateEnd(&stream);
+    
+    return ret;
   }
-  
-  SCM bv = scm_pointer_to_bytevector(out, stream.total_out);
+  //I don't know what the tag bits for a bytevector are so I need to
+  //make an empty one.
+  SCM bv = scm_c_make_bytevector(0);
+  SCM_SET_CELL_WORD_1(bv, stream.total_out);
+  SCM_SET_CELL_WORD_2(bv, out);
+  inflateEnd(&stream);
   return bv;
 }
 
-void init_openssl(){
+void init_vndb(){
   tls_tag = scm_make_smob_type("tls", sizeof(BIO*));
   scm_set_smob_free(tls_tag, scm_tls_free);
   scm_c_define_gsubr("tls-connect", 2, 0, 0, scm_connect_tls);
