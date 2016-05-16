@@ -10,7 +10,7 @@
             thunk case-equal bytevector->string bytevector-memcpy
             equal-any? print-hash-table build-hash-table hash-table
             keyword->symbol->string list->hashtable)
-  #:replace (string-split length))
+  #:replace (string-split length read-and-eval!))
 
 (define null '())
 ;;;;Macros
@@ -253,6 +253,10 @@ Returns a list of substrings"
   (let ((port (current-error-port)))
     (write obj port)
     (newline port)))
+;;This exists in the library, but is depreciated so override it
+(define-public* (read-and-eval! #:optional (port (current-input-port))
+                                           (env (interaction-environment)))
+  (eval (read port) env))
 (define-public (read-from-string str)
   (with-input-from-string str (lambda () (read))))
 (define-public (read-from-string-and-eval! str)
