@@ -108,11 +108,28 @@
 ;;These used to be defined really elegently using syntax-rules,
 ;;pattern matching and recursion, but that caused a stack overflow when
 ;;reading large hash tables (apperently macros aren't tail recursive)
-(define-macro (build-hash-table table . rest)
-  `(begin
-     (when ',rest
-       (for-each (lambda (x) (hash-set! ,table (car x) (cdr x))) ',rest))
-     ,table))
+;;These used to be defined really elegently using syntax-rules,
+;;pattern matching and recursion, but that caused a stack overflow when
+;;reading large hash tables (apperently macros aren't tail recursive)
+(define-syntax build-hash-table
+  (syntax-rules ()
+    ((_ table (key value) rest ...)
+     #'(begin
+         (hash-set! table key value)
+         (build-hash-table table rest ...)))
+    ((_ table)
+     table)))
+;; (define-macro (build-hash-table table . rest)
+;;   (let acc ((table table) (entries rest) (code '()))
+;;     (if (or (not entries) (null? entries))
+;;         `(append ,@code)
+;;         (acc table (cdr entries)
+;;              (cons `(hash-set! ,table ,(cadr entries) ,(cadar entries))
+;;                    code)))))
+;;   `(begin
+;;      (when ',rest
+;;        (for-each (lambda (x) (hash-set! ,table (car x) (cadr x))) ,rest))
+;;      ,table))
 (define-macro (hash-table . rest)
   (let ((table (gensym)))
     `(let ((,table (make-hash-table)))

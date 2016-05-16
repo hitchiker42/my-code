@@ -35,12 +35,12 @@
 
 
 ;;TODO: read/write the cache to/from disk in a seperate thread
-(define (read-cache) (read-from-file-and-eval *vndb-cache-file*))
+(define (read-cache) (json->scm (open-file *vndb-cache-file* "r")))
 (define (write-cache) (with-output-to-file *vndb-cache-file*
-                        (lambda () (print-hash-table *vndb-cache*))))
+                        (lambda () (scm->json *vndb-cache*))))
 (define (write-cache-backup)
   (with-output-to-file (concat *vndb-cache-file* ".bkup")
-                        (lambda () (print-hash-table *vndb-cache*))))
+    (scm->json *vndb-cache*)))
 (define *vndb-cache* (read-cache))
 (define (vnlist-cache) (hash-ref *vndb-cache* "vnlist"))
 (define (vn-cache) (hash-ref *vndb-cache* "VNs"))
@@ -201,6 +201,7 @@ make more queries, otherwise throw the error again"
   (vndb-get-all "vnlist" "(uid = 0)" "basic" 100
                 (map cache-vnlist! (hash-ref response "items")))
   (write-cache))
+;;use the cache here
 (define* (get-vn filter #:optional (flags "basic"))
   (let ((results '()))
     (vndb-get-all "vn" filter flags 25
@@ -272,7 +273,7 @@ if they're not already cached"
                #t #f)))
         #f)))
 
-(define* (vndb-get-vns-by-id ids #:optional (flags "basic"))
+(define* (get-vns-by-id ids #:optional (flags "basic"))
   "Look up a list of vns by their ids, using cache entries if possible"
   (let ((needed (filter (compose not check-vn-cache) ids)))
     (unless (null? needed)
@@ -286,12 +287,12 @@ if they're not already cached"
 ;;Some functions to parse returned data
 
 ;;This should probably be removed
-(define (vnlist-get-vns vnlist)
-  "Given a response from the \"get vnlist\" command return
-a filter to select those vns in a \"get vn\" command"
-  (let* ((ht (json-string->scm vnlist))
-         (vn-ids (map (lambda (x) (hash-ref x "vn")) (hash-ref ht "items"))))
-    (format #f "(id = [~a])" (string-join (map number->string vn-ids) ","))))
+;; (define (vnlist-get-vns vnlist)
+;;   "Given a response from the \"get vnlist\" command return
+;; a filter to select those vns in a \"get vn\" command"
+;;   (let* ((ht (json-string->scm vnlist))
+;;          (vn-ids (map (lambda (x) (hash-ref x "vn")) (hash-ref ht "items"))))
+;;     (format #f "(id = [~a])" (string-join (map number->string vn-ids) ","))))
 (define (get-items str)
   "Return a list of hashtables containing the items in str,
 which is a response from a \"get\" \"foo\" command"
@@ -319,9 +320,14 @@ which is a response from a \"get\" \"foo\" command"
       (lambda () (let ((ht (make-hash-table)))
                    (hash-set! ht "VNs" (make-hash-table))
                    (hash-set! ht "vnlist" (make-hash-table))
+                   (set! *vndb-cache* ht)
                    (print-hash-table ht))))))
 (define (cache-lookup-vn id)
-  (hash-ref (hash-ref *vndb-cache* "VNs") id))
+  (hash-ref-multi *vndb-cache* "VNs" id))
+(define (get-vnlist-entry id)
+  (hash-ref-multi *vndb-cache* "vnlist" id))
+(define (print-vnlist-entry id)
+  (print-hash-table (hash-ref-multi *vndb-cache* "vnlist" id)))
 ;;When converting a string to json all non ascii unicode characters
 ;;are escaped, this function undoes that
 (define (unescape-unicode str)
