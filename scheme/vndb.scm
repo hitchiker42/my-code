@@ -10,7 +10,7 @@
    (string-join (list (getcwd) "libguile-vndb")
                 file-name-separator-string) "init_vndb"))
 (use-modules (rnrs bytevectors) (rnrs io ports) (ice-9 receive) (ice-9 regex)
-             (ice-9 hash-table) (ice-9 futures) (ice-9 readline)
+             (ice-9 hash-table) (ice-9 futures) (ice-9 readline) (ice-9 optargs)
              (ice-9 buffered-input) (srfi srfi-1) (web client)(json) (util))
 ;;;Constants/Variables
 (define *vndb-port* 19534)
@@ -28,10 +28,12 @@
 ;;Functions to read/write the cache
 (define (read-cache) (json->scm (open-file *vndb-cache-file* "r")))
 (define* (write-cache #:optional bkup)
-  (with-output-to-file *vndb-cache-file*
-    (lambda () (scm->json *vndb-cache*)))
-  (if bkup (with-output-to-file (concat *vndb-cache-file* ".bkup")
-             (scm->json *vndb-cache*))))
+  (call-with-new-thread
+   (lambda ()
+     (with-output-to-file *vndb-cache-file*
+       (lambda () (scm->json *vndb-cache*)))
+     (if bkup (with-output-to-file (concat *vndb-cache-file* ".bkup")
+                (scm->json *vndb-cache*))))))
 
 ;;Load cache/tags/traits, define them to false if they're undefined so
 ;;the variables actually exist, then load them in a seperate thread
@@ -132,6 +134,8 @@
              (vndb-login-user username password))
       (begin (vndb-connect)
              (vndb-login-anon))))
+(define (vndb-logged-in?)
+  (if (or *vndb-socket* *vndb-tls*) #t #f))
 
 ;;Responses from the server all all in the form:
 ;;response-type { response-object }
@@ -182,7 +186,7 @@ make more queries, otherwise throw the error again"
           (sleep (ceiling (hash-ref err "fullwait"))))
         (throw err-type err-msg))))
 (define (get-items str)
-  "Return the items field from a response command as a list" 
+  "Return the items field from a response command as a list"
   (hash-ref (json-string->scm str) "items"))
 ;;Collect all the results from a vndb get command
 ;;Code in body has access to the 'response' variable which contains
@@ -229,19 +233,51 @@ make more queries, otherwise throw the error again"
   (let ((vn-cache (vn-cache)))
     (map (lambda (x) (hash-ref vn-cache x)) ids)))
 
+(define* (get-thing what filter #:optional (flags "basic") #:key
+                    (cache-fn (symbol-ref (build-symbol "cache-" what "!")))
+                    (hash-key "id"))
+  (let ((results '()))
+    (vndb-get-all what filter flags 25
+                  (begin (map cache-fn (hash-ref response "items"))
+                         (push! (hash-ref response "items")  results)))
+    (write-cache)
+    (let ((ret (make-hash-table)))
+      (dolist (r results)
+              (for-each (lambda (x)
+                          (hash-set! ret (hash-ref x hash-key) x)) r))
+      (if (not (zero? (hash-table-size ret))) ret #f))))
+(define* (get-release filter #:optional (flags "basic,vn"))
+  (get-thing "release" filter flags))
+;;search for a producer by name, no options, uses all possible flags
+(define* (get-producer name)
+  (get-thing "producer" (format #f "(search ~~ ~s)" name)
+             "basic,details,relations"))
 ;;use the cache here
 (define* (get-vn filter #:optional (flags "basic"))
-  (let ((results '()))
-    (vndb-get-all "vn" filter flags 25
-                  (begin (map cache-vn! (hash-ref response "items"))
-                         (push! (hash-ref response "items")  results)))
-         (write-cache)
-         (let ((ret (make-hash-table)))
-           (dolist (r results)
-                   (for-each (lambda (x)
-                               (hash-set! ret (hash-ref x "id") x)) r))
-           ret)))
-
+  (get-thing "vn" filter flags))
+(define* (random-vn #:optional (flags "basic"))
+  (let ((vn #f))
+    (until vn
+      (let
+          ((id (random (+ (hash-ref (dbstats) "vn") 1000))))        
+        (set! vn (or (check-vn-cache id)
+                     (get-vn (format #f "(id = ~s)" id) flags)))))
+    (if (not (check-vn-cache vn)) (cache-vn! vn))
+    vn))
+;;Functions to get vns from releases/producers
+(define* (release-get-vns release #:optional (flags "basic"))
+  (let* ((vns (hash-ref release "vn"))
+         (ids (map (lambda (x) (hash-ref x "id")) vns)))
+    (get-vns-by-id ids))) ;;does the cache checking for us
+(define* (releases-get-vns releases #:optional (flags "basic"))
+  (let ((vns
+         (append-map! (lambda (x);;for each release
+                        (map (lambda (y) (hash-ref y "id"))
+                             (hash-ref x "vn")))
+                        releases)))
+    (set! vns (uniq (sort vns <)))
+    (get-vns-by-id vns)))
+(define (dbstats) (hash-ref *vndb-cache* "dbstats"))
 ;;;Cache functions
 
 ;;Checks if id is in the cache, with all the fields specified by flags
@@ -264,10 +300,21 @@ make more queries, otherwise throw the error again"
                          flags))
                #t #f)))
         #f)))
+;;TODO: make these check if the cache entry exists, and merge with
+;;the existing entry if applicable
 (define (cache-vn! vn-ht)
   "Store a vn (represented as a scheme hash table) into the cache"
   (let ((id (hash-ref vn-ht "id")))
     (hash-set! (vn-cache) id vn-ht)))
+(define (cache-producer! producer)
+  "Store a producer (represented as a scheme hash table) into the cache"
+  (let ((name (hash-ref producer "name")))
+    (hash-set! (hash-ref *vndb-cache* "producers")
+               (string-downcase name) producer)))
+(define (cache-release! release)
+  "Store a release (represented as a scheme hash table) into the cache"
+  (let ((name (hash-ref release "id")))
+    (hash-set! (hash-ref *vndb-cache* "releases") "id" release)))
 (define (cache-vns! response) ;;response is a json string
   "Cache all the vns returned in a given response from the server"
   (for-each cache-vn! (get-items response)))
@@ -275,6 +322,12 @@ make more queries, otherwise throw the error again"
   "Cache all the vnlist entries in the given hash table"
   (let ((id (hash-ref vnlist-ht "vn")))
     (hash-set! (vnlist-cache) id vnlist-ht)))
+(define (update-dbstats!)
+  (unless (or *vndb-socket* *vndb-tls*)
+    (vndb-login))
+  (let ((dbstats (json-string->scm (vndb-dbstats))))
+    (hash-set! *vndb-cache* "dbstats" dbstats)
+    (write-cache)))
 (define* (empty-cache! #:optional force)
   "Empty the cache, requires conformation if force is not set"
   (when (not force)
@@ -295,6 +348,10 @@ make more queries, otherwise throw the error again"
   (hash-ref-multi *vndb-cache* "vnlist" id))
 (define (print-vnlist-entry id)
   (print-hash-table (hash-ref-multi *vndb-cache* "vnlist" id)))
+(define (cache-lookup-producer name)
+  (hash-ref-multi *vndb-cache* "producers" name))
+(define (cache-print-producer name)
+  (print-hash-table (hash-ref-multi *vndb-cache* "producers" name)))
 ;;When converting a string to json all non ascii unicode characters
 ;;are escaped, this function undoes that
 (define (unescape-unicode str)
@@ -335,6 +392,18 @@ make more queries, otherwise throw the error again"
            (push! vn matches))))
      vnlist-cache)
     matches))
+;;Sort a list of vns/releases by their date field
+(define (sort-by-date ls)
+  (let ((date->sec (lambda (date) (car (mktime (car (strptime "%F" date)))))))
+    (sort ls (lambda (a b) (< (date->sec (hash-ref a "released"))
+                              (date->sec (hash-ref b "released")))))))
+;; (define (sort-by ls what)
+;;   (case-equal what
+;;    ("id" (sort-by-key ls "id"))
+;;    ("date" (sort-by-date ls))
+;;    ('("rating" "score") (sort-by-key ls "rating"))
+;;    ("popularity" (sort-by-key ls "popularity"))
+;;    ("name" (sort-by-key ls "original"))))
 
 ;;;Functions to download/parse tags/traits
 (define (download-tags-file)
@@ -345,7 +414,8 @@ make more queries, otherwise throw the error again"
     (put-bytevector (open-file "traits.json.gz" "w") body)))
 ;;Optimally I'd make an array of tags indexed by id, and have
 ;;a hashtable which translated names to ids, Actually I could do this
-;;now since I use json to serialize stuff
+;;now since I use json to serialize stuff (nope, the json module doesn't
+;;support vectors/arrays)
 (define (parse-vndb-data-file infile outfile)
   (let ((buf (gunzip-bytevector
               (get-bytevector-all (open-file infile "r"))
@@ -368,6 +438,24 @@ make more queries, otherwise throw the error again"
       (hash-set! ht "by name" data-by-name)
 ;;      (with-output-to-file outfile (lambda () (print-hash-table ht)))
       ht)))
+;; (define (parse-vndb-data-file infile)
+;;   (let* ((buf (gunzip-bytevector
+;;               (get-bytevector-all (open-file infile "r"))
+;;               (* 1024 1024)))
+;;          (data (json-string->scm (utf8->string buf)))
+;;          (by-id (list->vector
+;;                  (sort data
+;;                        (lambda (x y) (< (hash-ref x "id") (hash-ref y "id"))))))
+;;          (by-name
+;;           (let ((tmp (make-hash-table (length data))))
+;;             (for-each (lambda (x)
+;;                         (hash-set! tmp (string-downcase
+;;                                         (hash-ref x "name")) (hash-ref x "id")))
+;;                       data) tmp))
+;;          (ht (make-hash-table 2)))
+;;     (hash-set! ht "by id" by-id)
+;;     (hash-set! ht "by name" by-name)
+;;     ht))
 ;;I'm not really worried about the processing time for creating duplicate
 ;;hash tables for ids and names, but about the fact that it uses excessive
 ;;storage, so it's find to make both and delete one here.
@@ -396,6 +484,11 @@ make more queries, otherwise throw the error again"
           (string-join (cons name names) ",")
           (acc (car parents)
                (cons name names))))))
+;;This needs to be called with
+;; (define (set-tag-children tags-ht)
+;;   (let ((tags (hash-map-values->list tags-ht identity)))
+;;     (sort tags (lambda (x y) (< (hash-ref x "id") (hash-ref y "id"))))
+;;     (set!
 ;;should basically work for tags as well
 (define (build-trait-tree traits)
   (let* ((n 2200);;should be high enough to cover all traits
@@ -432,17 +525,17 @@ make more queries, otherwise throw the error again"
 
 ;;;Lookup tags/traits
 (define (lookup-tag name) (print-hash-table (get-tag-by-name name)))
+(define (lookup-tag-by-id id) (print-hash-table (get-tag-by-id id)))
 (define (get-tag-by-name name) (hash-ref-multi *vndb-tags* "by name" name))
 (define (get-tag-by-id id)
   (get-tag-by-name (hash-ref-multi *vndb-tags* "by id" id)))
 ;;The tag id's are not contiunous, presumably some tags have been deleted
 ;;over time. This code returns a list of all the ids that are not assigned
-(define (get-num-tags/traits ht)
+(define (get-unused-tags/traits ht)
   (filter identity (map
-                    (lambda (x) (if (get-tag-by-id x) #f x))
+                    (lambda (x) (if (hash-ref ht x) #f x))
                     (iota (reduce max #f
-                                  (hash-map-keys->list
-                                   (hash-ref ht "by id") identity))))))
+                                  (hash-map-keys->list ht identity))))))
 (define (lookup-trait name) (print-hash-table (get-trait-by-name name)))
 (define (get-trait-by-id id) (hash-ref-multi *vndb-traits* "by id" id))
 (define (get-trait-by-name name) (hash-ref-multi *vndb-traits* "by name" name))
@@ -461,4 +554,3 @@ make more queries, otherwise throw the error again"
                (sexp (eval line (interaction-environment))))
           (when (eof-object? sexp) (break))
           (pprint sexp))))))
-               

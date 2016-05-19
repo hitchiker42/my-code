@@ -3,26 +3,37 @@
   #:use-module (rnrs io ports)
   #:use-module (system foreign)
   #:use-module (ice-9 hash-table)
+  #:use-module (ice-9 optargs)
   ;;Most stuff I export using define-pubilc, these are mostly macros
   ;;and inlineable procedures
-  #:export (progn list* prog1 typecase dolist as-list pop! push! concat
+  #:export (progn list* prog1 typecase dolist as-list pop! push! concat until
             incf decf concat-lit car-safe cdr-safe cl-car cl-cdr aref vref
-            thunk case-equal bytevector->string bytevector-memcpy
+            thunk case-equal bytevector->string bytevector-memcpy symbol-ref
             equal-any? print-hash-table build-hash-table hash-table
-            keyword->symbol->string list->hashtable)
+            keyword->symbol->string list->hashtable build-symbol)
   #:replace (string-split length read-and-eval!))
 
-(define null '())
+(define-public null '())
 ;;;;Macros
+;;Macros to make writing macros eaiser
+(define-syntax-rule (define-syntax-public name body ...)
+  (begin (define-syntax name body ...) (export name)))
+(define-syntax-rule (define-syntax-rule-public (name args ...) body ...)
+  (begin (define-syntax-rule (name args ...) body ...) (export name)))
+(define-syntax-rule (define-alias alias symbol)
+  (define-syntax alias (identifier-syntax symbol)))
+(define-syntax-rule (define-alias-public alias symbol)
+  (begin (define-syntax alias (identifier-syntax symbol)) (export alias)))
+(define-syntax-rule (define-macro* (name args ...) body ...)
+  (defmacro* name (args...) body ...))
+(define-syntax-rule (define-macro-public* (name args ...) body ...)
+  (defmacro*-public name (args...) body ...))
 ;;; Symbol aliases
-(define-syntax progn
-;;  "Alias for begin"
-  (identifier-syntax begin))
-(define-syntax list*
-;;  "Alias for cons*"
-  (identifier-syntax cons*))
-(define-syntax aref (identifier-syntax array-ref))
-(define-syntax vref (identifier-syntax vector-ref))
+(define-alias progn begin)
+(define-alias list* cons*)
+(define-alias aref array-ref)
+(define-alias vref vector-ref)
+(define-alias define-public* define*-public)
 
 ;;;Control structures
 (define-syntax-rule (prog1 first rest ...)
@@ -35,7 +46,8 @@
     (while (< var count)
       exp exp* ...
       (incf var))))
-
+(define-syntax-rule (until test body ...)
+  (while (not test) body ...))
 ;; This should let you break out of a dolist, but it doesn't
 ;; (let ((ls list))
 ;;   (let ((var (pop! ls)))
@@ -45,7 +57,27 @@
 
 (define-syntax-rule (thunk exp ...)
   (lambda () exp ...))
+;; (define-syntax-rule (build-symbol . args)
+;;   (build-symbol-acc (car args) (cdr args) '()))
+;; (define-syntax build-symbol-acc
+;;   (syntax-rules ()
+;;     ((_ () () ls) (string->symbol (string-join ls "")))
+;;     ((_ arg () ls)
+;;      (build-symbol () ()
+;;                    (cons (if (symbol? arg) (string->symbol arg) arg) ls)))
+;;     ((_ arg args ls)
+;;      (build-symbol (car args) (cdr args)
+;;                    (cons (if (symbol? arg) (string->symbol arg) arg) ls)))))
 
+;;convert a series of strings/symbols into a new symbol, the arguments
+;;get evaluated so any literal symbol needs to be quoted
+(define-macro (build-symbol . args)
+  `(string->symbol
+    (string-join
+    (map (lambda (x) (if (symbol? x) (symbol->string x) x))
+         (list ,@args)) "")))
+(define-syntax-rule (symbol-ref sym)
+  (module-ref (current-module) sym))
 ;;For what it's worth I tried to do this with syntax-case
 ;;The fact I need to do so much symbol manipulation means
 ;;its a lot eaiser to use define-macro
@@ -161,7 +193,7 @@
   (lambda (x)
     (syntax-case x ()
       ((_ (defn seq args ...)
-          list-expr string-expr array-expr error-expr)      
+          list-expr string-expr array-expr error-expr)
        #`(define-macro (defn seq args ...)
            (cond
             ((list? seq) (quasiquote list-expr))
@@ -210,6 +242,11 @@
           ((vector) (let ((vec (make-vector len)))
                        (array-index-map! vec proc) vec))
           (else (error))))))
+(define-public* (uniq ls #:optional (cmp equal?))
+  "Like delete-duplicates, but assumes the list is sorted"
+  (reverse!
+   (fold (lambda (l ls) (if (cmp l (car ls)) ls (cons l ls)))
+         (list (car ls)) (cdr ls))))
 ;;;String Functions
 (define (string-split str delim)
   "Split string into substrings delimited by delim.
@@ -392,10 +429,21 @@ bit in the integer is the first bit in the bitvector"
   (hash-for-each (lambda (key value)
                    (unless (hash-ref a key)
                      (hash-set! a key value))) b))
-(define-public (hash-map-keys->list ht f)
+(define-public* (hash-map-keys->list ht #:optional (f identity))
   (hash-map->list (lambda (key val) (f key)) ht))
-(define-public (hash-map-values->list ht f)
-  (hash-map->list (lambda (key val) (f key)) ht))
+(define-public* (hash-map-values->list ht #:optional (f identity))
+  (hash-map->list (lambda (key val) (f val)) ht))
+;;Sort a list of hashtables by compaing the value of a given key
+(define-public* (sort-by-key ls key #:optional lt)
+  (if (not lt)
+      (cond
+       ((number? (hash-ref (car ls) key))
+        (set! lt '<))
+       ((string? (hash-ref (car ls) key))
+        (set! lt 'string<))
+       (else (error))))
+  (sort ls (lambda (x y) (lt (hash-ref x key) (hash-ref y key)))))
+                                                     
 (define-public (hash-ref-multi ht . ref)
   (let acc ((ht ht) (ref ref))
     (if (null? ref) ht
