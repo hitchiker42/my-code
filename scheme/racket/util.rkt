@@ -14,7 +14,8 @@
          racket/sequence ;;Generic sequence functions
          racket/vector ;;vector map/filter
          racket/syntax ;;format-id
-         racket/port) ;;with-{input,output}-to-{file,string,...}
+         racket/port ;;with-{input,output}-to-{file,string,...}
+         rnrs/io/ports-6) ;;racket doesn't have input/output ports, somehow
 
 ;;To use a function at macroexpansion time we need to tell racket that we the
 ;;binding to be available at expansion time, not just run time
