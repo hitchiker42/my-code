@@ -12,9 +12,14 @@
 (define (scheme-get-type scm)
   (let ((ptr (scheme->pointer scm)))
     (ptr-ref ptr _short)))
-(define scheme-get-type-name
+(define scheme-get-type-name-or-null
   (get-ffi-obj "scheme_get_type_name_or_null" base-lib
-               (_fun _scheme -> _bytes)))
+               (_fun _short -> _bytes)))
+(define (scheme-get-type-name scm)
+  (if (fixnum? scm)
+      #"<fixnum-integer>"
+      (let ((type (scheme-get-type scm)))
+        (scheme-get-type-name-or-null type))))
 #|
 # define SCHEME_TYPE(obj)     (SCHEME_INTP(obj)?(Scheme_Type)scheme_integer_type:((Scheme_Object *)(obj))->type)
 # define _SCHEME_TYPE(obj) ((obj)->type) /* unsafe version */
