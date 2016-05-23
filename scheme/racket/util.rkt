@@ -15,7 +15,10 @@
          racket/vector ;;vector map/filter
          racket/syntax ;;format-id
          racket/port ;;with-{input,output}-to-{file,string,...}
-         rnrs/io/ports-6) ;;racket doesn't have input/output ports, somehow
+         rnrs/io/ports-6 ;;racket doesn't have input/output ports, somehow
+         racket/unsafe/ops
+         syntax/location
+         srfi/48) ;;format
 
 ;;To use a function at macroexpansion time we need to tell racket that we the
 ;;binding to be available at expansion time, not just run time
@@ -23,6 +26,7 @@
 (require (for-meta 2 racket/base))
 (require (for-syntax racket/string))
 (require (for-syntax racket/syntax))
+(require (for-syntax syntax/location))
 
 (define-syntax-rule (identifier-syntax id) (make-rename-transformer #'id))
 (define-syntax-rule (define-alias alias symbol)
@@ -91,7 +95,7 @@
                          (apply abort-current-to-prompt break-tag args))))))
               (let lp ()
                 (call-with-continuation-prompt
-                 (lambda () 
+                 (lambda ()
                    (define-syntax #,(datum->syntax #'while 'continue)
                      (lambda (x)
                        (syntax-case x ()
@@ -108,7 +112,7 @@
             break-tag
             (lambda (k . args)
               (my-if(null? args)
-                  #t  
+                  #t
                 (apply values args)))))))))
 (define-syntax define-macro
   (lambda (x)
@@ -133,7 +137,7 @@
                ((_ . args)
                 (let ((v (syntax->datum #'args)))
                   (datum->syntax y (apply transformer v)))))))))))
-;;There's not really a way around this my-ifI want macro defining macros 
+;;There's not really a way around this my I want macro defining macros
 (begin-for-syntax
  (define-syntax define-macro
   (lambda (x)
@@ -194,18 +198,55 @@
   (syntax-case stx ()
     ((_ name)
      (format-id #'name "~a?" (syntax-e #'name)))))
-(define-macro (format out fmt . rest)
-  (cond
-   ((eq? out #t) `(fprintf (current-output-port) ,fmt ,@rest))
-   ((eq? out #f) `(,(module-ref 'racket/base 'format) ,fmt ,@rest))
-   (else `(fprintf ,out ,fmt ,@rest))))
 
 (require racket/pretty)
 (define-alias pprint pretty-print)
 (define (macroexpand body) (syntax->datum (expand body)))
+
+(struct exn:fail:assertion exn:fail (srcloc)
+        #:property prop:exn:srclocs
+        (lambda (x) (list (exn:fail:assertion-srcloc x)))
+        #:extra-constructor-name make-exn:fail:assertion
+        #:transparent)
+(struct exn:fail:assertion-simple exn:fail ()
+        #:extra-constructor-name make-exn:fail:assertion-simple
+        #:transparent)
+(define-syntax (here stx)
+    #`(list (quote-source-file #,stx)
+            (quote-line-number #,stx)
+            (quote-column-number #,stx)
+            (quote-character-position #,stx)
+            (quote-character-span #,stx)))
+(begin-for-syntax
+ (define-syntax (here stx)
+    #`(list (quote-source-file #,stx)
+            (quote-line-number #,stx)
+            (quote-column-number #,stx)
+            (quote-character-position #,stx)
+            (quote-character-span #,stx))))
+;; (define-macro (assert! expr)
+;;   `(unless ,expr
+;;      (raise (make-exn:fail:assertion-simple
+;;              (format #f "Assertation-failure: ~s~%~s"
+;;                      'expr ,(here))
+;;              (current-continuation-marks)))))
+(define-syntax (assert! args)
+  (syntax-case args ()
+    ((_ expr)
+     (quasisyntax/loc args
+       (unless expr
+         (raise (make-exn:fail:assertion-simple
+                 (format #f "Assertation failure: ~s~%~s:~s:~s:~s:~s" 'expr
+                         (quote-source-file expr)
+                         (quote-line-number expr)
+                         (quote-column-number expr)
+                         (quote-character-position expr)
+                         (quote-character-span expr))
+                 (current-continuation-marks))))))))
 (provide (all-defined-out)
          (all-from-out
-          racket/bytes rnrs/bytevectors-6 racket/function racket/future racket/port
-          racket/string racket/math racket/sequence racket/vector racket/syntax)
+          racket/bytes rnrs/bytevectors-6 racket/port rnrs/io/ports-6
+          racket/function racket/future racket/string racket/math
+          racket/sequence srfi/48 racket/vector racket/syntax racket/unsafe/ops)
          (for-syntax (all-from-out racket/base racket/string racket/syntax))
          (for-meta 2 (all-from-out racket/base)))
