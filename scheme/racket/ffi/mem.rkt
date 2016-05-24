@@ -47,8 +47,10 @@ char *scheme_get_type_name_or_null(Scheme_Type t)
     return type_names[t]; |#
 (define _scheme-type _short)
 (define _scheme-invoke-proc _pointer)
-;;This assumes we're using the precise gc collector
-(define-cstruct _scheme-obj ((type _scheme-type)) #:define-unsafe)
+;;This assumes we're using the precise gc collector (though it really doesn't
+;;matter due to alignment)
+(define-cstruct _scheme-obj
+  ((type _scheme-type) (keyex _short))  #:define-unsafe)
 (define-cstruct _scheme-obj-inclhash ((so _scheme-obj)
                                       (keyex _short)) #:define-unsafe)
 (define-cstruct _scheme-hash-table

@@ -84,3 +84,7 @@
 ;;;ffi stuff
 (define-ffi-binding base-lib
   "scheme_get_port_fd" (_fun _scheme -> _intptr))
+(require racket/provide)
+(provide (except-out (all-defined-out)
+                     (matching-identifiers-out
+                      #rx"make-.*-funs?" (all-defined-out))))
