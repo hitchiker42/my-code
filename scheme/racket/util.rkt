@@ -245,6 +245,9 @@
                          (quote-character-span expr))
                  (current-continuation-marks))))))))
 (define-alias iota range)     
+;;(define internal-xorshift-state (make-bytevector 16))
+;;(define xorshift-rand ((state internal-xorshift-state))
+
 (provide (all-defined-out)
          (all-from-out
           racket/bytes rnrs/bytevectors-6 racket/port rnrs/io/ports-6

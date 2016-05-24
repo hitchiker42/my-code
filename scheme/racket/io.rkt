@@ -115,3 +115,7 @@
   "scheme_get_port_fd" (_fun _scheme -> _intptr))
 (define-ffi-binding base-lib
   "getaddrinfo" (_fun _bytes _bytes _addrinfo-pointer _pointer -> _int))
+(require racket/provide)
+(provide (except-out (all-defined-out)
+                     (matching-identifiers-out
+                      #rx"make-.*-funs?" (all-defined-out))))
