@@ -13,8 +13,9 @@
 (define (scheme-get-type scm)
   (let ((ptr (scheme->pointer scm)))
     (ptr-ref ptr _short)))
-(define-macro (define-ffi-binding lib c-name type)
-  (let ((sym (string->symbol (string-replace c-name "_" "-"))))
+(define-macro (define-ffi-binding lib c-name type
+                (scheme-name (string-replace c-name "_" "-")))
+  (let ((sym (string->symbol scheme-name)))
     `(define ,sym
        (get-ffi-obj ,c-name ,lib ,type))))
 ;;if the given type is outside the range of types this returns
@@ -90,7 +91,73 @@ char *scheme_get_type_name_or_null(Scheme_Type t)
 (define-cstruct _scheme-input-port
   ((p _scheme-port) (slow _byte) (closed _byte)
    (pending-eof _byte) (sub-type _scheme)) #:define-unsafe)
-
+;;simple objects
+(define-cstruct _scheme-simple-object-str
+  ((str _string/ucs-4) (tag-val _intptr)))
+(define-cstruct _scheme-simple-object-bytes
+  ((bytes _bytes) (tag-val _intptr)))
+(define-cstruct _scheme-simple-object-cons
+  ((car _scheme) (cdr _scheme)))
+(define _scheme-simple-object-union
+  (_union _scheme-simple-object-bytes
+             _scheme-simple-object-str
+             _scheme-simple-object-cons))
+(define-cstruct _scheme-simple-object
+  ((iso _scheme-obj-inclhash)
+   (u _scheme-simple-object-union)))
+;;this sortof already exists, make-sized-byte-string is the same as
+;;make_sized_byte_string with copy set to 0
+(define-ffi-binding base-lib
+  "scheme_make_sized_byte_string"
+  (_fun _pointer _intptr _int -> _scheme)
+  "scheme-make-byte-string")
+(define pointer->bytevector
+  (case-lambda
+    ((ptr len)
+     (scheme-make-byte-string ptr len 0))
+    ((ptr offset len)
+     (scheme-make-byte-string (ptr-add ptr offset) (- len offset) 0))))
+(define (bytevector->pointer bv (start 0))
+  (let* ((obj (cast bv _scheme _scheme-simple-object-pointer))
+         (byte-string (union-ref (scheme-simple-object-u obj) 0))
+         (ptr (scheme-simple-object-bytes-bytes byte-string)))
+    (ptr-add ptr start)))
+(define (allocate-bytevector sz)
+  (let ((ptr (malloc sz 'atomic-interior)))
+    (pointer->bytevector ptr sz)))
+(define (list->bytevector list)
+  (let* ((sz (length list))
+         (bv (allocate-bytevector sz))
+         (i 0))
+    (for-each (lambda (x) (bytes-set! bv i x) (incf i)) list)
+    bv))
+(define (copy-bytevector bv) ;;vs bytevector-copy
+  (let* ((sz (bytevector-length bv))
+         (new (malloc sz 'atomic-interior))
+         (old (bytevector->pointer bv)))
+    (memcpy new old sz)
+    (pointer->bytevector new sz)))
+         
+;;Be careful with using this with bytevectors allocated from racket
+;;since they don't trace interior pointers, this only matters if
+;;start is non-zero and the slice will outlive the original
+(define (bytevector-slice bv start (end (bytevector-length bv)))
+  (if (or (> end (bytevector-length bv))
+            (> start end))
+      (raise-arguments-error 'bytevector-slice
+                             "start <= end <= bytevector-length"
+                             "start" start "end" end)
+      (let ((ptr (bytevector->pointer bv)))
+        (pointer->bytevector ptr start end))))
+(define (bytevector-extend bv sz (mode 'atomic))
+  (let* ((old-len (bytevector-length bv))
+         (new-len (+ old-len sz))
+         (old (bytevector->pointer bv))
+         (new (malloc mode new-len)))
+    (memcpy new old old-len)
+    (memset new old-len 0 sz)
+    new))
+                  
 (provide
  (except-out (all-defined-out) scheme-get-type-name-or-null)
  (all-from-out ffi/unsafe))

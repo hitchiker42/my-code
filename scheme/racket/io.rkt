@@ -81,6 +81,37 @@
       (make-binary-input-port "<input port>" input subtype))
      ((output-port? input)
       (make-binary-output-port "<output port>" input subtype)))))
+(define (read-delim read-fn port msgbuf delim)
+  (let ((nbytes (read-fn port msgbuf)))
+    (if (eq? (bytevector-u8-ref msgbuf (1- nbytes)))
+        (bytevector-copy (bytevector-slice msgbuf 0 nbytes))
+        (let* ((buf (bytevector-copy msgbuf))
+               (buflen nbytes))
+          ;;loop until we end a read on delim
+          (while (not (eq? (bytevector-u8-ref buf (1- buflen)) delim))
+            (set! nbytes (read-fn port msgbuf))
+            (when (< (bytevector-length buf) (+ buflen nbytes))
+              (set! buf (bytevector-extend buf (bytevector-length buf))))
+            ;;dest offset source count
+            (memcpy (bytevector->pointer buf) buflen
+                    (bytevector->pointer msgbuf) nbytes)
+            (set! buflen (+ nbytes buflen)))
+          (bytevector-slice buf 0 buflen)))))
 ;;;ffi stuff
+(define _socklen _int)
+(define-cstruct _addrinfo
+  ((ai_flags _int) (ai_family _int)
+   (ai_socktype _int) (ai_protocol _int)
+   (ai_addrlen _socklen) (ai_addr _sockaddr-pointer)
+   (ai_cannonname _bytes) (ai_next _addrinfo-pointer)))
+(define _sock-data (_array _uint8 16))
+(define-cstruct _sockaddr
+  ((sa_family _ushort) (sa_data _sock-data)))
+(define-cstruct _in_addr
+  ((s_addr _uint32)))
+(define-cstruct _sockaddr_in
+  ((sin_port _uint16) (_sin_addr _in_addr)));;plus some padding
 (define-ffi-binding base-lib
   "scheme_get_port_fd" (_fun _scheme -> _intptr))
+(define-ffi-binding base-lib
+  "getaddrinfo" (_fun _bytes _bytes _addrinfo-pointer _pointer -> _int))

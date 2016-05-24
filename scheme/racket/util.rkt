@@ -17,6 +17,7 @@
          racket/port ;;with-{input,output}-to-{file,string,...}
          rnrs/io/ports-6 ;;racket doesn't have input/output ports, somehow
          racket/unsafe/ops
+         racket/list
          syntax/location
          srfi/48) ;;format
 
@@ -102,7 +103,7 @@
                          ((_)
                           #'(abort-to-prompt continue-tag))
                          ((_ . args)
-                          (syntax-violation 'continue "too many arguments" x))
+                          (error 'continue "too many arguments" x))
                          (_
                           #'(lambda ()
                               (abort-to-prompt continue-tag))))))
@@ -243,10 +244,11 @@
                          (quote-character-position expr)
                          (quote-character-span expr))
                  (current-continuation-marks))))))))
+(define-alias iota range)     
 (provide (all-defined-out)
          (all-from-out
           racket/bytes rnrs/bytevectors-6 racket/port rnrs/io/ports-6
-          racket/function racket/future racket/string racket/math
+          racket/function racket/future racket/string racket/math racket/list
           racket/sequence srfi/48 racket/vector racket/syntax racket/unsafe/ops)
          (for-syntax (all-from-out racket/base racket/string racket/syntax))
          (for-meta 2 (all-from-out racket/base)))
