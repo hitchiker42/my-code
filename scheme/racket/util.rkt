@@ -16,6 +16,7 @@
          racket/syntax ;;format-id
          racket/port ;;with-{input,output}-to-{file,string,...}
          rnrs/io/ports-6 ;;racket doesn't have input/output ports, somehow
+         racket/match ;;ml style pattern matching
          racket/unsafe/ops
          racket/list
          syntax/location
@@ -35,6 +36,7 @@
 
 (define-alias prog1 begin0)
 (define-alias progn begin)
+(define-alias string-strip string-trim)
 (define-syntax my-if
   (syntax-rules ()
     ((_ cond then) (when cond then))
@@ -73,9 +75,13 @@
 (define-alias 1- sub1)
 (define-alias 1+ add1)
 (define-syntax-rule (incf place)
-  (set! place (1+ place)))
+  (let ((ret (1+ place)))
+    (set! place ret)
+    ret))
 (define-syntax-rule (decf place)
-  (set! place (1- place)))
+  (let ((ret (1- place)))
+    (set! place ret)
+    ret))
 ;; A lot of these are taken from the guile source
 (define-syntax while
   (lambda (x)
@@ -199,7 +205,35 @@
   (syntax-case stx ()
     ((_ name)
      (format-id #'name "~a?" (syntax-e #'name)))))
-
+(define-macro (type-case expr . clauses)
+  (let ((val (gensym)))
+    `(let ((,val ,expr))
+       (cond
+        ,@(map (lambda (x)
+                (if (eq? 'else (car x))
+                    (list* 'else (cdr x))
+                    (list* (list (format-symbol "~a?" (car x)) val)
+                           (cdr x)))) clauses)))))
+(define-macro (pred-case expr . clauses)
+  (let ((val (gensym)))
+    `(let ((,val ,expr))
+       (cond
+        ,@(map (lambda (x)
+                 (if (eq? 'else (car x))
+                     (list* 'else (cdr x))
+                     (list* (list (car x) val)
+                            (cdr x)))) clauses)))))
+(define-syntax (aif stx)
+  (with-syntax ((it (datum->syntax stx 'it)))
+    (syntax-case stx ()
+      ((_ cond then)
+       #'(let ((it cond)) (if it then (void))))
+      ((_ cond then else)
+       #'(let ((it cond)) (if it then else)))
+      ((_ cond then else rest ...)
+       #'(let ((it cond))
+           (if it then (begin else rest ...)))))))
+  
 (require racket/pretty)
 (define-alias pprint pretty-print)
 (define (macroexpand body) (syntax->datum (expand body)))
@@ -244,14 +278,28 @@
                          (quote-character-position expr)
                          (quote-character-span expr))
                  (current-continuation-marks))))))))
-(define-alias iota range)     
+(define-alias iota range)
+(define (hash->alist ht)
+  (hash-map ht
+            (lambda (key value)
+              (if (hash? value)
+                  (cons key (hash->alist value))
+                  (cons key value)))))
+(define-macro (regexp-bind pat input . body)
+  `(let ((matched (regexp-match ,pat ,input)))
+     (unless (null? matched)
+       (when (< (length matched) 10)
+         (set! (matched (append matched
+                                (make-list (- 10 (length matched)) #f)))))
+       (match matched
+         ((list-rest $@ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $0)
 ;;(define internal-xorshift-state (make-bytevector 16))
 ;;(define xorshift-rand ((state internal-xorshift-state))
 
 (provide (all-defined-out)
          (all-from-out
-          racket/bytes rnrs/bytevectors-6 racket/port rnrs/io/ports-6
+          racket/bytes rnrs/bytevectors-6 racket/port rnrs/io/ports-6 racket/base
           racket/function racket/future racket/string racket/math racket/list
-          racket/sequence srfi/48 racket/vector racket/syntax racket/unsafe/ops)
-         (for-syntax (all-from-out racket/base racket/string racket/syntax))
-         (for-meta 2 (all-from-out racket/base)))
+          racket/sequence srfi/48 racket/vector racket/syntax racket/unsafe/ops))
+;;         (for-syntax (all-from-out racket/base racket/string racket/syntax))
+;;         (for-meta 2 (all-from-out racket/base)))

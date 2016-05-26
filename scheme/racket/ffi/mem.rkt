@@ -2,6 +2,8 @@
 (require ffi/unsafe)
 (require (rename-in racket/contract (-> -->)))
 (require "../util.rkt")
+(require (for-syntax "../util.rkt")
+         (for-meta 2 "../util.rkt"))
 (define (gc-malloc sz) (malloc 'atomic sz))
 ;;This gets a handle to all C libraries loaded at the time it's called
 ;;all we want is access to the racket C api
@@ -18,6 +20,9 @@
   (let ((sym (string->symbol scheme-name)))
     `(define ,sym
        (get-ffi-obj ,c-name ,lib ,type))))
+(define-macro (define-libc-binding c-name type)
+  (let ((sym (format-symbol "libc-~a" c-name)))
+    `(define ,sym (get-ffi-obj ,c-name base-lib ,type))))
 ;;if the given type is outside the range of types this returns
 ;;#<bad-value>, it only returns null for types that are in the range
 ;;of valid types, and don't exist
@@ -36,16 +41,12 @@
       #"<fixnum-integer>"
       (let ((type (scheme-get-type scm)))
         (scheme-get-type-name-or-null type))))
-#|
-# define SCHEME_TYPE(obj)     (SCHEME_INTP(obj)?(Scheme_Type)scheme_integer_type:((Scheme_Object *)(obj))->type)
-# define _SCHEME_TYPE(obj) ((obj)->type) /* unsafe version */
-SHARED_OK static char **type_names;
-SHARED_OK static Scheme_Type maxtype, allocmax;
-char *scheme_get_type_name_or_null(Scheme_Type t)
-{
-  if (t < 0 || t >= maxtype)
-    return "<bad-value>";
-    return type_names[t]; |#
+(define-macro (define-t-types . types)
+  `(begin ,@(map (lambda (x)
+                   `(define ,(format-symbol "~a_t" x) ,x)) types)))
+(define-t-types _int8 _uint8 _int16 _uint16 _int32 _uint32
+  _int64 _uint64 _size _ssize _ptrdiff)
+
 (define _scheme-type _short)
 (define _scheme-invoke-proc _pointer)
 ;;This assumes we're using the precise gc collector (though it really doesn't
@@ -139,7 +140,7 @@ char *scheme_get_type_name_or_null(Scheme_Type t)
          (old (bytevector->pointer bv)))
     (memcpy new old sz)
     (pointer->bytevector new sz)))
-         
+
 ;;Be careful with using this with bytevectors allocated from racket
 ;;since they don't trace interior pointers, this only matters if
 ;;start is non-zero and the slice will outlive the original
@@ -159,7 +160,35 @@ char *scheme_get_type_name_or_null(Scheme_Type t)
     (memcpy new old old-len)
     (memset new old-len 0 sz)
     new))
-                  
+(struct svector
+  (length size ptr)
+  #:mutable #:transparent)
+(define-syntax-rule (destructure-svector svec)
+  (values (svector-ptr svec) (svector-length svec) (svector-size svec)))
+(define/contract (svector-ref svec idx)
+  (--> svector? (and/c fixnum? positive?) any)
+  (if (>= idx (svector-length svec))
+      (raise-range-error 'svector-ref "svector" ""
+                         idx svec 0 (svector-length svec))
+      (ptr-ref (svector-ptr _scheme idx))))
+(define (svector-check-length svec (nelts 1))
+  (let-values (((ptr length size) (destructure-svector svec)))
+    (when (>= (+ length nelts) size)
+      (let ((new (malloc (* 2 size) 'nonatomic)))
+        (memcpy new ptr size _scheme)
+        (set-svector-ptr! svec new)
+        (set-svector-size! svec (* 2 size))
+        (svector-check-length svec nelts)))))
+(define/contract (svector-push! elt svec)
+  (--> any/c svector? any)
+  (svector-check-length svec)
+  (let-values (((ptr length size) (destructure-svector svec)))
+    (ptr-set! ptr _scheme length elt)
+    (set-svector-length! svec (1+ length))))
+(define/contract (svector-push-multipush! svec seq)
+  (--> any/c svector? any)
+  (svector-check-length svec (sequence-length seq)))
+  ;;do a memcpy)
 (provide
  (except-out (all-defined-out) scheme-get-type-name-or-null)
  (all-from-out ffi/unsafe))

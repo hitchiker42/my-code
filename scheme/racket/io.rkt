@@ -97,24 +97,76 @@
                     (bytevector->pointer msgbuf) nbytes)
             (set! buflen (+ nbytes buflen)))
           (bytevector-slice buf 0 buflen)))))
+;;no-create: error if it exists, otherwise truncate
+;;no-fail: no-error, truncate if exists
+;;no-truncate: if the file would be truncated (due to other options) don't
+(define (exists-flags->file-options flag)
+  (case flag
+    (('error) (file-options))
+    (('replace 'truncate 'truncate/replace)
+     (file-options no-fail))
+    (('must-truncate) (file-options no-create))
+    (('update) (file-options no-create no-truncate))
+    (('can-update #f) (file-options no-fail no-truncate))
+    ((#t) (error "unknown exists flag"))))
+(define (open-file filename mode (buffering 'block) (exists #f))
+  (let ((port
+         (case mode
+           ((in input r read) (open-input-file filename))
+           ((out output w write)
+            (open-output-file filename #:exists (or exists 'can-update)))
+           ((append)
+            (open-output-file filename #:exists 'append))
+           ((creat create)
+            (open-output-file filename #:exists 'error))
+           ((trunc truncate)
+            (open-output-file filename #:exists 'truncate))
+           ((r/w i/o read/write input/output rdwr)
+            (if (eq? exists 'append)
+                (let-values (((in out)
+                              (open-input-output-file
+                               filename #:exists 'append)))
+                  (file-stream-buffer-mode in 'none)
+                  (file-stream-buffer-mode out 'none)
+                  (ports->r6rs-port in out))
+                (open-file-input/output-port
+                 filename (exists-flags->file-options exists) buffering)))
+           ((#t) (error "unknown open mode")))))
+         ;;I can't see a way to set the buffer mode of an r6rs port after
+         ;;creation, so we can only set the buffer mode of racket ports here
+    (unless (and (input-port? port) (output-port? port))
+      (file-stream-buffer-mode port buffering))
+    port))         
 ;;;ffi stuff
-(define _socklen _int)
-(define-cstruct _addrinfo
-  ((ai_flags _int) (ai_family _int)
-   (ai_socktype _int) (ai_protocol _int)
-   (ai_addrlen _socklen) (ai_addr _sockaddr-pointer)
-   (ai_cannonname _bytes) (ai_next _addrinfo-pointer)))
+(define _off_t _size_t)
+(define _socklen_t _int)
 (define _sock-data (_array _uint8 16))
 (define-cstruct _sockaddr
   ((sa_family _ushort) (sa_data _sock-data)))
+(define-cstruct _addrinfo
+  ((ai_flags _int) (ai_family _int)
+   (ai_socktype _int) (ai_protocol _int)
+   (ai_addrlen _socklen_t) (ai_addr _sockaddr-pointer)
+   (ai_cannonname _bytes) (ai_next _addrinfo-pointer)))
 (define-cstruct _in_addr
-  ((s_addr _uint32)))
+  ((s_addr _uint32_t)))
 (define-cstruct _sockaddr_in
-  ((sin_port _uint16) (_sin_addr _in_addr)));;plus some padding
-(define-ffi-binding base-lib
-  "scheme_get_port_fd" (_fun _scheme -> _intptr))
+  ((sin_port _uint16_t) (_sin_addr _in_addr)));;plus some padding
 (define-ffi-binding base-lib
   "getaddrinfo" (_fun _bytes _bytes _addrinfo-pointer _pointer -> _int))
+;;MZ_EXTERN intptr_t scheme_get_port_fd(Scheme_Object *p);
+(define-ffi-binding base-lib
+  "scheme_get_port_fd" (_fun _scheme -> _intptr))
+;;MZ_EXTERN int scheme_get_port_socket(Scheme_Object *p, intptr_t *_s);
+(define-ffi-binding base-lib
+  "scheme_get_port_socket" (_fun _scheme (fd : (_ptr o _intptr))
+                                 -> _int -> fd))
+(define-libc-binding "read" (_fun _int _pointer _size_t -> _ssize_t))
+(define-libc-binding "pread" (_fun _int _pointer _size_t _off_t -> _ssize_t))
+(define-libc-binding "write" (_fun _int _pointer _size_t -> _ssize_t))
+(define-libc-binding "pwrite" (_fun _int _pointer _size_t -> _ssize_t))
+
+
 (require racket/provide)
 (provide (except-out (all-defined-out)
                      (matching-identifiers-out
