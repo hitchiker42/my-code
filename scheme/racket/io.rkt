@@ -147,6 +147,10 @@
                                  -> _int -> fd))
 
 ;;regexps aren't really io, but it seems silly to make another file
+
+;;The point of this struct & associated functions is to allow
+;;looping through all the matches of a regexp in a string, basically:
+;;(while (regexp-matcher-next-match matcher) (do something with match))
 (struct regexp-matcher
   (pattern string (last-match #:mutable #:auto)))
 (define (maybe-compile-regexp pattern)
@@ -166,13 +170,16 @@
 (define (make-regexp-matcher pat input)
   (let* ((re (maybe-compile-regexp pat)))
     (regexp-matcher re input)))
-;; (define (regexp-matcher-match-string matcher num)
-;;   (if (not (regexp-matcher-last-match matcher)) #f
-;;       (
-
-
-
-
+ (define (regexp-matcher-match-string matcher num)
+   (if (not (regexp-matcher-last-match matcher)) #f
+       (match (nth num (regexp-matcher-last-match))
+         ((cons start end
+                ;;TODO: write a substring function that doesn't copy
+                (substring (regexp-matcher-string matcher) start end))))))
+(define (regexp-matcher-match-start matcher num)
+  (car-safe (nth num (regexp-matcher-last-match matcher))))
+(define (regexp-matcher-match-end matcher num)
+  (car-safe (nth num (regexp-matcher-last-match matcher))))
 (require racket/provide)
 (provide (except-out (all-defined-out)
                      (matching-identifiers-out
