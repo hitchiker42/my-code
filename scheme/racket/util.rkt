@@ -14,13 +14,15 @@
          racket/sequence ;;Generic sequence functions
          racket/vector ;;vector map/filter
          racket/syntax ;;format-id
-         racket/port ;;with-{input,output}-to-{file,string,...}
+;;         racket/port ;;with-{input,output}-to-{file,string,...}
          rnrs/io/ports-6 ;;racket doesn't have input/output ports, somehow
          racket/match ;;ml style pattern matching
          racket/unsafe/ops
          racket/list
          syntax/location
-         srfi/48) ;;format
+         srfi/48 ;;format (the (format port fmt args ...)  version)
+         srfi/71 ;;unifies let and let-values
+         )
 
 ;;To use a function at macroexpansion time we need to tell racket that we the
 ;;binding to be available at expansion time, not just run time
@@ -37,6 +39,12 @@
 (define-alias prog1 begin0)
 (define-alias progn begin)
 (define-alias string-strip string-trim)
+(define-alias list->values unlist)
+(define-alias vector->values unvector)
+(define-alias string->bytes string->bytes/latin-1)
+(define-alias find memf)
+(define-alias false? not)
+(define (true? x) (not (not x)))
 (define-syntax my-if
   (syntax-rules ()
     ((_ cond then) (when cond then))
@@ -193,6 +201,8 @@
   (namespace-variable-value var (module->namespace mod)))
 (define-for-syntax (module-ref mod var)
   (namespace-variable-value var (module->namespace mod)))
+(define (symbol-ref var)
+  (namespace-variable-value var (current-namespace)))
 ;; (begin-for-syntax
 ;;  (define-macro (module-ref mod var)
 ;;   `(namespace-variable-value ',var (module->namespace ',mod))))
@@ -233,7 +243,7 @@
       ((_ cond then else rest ...)
        #'(let ((it cond))
            (if it then (begin else rest ...)))))))
-  
+
 (require racket/pretty)
 (define-alias pprint pretty-print)
 (define (macroexpand body) (syntax->datum (expand body)))
@@ -285,21 +295,36 @@
               (if (hash? value)
                   (cons key (hash->alist value))
                   (cons key value)))))
-(define-macro (regexp-bind pat input . body)
-  `(let ((matched (regexp-match ,pat ,input)))
-     (unless (null? matched)
-       (when (< (length matched) 10)
-         (set! (matched (append matched
-                                (make-list (- 10 (length matched)) #f)))))
-       (match matched
-         ((list-rest $@ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $0)
+;;Returns the result of body, if any exceptions are raised they
+;;are caught and #f is returned
+(define-syntax-rule (with-exception->false body ...)
+  (let ((prompt (make-continuation-prompt-tag)))
+    (call-with-continuation-prompt
+     call-with-exception-handler
+     prompt
+     (lambda () #f)
+     (lambda (exn) (abort-current-continuation prompt))
+     (lambda () (begin body ...)))))
+(define (nth n list)
+  (let loop ((ls list) (n n))
+    (if (null? ls) ls
+        (if (zero? n) (car ls)
+            (loop (cdr ls) (1- n))))))
+;; (define-macro (regexp-bind pat input . body)
+;;   `(let ((matched (regexp-match ,pat ,input)))
+;;      (unless (null? matched)
+;;        (when (< (length matched) 10)
+;;          (set! (matched (append matched
+;;                                 (make-list (- 10 (length matched)) #f)))))
+;;        (match matched
+;;          ((list-rest $@ $0 $1 $2 $3 $4 $5 $6 $7 $8 $9 $0)
 ;;(define internal-xorshift-state (make-bytevector 16))
 ;;(define xorshift-rand ((state internal-xorshift-state))
 
 (provide (all-defined-out)
          (all-from-out
-          racket/bytes rnrs/bytevectors-6 racket/port rnrs/io/ports-6 racket/base
+          racket/bytes rnrs/bytevectors-6 rnrs/io/ports-6 racket/base racket/match
           racket/function racket/future racket/string racket/math racket/list
-          racket/sequence srfi/48 racket/vector racket/syntax racket/unsafe/ops))
+          racket/sequence srfi/48 srfi/71 racket/vector racket/syntax racket/unsafe/ops))
 ;;         (for-syntax (all-from-out racket/base racket/string racket/syntax))
 ;;         (for-meta 2 (all-from-out racket/base)))

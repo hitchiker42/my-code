@@ -1,6 +1,6 @@
 #lang racket/base
 (require "util.rkt")
-(require "ffi/mem.rkt")
+(require "ffi/ffi.rkt")
 (require (rename-in racket/contract (-> -->)))
 
 ;;;Functions to convert racket ports to rnrs ports, since racket doesn't
@@ -19,7 +19,7 @@
           (scheme-port-sub-type port))))
     (case subtype
       (("<string-input-port>" "<string-output-port>") '<string-port>)
-      (("<file-input-port>" "<file-output-port>") '<file-port>)      
+      (("<file-input-port>" "<file-output-port>") '<file-port>)
       (("<stream-input-port>" "<stream-output-port>") '<stream-port>)
       (("<user-input-port>" "<user-output-port>") '<user-port>)
       (("<pipe-input-port>" "<pipe-output-port>") '<pipe>)
@@ -136,24 +136,8 @@
          ;;creation, so we can only set the buffer mode of racket ports here
     (unless (and (input-port? port) (output-port? port))
       (file-stream-buffer-mode port buffering))
-    port))         
-;;;ffi stuff
-(define _off_t _size_t)
-(define _socklen_t _int)
-(define _sock-data (_array _uint8 16))
-(define-cstruct _sockaddr
-  ((sa_family _ushort) (sa_data _sock-data)))
-(define-cstruct _addrinfo
-  ((ai_flags _int) (ai_family _int)
-   (ai_socktype _int) (ai_protocol _int)
-   (ai_addrlen _socklen_t) (ai_addr _sockaddr-pointer)
-   (ai_cannonname _bytes) (ai_next _addrinfo-pointer)))
-(define-cstruct _in_addr
-  ((s_addr _uint32_t)))
-(define-cstruct _sockaddr_in
-  ((sin_port _uint16_t) (_sin_addr _in_addr)));;plus some padding
-(define-ffi-binding base-lib
-  "getaddrinfo" (_fun _bytes _bytes _addrinfo-pointer _pointer -> _int))
+    port))
+;;;ffi stuff (Most i/o ffi stuff is with the rest of the ffi stuff)
 ;;MZ_EXTERN intptr_t scheme_get_port_fd(Scheme_Object *p);
 (define-ffi-binding base-lib
   "scheme_get_port_fd" (_fun _scheme -> _intptr))
@@ -161,10 +145,32 @@
 (define-ffi-binding base-lib
   "scheme_get_port_socket" (_fun _scheme (fd : (_ptr o _intptr))
                                  -> _int -> fd))
-(define-libc-binding "read" (_fun _int _pointer _size_t -> _ssize_t))
-(define-libc-binding "pread" (_fun _int _pointer _size_t _off_t -> _ssize_t))
-(define-libc-binding "write" (_fun _int _pointer _size_t -> _ssize_t))
-(define-libc-binding "pwrite" (_fun _int _pointer _size_t -> _ssize_t))
+
+;;regexps aren't really io, but it seems silly to make another file
+(struct regexp-matcher
+  (pattern string (last-match #:mutable #:auto)))
+(define (maybe-compile-regexp pattern)
+  (if (regexp? pattern) pattern
+      (pregexp pattern)))
+(define (regexp-matcher-next-match matcher)
+  (set-regexp-matcher-last-match! matcher
+   (regexp-match-positions (regexp-matcher-pattern matcher)
+                           (regexp-matcher-string matcher)
+                           (aif (regexp-matcher-last-match matcher)
+                                (cadr it) 0)))
+  ;;This is just to make the function return a boolean
+  (true? (regexp-matcher-last-match matcher)))
+
+;;The same as the normal constructor except if pat is a string it gets
+;;compiled into a regexp
+(define (make-regexp-matcher pat input)
+  (let* ((re (maybe-compile-regexp pat)))
+    (regexp-matcher re input)))
+;; (define (regexp-matcher-match-string matcher num)
+;;   (if (not (regexp-matcher-last-match matcher)) #f
+;;       (
+
+
 
 
 (require racket/provide)
