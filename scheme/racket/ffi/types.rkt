@@ -13,11 +13,11 @@
   (let ((sym (string->symbol scheme-name)))
     `(define ,sym
        (get-ffi-obj ,c-name ,lib ,type))))
-
 (define-macro (define-libc-binding c-name type
                 (scheme-name (format #f "libc-~a" c-name)))
   (let ((sym (string->symbol scheme-name)))
     `(define ,sym (get-ffi-obj ,c-name base-lib ,type))))
+
 (define (scheme->pointer scm)
   (cast scm _scheme _pointer))
 (define (pointer->scheme ptr)
@@ -94,13 +94,23 @@
   ((bytes _bytes) (tag-val _intptr)))
 (define-cstruct _scheme-simple-object-cons
   ((car _scheme) (cdr _scheme)))
+(define-cstruct _scheme-simple-object-cptr
+  ((ptr _pointer) (type _scheme)))
+(define-cstruct _scheme-simple-object-ptrs
+  ((ptr1 _pointer) (ptr2 _pointer)))
+(define-cstruct _scheme-simple-object-longs
+  ((int1 _intptr) (int2 _intptr)))
+;;putting more than 3 objects in this union makes racket segfault for some reason
 (define _scheme-simple-object-union
-  (_union _scheme-simple-object-bytes
-             _scheme-simple-object-str
-             _scheme-simple-object-cons))
-(define-cstruct _scheme-simple-object
-  ((iso _scheme-obj-inclhash)
-   (u _scheme-simple-object-union)))
+  (_union _scheme-simple-object-ptrs
+          _scheme-simple-object-longs
+          _scheme-simple-object-bytes))
+;;          _scheme-simple-object-str
+;;          _scheme-simple-object-cons
+;;          _scheme-simple-object-cptr))
+ (define-cstruct _scheme-simple-object
+   ((iso _scheme-obj-inclhash)
+    (u _scheme-simple-object-union)))
 (define _off_t _size_t)
 (define _socklen_t _int)
 (define _sock-data (_array _uint8 16))

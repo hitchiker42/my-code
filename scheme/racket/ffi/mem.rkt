@@ -29,17 +29,39 @@
   "scheme_make_sized_byte_string"
   (_fun _pointer _intptr _int -> _scheme)
   "scheme-make-byte-string")
-(define pointer->bytevector
-  (case-lambda
-    ((ptr len)
-     (scheme-make-byte-string ptr len 0))
-    ((ptr offset len)
-     (scheme-make-byte-string (ptr-add ptr offset) (- len offset) 0))))
-(define (bytevector->pointer bv (start 0))
-  (let* ((obj (cast bv _scheme _scheme-simple-object-pointer))
-         (byte-string (union-ref (scheme-simple-object-u obj) 0))
-         (ptr (scheme-simple-object-bytes-bytes byte-string)))
+(define-ffi-binding base-lib
+  "scheme_make_sized_char_string"
+  (_fun _pointer _intptr _int -> _scheme)
+  "scheme-make-char-string")
+(define-macro (make-pointer-cast type fxn)
+  `(define
+     (,(format-id "pointer->~a" type) ptr len (offset #f) #:copy (copy 0))
+     (if (not offset)
+         (,fxn ptr len copy)
+         (let ((len offset) (offset len))
+           (,fxn (ptr-add ptr offset) (- len offset) copy)))))
+(define (pointer->bytevector ptr len (offset #f) #:copy (copy 0))
+  (if (not offset)
+      (scheme-make-byte-string ptr len copy)
+      (let ((len offset)
+            (offset len))
+        (scheme-make-byte-string
+         (ptr-add ptr offset) (- len offset) copy))))
+(define (pointer->string ptr len (offset #f) #:copy (copy 0))
+  (if (not offset)
+      (scheme-make-char-string ptr len copy)
+      (let ((len offset)
+            (offset len))
+        (scheme-make-char-string
+         (ptr-add ptr offset) (- len offset) copy))))
+(define (simple-object->pointer rkt-obj (start 0))
+  (let* ((obj (cast rkt-obj _scheme _scheme-simple-object-pointer))
+         (u (union-ref (scheme-simple-object-u obj) 0))
+         (ptr (scheme-simple-object-c-ptr-ptr u)))
     (ptr-add ptr start)))
+(define-alias bytevector->pointer simple-object->pointer)
+(define-alias string->pointer simple-object->pointer)
+
 (define (allocate-bytevector sz)
   (let ((ptr (malloc sz 'atomic-interior)))
     (pointer->bytevector ptr sz)))
@@ -67,14 +89,14 @@
                              "start" start "end" end)
       (let ((ptr (bytevector->pointer bv)))
         (pointer->bytevector ptr start end))))
-(define (substring/shared bv start (end (bytevector-length bv)))
-  (if (or (> end (bytevector-length bv))
-            (> start end))
-      (raise-arguments-error 'bytevector-slice
-                             "start <= end <= bytevector-length"
+(define (string-slice str start (end (string-length str)))
+  (if (or (> end (string-length str))
+          (> start end))
+      (raise-arguments-error 'string-slice
+                             "start <= end <= string-length"
                              "start" start "end" end)
-      (let ((ptr (bytevector->pointer bv)))
-        (pointer->bytevector ptr start end))))
+      (let ((ptr (string->pointer bv)))
+        (pointer->string ptr start end))))
 (define (bytevector-extend bv sz (mode 'atomic))
   (let* ((old-len (bytevector-length bv))
          (new-len (+ old-len sz))

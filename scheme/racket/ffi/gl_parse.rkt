@@ -78,5 +78,5 @@
        ,(libc-strtol (string->bytes (attribute-value value))))))
 (define (parse-enums enums)
   (let ((group (find (lambda (x) (eq? (attribute-name x) 'group)))))
-  `(define ,(format-id "
+    `(define ,(string->symbol (regexp-replace 
              
