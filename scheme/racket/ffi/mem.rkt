@@ -35,29 +35,17 @@
   "scheme-make-char-string")
 (define-macro (make-pointer-cast type fxn)
   `(define
-     (,(format-id "pointer->~a" type) ptr len (offset #f) #:copy (copy 0))
+     (,(format-symbol "pointer->~a" type) ptr len (offset #f) #:copy (copy 0))
      (if (not offset)
          (,fxn ptr len copy)
          (let ((len offset) (offset len))
            (,fxn (ptr-add ptr offset) (- len offset) copy)))))
-(define (pointer->bytevector ptr len (offset #f) #:copy (copy 0))
-  (if (not offset)
-      (scheme-make-byte-string ptr len copy)
-      (let ((len offset)
-            (offset len))
-        (scheme-make-byte-string
-         (ptr-add ptr offset) (- len offset) copy))))
-(define (pointer->string ptr len (offset #f) #:copy (copy 0))
-  (if (not offset)
-      (scheme-make-char-string ptr len copy)
-      (let ((len offset)
-            (offset len))
-        (scheme-make-char-string
-         (ptr-add ptr offset) (- len offset) copy))))
+(make-pointer-cast bytevector scheme-make-byte-string)
+(make-pointer-cast string scheme-make-char-string)
 (define (simple-object->pointer rkt-obj (start 0))
   (let* ((obj (cast rkt-obj _scheme _scheme-simple-object-pointer))
          (u (union-ref (scheme-simple-object-u obj) 0))
-         (ptr (scheme-simple-object-c-ptr-ptr u)))
+         (ptr (scheme-simple-object-ptrs-ptr1 u)))
     (ptr-add ptr start)))
 (define-alias bytevector->pointer simple-object->pointer)
 (define-alias string->pointer simple-object->pointer)
@@ -77,26 +65,41 @@
          (old (bytevector->pointer bv)))
     (memcpy new old sz)
     (pointer->bytevector new sz)))
-
-;;Be careful with using this with bytevectors allocated from racket
-;;since they don't trace interior pointers, this only matters if
-;;start is non-zero and the slice will outlive the original
-(define (bytevector-slice bv start (end (bytevector-length bv)))
-  (if (or (> end (bytevector-length bv))
-            (> start end))
-      (raise-arguments-error 'bytevector-slice
-                             "start <= end <= bytevector-length"
-                             "start" start "end" end)
-      (let ((ptr (bytevector->pointer bv)))
-        (pointer->bytevector ptr start end))))
-(define (string-slice str start (end (string-length str)))
-  (if (or (> end (string-length str))
-          (> start end))
-      (raise-arguments-error 'string-slice
-                             "start <= end <= string-length"
-                             "start" start "end" end)
-      (let ((ptr (string->pointer bv)))
-        (pointer->string ptr start end))))
+;;There is a reason racket doesn't natively provide functions to get
+;;pointers into strings/bytevectors/vectors, the garbage collector by
+;;default doesn't trace interior pointers. So be careful using these
+(define-macro (gen-slice-fxn type)
+  (let ((type-slice (format-symbol "~a-slice" type))
+        (type-length (format-symbol "~a-length" type))
+        (type->pointer (format-symbol "~a->pointer" type))
+        (pointer->type (format-symbol "pointer->~a" type)))
+    `(define (,type-slice x start (end (,type-length x)))
+       (if (or (> end (,type-length x))
+               (> start end))
+               (raise-arguments-error ',type-slice
+                                      ,(format #f "start <= end <= ~a"
+                                               (symbol->string type-length))
+                                      "start" start "end" end)
+               (let ((ptr (,type->pointer x)))
+                 (,pointer->type ptr start end))))))
+(gen-slice-fxn bytevector)
+(gen-slice-fxn string)
+;; (define (bytevector-slice bv start (end (bytevector-length bv)))
+;;   (if (or (> end (bytevector-length bv))
+;;             (> start end))
+;;       (raise-arguments-error 'bytevector-slice
+;;                              "start <= end <= bytevector-length"
+;;                              "start" start "end" end)
+;;       (let ((ptr (bytevector->pointer bv)))
+;;         (pointer->bytevector ptr start end))))
+;; (define (string-slice str start (end (string-length str)))
+;;   (if (or (> end (string-length str))
+;;           (> start end))
+;;       (raise-arguments-error 'string-slice
+;;                              "start <= end <= string-length"
+;;                              "start" start "end" end)
+;;       (let ((ptr (string->pointer str)))
+;;         (pointer->string ptr start end))))
 (define (bytevector-extend bv sz (mode 'atomic))
   (let* ((old-len (bytevector-length bv))
          (new-len (+ old-len sz))

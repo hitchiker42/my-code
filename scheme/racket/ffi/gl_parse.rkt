@@ -36,7 +36,19 @@
                 (hash-set! ht 'content data))
             ht)))))
 ;;These are defined mostly in the order they apear in the xml file
-
+(define (un-camel-case id)
+  (let ((matcher (make-regexp-matcher #rx"[a-z0-9]([A-Z])(.)" id))
+        (result null))
+    (while (regexp-matcher-next-match matcher)
+      (
+      
+(define (translate-ids id)
+  (match id
+     ;;name of an enum, keep GL uppercase, downcase everything else and '_'->'-'
+    ((regexp #rx"GL_(.+)" (list _ name))
+     (concat "GL-" (string-downcase name)))
+    ((
+     
 ;;;The file starts with typedefs
 (define gl-typedef-regex
   #px"typedef *((?:un)?signed)? *(\\*+) *")

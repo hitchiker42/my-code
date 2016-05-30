@@ -164,7 +164,19 @@
                                 (cadr it) 0)))
   ;;This is just to make the function return a boolean
   (true? (regexp-matcher-last-match matcher)))
-
+;;Try to match pat at the current location of the matcher, it is
+;;assumed that the matcher has already made at least one match, if not
+;;an error will be raised
+(define (regexp-matcher-try-match matcher pat)
+  (let* ((re (maybe-compile-regexp pat))
+         (last (regexp-matcher-last-match matcher))
+         (maybe-match (regexp-match-positions re
+                                              (regexp-matcher-string matcher)
+                                              (cadr last))))
+    (if maybe-match
+        (begin0 #t
+          (set-regexp-matcher-last-match! matcher maybe-match))
+        #f)))
 ;;The same as the normal constructor except if pat is a string it gets
 ;;compiled into a regexp
 (define (make-regexp-matcher pat input)
@@ -173,9 +185,9 @@
  (define (regexp-matcher-match-string matcher num)
    (if (not (regexp-matcher-last-match matcher)) #f
        (match (nth num (regexp-matcher-last-match))
-         ((cons start end
+         ((cons start end)
                 ;;TODO: write a substring function that doesn't copy
-                (substring (regexp-matcher-string matcher) start end))))))
+                (string-slice (regexp-matcher-string matcher) start end)))))
 (define (regexp-matcher-match-start matcher num)
   (car-safe (nth num (regexp-matcher-last-match matcher))))
 (define (regexp-matcher-match-end matcher num)
