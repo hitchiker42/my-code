@@ -138,6 +138,16 @@
     (unless (and (input-port? port) (output-port? port))
       (file-stream-buffer-mode port buffering))
     port))
+;;Temporary files
+;;this needs to be a macro so it can modify its input argument
+;; (define-syntax-rule open-temp-file
+;;   (syntax-rules ()
+;;     ((_ template) (open-temp-file template #f))
+;;     ((_ template dir)
+;;      (let ((name make-temporary-file template  #f dir))
+;;        (set! template name)
+;;        (
+
 ;;;ffi stuff (Most i/o ffi stuff is with the rest of the ffi stuff)
 ;;MZ_EXTERN intptr_t scheme_get_port_fd(Scheme_Object *p);
 (define-ffi-binding base-lib

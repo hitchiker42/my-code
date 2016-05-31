@@ -16359,7 +16359,7 @@ typedef unsigned int GLhandleARB;
             <glx type="single" opcode="129"/>
         </command>
         <command>
-            <proto group="String">const <ptype>GLubyte</ptype> *<name>glGetStringi</name></proto>
+          <proto group="String">const <ptype>GLubyte</ptype> *<name>glGetStringi</name></proto>
             <param><ptype>GLenum</ptype> <name>name</name></param>
             <param><ptype>GLuint</ptype> <name>index</name></param>
         </command>

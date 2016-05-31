@@ -412,7 +412,19 @@
     (if (null? ls) ls
         (if (zero? n) (car ls)
             (loop (cdr ls) (1- n))))))
-
+(define (sloppy-assf proc list)
+  (let loop ((ls list))
+    (if (null? ls) #f
+        (if (and (list? (car ls))
+                 (proc (caar ls)))
+            (car ls)
+            (loop (cdr ls))))))
+(define (sloppy-assq elt list)
+  (sloppy-assf (lambda (x) (eq? x elt)) list))
+(define (sloppy-assv elt list)
+  (sloppy-assf (lambda (x) (eqv? x elt)) list))
+(define (sloppy-assoc elt list)
+  (sloppy-assf (lambda (x) (equal? x elt)) list))
 (define-syntax-rule (make-future body1 body2 ...)
   (future (lambda () (begin body1 body2 ...))))
 

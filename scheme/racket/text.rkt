@@ -83,7 +83,7 @@
            (string-downcase
             (re-matcher-match-string matcher 1)) result))
       (set! end (re-matcher-match-end matcher 0)))
-    (unless (re-matcher-at-end? matcher)
+    (unless (eq? end (string-length id))
       (push! (string-slice id end (string-length id)) result))
     (apply concat (reverse result))))
 (provide (all-defined-out))
