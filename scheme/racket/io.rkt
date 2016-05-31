@@ -145,54 +145,11 @@
 (define-ffi-binding base-lib
   "scheme_get_port_socket" (_fun _scheme (fd : (_ptr o _intptr))
                                  -> _int -> fd))
-
-;;regexps aren't really io, but it seems silly to make another file
-
-;;The point of this struct & associated functions is to allow
-;;looping through all the matches of a regexp in a string, basically:
-;;(while (regexp-matcher-next-match matcher) (do something with match))
-(struct regexp-matcher
-  (pattern string (last-match #:mutable #:auto)))
-(define (maybe-compile-regexp pattern)
-  (if (regexp? pattern) pattern
-      (pregexp pattern)))
-(define (regexp-matcher-next-match matcher)
-  (set-regexp-matcher-last-match! matcher
-   (regexp-match-positions (regexp-matcher-pattern matcher)
-                           (regexp-matcher-string matcher)
-                           (aif (regexp-matcher-last-match matcher)
-                                (cadr it) 0)))
-  ;;This is just to make the function return a boolean
-  (true? (regexp-matcher-last-match matcher)))
-;;Try to match pat at the current location of the matcher, it is
-;;assumed that the matcher has already made at least one match, if not
-;;an error will be raised
-(define (regexp-matcher-try-match matcher pat)
-  (let* ((re (maybe-compile-regexp pat))
-         (last (regexp-matcher-last-match matcher))
-         (maybe-match (regexp-match-positions re
-                                              (regexp-matcher-string matcher)
-                                              (cadr last))))
-    (if maybe-match
-        (begin0 #t
-          (set-regexp-matcher-last-match! matcher maybe-match))
-        #f)))
-;;The same as the normal constructor except if pat is a string it gets
-;;compiled into a regexp
-(define (make-regexp-matcher pat input)
-  (let* ((re (maybe-compile-regexp pat)))
-    (regexp-matcher re input)))
- (define (regexp-matcher-match-string matcher num)
-   (if (not (regexp-matcher-last-match matcher)) #f
-       (match (nth num (regexp-matcher-last-match))
-         ((cons start end)
-                ;;TODO: write a substring function that doesn't copy
-                (string-slice (regexp-matcher-string matcher) start end)))))
-(define (regexp-matcher-match-start matcher num)
-  (car-safe (nth num (regexp-matcher-last-match matcher))))
-(define (regexp-matcher-match-end matcher num)
-  (car-safe (nth num (regexp-matcher-last-match matcher))))
+;;I'm providing the text functions from here to avoid having a bunch
+;;of requires in other files
+(require "text.rkt")
 (require racket/provide)
 (provide (except-out (all-defined-out)
                      (matching-identifiers-out
-                      #rx"make-.*-funs?" (all-defined-out))))
+                      #rx"make-.*-funs?" (all-defined-out)))
+         (all-from-out "text.rkt"))

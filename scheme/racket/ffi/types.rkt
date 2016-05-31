@@ -33,6 +33,7 @@
   _int64 _uint64 _size _ssize _ptrdiff _intptr _uintptr)
 ;;_byte isn't quite the same as a char in C, but then again chars in C are weird
 (define _char _byte)
+(define _mzchar _int)
 (define _scheme-type _short)
 (define _scheme-invoke-proc _pointer)
 ;;These add a bit more type safey
@@ -88,29 +89,28 @@
   ((p _scheme-port) (slow _byte) (closed _byte)
    (pending-eof _byte) (sub-type _scheme)) #:define-unsafe)
 ;;simple objects
-(define-cstruct _scheme-simple-object-str
-  ((str _string/ucs-4) (tag-val _intptr)))
+;;In C this is a struct of a scheme-obj-inclhash and a union of
+;;structs with a size of 2 pointers. Making a union type in racket
+;;seems to cause a segfault for some reason so I'm just expanding each
+;;variant of the union into a sepreate struct here.
+(define-cstruct _scheme-simple-object-string
+  ((iso _scheme-obj-inclhash)
+   (str _string/ucs-4) (tag-val _intptr)))
 (define-cstruct _scheme-simple-object-bytes
-  ((bytes _bytes) (tag-val _intptr)))
+  ((iso _scheme-obj-inclhash)
+   (bytes _bytes) (tag-val _intptr)))
 (define-cstruct _scheme-simple-object-cons
-  ((car _scheme) (cdr _scheme)))
+  ((iso _scheme-obj-inclhash)
+  (car _scheme) (cdr _scheme)))
 (define-cstruct _scheme-simple-object-cptr
-  ((ptr _pointer) (type _scheme)))
+  ((iso _scheme-obj-inclhash)
+   (ptr _pointer) (type _scheme)))
 (define-cstruct _scheme-simple-object-ptrs
-  ((ptr1 _pointer) (ptr2 _pointer)))
+  ((iso _scheme-obj-inclhash)
+   (ptr1 _pointer) (ptr2 _pointer)))
 (define-cstruct _scheme-simple-object-longs
-  ((int1 _intptr) (int2 _intptr)))
-;;putting more than 3 objects in this union makes racket segfault for some reason
-(define _scheme-simple-object-union
-  (_union _scheme-simple-object-ptrs
-          _scheme-simple-object-longs
-          _scheme-simple-object-bytes))
-;;          _scheme-simple-object-str
-;;          _scheme-simple-object-cons
-;;          _scheme-simple-object-cptr))
- (define-cstruct _scheme-simple-object
-   ((iso _scheme-obj-inclhash)
-    (u _scheme-simple-object-union)))
+  ((iso _scheme-obj-inclhash)
+   (int1 _intptr) (int2 _intptr)))
 (define _off_t _size_t)
 (define _socklen_t _int)
 (define _sock-data (_array _uint8 16))

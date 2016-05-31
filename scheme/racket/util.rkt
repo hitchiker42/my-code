@@ -18,7 +18,7 @@
          rnrs/io/ports-6 ;;racket doesn't have input/output ports, somehow
          racket/match ;;ml style pattern matching
          racket/unsafe/ops
-         racket/list
+         (except-in racket/list last)
          syntax/location
          srfi/48 ;;format (the (format port fmt args ...)  version)
          srfi/71 ;;unifies let and let-values
@@ -44,6 +44,7 @@
 (define-alias string->bytes string->bytes/latin-1)
 (define-alias find memf)
 (define-alias false? not)
+(define-alias concat string-append)
 (define (true? x) (not (not x)))
 (define-syntax my-if
   (syntax-rules ()
@@ -63,23 +64,32 @@
       (acc (1+ var)))))
 (define-syntax-rule (until test body ...)
   (while (not test) body ...))
-
+;;TODO: look at set! transformers and try and use those here
 (define-syntax-rule (pop! ls)
   (prog1 (cl-car ls) (set! ls (cl-cdr ls))))
 (define-syntax-rule (push! elt place)
   (set! place (cons elt place)))
- (define (car-safe obj)
+(define (car-safe obj)
    ;;"My-Ifobj is a pair return (car obj) otherwise return '()"
-   (my-if(pair? obj) (car obj) '()))
- (define (cl-car ls)
-;;   ;;"my-ifls is null? return null, otherwise return (car ls)"
-   (my-if(null? ls) ls (car ls)))
- (define (cdr-safe obj)
-;;   ;;"My-Ifobj is a pair return (cdr obj) otherwise return '()"
-   (my-if(pair? obj) (cdr obj) '()))
- (define (cl-cdr ls)
-;;   ;;"my-ifls is null? return null, otherwise return (cdr ls)"
-   (my-if(null? ls) ls (cdr ls)))
+  (my-if(pair? obj) (car obj) '()))
+(define (cl-car ls)
+  ;;   ;;"my-ifls is null? return null, otherwise return (car ls)"
+  (my-if(null? ls) ls (car ls)))
+(define (cdr-safe obj)
+  ;;   ;;"My-Ifobj is a pair return (cdr obj) otherwise return '()"
+  (my-if(pair? obj) (cdr obj) '()))
+(define (cl-cdr ls)
+   ;;   ;;"my-ifls is null? return null, otherwise return (cdr ls)"
+  (my-if(null? ls) ls (cdr ls)))
+(define (last l)
+  (if (list? l)
+      (if (pair? l)
+          (let loop ((l l) (x (cdr l)))
+            (if (pair? x)
+                (loop x (cdr x))
+                (car l)))
+          null)
+      (raise-argument-error 'last "list?" l)))
 (define-alias 1- sub1)
 (define-alias 1+ add1)
 (define-syntax-rule (incf place)
@@ -190,8 +200,8 @@
       ((_ macro args body ...)
        #'(define-macro macro #f (lambda args body ...))))))
 
-(define-macro (concat . args) `(string-join ,args ""))
-(define-macro (concat-lit . args) (string-join args ""))
+(define-macro (concat-lit . args) (apply string-append args))
+;;since we have format-symbol I probably don't need this
 (define-macro (build-symbol . args)
   `(string->symbol
     (string-join
@@ -310,6 +320,10 @@
     (if (null? ls) ls
         (if (zero? n) (car ls)
             (loop (cdr ls) (1- n))))))
+(define (string->char str)
+  (string-ref str 0))
+(define (char->string char)
+  (string char))
 ;; (define-macro (regexp-bind pat input . body)
 ;;   `(let ((matched (regexp-match ,pat ,input)))
 ;;      (unless (null? matched)

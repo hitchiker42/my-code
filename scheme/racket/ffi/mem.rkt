@@ -4,7 +4,8 @@
 (require "../util.rkt")
 (require "types.rkt")
 (require (for-syntax "../util.rkt")
-         (for-meta 2 "../util.rkt"))
+         (for-meta 2 "../util.rkt")
+         (for-syntax ffi/unsafe))
 ;;if the given type is outside the range of types this returns
 ;;#<bad-value>, it only returns null for types that are in the range
 ;;of valid types, and don't exist
@@ -33,22 +34,22 @@
   "scheme_make_sized_char_string"
   (_fun _pointer _intptr _int -> _scheme)
   "scheme-make-char-string")
-(define-macro (make-pointer-cast type fxn)
+(define-macro (make-pointer-cast type fxn (elt-type _uint8))
   `(define
      (,(format-symbol "pointer->~a" type) ptr len (offset #f) #:copy (copy 0))
      (if (not offset)
          (,fxn ptr len copy)
          (let ((len offset) (offset len))
-           (,fxn (ptr-add ptr offset) (- len offset) copy)))))
+           (,fxn (ptr-add ptr offset ,elt-type) (- len offset) copy)))))
 (make-pointer-cast bytevector scheme-make-byte-string)
-(make-pointer-cast string scheme-make-char-string)
-(define (simple-object->pointer rkt-obj (start 0))
-  (let* ((obj (cast rkt-obj _scheme _scheme-simple-object-pointer))
-         (u (union-ref (scheme-simple-object-u obj) 0))
-         (ptr (scheme-simple-object-ptrs-ptr1 u)))
-    (ptr-add ptr start)))
+(make-pointer-cast string scheme-make-char-string _mzchar)
+(define (simple-object->pointer rkt-obj (start 0) (type _uint8))
+  (let* ((obj (cast rkt-obj _scheme _scheme-simple-object-ptrs-pointer))
+         (ptr (scheme-simple-object-ptrs-ptr1 obj)))
+    (ptr-add ptr start type)))
 (define-alias bytevector->pointer simple-object->pointer)
-(define-alias string->pointer simple-object->pointer)
+(define (string->pointer str (start 0))
+  (simple-object->pointer str start _mzchar))
 
 (define (allocate-bytevector sz)
   (let ((ptr (malloc sz 'atomic-interior)))
@@ -136,6 +137,7 @@
 (define/contract (svector-push-multipush! svec seq)
   (--> any/c svector? any)
   (svector-check-length svec (sequence-length seq)))
-  ;;do a memcpy)
+;;do a memcpy)
+(
 (provide
  (except-out (all-defined-out) scheme-get-type-name-or-null))
