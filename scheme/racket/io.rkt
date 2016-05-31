@@ -1,7 +1,8 @@
 #lang racket/base
-(require "util.rkt")
-(require "ffi/ffi.rkt")
-(require (rename-in racket/contract (-> -->)))
+(require "util.rkt" "ffi/ffi.rkt")
+(require racket/port (rename-in racket/contract (-> -->))
+         (only-in racket/file file->string file->bytes))
+
 
 ;;;Functions to convert racket ports to rnrs ports, since racket doesn't
 ;;;have a native input/output port type.
@@ -195,4 +196,5 @@
 (require racket/provide)
 (provide (except-out (all-defined-out)
                      (matching-identifiers-out
-                      #rx"make-.*-funs?" (all-defined-out))))
+                      #rx"make-.*-funs?" (all-defined-out)))
+         (all-from-out racket/port racket/file))

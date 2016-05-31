@@ -90,45 +90,104 @@
   (let ((ret (1- place)))
     (set! place ret)
     ret))
-;; A lot of these are taken from the guile source
-(define-syntax while
-  (lambda (x)
-    (syntax-case x ()
-      ((while cond body ...)
-       #`(let ((break-tag (make-continuation-prompt-tag 'break))
-               (continue-tag (make-continuation-prompt-tag 'continue)))
-           (call-with-continuation-prompt
-            (lambda ()
-              ;;Figure out how to fix this so I can break without a value
-              (define-syntax #,(datum->syntax #'while 'break)
-                (lambda (x)
-                  (syntax-case x ()
-                    ((_ arg (... ...))
-                     #'(abort-current-continuation break-tag arg (... ...)))
-                    (_
-                     #'(lambda args
-                         (apply abort-current-to-prompt break-tag args))))))
-              (let lp ()
-                (call-with-continuation-prompt
-                 (lambda ()
-                   (define-syntax #,(datum->syntax #'while 'continue)
-                     (lambda (x)
-                       (syntax-case x ()
-                         ((_)
-                          #'(abort-to-prompt continue-tag))
-                         ((_ . args)
-                          (error 'continue "too many arguments" x))
-                         (_
-                          #'(lambda ()
-                              (abort-to-prompt continue-tag))))))
-                   (do () ((not cond) #f) body ...))
-                 continue-tag
-                 (lambda (k) (lp)))))
-            break-tag
-            (lambda (k . args)
-              (my-if(null? args)
-                  #t
-                (apply values args)))))))))
+;; (define-syntax-parameter break
+;;   (lambda (stx)
+;;     (raise-syntax-error (syntax-e stx) "can only be used in a while loop")))
+;; (define-syntax-parameter continue
+;;   (lambda (stx)
+;;     (raise-syntax-error (syntax-e stx) "can only be used in a while loop")))
+;; (define-syntax (while stx)
+;;   (syntax-case stx ()
+;;     ((while cond body ...)
+;;      #`(let ((break-tag (make-continuation-prompt-tag 'break))
+;;              (continue-tag (make-continuation-prompt-tag 'continue)))
+;;          (call-with-continuation-prompt
+;;           (lambda ()
+;;             ;;Figure out how to fix this so I can break without a value
+;;             ;;(define-syntax #,(datum->syntax #'while 'break)
+;;             (syntax-parameterize 
+;;                 ((break (lambda (x)
+;;                           (syntax-case x ()
+;;                             ((_)
+;;                              #'(abort-current-continuation break-tag))
+;;                             ((_ arg (... ...))
+;;                              #'(abort-current-continuation
+;;                                 break-tag arg (... ...)))
+;;                             (_
+;;                              #'(lambda args
+;;                                  (apply abort-current-continuation
+;;                                         break-tag args)))))))
+;;               (let lp ()
+;;                 (call-with-continuation-prompt
+;;                  (lambda ()
+;;                    (syntax-parameterize
+;;                        ((continue
+;;                          (lambda (x)
+;;                            (syntax-case x ()
+;;                              ((_)
+;;                               #'(abort-current-to-prompt continue-tag))
+;;                              ((_ . args)
+;;                               (error 'continue "too many arguments" x))
+;;                              (_
+;;                               #'(lambda ()
+;;                                   (abort-current-to-prompt continue-tag)))))))
+;;                      (do () ((not cond) #f) body ...))
+;;                    continue-tag
+;;                    (lambda (k) (lp)))))
+;;               break-tag
+;;               (lambda (k . args)
+;;                 (my-if (null? args)
+;;                        #t
+;;                        (apply values args))))))))))
+
+;;; while and define-macro are taken from guile and slightly modifed
+;;; to work with racket
+(define-syntax (while stx)
+  (syntax-case stx ()
+    ((while cond body ...)
+     #`(let ((break-tag (make-continuation-prompt-tag 'break))
+             (continue-tag (make-continuation-prompt-tag 'continue)))
+         (call-with-continuation-prompt
+          (lambda ()
+            ;;Figure out how to fix this so I can break without a value
+            (define-syntax #,(datum->syntax #'while 'break)
+              (lambda (x)
+                (syntax-case x ()
+                  ((_)
+                   #'(abort-current-continuation break-tag #f))
+                  ((_ arg args (... ...))
+                   #'(abort-current-continuation break-tag arg args (... ...)))
+                  (_
+                   #'(lambda args
+                       (apply abort-current-continuation break-tag args))))))
+            (let lp ()
+              (call-with-continuation-prompt
+               (lambda ()
+                 (define-syntax #,(datum->syntax #'while 'continue)
+                   (lambda (x)
+                     (syntax-case x ()
+                       ((_)
+                        #'(abort-current-continuation continue-tag))
+                       ((_ . args)
+                        (error 'continue "too many arguments" x))
+                       (_
+                        #'(lambda ()
+                            (abort-current-continuation continue-tag))))))
+                 (do () ((not cond) #f) body ...))
+               continue-tag
+               (lambda (k) (lp)))))
+          break-tag
+          (lambda (arg . args)
+            (my-if (not arg)
+                   #t
+                   (apply values (list* arg args)))))))))
+;;A form of while without break/continue support, should be faster
+(define-syntax-rule (while-do test body1 body2 ...)
+  (do () ((not test) #f) body1 body2 ...))
+(define-syntax-rule (do-while test body1 body2 ...)
+  (begin
+    body1 body2 ...
+    (do () ((not test) #f) body1 body2 ...)))
 (define-syntax define-macro
   (lambda (x)
 ;;    "Define a defmacro."
@@ -190,7 +249,8 @@
       ((_ macro args body ...)
        #'(define-macro macro #f (lambda args body ...))))))
 
-(define-macro (concat . args) `(string-join ,args ""))
+(define-syntax-rule (concat arg args ...)
+  (string-join (list arg args ...) ""))
 (define-macro (concat-lit . args) (string-join args ""))
 (define-macro (build-symbol . args)
   `(string->symbol
@@ -243,6 +303,10 @@
       ((_ cond then else rest ...)
        #'(let ((it cond))
            (if it then (begin else rest ...)))))))
+(define-syntax (symbol-bound? stx)
+  (syntax-case stx ()
+    ((_ sym)
+     (if (identifier-binding #'sym) (syntax #t) (syntax #f)))))
 
 (require racket/pretty)
 (define-alias pprint pretty-print)
@@ -295,9 +359,13 @@
               (if (hash? value)
                   (cons key (hash->alist value))
                   (cons key value)))))
+(define-syntax hash-ref-multi
+  (syntax-rules ()
+    ((_ ht key) (hash-ref ht key))
+    ((_ ht key keys ...) (hash-ref (hash-ref-multi ht key) keys ...))))
 ;;Returns the result of body, if any exceptions are raised they
 ;;are caught and #f is returned
-(define-syntax-rule (with-exception->false body ...)
+(define-syntax-rule (false-if-exception body ...)
   (let ((prompt (make-continuation-prompt-tag)))
     (call-with-continuation-prompt
      call-with-exception-handler
@@ -310,6 +378,18 @@
     (if (null? ls) ls
         (if (zero? n) (car ls)
             (loop (cdr ls) (1- n))))))
+(define-syntax-rule (make-future body1 body2 ...)
+  (future (lambda () (begin body1 body2 ...))))
+;;this is a kinda lame way to do this, but I can't think of another way
+;;since you can't define a top level variable inside of a conditional
+(define-syntax define-once
+  (syntax-rules ()
+    ((_ name body)
+     (define name (if (symbol-bound? name) (symbol-ref 'name) body)))
+    ((_ (name args ...) body1 body2 ...)
+     (define (name args ...)
+       (if (symbol-bound? name) ((symbol-ref 'name) args ...)
+           (begin body1 body2 ...))))))
 ;; (define-macro (regexp-bind pat input . body)
 ;;   `(let ((matched (regexp-match ,pat ,input)))
 ;;      (unless (null? matched)
@@ -328,6 +408,3 @@
           racket/sequence srfi/48 srfi/71 racket/vector racket/syntax racket/unsafe/ops))
 ;;         (for-syntax (all-from-out racket/base racket/string racket/syntax))
 ;;         (for-meta 2 (all-from-out racket/base)))
-
-    
-     
