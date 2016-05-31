@@ -316,10 +316,15 @@
   (syntax-case stx ()
     ((_ sym)
      (if (identifier-binding #'sym) (syntax #t) (syntax #f)))))
-
+(begin-for-syntax
+ (define-syntax (symbol-bound? stx)
+  (syntax-case stx ()
+    ((_ sym)
+     (if (identifier-binding #'sym) (syntax #t) (syntax #f))))))
 (require racket/pretty)
 (define-alias pprint pretty-print)
 (define (macroexpand body) (syntax->datum (expand body)))
+(define (macroexpand-1 body) (syntax->datum (expand-once body)))
 
 (struct exn:fail:assertion exn:fail (srcloc)
         #:property prop:exn:srclocs
@@ -373,15 +378,35 @@
     ((_ ht key) (hash-ref ht key))
     ((_ ht key keys ...) (hash-ref (hash-ref-multi ht key) keys ...))))
 ;;Returns the result of body, if any exceptions are raised they
-;;are caught and #f is returned
-(define-syntax-rule (false-if-exception body ...)
+;;are caught, the context of the exception is escapes and the result
+;;of calling f with the exception is returned
+(define-syntax-rule (with-caught-exceptions f body ...)
   (let ((prompt (make-continuation-prompt-tag)))
     (call-with-continuation-prompt
-     call-with-exception-handler
-     prompt
-     (lambda () #f)
-     (lambda (exn) (abort-current-continuation prompt))
-     (lambda () (begin body ...)))))
+     call-with-exception-handler;;call this
+     prompt;;with this prompt
+     f;;and this handler
+     ;;and these args
+     (lambda (exn) (abort-current-continuation prompt exn))
+     (lambda () body ...))))
+(define-syntax-rule (false-if-exception body ...)
+  (with-caught-exceptions (lambda (exn) #f) body ...))
+(define-syntax-rule (return-exceptions body ...)
+  (with-caught-exceptions (lambda (exn) exn) body ...))
+(begin-for-syntax
+ (define-syntax-rule (with-caught-exceptions f body ...)
+   (let ((prompt (make-continuation-prompt-tag)))
+     (call-with-continuation-prompt
+      call-with-exception-handler;;call this
+      prompt;;with this prompt
+      f;;and this handler
+      ;;and these args
+      (lambda (exn) (abort-current-continuation prompt exn))
+      (lambda () body ...))))
+ (define-syntax-rule (false-if-exception body ...)
+   (with-caught-exceptions (lambda (exn) #f) body ...)))
+
+
 (define (nth n list)
   (let loop ((ls list) (n n))
     (if (null? ls) ls
@@ -390,16 +415,23 @@
 
 (define-syntax-rule (make-future body1 body2 ...)
   (future (lambda () (begin body1 body2 ...))))
+
+;;define-once is way more complicated that it should be
 ;;this is a kinda lame way to do this, but I can't think of another way
 ;;since you can't define a top level variable inside of a conditional
-(define-syntax define-once
-  (syntax-rules ()
-    ((_ name body)
-     (define name (if (symbol-bound? name) (symbol-ref 'name) body)))
-    ((_ (name args ...) body1 body2 ...)
-     (define (name args ...)
-       (if (symbol-bound? name) ((symbol-ref 'name) args ...)
-           (begin body1 body2 ...))))))
+(define-macro (define-once var expr)
+  `(define ,var (or (false-if-exception ,var) ,expr)))
+  ;; (let ((boundp (false-if-exception (or var (not var)))))
+  ;;   (if boundp
+  ;;       `(define ,var ,var)
+  ;;       `(define ,var ,expr))))
+  ;; (syntax-rules ()
+  ;;   ((_ name body)
+  ;;    (define name (if (symbol-bound? name) (symbol-ref 'name) body)))
+  ;;   ((_ (name args ...) body1 body2 ...)
+  ;;    (define (name args ...)
+  ;;      (if (symbol-bound? name) ((symbol-ref 'name) args ...)
+  ;;          (begin body1 body2 ...))))))
 
 (define (string->char str)
   (string-ref str 0))

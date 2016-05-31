@@ -18,7 +18,11 @@
 (define-once vndb-tags #f)
 (define-once vndb-traits #f)
 (define (load-cache-files)
-  (set! vndb-cache (false-if-exception (read-cache)))
-  (set! vndb-tags (false-if-exception (json->scheme vndb-tags-file)))
-  (set! vndb-traits (false-if-exception (json->scheme vndb-traits-file))))
-;;(future load-cache-files)
+  (values (false-if-exception (read-cache))
+          (false-if-exception (json->scheme vndb-tags-file))
+          (false-if-exception (json->scheme vndb-traits-file))))
+(require racket/place)
+(define cache-future
+  (make-future
+   (set! vndb-cache (place-channel-get
+                     (place out (place-channel-put out (load-cache-files)))))))
