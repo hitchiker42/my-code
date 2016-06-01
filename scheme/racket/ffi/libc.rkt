@@ -33,13 +33,30 @@
 (define pthread-attr-size 64);;actually only 56 bytes, but rounded up
 (define posix-sem-size 32)
 (define pthread-size 8)
-
+(define pthread-attr-detachstate
+  (_enum '(PTHREAD_CREATE_JOINABLE PTHREAD_CREATE_DETACHED)))
 (define-libc-binding "pthread_create"
-  (_fun _pointer _pointer (_fun _pointer -> _pointer) -> _pointer))
+  (_fun (attr init (arg #f)) :: (t : (_ptr o _uint64))
+        (_pointer = attr)
+        (init : (_fun _pointer -> _pointer))
+        (arg : _pointer) ->
+        (err : _int) -> (values err t)))
 (define-libc-binding "pthread_attr_init" (_fun _pointer -> _int))
 (define-libc-binding "pthread_attr_destroy" (_fun _pointer -> _int))
 (define-libc-binding "pthread_attr_setdetachstate" (_fun _pointer _int -> _int))
-
+(define-libc-binding "pthread_self" (_fun -> _uint64_t))
+(define pthread-attr-detached
+  (let ((attr (malloc 'atomic pthread-attr-size)))
+    (libc-pthread_attr_init attr)
+    (libc-pthread_attr_setdetachstate attr 1)
+    attr))
+(define (pthread-create fn #:detached (detached #t)
+                           #:arg (arg #f))
+  (libc-pthread_create (if detached pthread-attr-detached #f)
+                       fn arg))
+(define test-val 1)
+(define test-fn (lambda (x) (format #t "Hello, from ~a\n" (libc-pthread_self))))
+(pthread-create test-fn #:detached #f)
 ;; (define (get-pthread-type-sizes . types)
 ;;   (require racket/system)
 ;;   (let ((print-stmts (map (lambda (type) (format #f "print_sizeof(~a);\n" type))))
