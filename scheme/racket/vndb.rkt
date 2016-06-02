@@ -6,9 +6,9 @@
 (define vndb-tls-port 19535)
 (define vndb-hostname "api.vndb.org")
 
-(define vndb-cache-file (build-path (current-directory) "vndb.cache.json"))
-(define vndb-tags-file (build-path (current-directory) "vndb.tags.json"))
-(define vndb-traits-file (build-path (current-directory) "vndb.traits.json"))
+(define vndb-cache-file (build-path (current-directory) "vndb.cache"))
+(define vndb-tags-file (build-path (current-directory) "vndb.tags"))
+(define vndb-traits-file (build-path (current-directory) "vndb.traits"))
 (define (json->scheme (what (current-input-port)) #:null (jsnull json-null))
   (cond
    ((path? what) (read-json (open-input-file what)))
@@ -16,7 +16,11 @@
    ((bytes? what) (bytes->jsexpr what jsnull))
    ((port? what) (read-json what jsnull))))
 (define-once vndb-cache-box (malloc-immobile-cell #f))
-(define (vndb-cache) (ptr-ref vndb-cache-box _scheme))
+                                        ;(define (vndb-cache) (ptr-ref vndb-cache-box _scheme))
+;;(define vndb-cache #f)
+(define vndb-cache (read (open-input-file vndb-cache-file)))
+;;use this to prevent a procudure from closing over the value of vndb-cache
+(define (get-vndb-cache) vndb-cache)
 (define-once vndb-tags-box (malloc-immobile-cell #f))
 (define (vndb-tags) (ptr-ref vndb-tags-box _scheme))
 (define-once vndb-traits-box (malloc-immobile-cell #f))
@@ -34,6 +38,7 @@
   (place-channel-put load-place vndb-cache-box)
   (place-channel-put load-place vndb-tags-box)
   (place-channel-put load-place vndb-traits-box))
-(unless cache-loaded?
-  (do-load-cache)
-  (set! cache-loaded? #t))
+;; (unless cache-loaded?
+;;   (do-load-cache)
+;;   (set! cache-loaded? #t))
+;vndb-cache
