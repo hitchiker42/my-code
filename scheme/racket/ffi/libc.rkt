@@ -9,6 +9,7 @@
 (define-libc-binding "close" (_fun _int -> _int))
 ;;FILE io
 (define-libc-binding "fputs" (_fun _string _pointer -> _int))
+(define-libc-binding "puts" (_fun _string -> _int))
 (define-libc-binding "getaddrinfo"
   (_fun _bytes _bytes _addrinfo-pointer _pointer -> _int))
 (define-libc-binding "strtol"
@@ -56,7 +57,7 @@
                        fn arg))
 (define test-val 1)
 (define test-fn (lambda (x) (format #t "Hello, from ~a\n" (libc-pthread_self))))
-(pthread-create test-fn #:detached #f)
+;(pthread-create test-fn #:detached #f)
 ;; (define (get-pthread-type-sizes . types)
 ;;   (require racket/system)
 ;;   (let ((print-stmts (map (lambda (type) (format #f "print_sizeof(~a);\n" type))))

@@ -1,6 +1,7 @@
 #lang racket/base
 (require ffi/unsafe)
 (require (rename-in racket/contract (-> -->)))
+(require (only-in '#%foreign ffi-callback))
 (require "../util.rkt")
 (require "types.rkt")
 (require (for-syntax "../util.rkt")
@@ -15,10 +16,12 @@
 ;;  "scheme_get_env" (_fun _pointer -> _pointer))
 ;;There are a few special environments you can't get the normal way
 ;;(i.e module->namespace) but they have accessor functinos in the C api
-;;(define-ffi-binding base-lib "scheme_get_foreign_env"
-;;  (_fun -> _scheme))
-;;(define-ffi-binding base-lib "scheme_get_unsafe_env"
-;;  (_fun -> _scheme))
+(define-ffi-binding base-lib "scheme_get_foreign_env"
+ (_fun -> _scheme))
+(define-ffi-binding base-lib "scheme_get_unsafe_env"
+  (_fun -> _scheme))
+(define-ffi-binding base-lib "scheme_get_futures_env"
+  (_fun -> _scheme))
 (define (scheme-get-type-name scm)
   (if (fixnum? scm)
       #"<fixnum-integer>"
@@ -138,6 +141,34 @@
   (--> any/c svector? any)
   (svector-check-length svec (sequence-length seq)))
 ;;do a memcpy)
+
+;;process threads (aka real threads)
+(define _mzrt_thread_id _uintptr);;aka pthread_t
+(define-cstruct _mz_proc_thread
+  ((thread-id _mzrt_thread_id) (refcount _int)))
+(define _mz_proc_thread_start (_fun _pointer -> _pointer))
+(define-ffi-binding base-lib
+  "mz_proc_thread_create"
+  (_fun _pointer _pointer -> _mz_proc_thread-pointer))
+(define-ffi-binding base-lib
+  "mz_proc_thread_wait" (_fun _mz_proc_thread-pointer -> _pointer))
+(define-ffi-binding base-lib
+  "mz_proc_thread_detach" (_fun _mz_proc_thread-pointer -> _int))
+(define-ffi-binding base-lib
+  "mz_proc_thread_exit" (_fun _pointer -> _void))
+;;semaphores
+(define-ffi-binding base-lib
+  "mzrt_sema_create" (_fun _pointer _int -> _int))
+(define-ffi-binding base-lib
+  "mzrt_sema_post" (_fun _pointer -> _int))
+(define-ffi-binding base-lib
+  "mzrt_sema_wait" (_fun _pointer -> _int))
+(define-ffi-binding base-lib
+  "mzrt_sema_destroy" (_fun _pointer -> _int))
+;(load-extension "racket_util.so")
+;; (define hello (lambda x (println "Hello, World!\n")))
+;; (define test-callback (ffi-callback hello (list _pointer) _pointer))
+;; (define thread (mz-proc-thread-create test-callback #f))
 
 (provide
  (except-out (all-defined-out) scheme-get-type-name-or-null))

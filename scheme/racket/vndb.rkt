@@ -1,9 +1,11 @@
 #lang racket/base
 (require "util.rkt" "io.rkt" "ffi/ffi.rkt")
 (require json)
+(require openssl)
 (define vndb-port 19534)
 (define vndb-tls-port 19535)
 (define vndb-hostname "api.vndb.org")
+
 (define vndb-cache-file (build-path (current-directory) "vndb.cache.json"))
 (define vndb-tags-file (build-path (current-directory) "vndb.tags.json"))
 (define vndb-traits-file (build-path (current-directory) "vndb.traits.json"))
@@ -13,16 +15,25 @@
    ((string? what) (string->jsexpr what jsnull))
    ((bytes? what) (bytes->jsexpr what jsnull))
    ((port? what) (read-json what jsnull))))
-(define (read-cache) (json->scheme vndb-cache-file))
-(define-once vndb-cache #f)
-(define-once vndb-tags #f)
-(define-once vndb-traits #f)
+(define-once vndb-cache-box (malloc-immobile-cell #f))
+(define (vndb-cache) (ptr-ref vndb-cache-box _scheme))
+(define-once vndb-tags-box (malloc-immobile-cell #f))
+(define (vndb-tags) (ptr-ref vndb-tags-box _scheme))
+(define-once vndb-traits-box (malloc-immobile-cell #f))
+(define (vndb-traits) (ptr-ref vndb-traits-box _scheme))
+(define-once cache-loaded? #f)
 (define (load-cache-files)
-  (values (false-if-exception (read-cache))
+  (values (false-if-exception (json->scheme vndb-cache-file))
           (false-if-exception (json->scheme vndb-tags-file))
           (false-if-exception (json->scheme vndb-traits-file))))
 (require racket/place)
-(define cache-future
-  (make-future
-   (set! vndb-cache (place-channel-get
-                     (place out (place-channel-put out (load-cache-files)))))))
+;;define-once to avoid creating a new place each time the module is loaded
+(define-once load-place #f) 
+(define (do-load-cache)
+  (set! load-place (dynamic-place "places.rkt" 'load-vndb-cache-proc))
+  (place-channel-put load-place vndb-cache-box)
+  (place-channel-put load-place vndb-tags-box)
+  (place-channel-put load-place vndb-traits-box))
+(unless cache-loaded?
+  (do-load-cache)
+  (set! cache-loaded? #t))
