@@ -427,7 +427,10 @@
   (sloppy-assf (lambda (x) (equal? x elt)) list))
 (define-syntax-rule (make-future body1 body2 ...)
   (future (lambda () (begin body1 body2 ...))))
-
+;;pushes value onto a list stored in key in ht
+;;a list is created if one dosent't
+(define (hash-push! ht key value)
+  (hash-update! ht key (lambda (x) (cons value x)) null))
 ;;define-once is way more complicated that it should be
 ;;this is a kinda lame way to do this, but I can't think of another way
 ;;since you can't define a top level variable inside of a conditional

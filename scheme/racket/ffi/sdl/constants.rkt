@@ -1,4 +1,3 @@
-
 #lang racket
 (require  
   ffi/unsafe
@@ -145,7 +144,7 @@
  
 
 (define _SDL_WindowFlags
-  (_enum
+  (_bitmask
    `(SDL_WINDOW_FULLSCREEN = #x00000001;        /**< fullscreen window */
     SDL_WINDOW_OPENGL = #x00000002     ;        /**< window usable with OpenGL context */
     SDL_WINDOW_SHOWN = #x00000004      ;        /**< window is visible */
@@ -159,6 +158,20 @@
     SDL_WINDOW_MOUSE_FOCUS = #x00000400;        /**< window has mouse focus */
     SDL_WINDOW_FULLSCREEN_DESKTOP = ,(bitwise-ior #x00000001 #x00001000 )
     SDL_WINDOW_FOREIGN = #x00000800)))
+
+;; (define SDL_WINDOW_FULLSCREEN = #x00000001)
+;; (define SDL_WINDOW_OPENGL  #x00000002)
+;; (define SDL_WINDOW_SHOWN  #x00000004)
+;; (define SDL_WINDOW_HIDDEN  #x00000008)
+;; (define SDL_WINDOW_BORDERLESS  #x00000010)
+;; (define SDL_WINDOW_RESIZABLE  #x00000020)
+;; (define SDL_WINDOW_MINIMIZED  #x00000040)
+;; (define SDL_WINDOW_MAXIMIZED  #x00000080)
+;; (define SDL_WINDOW_INPUT_GRABBED  #x00000100)
+;; (define SDL_WINDOW_INPUT_FOCUS  #x00000200)
+;; (define SDL_WINDOW_MOUSE_FOCUS  #x00000400)
+;; (define SDL_WINDOW_FULLSCREEN_DESKTOP  (bitwise-ior #x00000001 #x00001000))
+;; (define SDL_WINDOW_FOREIGN  #x00000800)
 
 (define _SDL_WindowEventID
   (_enum
@@ -209,6 +222,9 @@
    '(SDL_GL_CONTEXT_PROFILE_CORE = #x0001
      SDL_GL_CONTEXT_PROFILE_COMPATIBILITY = #x0002
      SDL_GL_CONTEXT_PROFILE_ES = #x0004)))
+(define SDL_GL_CONTEXT_PROFILE_CORE #x0001)
+(define SDL_GL_CONTEXT_PROFILE_COMPATIBILITY #x0002)
+(define SDL_GL_CONTEXT_PROFILE_ES #x0004)
 
 (define _SDL_GLcontextFlag
   (_enum
@@ -216,7 +232,10 @@
     SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG = #x0002
     SDL_GL_CONTEXT_ROBUST_ACCESS_FLAG = #x0004
     SDL_GL_CONTEXT_RESET_ISOLATION_FLAG = #x0008)))
-
+(define SDL_GL_CONTEXT_DEBUG_FLAG  #x0001)
+(define SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG  #x0002)
+(define SDL_GL_CONTEXT_ROBUST_ACCESS_FLAG  #x0004)
+(define SDL_GL_CONTEXT_RESET_ISOLATION_FLAG  #x0008)
 
 
 

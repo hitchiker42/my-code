@@ -147,28 +147,30 @@
 (define (collect-features types enums commands)
   (let* ((ht (make-hash))
          (mapfn (lambda (x)
-                  (when (list? x)
+                  (when (and (list? x) (not (null? x)))
                     (hash-set! ht (car x) (cdr x))))))
     (map mapfn types)
     (map mapfn enums)
     (map mapfn commands)
     ht))
-(define (parse-feature sxml ht)
+(define (parse-feature sxml items-ht features-ht)
   (assert! (or (eq? (sxml:element-name sxml) 'feature)
                (eq? (sxml:element-name sxml) 'extension)))
-  (let ((parse-require
-        (lambda (x)
-          (map (lambda (y)
-                 (sxml:attr y 'name)) (sxml:elements x)))))
-    (cons (sxml:attr sxml 'name)
-          (append
-           (map parse-require
-                (filter (lambda (x) (and (sxml:element? x)
-                                         (eq? (sxml:element-name x) 'require)))
-                        (sxml:content sxml)))))))
-(define (parse-extensions sxml ht)
+  (let* ((feature-name (sxml:attr sxml 'name))
+         (parse-require
+          (lambda (x)
+            (map (lambda (y)
+                   (hash-push! features-ht feature-name
+                               (hash-ref items-ht (sxml:attr y 'name))))
+                 (sxml:elements x)))))
+    (for-each parse-require
+              (filter (lambda (x) (and (sxml:element? x)
+                                       (eq? (sxml:element-name x) 'require)))
+                      (sxml:content sxml)))
+    (cons feature-name (hash-ref features-ht feature-name))))
+(define (parse-extensions sxml items-ht feature-ht)
   (append
-   (map (lambda (x) (parse-feature x ht))
+   (map (lambda (x) (parse-feature x items-ht feature-ht))
         (filter (lambda (x) (and (sxml:element? x)
                                  (eq? (sxml:element-name x) 'extension)))
                 (sxml:content sxml)))))
@@ -176,41 +178,27 @@
   (assert! (eq? (car sxml) '*TOP*))
   (let ((registry (last sxml))
         (types null) (enums null) (commands null)
-        (features-ht #f) (features null))
+        (features-ht (make-hash)) (items-ht #f)(features null))
     (for-each
      (lambda (elt)
        (case (sxml:element-name elt)
          ((types) (set! types (cons (parse-types elt) types)))
          ((enums) (set! enums (cons (parse-enums elt) enums)))
-         ((commands) (set! commands (cons (parse-commands elt) commands)))))
+         ((commands) (set! commands (cons (parse-commands elt) commands)))
+         ((feature)
+          (begin
+            (when (not items-ht)
+              (set! types (apply append types))
+              (set! enums (apply append enums))
+              (set! commands (apply append commands))
+              (set! items-ht
+                (collect-features types enums commands)))
+            (parse-feature elt items-ht features-ht)))))
        registry)
-    (list (apply append types)
-          (apply append enums)
-          (apply append commands))))
+    (list features-ht items-ht)))
+;          features-ht)))
 (define (read-gl-xml (xml-file "gl.xml"))
   (xml->sxml (open-file xml-file 'read)))
-         ;; ((feature) (when (not features-ht)
-         ;;              (set! features-ht (collect-features types enums commands)))
-         ;;  (push! (parse-feature elt features-ht) features))
-         ;; ((extensions) (append features (parse-extensions elt features-ht))))) registry)
-;    (list types enums commands features)))
-
-
-;;;Next are a set of enum groups which we ignore spince the same information
-;;is provided with the actual definitions of the enums
-;; (define (parse-enum enum)
-;;   (let (((values value name . rest) (list->values (element-attributes enum))))
-;;     (assert! (eq? 'value (attribute-name value)))
-;;     (assert! (eq? 'name (attribute-name name)))
-;;     `(define ,(string->symbol (attribute-value name))
-;;        ,(libc-strtol (string->bytes (attribute-value value))))))
-;; (define (parse-enums enums)
-;;   (let ((group (find (lambda (x) (eq? (attribute-name x) 'group)))
-;;                (element-attributes enums)))
-;;     (map
-;;      (lambda (enum) (enum (element-content enums))
-;;              (let ((name (element-attributes enum)
-;;              `(define ,(string->symbol
-;;                         (concat "GL-"
-;;                                 (string-replace
-;;                                  (string-downcase (string-slice
+(define gl-rkt (parse-registry (read-gl-xml)))
+(define gl-features (car gl-rkt))
+(define gl-items (cadr gl-rkt))
