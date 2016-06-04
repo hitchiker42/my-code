@@ -30,7 +30,9 @@
 ;;Racket doesn't provide much support for temporary files, and I'd rather use
 ;;the ones from C
 (define-libc-binding "mkstemp" (_fun _bytes -> _int))
-(define-libc-binding "atexit" (_fun (_fun -> _void) -> _int))
+;; atexit doesn't play nice with dynamically loaded code
+;;(define-libc-binding "atexit" (_fun (_fun -> _void) -> _int))
+
 ;; ;;threads
 ;; (define pthread-attr-size 64);;actually only 56 bytes, but rounded up
 ;; (define posix-sem-size 32)
