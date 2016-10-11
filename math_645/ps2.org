@@ -1,0 +1,104 @@
+#+AUTHOR: Tucker DiNapoli
+#+TITLE: Math 645 Problem Set 2
+#+DATE: <2016-09-28 Wed>
+#+Options: H:0 toc:nil
+#+LATEX_HEADER: \usepackage{fullpage,fontspec,parskip}
+# #+LATEX_HEADER: \setmonofont{DejaVu Sans Mono}[{SizeFeatures={Size=10}}]
+#+LATEX_HEADER: \setmainfont[Ligatures=TeX]{Linux Libertine O}
+1.
+   a.
+       |         | Noodles | Pigs | Sausage |
+       |---------+---------+------+---------|
+       | Noodles |     10% |  80% |     10% |
+       | Pigs    |     50% |  20% |     30% |
+       | Sausage |     20% |  40% |     40% |
+   b.
+       N = 0.1S + 0.8P + 0.1N\\
+       P = 0.5S + 0.2P + 0.3N\\
+       S = 0.2S + 0.4P + 0.4N\\
+   c.
+      I'm not really sure what you mean by this. Even if we set S to 100 this
+      is an over determined system. If we plug in S = 100 and solve we get
+      N = P = 100, as is to be expected. The math to show this is easy enough
+      so I'm not going to do it out.
+2.
+   1.
+      a. False, Ax = 0 has the trivial solution for any A, the columns of A are
+         linearly independent if A has only the trivial solution
+      b. False, if S is a linearly dependent set, then at least one vector is a
+         linear combination of the others
+      c. True, Given a vector in R^4 there can be at most 3 other vectors
+         (in ℝ⁴) that are linearly independent from it. A 4x5 matrix has 5
+         vectors in  ℝ⁴ meaning at least one must be a linear combination of
+         the others.
+      d. True, This is true by definition.
+   2.
+      a. True, If u and v are linearly independent vectors then au + bv = 0 or
+         u = cv, which is the equation of a line through the origin.
+      b. False, Any set containing the zero vector is linearly dependent, so
+         a set could have fewer members than dimensions but, if it had the zero
+         vector in it, it would still be linearly dependent.
+      c. True, This is true by definition.
+      d. False, See the answer to part b.
+3.
+   1. u,v are linearly independent vector in ℝ^3, P is a plane through
+      u,v and 0, with the equation x = st + uv.
+      Show a linear transformation T: ℝ^3->ℝ^3 maps P to either a plane,
+      line or point containing the origin.
+   2. f(x) = mx + b\\
+      Show that f is only a linear transformation when b == 0, why is f
+      called a linear function
+
+      f is linear if ∀c∈̱ℝ f(cu) = cf(u)\\
+      f(cu) = mcu + b, cf(u) = c*(mu + b) = cmu + c*b;\\
+      mcu + b = cmu + cb -> b = cb\\
+      b = cb only when c or b is 0, since c can be any real number in order
+      for f(cu) to equal cf(u) b must be 0. so f is only a linear
+      transformation when b is 0. It is called a linear function because it is
+      the function of a line (duh).
+
+   3. Show an affine transformation (T(x)=Ax + b) is a linear transformation
+      only when b = 0.
+
+      As with the last problem when we simplify T(cx) = cT(x) we get
+      A(cx) + b = A(cx) + cb -> b = cb, which is only true (for nonzero c)
+      when b is zero. We can make this a linear transformation by adding
+      another dimension (i.e using homogeneous coordinates).
+
+4. 1.9 #4,6,11,15,19,23
+   1. The 2x2 rotation matrix is: [[cos(θ),-sin(θ)],[sin(θ),cos(θ)]].
+      So the matrix for a -π/4 radian rotation is:\\
+      A = [[cos(-π/4),-sin(π/4)], [sin(π/4),cos(π/4)]]\\
+      or [[sqrt(2)/2,-sqrt(2)/2],[sqrt(2)/2,sqrt(2)/2]].
+
+   2. the 2x2 shear matrix is [[a,1],[1,b]], where a is the horizontal
+      shear and b is the vertical shear. Which means to shear y by 3x
+      you would use the following, [[3,1],[1,0]].
+   3. Any reflection is just a rotation, in this case by π radians, this would
+      be given by the matrix:\\
+      A = [[cos(π),-sin(π)],[sin(π),cos(π)]] = [[-1,0],[0,-1]].
+      A reflection about some line is equivalent to a 3d rotation about that
+      line by pi radians. Despite being a 3d rotation the fact the angle is π
+      means the result will still be expressable as a 2d vector.
+   4. [[3,0,-2],[4,0,0],[1,-1,1]]
+   5. [[1,-5,4],[0,1,-6]]
+   6.
+      a. True, the columns of an nxn identity matrix form a set of orthogonal
+         basis vectors in ℝⁿ, so any column vector in ℝⁿ can be expressed as a
+         linear combination of the columns of an identity matrix. Since T is a
+         linear transformation we can transform a column vector into a linear
+         combination of the unit vectors and then add them together and we get
+         the same result as if we applied T to the original vector.
+      b. True, a rotation of by angle φ about the origin can be expressed by
+         the 2x2 matrix [[cos(φ),-sin(φ)],[sin(φ),cos(φ)]]
+      c. False, assume f: ℝᵐ->ℝⁿ and g:ℝⁿ->ℝˡ are linear transformations, then
+         h = g∘f: ℝᵐ->ℝˡ must also be linear. If we let A and B be the
+         transformation matrices of f and g then f(x) = Ax and g(y) = By, thus
+         h(x) = B(Ax) = (BA)x. Since we can express h as a matrix
+         transformation it must be a linear transformation.
+      d. False, T:ℝⁿ->ℝᵐ is onto if ∀y∈ℝᵐ ∃x∈ℝⁿ such that T(x) = y. By the
+         wording in the question T could just map every x onto 1 y.
+      e. True, Assume f(x) = Ax: R³->R² was one to one, then there must exist
+         an inverse function g(x) = Bx: R²->R³. This would imply that we could
+         span R³ with only vectors from R², which is impossible, thus f cannot
+         be one to one.
