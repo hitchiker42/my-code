@@ -1,0 +1,3508 @@
+[1] "T tests for Fall pre - Fall post"
+$coachesunity
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -5.1131, df = 1505.2, p-value = 3.575e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2884130 -0.1284807
+sample estimates:
+mean of x mean of y 
+ 4.342012  4.550459 
+
+
+$coachteamissues
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -3.9549, df = 1569.2, p-value = 7.999e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.23628265 -0.07961044
+sample estimates:
+mean of x mean of y 
+ 4.368047  4.525994 
+
+
+$coachesserious
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -3.8888, df = 1551.5, p-value = 0.000105
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.17002756 -0.05601337
+sample estimates:
+mean of x mean of y 
+ 4.646154  4.759174 
+
+
+$coachesexpectations
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -3.2654, df = 1525.6, p-value = 0.001117
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.17162309 -0.04281152
+sample estimates:
+mean of x mean of y 
+ 4.537278  4.644495 
+
+
+$coachesavoidsubstanceuse
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -3.1217, df = 1622.8, p-value = 0.00183
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.18578609 -0.04240818
+sample estimates:
+mean of x mean of y 
+ 4.450888  4.564985 
+
+
+$socialnormscoachimportant
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.8919, df = 1604.4, p-value = 0.003881
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2018147 -0.0386916
+sample estimates:
+mean of x mean of y 
+ 4.252071  4.372324 
+
+
+$coachcares
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.8553, df = 1622.2, p-value = 0.004354
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.1709930 -0.0317322
+sample estimates:
+mean of x mean of y 
+ 4.504142  4.605505 
+
+
+$coachescontactparents
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.771, df = 1671.1, p-value = 0.005651
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.24330180 -0.04162301
+sample estimates:
+mean of x mean of y 
+ 3.880473  4.022936 
+
+
+$athleticcontractchoice
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.7685, df = 1868.7, p-value = 0.005687
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05022171 0.29423842
+sample estimates:
+mean of x mean of y 
+ 3.784615  3.612385 
+
+
+$parentsseecoachasimportant
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.7617, df = 1627, p-value = 0.005814
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.21229990 -0.03597291
+sample estimates:
+mean of x mean of y 
+ 4.040237  4.164373 
+
+
+$before16
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.5848, df = 1832.2, p-value = 0.009821
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03294202 0.24018285
+sample estimates:
+mean of x mean of y 
+ 3.472189  3.335627 
+
+
+$adequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.568, df = 1671.4, p-value = 0.01032
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03641539 0.27191207
+sample estimates:
+mean of x mean of y 
+ 1.830769  1.676606 
+
+
+$ages14_24
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.4526, df = 1857.6, p-value = 0.01427
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02369217 0.21283137
+sample estimates:
+mean of x mean of y 
+ 3.893491  3.775229 
+
+
+$socialnormsensitivecoach
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.4329, df = 1688.9, p-value = 0.01508
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.1923234 -0.0206365
+sample estimates:
+mean of x mean of y 
+ 4.128994  4.235474 
+
+
+$socialnormsatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.3112, df = 1796.5, p-value = 0.02094
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02049777 0.25028558
+sample estimates:
+mean of x mean of y 
+ 3.261538  3.126147 
+
+
+$sleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.311, df = 1793, p-value = 0.02095
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.31853234 -0.02607074
+sample estimates:
+mean of x mean of y 
+ 4.040237  4.212538 
+
+
+$drinkinginjury
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.2918, df = 1905.1, p-value = 0.02203
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01554351 0.19998587
+sample estimates:
+mean of x mean of y 
+ 4.196450  4.088685 
+
+
+$healthybalancedmeals
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.1497, df = 1736.7, p-value = 0.03172
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.133858659 -0.006133741
+sample estimates:
+mean of x mean of y 
+ 4.517160  4.587156 
+
+
+[1] "T tests for Winter pre - Winter post"
+$healthybalancedmeals
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 6.6723, df = 1662.4, p-value = 3.42e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1279904 0.2345687
+sample estimates:
+mean of x mean of y 
+ 4.613192  4.431912 
+
+
+$coachteamissues
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 6.248, df = 1658.8, p-value = 5.274e-10
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1329525 0.2546219
+sample estimates:
+mean of x mean of y 
+ 4.568635  4.374848 
+
+
+$coachesunity
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 6.238, df = 1649.6, p-value = 5.621e-10
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1305492 0.2502996
+sample estimates:
+mean of x mean of y 
+ 4.575291  4.384866 
+
+
+$coachesexpectations
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 5.7686, df = 1660.1, p-value = 9.516e-09
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09507441 0.19303526
+sample estimates:
+mean of x mean of y 
+ 4.669456  4.525401 
+
+
+$coachesserious
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 5.6811, df = 1668.5, p-value = 1.576e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.08173161 0.16792411
+sample estimates:
+mean of x mean of y 
+ 4.767340  4.642512 
+
+
+$coachesavoidsubstanceuse
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 5.5109, df = 1610.4, p-value = 4.149e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09951676 0.20950154
+sample estimates:
+mean of x mean of y 
+ 4.573561  4.419052 
+
+
+$coachcares
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 5.3036, df = 1663.6, p-value = 1.287e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09489425 0.20627129
+sample estimates:
+mean of x mean of y 
+ 4.635318  4.484736 
+
+
+$leadersplayerseat
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 5.0817, df = 1568.5, p-value = 4.188e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1064983 0.2403942
+sample estimates:
+mean of x mean of y 
+ 4.274432  4.100986 
+
+
+$leadersatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.9375, df = 1634.5, p-value = 8.722e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1012426 0.2346926
+sample estimates:
+mean of x mean of y 
+ 4.348876  4.180908 
+
+
+$leadersplayersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.9105, df = 1566.9, p-value = 1.003e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1038184 0.2419224
+sample estimates:
+mean of x mean of y 
+ 4.254295  4.081424 
+
+
+$leadersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.766, df = 1480, p-value = 2.064e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09455796 0.22683762
+sample estimates:
+mean of x mean of y 
+ 4.256422  4.095725 
+
+
+$leadershelpothers
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.4492, df = 1564.5, p-value = 9.229e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09019131 0.23241822
+sample estimates:
+mean of x mean of y 
+ 4.247853  4.086549 
+
+
+$coachencouragesadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.1315, df = 1561.2, p-value = 3.796e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05863214 0.16462934
+sample estimates:
+mean of x mean of y 
+ 4.602710  4.491079 
+
+
+$communitycharacterbuilding
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.0685, df = 1638.9, p-value = 4.957e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.06202632 0.17750429
+sample estimates:
+mean of x mean of y 
+ 4.245605  4.125840 
+
+
+$socialnormscoachimportant
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.9446, df = 1512.2, p-value = 8.36e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.06848072 0.20395652
+sample estimates:
+mean of x mean of y 
+ 4.370814  4.234596 
+
+
+$socialnormscontracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.7909, df = 1596.3, p-value = 0.0001557
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04276588 0.13446712
+sample estimates:
+mean of x mean of y 
+ 4.557603  4.468986 
+
+
+$coachescontactparents
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.6794, df = 1503.4, p-value = 0.000242
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.07129938 0.23412791
+sample estimates:
+mean of x mean of y 
+ 4.081234  3.928520 
+
+
+$parentsseecoachasimportant
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.5796, df = 1554.6, p-value = 0.0003547
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.06040332 0.20684478
+sample estimates:
+mean of x mean of y 
+ 4.173593  4.039969 
+
+
+$faircontracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.537, df = 1619.4, p-value = 0.0004162
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03801401 0.13266358
+sample estimates:
+mean of x mean of y 
+ 4.464157  4.378818 
+
+
+$socialnormsatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.4214, df = 1496.9, p-value = 0.0006398
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.06482481 0.23903236
+sample estimates:
+mean of x mean of y 
+ 3.252355  3.100426 
+
+
+$communityrespectfulbehavior
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.3807, df = 1511.7, p-value = 0.0007415
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04292906 0.16160045
+sample estimates:
+mean of x mean of y 
+ 4.211543  4.109279 
+
+
+$contracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -3.2178, df = 1322.1, p-value = 0.001323
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.08820723 -0.02139045
+sample estimates:
+mean of x mean of y 
+ 2.737641  2.792439 
+
+
+$communityadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.1689, df = 1584.9, p-value = 0.001559
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04325234 0.18377715
+sample estimates:
+mean of x mean of y 
+ 3.897896  3.784381 
+
+
+$socialnormsensitivecoach
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.0521, df = 1509.6, p-value = 0.002312
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03737074 0.17180336
+sample estimates:
+mean of x mean of y 
+ 4.279130  4.174543 
+
+
+$communityeatinghabits
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.7223, df = 1512.3, p-value = 0.006558
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02691267 0.16569740
+sample estimates:
+mean of x mean of y 
+ 3.951237  3.854932 
+
+
+$socialnormssensitivetopics
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.6056, df = 1526.5, p-value = 0.009262
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01762791 0.12500627
+sample estimates:
+mean of x mean of y 
+ 4.414075  4.342758 
+
+
+$parentseathealthy
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.5638, df = 1600.3, p-value = 0.01044
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01385234 0.10407200
+sample estimates:
+mean of x mean of y 
+ 4.545958  4.486996 
+
+
+$communityatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.501, df = 1544, p-value = 0.01249
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02221422 0.18375820
+sample estimates:
+mean of x mean of y 
+ 3.646096  3.543109 
+
+
+$parentshealthychoices
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.4435, df = 1571.1, p-value = 0.01466
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01475511 0.13484470
+sample estimates:
+mean of x mean of y 
+ 4.210842  4.136042 
+
+
+$socialnormsenoughadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.3653, df = 1512.4, p-value = 0.01814
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01591943 0.17059524
+sample estimates:
+mean of x mean of y 
+ 3.616625  3.523368 
+
+
+$clearcontracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.3487, df = 1578.9, p-value = 0.01896
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01037315 0.11544811
+sample estimates:
+mean of x mean of y 
+ 4.402659  4.339748 
+
+
+$parentsadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.3244, df = 1610.7, p-value = 0.02023
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.008412373 0.099336724
+sample estimates:
+mean of x mean of y 
+ 4.571527  4.517652 
+
+
+$teammateaccountability
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.3046, df = 1413.8, p-value = 0.02133
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01392307 0.17320507
+sample estimates:
+mean of x mean of y 
+ 3.941608  3.848044 
+
+
+$contractcoaches
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.1738, df = 1547.8, p-value = 0.02987
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.006210953 0.120985326
+sample estimates:
+mean of x mean of y 
+ 4.356157  4.292559 
+
+
+$contractparents
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.1451, df = 1615.3, p-value = 0.03209
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.006105844 0.136490272
+sample estimates:
+mean of x mean of y 
+ 4.120838  4.049540 
+
+
+$athletictraining
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.0405, df = 1552, p-value = 0.04147
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.002857625 0.144803218
+sample estimates:
+mean of x mean of y 
+ 4.217985  4.144154 
+
+
+$parentsaddresssensitiveissues
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.004, df = 1670.9, p-value = 0.04523
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.001013002 0.094335928
+sample estimates:
+mean of x mean of y 
+ 4.550871  4.503197 
+
+
+[1] "T tests for Fall pre - Winter post"
+$socialnormsatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.85, df = 1647.7, p-value = 0.004426
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05023372 0.27199121
+sample estimates:
+mean of x mean of y 
+ 3.261538  3.100426 
+
+
+$leadersplayerseat
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.5943, df = 1782.5, p-value = 0.009556
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02646915 0.19049437
+sample estimates:
+mean of x mean of y 
+ 4.209467  4.100986 
+
+
+$clearcontracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.5448, df = 1729.5, p-value = 0.01102
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01978397 0.15279076
+sample estimates:
+mean of x mean of y 
+ 4.426036  4.339748 
+
+
+$healthybalancedmeals
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.4941, df = 1849.2, p-value = 0.01271
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01821302 0.15228188
+sample estimates:
+mean of x mean of y 
+ 4.517160  4.431912 
+
+
+$leadersplayersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.4895, df = 1792.3, p-value = 0.01288
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02264938 0.19083372
+sample estimates:
+mean of x mean of y 
+ 4.188166  4.081424 
+
+
+$teammateaccountability
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.4477, df = 1698.4, p-value = 0.01448
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02360731 0.21403220
+sample estimates:
+mean of x mean of y 
+ 3.966864  3.848044 
+
+
+$leadershelpothers
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.3359, df = 1752.6, p-value = 0.01961
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.0168655 0.1934694
+sample estimates:
+mean of x mean of y 
+ 4.191716  4.086549 
+
+
+$leadersatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.1221, df = 1768.9, p-value = 0.03397
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.007004864 0.177924778
+sample estimates:
+mean of x mean of y 
+ 4.273373  4.180908 
+
+
+$sleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.078, df = 1573, p-value = 0.03787
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.284914479 -0.008220583
+sample estimates:
+mean of x mean of y 
+ 4.040237  4.186804 
+
+
+[1] "T tests for Winter pre - Spring post"
+$healthybalancedmeals
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 7.4314, df = 1586.9, p-value = 1.749e-13
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1536521 0.2638489
+sample estimates:
+mean of x mean of y 
+ 4.613192  4.404441 
+
+
+$coachesunity
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 6.6567, df = 1587, p-value = 3.845e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1527051 0.2802906
+sample estimates:
+mean of x mean of y 
+ 4.575291  4.358793 
+
+
+$coachteamissues
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 6.561, df = 1586.9, p-value = 7.216e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1503353 0.2785563
+sample estimates:
+mean of x mean of y 
+ 4.568635  4.354189 
+
+
+$coachesserious
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 5.728, df = 1571.1, p-value = 1.216e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.0831038 0.1696591
+sample estimates:
+mean of x mean of y 
+ 4.767340  4.640959 
+
+
+$leadersatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 5.5243, df = 1574.7, p-value = 3.864e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1238098 0.2601327
+sample estimates:
+mean of x mean of y 
+ 4.348876  4.156904 
+
+
+$coachcares
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 5.5111, df = 1586.3, p-value = 4.156e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1027137 0.2162294
+sample estimates:
+mean of x mean of y 
+ 4.635318  4.475847 
+
+
+$coachesavoidsubstanceuse
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 5.099, df = 1549.7, p-value = 3.835e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.08837018 0.19886464
+sample estimates:
+mean of x mean of y 
+ 4.573561  4.429943 
+
+
+$leadersplayersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.9925, df = 1516.1, p-value = 6.649e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1071867 0.2459209
+sample estimates:
+mean of x mean of y 
+ 4.254295  4.077741 
+
+
+$leadersplayerseat
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.7695, df = 1518.5, p-value = 2.025e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09637122 0.23101469
+sample estimates:
+mean of x mean of y 
+ 4.274432  4.110739 
+
+
+$coachencouragesadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.6541, df = 1555.7, p-value = 3.531e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.0767268 0.1885149
+sample estimates:
+mean of x mean of y 
+ 4.602710  4.470089 
+
+
+$leadersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.5288, df = 1463.3, p-value = 6.414e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.08802215 0.22253799
+sample estimates:
+mean of x mean of y 
+ 4.256422  4.101142 
+
+
+$coachesexpectations
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.3808, df = 1583.4, p-value = 1.26e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05630261 0.14759642
+sample estimates:
+mean of x mean of y 
+ 4.669456  4.567506 
+
+
+$faircontracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.14, df = 1583.9, p-value = 3.656e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05633072 0.15776699
+sample estimates:
+mean of x mean of y 
+ 4.464157  4.357108 
+
+
+$leadershelpothers
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.0955, df = 1519.7, p-value = 4.435e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.07811169 0.22171276
+sample estimates:
+mean of x mean of y 
+ 4.247853  4.097941 
+
+
+$socialnormscontracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 4.0639, df = 1537, p-value = 5.069e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04925666 0.14116642
+sample estimates:
+mean of x mean of y 
+ 4.557603  4.462391 
+
+
+$coachescontactparents
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.9726, df = 1479.3, p-value = 7.452e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.08473661 0.25004337
+sample estimates:
+mean of x mean of y 
+ 4.081234  3.913844 
+
+
+$adequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -3.8321, df = 1447.9, p-value = 0.0001325
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.30704131 -0.09912978
+sample estimates:
+mean of x mean of y 
+ 1.768936  1.972022 
+
+
+$teammateaccountability
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.6743, df = 1464.6, p-value = 0.0002471
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.07311377 0.24058963
+sample estimates:
+mean of x mean of y 
+ 3.941608  3.784757 
+
+
+$parentsaddresssensitiveissues
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.6637, df = 1581.4, p-value = 0.0002568
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04294246 0.14190914
+sample estimates:
+mean of x mean of y 
+ 4.550871  4.458445 
+
+
+$clearcontracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.6391, df = 1571.1, p-value = 0.0002824
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04803584 0.16036072
+sample estimates:
+mean of x mean of y 
+ 4.402659  4.298460 
+
+
+$communitycharacterbuilding
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.5433, df = 1577.8, p-value = 0.0004067
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.0476690 0.1658912
+sample estimates:
+mean of x mean of y 
+ 4.245605  4.138825 
+
+
+$socialnormsensitivecoach
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.4137, df = 1501, p-value = 0.0006579
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05119126 0.18948839
+sample estimates:
+mean of x mean of y 
+  4.27913   4.15879 
+
+
+$socialnormssensitivetopics
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.343, df = 1543, p-value = 0.0008486
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.0401236 0.1540608
+sample estimates:
+mean of x mean of y 
+ 4.414075  4.316983 
+
+
+$parentsadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.3332, df = 1550.7, p-value = 0.0008788
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03197318 0.12341555
+sample estimates:
+mean of x mean of y 
+ 4.571527  4.493833 
+
+
+$contractcoaches
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.2004, df = 1539.2, p-value = 0.0014
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03777097 0.15737661
+sample estimates:
+mean of x mean of y 
+ 4.356157  4.258583 
+
+
+$communityadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.1675, df = 1564.6, p-value = 0.001567
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04539768 0.19306846
+sample estimates:
+mean of x mean of y 
+ 3.897896  3.778663 
+
+
+$alcohol
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -3.0656, df = 1580, p-value = 0.002209
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.09742883 -0.02139951
+sample estimates:
+mean of x mean of y 
+ 1.130977  1.190392 
+
+
+$contracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -3.0404, df = 1307.2, p-value = 0.00241
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.08562232 -0.01846216
+sample estimates:
+mean of x mean of y 
+ 2.737641  2.789683 
+
+
+$parentsseecoachasimportant
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.8583, df = 1493, p-value = 0.004319
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03326298 0.17878924
+sample estimates:
+mean of x mean of y 
+ 4.173593  4.067567 
+
+
+$parentseathealthy
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.7681, df = 1532.2, p-value = 0.005707
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01842867 0.10806353
+sample estimates:
+mean of x mean of y 
+ 4.545958  4.482712 
+
+
+$sleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.7335, df = 1366.1, p-value = 0.006348
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04940274 0.30055505
+sample estimates:
+mean of x mean of y 
+ 4.157787  3.982809 
+
+
+$socialnormscoachimportant
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.7063, df = 1429.3, p-value = 0.006885
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02514075 0.15759187
+sample estimates:
+mean of x mean of y 
+ 4.370814  4.279448 
+
+
+$contractparents
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.483, df = 1571, p-value = 0.01313
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01794081 0.15289307
+sample estimates:
+mean of x mean of y 
+ 4.120838  4.035421 
+
+
+$communityeatinghabits
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.4811, df = 1508.4, p-value = 0.01321
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01899768 0.16244046
+sample estimates:
+mean of x mean of y 
+ 3.951237  3.860518 
+
+
+$before16
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.3366, df = 1456.7, p-value = 0.01959
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.17797947 -0.01552925
+sample estimates:
+mean of x mean of y 
+ 3.396816  3.493571 
+
+
+$drinkinginjury
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.3039, df = 1462.7, p-value = 0.02137
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.13446406 -0.01078986
+sample estimates:
+mean of x mean of y 
+ 4.189037  4.261664 
+
+
+$communityatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.215, df = 1529.8, p-value = 0.02691
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01079381 0.17785946
+sample estimates:
+mean of x mean of y 
+ 3.646096  3.551769 
+
+
+$socialnormslifestylechoices
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.1909, df = 1325.9, p-value = 0.02864
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.006375742 0.115566118
+sample estimates:
+mean of x mean of y 
+ 4.431669  4.370698 
+
+
+$parentsavoidatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.1901, df = 1437.6, p-value = 0.02868
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.006449107 0.117191261
+sample estimates:
+mean of x mean of y 
+ 4.611677  4.549856 
+
+
+$marijuana
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.119, df = 1584.9, p-value = 0.03424
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.078212073 -0.003020426
+sample estimates:
+mean of x mean of y 
+ 1.095435  1.136052 
+
+
+$parentshealthychoices
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.0416, df = 1547.3, p-value = 0.04136
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.002539873 0.126877079
+sample estimates:
+mean of x mean of y 
+ 4.210842  4.146133 
+
+
+[1] "T tests for Fall pre - Spring post"
+$teammateaccountability
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.6201, df = 1771.2, p-value = 0.0003028
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.08344424 0.28077052
+sample estimates:
+mean of x mean of y 
+ 3.966864  3.784757 
+
+
+$clearcontracts
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.6053, df = 1810.2, p-value = 0.0003202
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05817504 0.19697500
+sample estimates:
+mean of x mean of y 
+ 4.426036  4.298460 
+
+
+$alcohol
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -3.2344, df = 1953.2, p-value = 0.001239
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.11573485 -0.02836177
+sample estimates:
+mean of x mean of y 
+ 1.118343  1.190392 
+
+
+$healthybalancedmeals
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 3.2282, df = 1851.9, p-value = 0.001267
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.0442387 0.1811981
+sample estimates:
+mean of x mean of y 
+ 4.517160  4.404441 
+
+
+$leadersatod
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.6382, df = 1771.2, p-value = 0.008407
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02988401 0.20305289
+sample estimates:
+mean of x mean of y 
+ 4.273373  4.156904 
+
+
+$leadersplayersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.5676, df = 1766.2, p-value = 0.01032
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02607447 0.19477530
+sample estimates:
+mean of x mean of y 
+ 4.188166  4.077741 
+
+
+$leadersplayerseat
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.3523, df = 1759.2, p-value = 0.01877
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01641112 0.18104575
+sample estimates:
+mean of x mean of y 
+ 4.209467  4.110739 
+
+
+$athleticcontractchoice
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.3217, df = 1680.6, p-value = 0.02037
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02151615 0.25575714
+sample estimates:
+mean of x mean of y 
+ 3.784615  3.645979 
+
+
+$contractcoaches
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.2694, df = 1734.9, p-value = 0.02337
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01180698 0.16215041
+sample estimates:
+mean of x mean of y 
+ 4.345562  4.258583 
+
+
+$adequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.2549, df = 1751.4, p-value = 0.02426
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.26411368 -0.01839113
+sample estimates:
+mean of x mean of y 
+ 1.830769  1.972022 
+
+
+$tobacco
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = -2.2206, df = 1953.9, p-value = 0.0265
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.071739136 -0.004449617
+sample estimates:
+mean of x mean of y 
+ 1.047337  1.085432 
+
+
+$coachencouragesadequatesleep
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.1259, df = 1824.9, p-value = 0.03365
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.005660052 0.140552772
+sample estimates:
+mean of x mean of y 
+ 4.543195  4.470089 
+
+
+$leadershelpothers
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.0699, df = 1739.7, p-value = 0.03861
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.004919646 0.182630206
+sample estimates:
+mean of x mean of y 
+ 4.191716  4.097941 
+
+
+$contractparents
+
+	Welch Two Sample t-test
+
+data:  x[pre] and x[post]
+t = 2.0214, df = 1731, p-value = 0.04339
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.002675237 0.177370503
+sample estimates:
+mean of x mean of y 
+ 4.125444  4.035421 
+
+
+[1] "T tests for Average Fall post - Winter post"
+$healthybalancedmeals
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 8.8908, df = 1199, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1548406 0.2425288
+sample estimates:
+mean of x mean of y 
+ 4.630597  4.431912 
+
+
+$coachesunity
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 7.9751, df = 1199, p-value = 3.528e-15
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1491065 0.2464061
+sample estimates:
+mean of x mean of y 
+ 4.582623  4.384866 
+
+
+$coachesavoidsubstanceuse
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 7.9056, df = 1199, p-value = 6.01e-15
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1317938 0.2188023
+sample estimates:
+mean of x mean of y 
+ 4.594350  4.419052 
+
+
+$coachteamissues
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 7.7146, df = 1199, p-value = 2.541e-14
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1461898 0.2459060
+sample estimates:
+mean of x mean of y 
+ 4.570896  4.374848 
+
+
+$leadersplayersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 7.1555, df = 1199, p-value = 1.448e-12
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1413125 0.2480780
+sample estimates:
+mean of x mean of y 
+ 4.276119  4.081424 
+
+
+$coachesexpectations
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 7.1402, df = 1199, p-value = 1.612e-12
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1126292 0.1979759
+sample estimates:
+mean of x mean of y 
+ 4.680704  4.525401 
+
+
+$leadersplayerseat
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 7.0172, df = 1199, p-value = 3.777e-12
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1334642 0.2370591
+sample estimates:
+mean of x mean of y 
+ 4.286247  4.100986 
+
+
+$socialnormscoachimportant
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 6.8395, df = 1199, p-value = 1.263e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1269287 0.2290397
+sample estimates:
+mean of x mean of y 
+ 4.412580  4.234596 
+
+
+$coachcares
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 6.7836, df = 1199, p-value = 1.837e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1127685 0.2045405
+sample estimates:
+mean of x mean of y 
+ 4.643390  4.484736 
+
+
+$leadersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 6.7537, df = 1199, p-value = 2.242e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1200480 0.2183538
+sample estimates:
+mean of x mean of y 
+ 4.264925  4.095725 
+
+
+$coachesserious
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 6.7119, df = 1199, p-value = 2.956e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09002595 0.16439480
+sample estimates:
+mean of x mean of y 
+ 4.769723  4.642512 
+
+
+$coachencouragesadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 6.6994, df = 1199, p-value = 3.21e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09865973 0.18037634
+sample estimates:
+mean of x mean of y 
+ 4.630597  4.491079 
+
+
+$parentsseecoachasimportant
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 6.2267, df = 1199, p-value = 6.577e-10
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1223128 0.2348496
+sample estimates:
+mean of x mean of y 
+ 4.218550  4.039969 
+
+
+$leadershelpothers
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 6.1639, df = 1199, p-value = 9.679e-10
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1176029 0.2274237
+sample estimates:
+mean of x mean of y 
+ 4.259062  4.086549 
+
+
+$coachescontactparents
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 6.0584, df = 1199, p-value = 1.838e-09
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1276257 0.2498761
+sample estimates:
+mean of x mean of y 
+ 4.117271  3.928520 
+
+
+$leadersatod
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 5.5538, df = 1199, p-value = 3.44e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09811979 0.20530949
+sample estimates:
+mean of x mean of y 
+ 4.332623  4.180908 
+
+
+$communitycharacterbuilding
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 4.8987, df = 1199, p-value = 1.097e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.0696400 0.1626894
+sample estimates:
+mean of x mean of y 
+ 4.242004  4.125840 
+
+
+$socialnormscontracts
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 4.5969, df = 1199, p-value = 4.741e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04833199 0.12030518
+sample estimates:
+mean of x mean of y 
+ 4.553305  4.468986 
+
+
+$communityrespectfulbehavior
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 4.5609, df = 1199, p-value = 5.616e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05922908 0.14865294
+sample estimates:
+mean of x mean of y 
+ 4.213220  4.109279 
+
+
+$socialnormsensitivecoach
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 4.2483, df = 1199, p-value = 2.321e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05896975 0.16017471
+sample estimates:
+mean of x mean of y 
+ 4.284115  4.174543 
+
+
+$socialnormslifestylechoices
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 3.9297, df = 1199, p-value = 8.991e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03337404 0.09992465
+sample estimates:
+mean of x mean of y 
+  4.46322   4.39657 
+
+
+$teammateaccountability
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 3.8541, df = 1199, p-value = 0.0001223
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05549747 0.17058906
+sample estimates:
+mean of x mean of y 
+ 3.961087  3.848044 
+
+
+$socialnormsatod
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 3.602, df = 1199, p-value = 0.0003287
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05451244 0.18493408
+sample estimates:
+mean of x mean of y 
+ 3.220149  3.100426 
+
+
+$faircontracts
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 3.5936, df = 1199, p-value = 0.0003394
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03130312 0.10658245
+sample estimates:
+mean of x mean of y 
+ 4.447761  4.378818 
+
+
+$clearcontracts
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 3.5228, df = 1199, p-value = 0.0004431
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03250597 0.11422377
+sample estimates:
+mean of x mean of y 
+ 4.413113  4.339748 
+
+
+$contractcoaches
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 3.4771, df = 1199, p-value = 0.0005251
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03394922 0.12187079
+sample estimates:
+mean of x mean of y 
+ 4.370469  4.292559 
+
+
+$sleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 3.2333, df = 1199, p-value = 0.001257
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.0505441 0.2065475
+sample estimates:
+mean of x mean of y 
+ 4.315350  4.186804 
+
+
+$athletictraining
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 3.1017, df = 1199, p-value = 0.001969
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03164741 0.14059850
+sample estimates:
+mean of x mean of y 
+ 4.230277  4.144154 
+
+
+$parentsadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 2.9622, df = 1199, p-value = 0.003115
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01833821 0.09028031
+sample estimates:
+mean of x mean of y 
+ 4.571962  4.517652 
+
+
+$parentseathealthy
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 2.959, df = 1199, p-value = 0.003147
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01803272 0.08899819
+sample estimates:
+mean of x mean of y 
+ 4.540512  4.486996 
+
+
+$socialnormssensitivetopics
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 2.773, df = 1199, p-value = 0.005641
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01683514 0.09828835
+sample estimates:
+mean of x mean of y 
+ 4.400320  4.342758 
+
+
+$parentsavoidatod
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 2.5862, df = 1199, p-value = 0.009822
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01124447 0.08192806
+sample estimates:
+mean of x mean of y 
+ 4.636994  4.590407 
+
+
+$contracts
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = -2.4341, df = 1199, p-value = 0.01507
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.052018970 -0.005587091
+sample estimates:
+mean of x mean of y 
+ 2.763636  2.792439 
+
+
+$athleticcontractchoice
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = -2.3358, df = 1199, p-value = 0.01967
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.14619157 -0.01271568
+sample estimates:
+mean of x mean of y 
+ 3.621535  3.700989 
+
+
+$communityadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 2.3182, df = 1199, p-value = 0.02061
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.009953426 0.119578379
+sample estimates:
+mean of x mean of y 
+ 3.849147  3.784381 
+
+
+$parentcontracts
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 2.1045, df = 1199, p-value = 0.03554
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.001969556 0.056187401
+sample estimates:
+mean of x mean of y 
+ 2.733832  2.704754 
+
+
+$communityeatinghabits
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and winter.post
+t = 2.0425, df = 1199, p-value = 0.04132
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.002146482 0.106753661
+sample estimates:
+mean of x mean of y 
+ 3.909382  3.854932 
+
+
+[1] "T tests for Average Winter post - Spring post"
+$coachesexpectations
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -21.265, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.4593238 -0.3817225
+sample estimates:
+mean of x mean of y 
+ 4.146983  4.567506 
+
+
+$brainmessages
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -21.126, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3695329 -0.3067239
+sample estimates:
+mean of x mean of y 
+ 4.192555  4.530683 
+
+
+$coachesserious
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -21.069, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.4389447 -0.3641540
+sample estimates:
+mean of x mean of y 
+ 4.239409  4.640959 
+
+
+$impactonperformance
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -19.519, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3829717 -0.3130083
+sample estimates:
+mean of x mean of y 
+ 4.261232  4.609222 
+
+
+$simpletasks
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -19.258, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3598055 -0.2932685
+sample estimates:
+mean of x mean of y 
+ 4.195764  4.522301 
+
+
+$longtermeffect
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -18.668, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3627966 -0.2937876
+sample estimates:
+mean of x mean of y 
+ 4.282413  4.610705 
+
+
+$damagemusclefibers
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -16.742, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3481304 -0.2750913
+sample estimates:
+mean of x mean of y 
+ 4.143774  4.455385 
+
+
+$socialnormscontracts
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -16.541, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3406171 -0.2683760
+sample estimates:
+mean of x mean of y 
+ 4.157895  4.462391 
+
+
+$parentseathealthy
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -16.036, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3220595 -0.2518376
+sample estimates:
+mean of x mean of y 
+ 4.195764  4.482712 
+
+
+$coachesavoidsubstanceuse
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -15.915, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3993165 -0.3116614
+sample estimates:
+mean of x mean of y 
+ 4.074454  4.429943 
+
+
+$parentsadequatesleep
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -15.036, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3144707 -0.2418722
+sample estimates:
+mean of x mean of y 
+ 4.215661  4.493833 
+
+
+$coachcares
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -14.851, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.4042850 -0.3099249
+sample estimates:
+mean of x mean of y 
+ 4.118742  4.475847 
+
+
+$coachencouragesadequatesleep
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -14.398, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3715116 -0.2824017
+sample estimates:
+mean of x mean of y 
+ 4.143132  4.470089 
+
+
+$parentsavoidatod
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -14.186, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3387725 -0.2564473
+sample estimates:
+mean of x mean of y 
+ 4.252246  4.549856 
+
+
+$drinkinginjury
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -13.95, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3775374 -0.2844295
+sample estimates:
+mean of x mean of y 
+ 3.930680  4.261664 
+
+
+$healthybalancedmeals
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -13.383, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3599695 -0.2679120
+sample estimates:
+mean of x mean of y 
+ 4.090501  4.404441 
+
+
+$faircontracts
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -13.108, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3212754 -0.2376140
+sample estimates:
+mean of x mean of y 
+ 4.077664  4.357108 
+
+
+$socialnormscoachimportant
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -12.93, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3721240 -0.2740636
+sample estimates:
+mean of x mean of y 
+ 3.956354  4.279448 
+
+
+$testosterone
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -12.668, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3006821 -0.2200326
+sample estimates:
+mean of x mean of y 
+ 4.032734  4.293092 
+
+
+$socialnormslifestylechoices
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -12.191, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2776034 -0.2006352
+sample estimates:
+mean of x mean of y 
+ 4.131579  4.370698 
+
+
+$coachteamissues
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -11.932, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3810417 -0.2734211
+sample estimates:
+mean of x mean of y 
+ 4.026958  4.354189 
+
+
+$communityrespectfulbehavior
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -11.885, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3272391 -0.2344986
+sample estimates:
+mean of x mean of y 
+ 3.878049  4.158918 
+
+
+$parentsaddresssensitiveissues
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -11.821, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2965518 -0.2121229
+sample estimates:
+mean of x mean of y 
+ 4.204108  4.458445 
+
+
+$coachesunity
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -11.815, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3749675 -0.2681637
+sample estimates:
+mean of x mean of y 
+ 4.037227  4.358793 
+
+
+$contractcoaches
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -11.045, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3120773 -0.2179265
+sample estimates:
+mean of x mean of y 
+ 3.993582  4.258583 
+
+
+$clearcontracts
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -10.922, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2983203 -0.2074582
+sample estimates:
+mean of x mean of y 
+ 4.045571  4.298460 
+
+
+$lostpotential
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -10.757, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3094122 -0.2139481
+sample estimates:
+mean of x mean of y 
+ 4.002567  4.264248 
+
+
+$leadersplayerseat
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -10.732, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3382455 -0.2336818
+sample estimates:
+mean of x mean of y 
+ 3.824775  4.110739 
+
+
+$socialnormssensitivetopics
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -10.61, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2881380 -0.1982028
+sample estimates:
+mean of x mean of y 
+ 4.073813  4.316983 
+
+
+$communitycharacterbuilding
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -10.376, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3032190 -0.2067796
+sample estimates:
+mean of x mean of y 
+ 3.883825  4.138825 
+
+
+$athletictraining
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -10.373, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3371960 -0.2299226
+sample estimates:
+mean of x mean of y 
+ 3.908216  4.191775 
+
+
+$leadersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -10.134, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3122555 -0.2109532
+sample estimates:
+mean of x mean of y 
+ 3.839538  4.101142 
+
+
+$leadersatod
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -9.2665, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3169016 -0.2061497
+sample estimates:
+mean of x mean of y 
+ 3.895379  4.156904 
+
+
+$leadersplayersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -9.2271, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3067574 -0.1991735
+sample estimates:
+mean of x mean of y 
+ 3.824775  4.077741 
+
+
+$leadershelpothers
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -9.1991, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3174125 -0.2058123
+sample estimates:
+mean of x mean of y 
+ 3.836329  4.097941 
+
+
+$parentsseecoachasimportant
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -9.0319, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3119430 -0.2005976
+sample estimates:
+mean of x mean of y 
+ 3.811297  4.067567 
+
+
+$socialnormsensitivecoach
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -8.6584, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2876754 -0.1813811
+sample estimates:
+mean of x mean of y 
+ 3.924262  4.158790 
+
+
+$parentshealthychoices
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -7.6406, df = 1111, p-value = 4.654e-14
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2409341 -0.1424745
+sample estimates:
+mean of x mean of y 
+ 3.954429  4.146133 
+
+
+$ages14_24
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -7.0698, df = 1111, p-value = 2.738e-12
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2525112 -0.1427989
+sample estimates:
+mean of x mean of y 
+ 3.750321  3.947976 
+
+
+$contractparents
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -5.9808, df = 1111, p-value = 2.99e-09
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2209344 -0.1117816
+sample estimates:
+mean of x mean of y 
+ 3.869063  4.035421 
+
+
+$coachescontactparents
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -5.914, df = 1111, p-value = 4.44e-09
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2519670 -0.1264262
+sample estimates:
+mean of x mean of y 
+ 3.724647  3.913844 
+
+
+$communityeatinghabits
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -5.5889, df = 1111, p-value = 2.874e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2130552 -0.1023316
+sample estimates:
+mean of x mean of y 
+ 3.702824  3.860518 
+
+
+$before16
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -5.3914, df = 1111, p-value = 8.537e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.2284749 -0.1065486
+sample estimates:
+mean of x mean of y 
+ 3.326059  3.493571 
+
+
+$sleep
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = 4.7956, df = 1111, p-value = 1.843e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.130263 0.310671
+sample estimates:
+mean of x mean of y 
+ 4.203276  3.982809 
+
+
+$communityadequatesleep
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -4.6308, df = 1111, p-value = 4.073e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.19935299 -0.08069423
+sample estimates:
+mean of x mean of y 
+ 3.638639  3.778663 
+
+
+$socialnormseating
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -4.3431, df = 1111, p-value = 1.533e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.18396836 -0.06947138
+sample estimates:
+mean of x mean of y 
+ 3.596919  3.723639 
+
+
+$socialnormsenoughadequatesleep
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -3.6776, df = 1111, p-value = 0.0002467
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.17990900 -0.05472518
+sample estimates:
+mean of x mean of y 
+ 3.471759  3.589076 
+
+
+$teammateaccountability
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -3.6053, df = 1111, p-value = 0.0003257
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.17905449 -0.05284623
+sample estimates:
+mean of x mean of y 
+ 3.668806  3.784757 
+
+
+$alcohol
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -2.9768, df = 1111, p-value = 0.002976
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.08181666 -0.01680868
+sample estimates:
+mean of x mean of y 
+ 1.141079  1.190392 
+
+
+$communityatod
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = -2.846, df = 1111, p-value = 0.004508
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.16011089 -0.02943488
+sample estimates:
+mean of x mean of y 
+ 3.456996  3.551769 
+
+
+$meals
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = 2.7133, df = 1111, p-value = 0.006766
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03625568 0.22566285
+sample estimates:
+mean of x mean of y 
+ 4.375532  4.244573 
+
+
+$adequatesleep
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = 2.6036, df = 1111, p-value = 0.009347
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02539744 0.18075184
+sample estimates:
+mean of x mean of y 
+ 2.075096  1.972022 
+
+
+$contracts
+
+	Welch Two Sample t-test
+
+data:  winter.post.avg and spring.post
+t = 2.3074, df = 1111, p-value = 0.02122
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.004129189 0.051056708
+sample estimates:
+mean of x mean of y 
+ 2.817276  2.789683 
+
+
+[1] "T tests for Average Fall post - Spring post"
+$healthybalancedmeals
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 9.6405, df = 1111, p-value < 2.2e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1801269 0.2721844
+sample estimates:
+mean of x mean of y 
+ 4.630597  4.404441 
+
+
+$coachesunity
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 8.224, df = 1111, p-value = 5.452e-16
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1704279 0.2772317
+sample estimates:
+mean of x mean of y 
+ 4.582623  4.358793 
+
+
+$coachteamissues
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 7.9018, df = 1111, p-value = 6.579e-15
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1628962 0.2705168
+sample estimates:
+mean of x mean of y 
+ 4.570896  4.354189 
+
+
+$coachesavoidsubstanceuse
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 7.3603, df = 1111, p-value = 3.563e-13
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1205788 0.2082339
+sample estimates:
+mean of x mean of y 
+ 4.594350  4.429943 
+
+
+$leadersplayersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 7.236, df = 1111, p-value = 8.598e-13
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1445867 0.2521705
+sample estimates:
+mean of x mean of y 
+ 4.276119  4.077741 
+
+
+$sleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 7.2334, df = 1111, p-value = 8.759e-13
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.2423375 0.4227455
+sample estimates:
+mean of x mean of y 
+ 4.315350  3.982809 
+
+
+$coachencouragesadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 7.0684, df = 1111, p-value = 2.763e-12
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1159532 0.2050631
+sample estimates:
+mean of x mean of y 
+ 4.630597  4.470089 
+
+
+$coachcares
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 6.9677, df = 1111, p-value = 5.509e-12
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1203632 0.2147233
+sample estimates:
+mean of x mean of y 
+ 4.643390  4.475847 
+
+
+$adequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = -6.9008, df = 1111, p-value = 8.671e-12
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.3508715 -0.1955171
+sample estimates:
+mean of x mean of y 
+ 1.698827  1.972022 
+
+
+$coachesserious
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 6.7561, df = 1111, p-value = 2.282e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09136859 0.16615929
+sample estimates:
+mean of x mean of y 
+ 4.769723  4.640959 
+
+
+$leadersplayerseat
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 6.5867, df = 1111, p-value = 6.926e-11
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1232264 0.2277902
+sample estimates:
+mean of x mean of y 
+ 4.286247  4.110739 
+
+
+$coachescontactparents
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 6.3588, df = 1111, p-value = 2.964e-10
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1406568 0.2661976
+sample estimates:
+mean of x mean of y 
+ 4.117271  3.913844 
+
+
+$leadersadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 6.3446, df = 1111, p-value = 3.241e-10
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1131320 0.2144343
+sample estimates:
+mean of x mean of y 
+ 4.264925  4.101142 
+
+
+$leadersatod
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 6.2261, df = 1111, p-value = 6.768e-10
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1203423 0.2310942
+sample estimates:
+mean of x mean of y 
+ 4.332623  4.156904 
+
+
+$coachesexpectations
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 5.7242, df = 1111, p-value = 1.336e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.07439655 0.15199782
+sample estimates:
+mean of x mean of y 
+ 4.680704  4.567506 
+
+
+$leadershelpothers
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 5.6655, df = 1111, p-value = 1.866e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1053207 0.2169209
+sample estimates:
+mean of x mean of y 
+ 4.259062  4.097941 
+
+
+$teammateaccountability
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 5.4827, df = 1111, p-value = 5.184e-08
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.1132268 0.2394350
+sample estimates:
+mean of x mean of y 
+ 3.961087  3.784757 
+
+
+$socialnormscoachimportant
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 5.3277, df = 1111, p-value = 1.204e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.08410168 0.18216207
+sample estimates:
+mean of x mean of y 
+ 4.412580  4.279448 
+
+
+$parentsseecoachasimportant
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 5.3212, df = 1111, p-value = 1.246e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.09531053 0.20665600
+sample estimates:
+mean of x mean of y 
+ 4.218550  4.067567 
+
+
+$clearcontracts
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 4.9517, df = 1111, p-value = 8.498e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.06922147 0.16008357
+sample estimates:
+mean of x mean of y 
+ 4.413113  4.298460 
+
+
+$socialnormscontracts
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 4.9385, df = 1111, p-value = 9.079e-07
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05479304 0.12703420
+sample estimates:
+mean of x mean of y 
+ 4.553305  4.462391 
+
+
+$socialnormslifestylechoices
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 4.7172, df = 1111, p-value = 2.695e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05403728 0.13100551
+sample estimates:
+mean of x mean of y 
+ 4.463220  4.370698 
+
+
+$contractcoaches
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 4.6634, df = 1111, p-value = 3.488e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.06481028 0.15896102
+sample estimates:
+mean of x mean of y 
+ 4.370469  4.258583 
+
+
+$socialnormsensitivecoach
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 4.6268, df = 1111, p-value = 4.151e-06
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.07217785 0.17847216
+sample estimates:
+mean of x mean of y 
+ 4.284115  4.158790 
+
+
+$drinkinginjury
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = -4.3783, df = 1111, p-value = 1.309e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.15043520 -0.05732737
+sample estimates:
+mean of x mean of y 
+ 4.157783  4.261664 
+
+
+$before16
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = -4.288, df = 1111, p-value = 1.959e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.19419278 -0.07226655
+sample estimates:
+mean of x mean of y 
+ 3.360341  3.493571 
+
+
+$faircontracts
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 4.2521, df = 1111, p-value = 2.295e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04882216 0.13248354
+sample estimates:
+mean of x mean of y 
+ 4.447761  4.357108 
+
+
+$parentsadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 4.2232, df = 1111, p-value = 2.606e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04182983 0.11442832
+sample estimates:
+mean of x mean of y 
+ 4.571962  4.493833 
+
+
+$communitycharacterbuilding
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 4.1985, df = 1111, p-value = 2.902e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05495981 0.15139920
+sample estimates:
+mean of x mean of y 
+ 4.242004  4.138825 
+
+
+$parentsavoidatod
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 4.1536, df = 1111, p-value = 3.524e-05
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.04597461 0.12829983
+sample estimates:
+mean of x mean of y 
+ 4.636994  4.549856 
+
+
+$socialnormssensitivetopics
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 3.6363, df = 1111, p-value = 0.0002893
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03836925 0.12830445
+sample estimates:
+mean of x mean of y 
+ 4.400320  4.316983 
+
+
+$parentsaddresssensitiveissues
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 3.4675, df = 1111, p-value = 0.0005453
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.03238944 0.11681828
+sample estimates:
+mean of x mean of y 
+ 4.533049  4.458445 
+
+
+$ages14_24
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = -3.3633, df = 1111, p-value = 0.0007964
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.14888752 -0.03917525
+sample estimates:
+mean of x mean of y 
+ 3.853945  3.947976 
+
+
+$parentseathealthy
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 3.23, df = 1111, p-value = 0.001274
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.02268844 0.09291033
+sample estimates:
+mean of x mean of y 
+ 4.540512  4.482712 
+
+
+$meals
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 3.0305, df = 1111, p-value = 0.002498
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.05156883 0.24097600
+sample estimates:
+mean of x mean of y 
+ 4.390845  4.244573 
+
+
+$alcohol
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = -2.934, df = 1111, p-value = 0.003415
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.08110845 -0.01610046
+sample estimates:
+mean of x mean of y 
+ 1.141787  1.190392 
+
+
+$communityadequatesleep
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 2.331, df = 1111, p-value = 0.01993
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.01115485 0.12981361
+sample estimates:
+mean of x mean of y 
+ 3.849147  3.778663 
+
+
+$communityrespectfulbehavior
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 2.2977, df = 1111, p-value = 0.02176
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.007931701 0.100672247
+sample estimates:
+mean of x mean of y 
+ 4.213220  4.158918 
+
+
+$contracts
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = -2.1781, df = 1111, p-value = 0.02961
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.049510195 -0.002582676
+sample estimates:
+mean of x mean of y 
+ 2.763636  2.789683 
+
+
+$marijuana
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = -2.1115, df = 1111, p-value = 0.03495
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ -0.064551543 -0.002368139
+sample estimates:
+mean of x mean of y 
+ 1.102592  1.136052 
+
+
+$contractparents
+
+	Welch Two Sample t-test
+
+data:  fall.post.avg and spring.post
+t = 2.0228, df = 1111, p-value = 0.04334
+alternative hypothesis: true difference in means is not equal to 0
+95 percent confidence interval:
+ 0.001687123 0.110839913
+sample estimates:
+mean of x mean of y 
+ 4.091684  4.035421 
+
+
