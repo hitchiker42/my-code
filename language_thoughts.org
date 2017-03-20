@@ -1,0 +1,52 @@
+* Rust
+** No overloading, optional/rest arguments, or multiple dispatch
+** You can't hack something together in Rust
+   this is due to the design of the language focusing on safety,
+   which comes at the expense of being able to write things quickly
+   from scratch
+* Go
+** Does little that C++ doesn't, while lacking the support of C++
+** Packages
+*** Package exports are determined by identifier capitalization
+    capitalized identifiers are exported, capitalized ones aren't
+** Type declarations
+   var type, rather than C which is type var or ml/rust/hakell/etc.. which are
+   roughly var: type.
+
+   Even functions are f(args) rettype, not f(args) -> rettype
+
+* Ocaml
+** ML dialect, syntax is basically the same as SML
+** Very minimal standard library
+   There are several standard library replacements, but this
+   is a huge downside for portability.
+* F♯
+** ML dialect, two versions of syntax
+   The 'verbose' syntax is like SML and Ocaml, while the 'light' 
+   syntax is much less explicit, and relies on syntactically significant
+   whitespace
+** Runs on Mono/DotNet
+   Pros: lots of available libraries, compatible with any other dotnet
+         language, portable
+   Cons: Limited support on linux, especially for development, virtual
+         machine limits what you can do with the language
+* Haskell
+** Very interesting language academically
+   Lots of neat stuff with type systems, monads, etc..
+** Some issues with writing practical code
+   Not a lot of issues mind you, but enough that it has a 
+   decent learning curve
+* Erlang
+** Lots of neat / unique ideas/features
+*** great support for concurrency
+*** Very expressive pattern matching support
+*** Super safe
+** Basically unusable due to practical/syntax issues
+*** No mutable data, at all
+    The only way to store program state is via arguments to
+    tail recursive functions
+*** Can't rebind variable names
+* Elixir
+** Has proper syntactical macros!   
+** Run on erlang vm, which increases available libraries
+** Still no mutable data
