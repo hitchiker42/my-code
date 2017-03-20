@@ -5,11 +5,14 @@ use util::time;
 use util::c::libc;
 use std::mem;
 //mod game;
+static mut term_rows: i32 = 24;
+static mut term_cols: i32 = 80;
 pub fn init() {
     initscr();//start curses mode
     cbreak();//disable line buffering, pass ^C,^Z,etc to terminal
     //raw();//disable line buffering, don't pass ctrl chars to terminal
     noecho();//don't echo keyboard input;
+    unsafe { getmaxyx(stdscr, &mut term_rows, &mut term_cols) };
 }
 pub fn draw(game: &LifeGame, win: WINDOW){
     for i in 0..game.rows() {
@@ -19,7 +22,7 @@ pub fn draw(game: &LifeGame, win: WINDOW){
                i == game.rows()-1 || j == game.cols()-1){
                 waddch(win, '*' as chtype);
             }
-            waddch(win, if game.grid[i][j] == 1 {'#'} else {' '} as chtype);
+            waddch(win, if game.grid.read(i,j) == 1 {'#'} else {' '} as chtype);
         }
     }
     wrefresh(win);
@@ -36,10 +39,8 @@ pub fn run_life(game: &mut LifeGame, win_opt: Option<WINDOW>) -> ! {
 }
 pub fn main() -> ! {
     init();
-    let (mut term_rows, mut term_cols) = (24i32,80i32);
-    getmaxyx(stdscr, &mut term_rows, &mut term_cols);
-    let mut game = LifeGame::new(term_rows as usize, term_cols as usize);
-    game.randomize();
+    let mut game = unsafe { LifeGame::new(term_rows as u32, term_cols as u32) };
+    game.grid.randomize();
 //    unsafe { libc::atexit(mem::transmute(ncurses_lib::ll::endwin)) };
     run_life(&mut game, None);
 }

@@ -1,9 +1,6 @@
 [package]
-name = "util"
+name = "map-route"
 version = "0.1.0"
 authors = ["Tucker DiNapoli <T.DiNapoli42@gmail.com>"]
 
 [dependencies]
-libc = "0.2.8"
-num = "0.1"
-regex = "0.1.69"

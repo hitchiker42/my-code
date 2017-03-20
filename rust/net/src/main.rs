@@ -1,4 +1,5 @@
 extern crate net;
 fn main() {
-    println!("Hello, world!");
+    let mut argv = std::env::args();
+    
 }

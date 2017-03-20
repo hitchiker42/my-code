@@ -1,6 +1,7 @@
 [package]
-name = "game_of_life"
+name = "macros"
 version = "0.1.0"
 authors = ["Tucker DiNapoli <T.DiNapoli42@gmail.com>"]
 
 [dependencies]
+quasi = "0.10.0"
