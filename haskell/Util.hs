@@ -1,6 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Util where
 import Data.List
+import Data.Maybe
+import Data.Array
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as C
 --- Example of infix operators
 -- same precedence as elem and notElem
 infixl 4 ∈,∉
@@ -57,22 +61,19 @@ mostFrequentDigitSum n =
         groups = group $ sortBy (\x y -> compare y x) ls'
         groups' = sortBy (\x y -> compare (length y) (length x)) groups in
     head $ head groups'
-arrayConversion x =
-    let acc _ [x] = x
-        acc True ls = acc (*) $ map (\(x,y) -> x+y) $ zipSelf ls
-        acc False ls = acc (+) $ map (\(x,y) -> x*y) $ zipSelf ls in
-    acc True x
 -- toDigits x = let acc 0 ls = ls
 --                  acc n ls = acc (n // 10) ((n % 10):ls)
 -- --- Example of data structures
 -- -- Functional queue
 -- data Queue a = [a] [a] deriving (Read, Show)
 
+-- queue_empty :: Queue a -> Bool
 -- enqueue :: Queue a -> a -> Queue a
 -- enqueue_list :: Queue a -> [a] -> Queue a
 -- dequeue :: Queue a -> (a, Queue a)
 -- peek :: Queue a -> Maybe a
-
+-- queue_empty (Queue [] [])  = True
+-- queue_empty _ = False
 -- enqueue (Queue [] []) x = Queue [] x
 -- enqueue (Queue e d) x = Queue (x:e) d
 -- -- iterate f a --> [a,f(a),f(f(a)),...]
