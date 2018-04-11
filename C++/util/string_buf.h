@@ -4,130 +4,6 @@
 #include "string_view.h"
 #include "svector.h"
 namespace util {
-
-//A streambuf using a simple block of characters as the output stream
-//as well as the put area. Similar to a std::basic_stringbuf, except
-//that it is possible to take the block of memory from it directly
-//rather than just making a copy.
-struct basic_membuf : std::basic_streambuf<char>  {
-  using Base = std::basic_streambuf<char>;
-  using Traits = std::char_traits<char>;
-
-  static constexpr size_t initial_size = 32;
-  size_t bufsz = 0;
-  char *buf = nullptr;
-  basic_membuf() {
-    Base::setp(nullptr, nullptr);
-  }
-  basic_membuf(size_t sz) : bufsz{sz}, buf{(char*)calloc(sz,1)} {
-    Base::setp(buf, buf+bufsz);
-  }
-  ~basic_membuf() {
-    free(buf);
-  }
-  char* bufptr(){
-    return Base::pptr();
-  }
-  ptrdiff_t buflen() {
-    return (Base::pptr() - Base::pbase());
-  }
-  bool is_full(){
-    return (Base::pptr() == Base::epptr());
-  }
-  //Replaces buf with a newly allocated block of a minimum new_sz
-  //bytes, copies the memory from pbase()-pptr() to the new memory, 
-  //and resets the values of pbase, pptr and epptr. Returns pptr()
-  char* reallocate(size_t new_sz){
-    size_t len = buflen();
-    if(!len){
-      bufsz = initial_size;
-      buf = (char*)calloc(bufsz,1);
-    } else {
-      bufsz = std::max(new_sz, bufsz*2);
-      char* newbuf = (char*)calloc(bufsz,1);
-      memcpy(newbuf, buf, len);
-      free(buf);
-      buf = newbuf;
-    }
-    Base::setp(buf, buf+bufsz);
-    Base::pbump(len);
-    return (buf + len);
-  }
-    
-  int overflow(int ch) override {
-    printf("Calling Overflow\n");
-    if (ch == Traits::eof()) {
-      return ch;
-    }
-    char* ptr = reallocate(bufsz*2);
-    *(ptr) = (char)ch;
-    Base::pbump(1);
-    return ch;
-  }
-  std::streamsize xsputn(const char *str, std::streamsize count) override {
-    printf("Calling xsputn\n");
-    auto needed = buflen() + count;
-    if(needed < bufsz){
-      memcpy(bufptr(), str, count);
-      Base::pbump(count);
-    } else {
-      char *ptr = reallocate(needed);
-      memcpy(ptr, str, count);
-      Base::pbump(count);
-    }
-    return count;
-  }
-  //Return a copy of the output buffer as a std::string.
-  std::string to_std_string(){
-    return std::string(buf, buflen());
-  }
-  //Returns a string_view of the current output, is invalidated if
-  //this goes out of scope, or if reallocate is called.
-  string_view to_string_view(){
-    return string_view(buf, buflen(), false, false);
-  }
-  string_view copy_to_string_view(){
-    return string_view(buf, buflen(), true);
-  }
-  //Transfer ownership of the output buffer to a string_view and return it.
-  string_view move_to_string_view(){
-    //We use calloc for allocation, so unless the buffer is full the
-    //string_view will be null terminated.
-    uint8_t flags = (is_full() ? string_view::flag_owned : string_view::flag_both);
-    auto ret = string_view(buf, buflen(), flags);
-    bufsz = 0;
-    buf = nullptr;
-    //C++17 mandates that the copy/move must be elided here but 
-    //Guaranteed to be equivalent to a move
-    return ret;
-  } 
-};
-
-struct basic_memstream : std::basic_ostream<char> {
-  using Base = std::basic_ostream<char>;
-  using Traits = std::char_traits<char>;
-  using streambuf_type = basic_membuf;
-  using ostream_type = std::basic_ostream<char>;
-
-  streambuf_type buf;
-
-  basic_memstream() : ostream_type(), buf() {
-    this->init(&buf);
-  }
-  
-  streambuf_type* rdbuf() const {
-    return const_cast<streambuf_type*>(&buf);
-  }
-  string_view sv(){
-    return buf.to_string_view();
-  }
-  string_view move_to_sv(){
-    return buf.move_to_string_view();
-  }
-};
-  
-  
-
 /*
   A possible optimization is to use a discriminated union and keep integers/floats
   as seperate types until we create the final string.
@@ -287,3 +163,128 @@ gen_append_fn(append_hex, double, "%a");
 }//namespace util
 
 #endif /*_STRING_BUF_H_*/
+
+#if 0
+//A streambuf using a simple block of characters as the output stream
+//as well as the put area. Similar to a std::basic_stringbuf, except
+//that it is possible to take the block of memory from it directly
+//rather than just making a copy.
+struct basic_membuf : std::basic_streambuf<char>  {
+  using Base = std::basic_streambuf<char>;
+  using Traits = std::char_traits<char>;
+
+  static constexpr size_t initial_size = 32;
+  size_t bufsz = 0;
+  char *buf = nullptr;
+  basic_membuf() {
+    Base::setp(nullptr, nullptr);
+  }
+  basic_membuf(size_t sz) : bufsz{sz}, buf{(char*)calloc(sz,1)} {
+    Base::setp(buf, buf+bufsz);
+  }
+  ~basic_membuf() {
+    free(buf);
+  }
+  char* bufptr(){
+    return Base::pptr();
+  }
+  ptrdiff_t buflen() {
+    return (Base::pptr() - Base::pbase());
+  }
+  bool is_full(){
+    return (Base::pptr() == Base::epptr());
+  }
+  //Replaces buf with a newly allocated block of a minimum new_sz
+  //bytes, copies the memory from pbase()-pptr() to the new memory, 
+  //and resets the values of pbase, pptr and epptr. Returns pptr()
+  char* reallocate(size_t new_sz){
+    size_t len = buflen();
+    if(!len){
+      bufsz = initial_size;
+      buf = (char*)calloc(bufsz,1);
+    } else {
+      bufsz = std::max(new_sz, bufsz*2);
+      char* newbuf = (char*)calloc(bufsz,1);
+      memcpy(newbuf, buf, len);
+      free(buf);
+      buf = newbuf;
+    }
+    Base::setp(buf, buf+bufsz);
+    Base::pbump(len);
+    return (buf + len);
+  }
+    
+  int overflow(int ch) override {
+    printf("Calling Overflow\n");
+    if (ch == Traits::eof()) {
+      return ch;
+    }
+    char* ptr = reallocate(bufsz*2);
+    *(ptr) = (char)ch;
+    Base::pbump(1);
+    return ch;
+  }
+  std::streamsize xsputn(const char *str, std::streamsize count) override {
+    printf("Calling xsputn\n");
+    auto needed = buflen() + count;
+    if(needed < bufsz){
+      memcpy(bufptr(), str, count);
+      Base::pbump(count);
+    } else {
+      char *ptr = reallocate(needed);
+      memcpy(ptr, str, count);
+      Base::pbump(count);
+    }
+    return count;
+  }
+  //Return a copy of the output buffer as a std::string.
+  std::string to_std_string(){
+    return std::string(buf, buflen());
+  }
+  //Returns a string_view of the current output, is invalidated if
+  //this goes out of scope, or if reallocate is called.
+  string_view to_string_view(){
+    return string_view(buf, buflen(), false, false);
+  }
+  string_view copy_to_string_view(){
+    return string_view(buf, buflen(), true);
+  }
+  //Transfer ownership of the output buffer to a string_view and return it.
+  string_view move_to_string_view(){
+    //We use calloc for allocation, so unless the buffer is full the
+    //string_view will be null terminated.
+    uint8_t flags = (is_full() ? string_view::flag_owned : string_view::flag_both);
+    auto ret = string_view(buf, buflen(), flags);
+    bufsz = 0;
+    buf = nullptr;
+    //C++17 mandates that the copy/move must be elided here but 
+    //Guaranteed to be equivalent to a move
+    return ret;
+  } 
+};
+
+struct basic_memstream : std::basic_ostream<char> {
+  using Base = std::basic_ostream<char>;
+  using Traits = std::char_traits<char>;
+  using streambuf_type = basic_membuf;
+  using ostream_type = std::basic_ostream<char>;
+
+  streambuf_type buf;
+
+  basic_memstream() : ostream_type(), buf() {
+    this->init(&buf);
+  }
+  
+  streambuf_type* rdbuf() const {
+    return const_cast<streambuf_type*>(&buf);
+  }
+  string_view sv(){
+    return buf.to_string_view();
+  }
+  string_view move_to_sv(){
+    return buf.move_to_string_view();
+  }
+};
+  
+  
+#endif

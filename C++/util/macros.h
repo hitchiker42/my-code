@@ -137,69 +137,50 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
 //modified so the type of the member was passed to the macro rather
 //than the template.
 //The (type of th) class being tested is available for use in type as T.
-#define define_has_member_typed(name, type)             \
-  define_has_member_typed_(name, type, CAT(has_, name))
+#define define_has_member(name)                 \
+  define_has_member_(name, CAT(has_, name))
+#define define_has_member_(name, struct_name)                           \
+  template <typename T, typename = void>                                \
+  struct struct_name : std::false_type {};                              \
+  template<typename T>                                                  \
+  struct struct_name<T, std::void_t<decltype(T::name)>> : std::true_type {}; \
+  template <typename T>                                                 \
+  inline constexpr bool CAT(struct_name, _v) = struct_name<T>::value;
 
-#define define_has_member_typed_(name, type, struct_name)               \
+#define define_has_member_typed(name, type)            \
+  define_has_member_typed_(name, type, CAT(has_, name))
+#define define_has_member_typed_(name, struct_name, type)               \
   template <typename T, typename = void>                                \
-  struct struct_type : std::false_type {};                              \
+  struct struct_name : std::false_type {};                              \
   template<typename T>                                                  \
-  struct struct_type<                                                   \
-    U, std::void_t<decltype(T::name)> : std::true_type {};              \
+  struct struct_name<T,                                                 \
+    std::enable_if_t<std::is_same_v<decltype(T::name), type>, void>>    \
+    : std::true_type {};                                                \
   template <typename T>                                                 \
   inline constexpr bool CAT(struct_name, _v) = struct_name<T>::value;
-/*  
-    Kept for posterity
-    template <typename U> struct struct_name {                            
-    // This will get instantiated iff the second arg                  
-    // has the type given by the first arg                            
-    template <typename T, T> struct helper;                             
-    // This will get chosen iff the class has a member 'name'         
-    // Argument needs to be a pointer since is_type isn't defined     
-    template <typename T> static int8_t check(helper<type, T::name> *); 
-    // This will catch anything                                       
-    template <typename T> static int16_t check(...);//{return 0;};    
-    // This is the flag that indicates if the member exists           
-    static constexpr bool value = sizeof(check<U>(0)) == sizeof(int8_t); 
-  };                                                                    
-  template <typename T>                                                 
+
+#define define_has_member_function(name)                \
+  define_has_member_function_(name, CAT(has_, name))
+#define define_has_member_function_(name, struct_name)                  \
+  template <typename T, typename = void>                                \
+  struct struct_name : std::false_type {};                              \
+  template<typename T>                                                  \
+  struct struct_name<                                                   \
+   T, std::enable_if_t<std::is_member_function_pointer_v<decltype(&T::name)>, \
+                       void>> : std::true_type {};                      \
+  template <typename T>                                                 \
   inline constexpr bool CAT(struct_name, _v) = struct_name<T>::value;
+/*
+  Type manipulation with overload sets is tricky, so to test if a struct
+  has a member function taking specific types we just use decltype on
+  an invocation of the function. This is less elegent that the previous 3
+  ways to test for members, but this works and trying to do it more elegently
+  doesn't work.
 */
-#define define_has_member_function(name, type)             \
-  define_has_member_function_(name, type, CAT(has_, name))
-#define define_has_member_function_(name, type, struct_name)            \
-  template <typename T, typename = void>                                \
-  struct struct_type : std::false_type {};                              \
-  template<typename T>                                                  \
-  struct struct_type<                                                   \
-    U, std::enable_if_t<std::is_member_function_pointer<decltype(&T::name)>, \
-                        void> : std::is_true_type {};                   \
-  template <typename T>                                                 \
-  inline constexpr bool CAT(struct_name, _v) = struct_name<T>::value;
-#if 0
-#define define_has_member_function_(name, type, struct_name)               \
-  template <typename U> struct struct_name {                            \
-    /* This will get instantiated iff the second arg*/                  \
-    /* has the type given by the first arg */                           \
-    template <typename T, T> struct helper;                             \
-    /* This will get chosen iff the class has a member 'name'*/         \
-    /* Argument needs to be a pointer since is_type isn't defined */    \
-    template <typename T> static int8_t check(helper<type, &T::name> *); \
-    /* This will catch anything */                                      \
-    template <typename T> static int16_t check(...);/*{return 0;};*/    \
-    /* This is the flag that indicates if the member exists */          \
-    static constexpr bool value = sizeof(check<U>(0)) == sizeof(int8_t); \
-  };                                                                    \
-  template <typename T>                                                 \
-  inline constexpr bool CAT(struct_name, _v) = struct_name<T>::value;
-#endif
 #define define_has_member_overloaded(name)              \
   define_has_member_overloaded_(name, CAT(has_, name))
-
 #define define_has_member_overloaded_(name, struct_name)                \
   template <typename T, typename... Args> struct struct_name {          \
-    /* This will get chosen iff the class has a member 'name'*/         \
-    /* Argument needs to be a pointer since is_type isn't defined */    \
     template <typename N,                                               \
               typename = decltype(std::declval<N>().name(std::declval<Args>()...))> \
     static int8_t check(int);                                            \
@@ -207,25 +188,11 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
     template <typename N> static int16_t check(...);/*{return 0;};*/     \
     /* This is the flag that indicates if the member exists */          \
     static constexpr bool value = sizeof(check<T>(0)) == sizeof(int8_t); \
-  };
-//Won't work if T::name is an overloaded function.
-#define define_has_member_untyped(name)                 \
-  define_has_member_untyped_(name, CAT(has_, name))
-#define define_has_member_untyped_(name, struct_name)                   \
-  template<typename T, typename = void>                                 \
-  struct struct_name {                                                  \
-    static constexpr bool value = false;                                \
   };                                                                    \
-  template<typename T>                                                  \
-  /*decltype((void)T::name, 0) == decltype(0) == int, but if T::name*/  \
-  /*doesn't exist we get a substitution failure and use the default template */ \
-  /*Without the '&' if name is function the compiler thinks we're calling it */ \
-  struct struct_name<T, decltype((void)(&T::name))> {                   \
-    static constexpr bool value = true;                                 \
-  };
+  template<typename T, typename... Args>                                \
+  inline constexpr bool CAT(struct_name, _v) = struct_name<T,Args...>::value;
 
-//this is defined in config.h, but I'm putting it here as well so that this
-//file can be used standalone.
+//Macro for portably using possibly empty __VA_ARGS__ 
 #ifndef MAYBE_VA_ARGS
 #if (defined __GNUC__)
 #define MAYBE_VA_ARGS(...) ,##__VA_ARGS__
@@ -233,14 +200,7 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
 #define MAYBE_VA_ARGS(...) ,__VA_ARGS__
 #endif
 #endif
-#define enable_if_has(what, T, ...)                             \
-  std::enable_if_t<CAT(has_, what)<T MAYBE_VA_ARGS>::value, T>
-#define enable_if_doesnt_have(what, T, ...)                     \
-  std::enable_if_t<!CAT(has_, what)<T MABYE_VA_ARGS>::value, T>
-#define enable_int_if_has(what, T, ...)                                 \
-  std::enable_if_t<CAT(has_, what)<T MABYE_VA_ARGS>::value, int>
-#define enable_int_if_doesnt_have(what, T, ...)                         \
-  std::enable_if_t<!CAT(has_, what)<T MAYBE_VA_ARGS>::value, int>
+
 /*
   Super tricky way to test if something is a string literal.
 

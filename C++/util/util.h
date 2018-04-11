@@ -1,9 +1,29 @@
 #ifndef __UTIL_H__
 #define __UTIL_H__
-#include "common.h"
+//C headers
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <limits.h>
+//C++ headers
+#include <algorithm>
+#include <array>
+#include <functional>
+#include <initializer_list>
+#include <iterator>
+#include <numeric>
+#include <map>
+#include <type_traits>
+#include <string>
+#include <vector>
+#include <utility>
+#include <unordered_map>
+
+#include "macros.h"
 #include "templates.h"
-#include "my_array.h"
-#include "svector.h"
+//#include "my_array.h"
+//#include "svector.h"
 /*
   Low level bit manipulation, using compiler intrinsics
 */
@@ -87,24 +107,6 @@ template<typename T,
 constexpr int lg2(T x){
   return (std::max(sizeof(T),sizeof(int))*CHAR_BIT) - (clz(x) + 1);
 }
-
-#define define_rel_ops_generic(T, qualifier)            \
-  qualifier bool operator !=(const T& a, const T& b){   \
-    return !(a == b);                                   \
-  }                                                     \
-  qualifier bool operator <=(const T& a, const T& b){   \
-    return a == b || a < b;                             \
-  }                                                     \
-  qualifier bool operator >(const T& a, const T& b){    \
-    return !(a <= b);                                   \
-  }                                                     \
-  qualifier bool operator >=(const T& a, const T& b){   \
-    return !(a < b);                                    \
-  }
-#define define_rel_ops_in_class(T)              \
-  define_rel_ops_generic(T, friend)
-
-
 //Functions and classes in namespace util.
 namespace util {
 template <typename T>
@@ -391,14 +393,24 @@ struct bitset_32 {
 /*
   In case you need a custom hash function.
 */
+/*
+  templatized version.
+  template<typename T> static constexpr T fnv_prime;
+  template<typename T> static constexpr T fnv_offset_basis;
+  template<> static constexpr T fnv_prime<uint32_t> = 16777619U;
+  template<> static constexpr T fnv_offset_basis<uint32_t> = 2166136261U;
+  template<> static constexpr uint64_t fnv_prime = 1099511628211UL;
+  template<> static constexpr uint64_t fnv_offset_basis = 0xCBF29CE484222325UL;
+  //Versions for 128, 256, 512 and 1024 bytes also exist.
+*/
 static constexpr uint64_t fnv_prime_64 = 1099511628211UL;
 static constexpr uint64_t fnv_offset_basis_64 = 14695981039346656037UL;
 static constexpr uint32_t fnv_prime_32 = 16777619U;
-static constexpr uint32_t fnv_offset_basis_32 = _322166136261U;
-//TODO, maybe: make this a template and specialize for 32 and 64 bit types.
+static constexpr uint32_t fnv_offset_basis_32 = 2166136261U;
+//TODO, maybe: make this a template and specialize it.
 [[maybe_unused]] static uint64_t fnv_hash(const void *key, size_t keylen,
                                           uint64_t seed = fnv_offset_basis_64){
-  const unsigned char *raw_data = reinterpret_cast<unsigned char*>(key);
+  const unsigned char *raw_data = reinterpret_cast<const unsigned char*>(key);
   uint64_t hash = seed;
   for(size_t i=0; i < keylen; i++){
     hash = (hash ^ raw_data[i]) * fnv_prime_64;
@@ -422,10 +434,11 @@ uint64_t fnv_hash(const T& key){
   for(const auto &elt : key){
     hash = hash_combine(hash, fnv_hash(elt));
   }
+  return hash;
 }
     
 template<>
-uint64_t fnv_hash(const char* key){
+uint64_t fnv_hash(const char* const& key){
   return fnv_hash(key, strlen(key));
 }
 /*
@@ -451,6 +464,87 @@ size_t memspn_table(const uint8_t *buf, size_t len,
 size_t memcspn_table(const uint8_t *buf, size_t len,
                      const uint8_t reject[256]);
 }
+#if (defined NEED_TIMER)
+#include <time.h>
+#include <sys/time.h>
+namespace util {
+//Could put these constants / functions into a detail namespace.
+static constexpr int NANO_SCALE = 1000000000;
+static constexpr double NANO_SCALE_FLOAT = 1e9;
+static constexpr int MICRO_SCALE = 1000000;
+static constexpr double MICRO_SCALE_FLOAT = 1e6;
+static constexpr double timespec_to_float(struct timespec t){
+  return t.tv_sec + (t.tv_nsec / NANO_SCALE_FLOAT);
+}
+//Can't be constxepr due to uninitialized variable.
+static struct timespec timeval_to_timespec(struct timeval tv){
+  struct timespec ts;
+  ts.tv_sec = tv.tv_sec;
+  ts.tv_nsec = (tv.tv_usec * (NANO_SCALE/MICRO_SCALE));
+  return ts;
+}
+static struct timespec get_current_time(){
+  struct timespec ts;
+#if (defined _POSIX_TIMERS) && (_POSIX_TIMERS > 0)
+  clock_gettime(CLOCK_REALTIME, &ts);
+#else
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  ts =  timeval_to_timespec(tv);
+#endif
+  return ts;
+}
+static struct timespec get_cpu_time(){
+  struct timespec ts;
+#if (defined _POSIX_TIMERS) && (_POSIX_TIMERS > 0) && (defined _POSIX_CPUTIME)
+  clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts);
+#else
+  clock_t clk = clock();
+  int64_t nsecs = (clk*NANO_SCALE)/CLOCKS_PER_SEC;
+  ts.tv_sec = nsecs/NANO_SCALE;
+  ts.tv_nsec = nsecs % NANO_SCALE;
+#endif
+  return ts;
+}
+static inline  double float_time(){
+  return timespec_to_float(get_current_time());
+}
+static inline double float_cputime(){
+  return timespec_to_float(get_cpu_time());
+}
+struct cpu_timer {
+  double start_time = 0.0;
+  double stop_time = 0.0;
+  
+  void start(){
+    start_time = float_cputime();
+  }
+  void stop(){
+    stop_time = float_cputime();
+  }
+  //not strictly necessary
+  void reset(){
+    start_time = stop_time = 0.0;
+  }
+  void restart(){
+    stop_time = 0.0;
+    start_time = float_cputime();
+  }
+  //Doesn't check if stop/start have been called.
+  double elapsed(){
+    return (stop_time - start_time);
+  }
+  template<typename T, typename ... Ts>
+  double time_function(T fn, Ts&&... Args){
+    reset();
+    start();
+    (void)fn(std::forward<Ts>(Args)...);
+    stop();
+    return elapsed();
+  }
+};
+}
+#endif /* NEED_TIMERS */
 #if 0
 namespace util {
 /*

@@ -66,11 +66,19 @@ struct string_view {
   constexpr string_view(string_view&& sv) noexcept
     : ptr{sv.ptr}, sz{sv.sz}, flags{sv.flags} {
     sv.flags &= ~flag_owned;
+  } 
+  //string views are immutable, the copy assigment/move operators are
+  //really just to allow reusing a variable
+  string_view& operator=(string_view &other) {
+    this->~string_view();
+    new(this) string_view(other);
+    return *this;
   }
-  //Copy assignment makes no sense, string_views are immutable
-  string_view& operator=(string_view &) = delete;
-  string_view& operator=(string_view &&) = delete;
-
+  string_view& operator=(string_view &&other) {
+    this->~string_view();
+    new(this) string_view(other);
+    return *this;
+  }
 
   //Constructing a string_view from a std::string, cstring, or
   //std::string_view must be done explicitly (why?)
@@ -109,7 +117,7 @@ struct string_view {
     return string_view(ptr, sz, owns_memory(),
                        owns_memory() || is_null_terminated());
   }
-  //Conversions to std::string and std::string_view
+
   std::string to_std_string() const {
     return std::string(data(), size());
   }
@@ -150,21 +158,25 @@ struct string_view {
   #define do_cmp(lhs, rhs) lhs.compare(rhs)
   generate_comparison_operators_via_compare(string_view, do_cmp);
   #undef do_cmp
-#if 0
-  //Substring functions
-  //Be careful with these, the string_view they return won't be
-  //null terminated and won't own its own memory.
 
+  //Substring functions
   string_view substr(size_t start) const {
-    return substr_view(start, sz);
+    return substr(start, sz);
   }
   string_view substr(size_type start, size_type end) const {
     return string_view(ptr + start, end - start, false, false);
   }
-#endif
+  //Substring functions which return a copy, this is the only way to get
+  //null terminated substrings.
+  string_view substr_copy(size_t start) const {
+    return substr_copy(start, sz);
+  }
+  string_view substr_copy(size_type start, size_type end) const {
+    return string_view(ptr + start, end - start, true);
+  }
 };
 //Copying the std libraries naming hierarchy.
- //string_view can't be a literal b/c of non-trival destructor.
+//string_view can't be a literal b/c of non-trival destructor.
 namespace literals {
 inline namespace string_literals {
   string_view operator "" _sv(const char *str, size_t sz){

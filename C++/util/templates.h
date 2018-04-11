@@ -1,15 +1,16 @@
 #ifndef __TEMPLATES_H__
 #define __TEMPLATES_H__
 #include <type_traits>
+//Macros, most notably  macros for defining templates to test for the existance
+//of a member function/variable.
+#include "macros.h"
 #if 0
 namespace util {
 namespace templates {
 #endif
-//Macros, most notably it includes some macros to simplify using enable_if
-//and macros for defining templates to test for a member function/variable.
-#include "macros.h"
+
 /*
-  convience typedefs for iterator traits
+  convience typedefs for iterator traits (avoids having to add 'typename')
 */
 template <class It>
 using iter_traits_value_type = typename std::iterator_traits<It>::value_type;
@@ -25,20 +26,19 @@ using iter_traits_iterator_category =
   typename std::iterator_traits<It>::iterator_category;
 template <class It>
 using iter_traits_category = iter_traits_iterator_category<It>;
-
 /*
   Functions for mapping over stl containers.
 */
 /*
   I wish there was a nicer way to do this, but if there is I don't know it .
 */
-define_has_member_untyped(reserve);
+define_has_member_function(reserve);
 define_has_member_overloaded(push_back);
 define_has_member_overloaded(insert);
 /*
   Template functions for containers / Iterators.
 */
-//is_iterable_v<T> is true if std::begin, std::end can be called on T.
+//is_iterable_v<T> is true if std::begin, std::end can be called with T.
 template<typename T, typename = void>
 struct is_iterable : std::false_type {};
 template<typename T>
@@ -48,23 +48,23 @@ struct is_iterable<
 template<typename T>
 inline constexpr bool is_iterable_v = is_iterable<T>::value;
 
-//is_raw_data_v<T> is true if 
+//is_raw_data_v<T> is true if std::data can be called with T
 template<typename T, typename = void>
-struct is_raw_data : std::false_type {}
+struct is_raw_data : std::false_type {};
 template<typename T>
 struct is_raw_data<
-  T, std::void_t<decltype(std::data(stD::declval<T>()))>> : std::true_type {};
+  T, std::void_t<decltype(std::data(std::declval<T>()))>> : std::true_type {};
 template<typename T>
 inline constexpr bool is_raw_data_v = is_raw_data<T>::value;
 
 //Reserve space if possible, do nothing if not
 template<typename T,
-         std::enable_if_t<!(has_reserve<T>::value), int> = 0>
-void maybe_reserve([[gnu::unused]] T &x, [[gnu::unused]] size_t sz){
+         std::enable_if_t<!has_reserve_v<T>, int> = 0>
+void maybe_reserve([[maybe_unused]] T &x, [[maybe_unused]] size_t sz){
   return;
 }
 template<typename T,
-         std::enable_if_t<has_reserve<T>::value, int> = 0>
+         std::enable_if_t<has_reserve_v<T>, int> = 0>
 void maybe_reserve(T &x, size_t sz){
   x.reserve(sz);
 }
@@ -72,19 +72,14 @@ void maybe_reserve(T &x, size_t sz){
   Destructive map function
 */
 /*
-  Define both a pointer and non pointer version, I think Fmap_into
-  implies it modifies its argument, so I'm willing to allow reference
-  arguments, but provide a pointer version since it's still better
-  to make the modification explicit.
+  Define both a pointer and reference version.
 */
-template<class Container, class Fn,
-         typename enable_int_if_is_not(pointer, Container) = 0>
-void Fmap_into(const Fn &f, Container &seq){
+template<class Container, class Fn>
+void Fmap_into(const Fn &f, Container& seq){
   std::transform(seq.begin(), seq.end(), seq.begin(), f);
 }
-template<class Container, class Fn,
-         typename enable_int_if_is(pointer, Container) = 0>
-void Fmap_into(const Fn &f, Container seq){
+template<class Container, class Fn>
+void Fmap_into(const Fn &f, Container* seq){
   std::transform(seq->begin(), seq->end(), seq->begin(), f);
 }
 template<class Container, class Fn>
@@ -98,7 +93,7 @@ void Fmapc(const Container &seq, Fn f){
 template<class Fn, class T,
          typename
          std::enable_if_t<
-           has_push_back<T, const typename T::value_type&>::value, int> = 0>
+           has_push_back_v<T, const typename T::value_type&>, int> = 0>
 T Fmap(const Fn &f, const T &seq){
   T ret;
   //reserve the necessary space if possible
@@ -106,7 +101,7 @@ T Fmap(const Fn &f, const T &seq){
   std::transform(seq.begin(), seq.end(), std::back_inserter(ret), f);
   return ret;
 }
-//version for assoicative containers (eg map/set)
+//version for associative containers (eg map/set)
 template<class Fn, class T,
          typename std::enable_if_t<
            !has_push_back<T, const typename T::value_type&>::value &&
@@ -117,6 +112,7 @@ T Fmap(const Fn &f, const T &seq){
   std::transform(seq.begin(), seq.end(), std::inserter(ret, ret.end()), f);
   return ret;
 }
+//Compile time fold.
 template<typename T, typename U = T>
 constexpr T constexpr_foldl(const U *ptr, size_t n, const T init,
                             T(*f)(const T,const U)){
@@ -550,6 +546,17 @@ T* typed_calloc(size_t sz, size_t nmemb){
   return (T*)calloc(sz,nmemb);
 }
 
+//Templates to simplify placement new & related functions
+template<class T, class... Ts>
+T* placement_new(void *mem, Ts&&... Args){
+  return new(mem) T(std::forward<Ts>(Args)...);
+}
+template<class T, class... Ts>
+T* reconstruct(T& obj, Ts&&... Args){
+  obj.~T();
+  return new(&obj) T(std::forward<Ts>(Args)...);
+}
+
 // template <typename T>
 // svector<T> vector_iota(T start, T stop, T step = T(1)){
 //   T range = stop - start;
@@ -623,7 +630,6 @@ std::string object_to_string(const T& obj){
   return ss.str();
 }
 #endif
-define_has_member_untyped(m_Prev);
 /*
   Variadic templates (parameter packs)
 */
@@ -878,6 +884,7 @@ struct transform_iter {
     return {transform_iter(f, start), transform_iter(f, stop)};
   }
 };
+//Merge this with my actual range class?
 template <class Fn, class It>
 struct transform_range {
   transform_range(Fn f, It start, It stop)
@@ -1034,74 +1041,6 @@ decltype(auto) key_iterator_range(const Map& m){
   return transform_range([](auto& p)->const rettype& { return p.first; },
                          m.begin(), m.end());
 }
-/*
-  These define iterators for classes which act as linked list nodes,
-  which a lot of classes in this project do.
-
-  LinkedIter<T> defines a forward iterator for classes which have
-  a 'T* m_Next' member and a bidirectional iterator for classes
-  which also have a 'T* m_Prev' member.
-*/
-template<typename Type,
-         bool bidi = has_m_Prev<Type, Type*>::value>
-struct LinkedIter;
-
-template <typename Type>
-struct LinkedIter<Type, true> {
-  //Iterator Traits
-  typedef ptrdiff_t difference_type;
-  typedef std::remove_cv_t<Type> value_type;
-  typedef Type* pointer;
-  typedef Type& reference;
-  //Its not a bidirectional iterator since we can't create
-  //a past the end iterator which properly decrements witout
-  //some extra work in creating a sentinal node instead of just
-  //using nullptr as the end of list.
-  typedef std::forward_iterator_tag iterator_category;
-
-  value_type *ptr;
-
-  //Constructor/Dest
-  LinkedIter() : ptr{nullptr} {};
-  //explicit means you need to actually call the constructor
-  explicit LinkedIter(value_type *ptr) : ptr{ptr} {};
-  ~LinkedIter() = default;//doesn't really do anything
-
-  //Members
-  LinkedIter& operator++(){//pre-increment
-    ptr = ptr->m_Next;
-    return *this;
-  }
-  LinkedIter& operator++(int){//post increment
-    LinkedIter ret = LinkedIter(ptr);
-    ptr = ptr->m_Next;
-    return ret;
-  }
-  LinkedIter& operator--(){//pre-decrement
-    ptr = ptr->m_Prev;
-    return *this;
-  }
-  LinkedIter& operator--(int){//post decrement
-    LinkedIter ret = LinkedIter(ptr);
-    ptr = ptr->m_Prev;
-    return ret;
-  }
-  template<typename T>
-  bool operator ==(const LinkedIter<T>&rhs){
-    return ptr == rhs.ptr;
-  }
-  template<typename T>
-  bool operator !=(const LinkedIter<T>&rhs){
-    return ptr != rhs.ptr;
-  }
-  reference operator*(){
-    return *ptr;
-  }
-  pointer operator->(){
-    return ptr;
-  }
-};
-
 // template<typename F>
 // struct fix_type {
 //   F fn;
