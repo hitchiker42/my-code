@@ -93,6 +93,7 @@
 #define MACRO_MAP0(f, x, peek, ...) f(x) MAP_NEXT (peek, MACRO_MAP1) (f, peek, __VA_ARGS__)
 #define MACRO_MAP1(f, x, peek, ...) f(x) MAP_NEXT (peek, MACRO_MAP0) (f, peek, __VA_ARGS__)
 #define MACRO_MAP(f, ...) EVAL (MACRO_MAP1(f, __VA_ARGS__ ,(), 0))
+
 /**
    C++ specific macros.
  */
@@ -199,6 +200,12 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
 #else
 #define MAYBE_VA_ARGS(...) ,__VA_ARGS__
 #endif
+#endif
+
+#if (defined DEBUG)
+#define DEBUG_PRINTF(fmt, ...) fprintf(stderr, fmt MAYBE_VA_ARGS(__VA_ARGS__))
+#else
+#define DEBUG_PRINTF(...)
 #endif
 
 /*

@@ -30,6 +30,8 @@ namespace util {
       any elements added/removed.
 
   Memory is managed using malloc/free, not new/delete.
+
+  Maybe change to take an allocator as a template parameter.
 */
 template<typename T>
 struct svector {
@@ -91,7 +93,6 @@ struct svector {
       destruct(i);
     }
   }
-
   ~svector(){
     clear();
     free((void*)vec);
@@ -105,9 +106,62 @@ struct svector {
   }
   void push(T val){
     check_length();
-    vec[len++] = val;
+    new(vec + len) T(val);
+    ++len;
   }
-  void push_back(T val){push(val);}
+  void push_back(T val){
+    push(val);
+  }
+  /*
+    append and multipush are both functions to add a range
+    of elements to the vector, the difference is that multipush
+    copies elements while append moves them, for trivially copyable
+    types they are identical.
+
+    TODO: Make sure to test these to make sure they do what I say they do.
+  */
+  void multipush(const T* vals, size_t cnt){
+    check_length(cnt);
+    //assume std::copy is optimized for trivally copyable types
+    std::copy(vals, vals + cnt, vec + len);
+    len += cnt;
+  }
+  template<typename InputIt>
+  void multipush(InputIt first, InputIt last){
+    if constexpr(is_random_access_iterator_v<InputIt>){
+      size_t cnt = std::distance(first, last);      
+      check_length(cnt);
+      std::copy(first, last, vec + len);
+      len += cnt;
+    } else {
+      std::copy(first, last, std::back_inserter(*(this)));
+    }
+  }
+  //moves cnt values from the location pointed to by vals into the vector.
+  //For trivally destructible types a simple memcpy is used instead.
+  void append(T* vals, size_t cnt){
+    check_length(cnt);
+    if constexpr(std::is_trivially_copyable_v<T>) {
+      memcpy(vec + len, vals, cnt * sizeof(T));
+    } else {
+      std::move(vals, vals + cnt, vec + len);
+    }
+    len += cnt;
+  }
+  void append(const T* vals, size_t cnt){
+    return multipush(vals, cnt);
+  }
+  template<typename InputIt>
+  void append(InputIt first, InputIt last){
+    if constexpr(is_random_access_iterator_v<InputIt>){
+      size_t cnt = std::distance(first, last);      
+      check_length(cnt);
+      std::move(first, last, vec + len);
+      len += cnt;
+    } else {
+      std::move(first, last, std::back_inserter(*(this)));
+    }
+  }
   //Moves the last element out of the vector and returns it
   T pop(){
     //len < sz checks to see if len has wrapped around
@@ -125,7 +179,7 @@ struct svector {
       len = 0;
     }
   }
-  //Calling resize with no specific value will zero the new elements bytewise,
+  //Calling resize with no specific value will zero the new elements bytewise.
   void resize(size_type new_len){
     if(new_len < len){
       destruct(new_len, len);
@@ -136,7 +190,7 @@ struct svector {
       }
     }
     len = new_len;
-  } 
+  }
   void resize(size_type new_len, const T& val){
     if(new_len < len){
       destruct(new_len, len);
@@ -188,21 +242,27 @@ struct svector {
     len = sz = 0;
     return ret;
   }
-  //This function seems kinda silly, now that I look at it.
-  void give_memory(T *mem, ssize_t new_len, ssize_t new_sz = -1){
-    if(new_sz == -1){ new_sz = new_len; }
+  void give_memory(T *mem, size_t new_len, size_t new_sz = -1){
+    if(new_sz == (size_t)-1){ new_sz = new_len; }
     if(len > 0) { this->~svector(); }
     new(this) svector(mem, new_len, new_sz);
   }
   //Explictly change the length without modifying the contents.
   //new_len must be < capacity() && any elements added/removed due to
-  //the length change are not initialized/destructed.
+  //the length change are not touched.
   bool set_length(size_t new_len){
     if(new_len > sz){
       return false;
     } else {
       len = new_len;
+      return true;
     }
+  }
+  //Unlike give_memory this ignores the existing contents.
+  void set_contents(T *ptr, size_t new_len, size_t new_sz){
+    vec = ptr;
+    len = new_len;
+    sz = new_sz;
   }
 
   //Standard container functions

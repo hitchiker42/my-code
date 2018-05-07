@@ -26,6 +26,28 @@ using iter_traits_iterator_category =
   typename std::iterator_traits<It>::iterator_category;
 template <class It>
 using iter_traits_category = iter_traits_iterator_category<It>;
+
+template <class It>
+struct is_forward_iterator :
+    std::is_base_of<std::forward_iterator_tag,
+                    iter_traits_iterator_category<It>> {};
+template <class It>
+inline constexpr bool is_forward_iterator_v = is_forward_iterator<It>::value;
+
+template <class It>
+struct is_bidirectional_iterator :
+    std::is_base_of<std::bidirectional_iterator_tag,
+                    iter_traits_iterator_category<It>> {};
+template <class It>
+inline constexpr bool is_bidirectional_iterator_v = is_bidirectional_iterator<It>::value;
+
+template <class It>
+struct is_random_access_iterator :
+    std::is_base_of<std::random_access_iterator_tag,
+                    iter_traits_iterator_category<It>> {};
+template <class It>
+inline constexpr bool is_random_access_iterator_v = is_random_access_iterator<It>::value;
+  
 /*
   Functions for mapping over stl containers.
 */
@@ -659,6 +681,18 @@ template <typename Fn, typename U, typename ...Ts,
 U variadic_fold(Fn &&f, U acc, Ts&& ... Args){
   return variadic_fold_impl(f, acc, Args...);
 }
+template <typename Fn, typename T,
+          std::enable_if_t<std::is_invocable_v<Fn, T>, int> = 0>
+void variadic_for_each(Fn &&f, T val){
+  f(val);
+  return;
+}
+template <typename Fn, typename T, typename ...Ts,
+          std::enable_if_t<std::is_invocable_v<Fn, T>, int> = 0>
+void variadic_for_each(Fn &&f, T val, Ts&&... vals){
+  f(val);
+  return variadic_for_each_impl(f, vals...);
+};
 /*
   Useful generic function templates
 */
@@ -834,7 +868,9 @@ struct transform_iter {
   }
 //  template<std::enable_if_t<std::is_base_of_v<std::bidirectional_iterator_tag,
 //                                              iter_traits_category<It>>, int> = 0>
-
+  template<typename T = iter_traits_category<It>,
+           std::enable_if_t<std::is_base_of_v<std::bidirectional_iterator_tag,
+                                              T>, int> = 0>
   transform_iter& operator--(int){
     auto ret = *this;
     --iter;

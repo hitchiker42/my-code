@@ -5,6 +5,8 @@
 #include <optional>
 #include <string_view>
 #include <stdio.h>
+
+#if (defined NEED_FILESYSTEM_LIB)
 //Use either the C++17 filesystem library or the experimental filesytem
 //library if that's not available.
 #if __has_include(<filesystem>)
@@ -27,8 +29,14 @@ namespace fs {
   using path = std::string;
 }
 #endif //Filesystem
-#endif /* __FILESYSTEM_H__ */
+#else /* NEEED_FILESYSTEM_LIB_ */
+#define NO_FS_LIB
+namespace fs {
+  using path = std::string;
+}
+#endif
 //Simple RAII wrapper for a FILE* which closes the file on destruction.
+//implicitly convertible to a raw FILE*
 struct FILE_wrapper {
   FILE *f = nullptr;
   //Constructor doesn't throw if file fails to open (maybe it should?)
@@ -37,8 +45,8 @@ struct FILE_wrapper {
   FILE_wrapper(const char* path, const char* mode) noexcept
     : f{fopen(path, mode)} {};
 
-  FILE_wrapper(const fs::path& path, const char* mode) noexcept
-    : f{fopen(path.c_str(), mode)} {};
+  FILE_wrapper(std::string_view path, const char* mode) noexcept
+    : f{fopen(path.data(), mode)} {};
   //Takes ownership of the given FILE pointer.
   explicit FILE_wrapper(FILE *f) noexcept 
     : f{f} {};
@@ -82,6 +90,9 @@ struct FILE_wrapper {
   operator FILE*() const noexcept {
     return f;
   }
+  FILE* unwrap(){
+    return f;
+  }
 #if (defined unix) || (defined __unix) || (defined __unix__)
   int native_handle(){
     return fileno(f);
@@ -102,6 +113,13 @@ struct FILE_wrapper {
   }
   size_t read(void *ptr, size_t sz){
     return fread(ptr, 1, sz, f);
+  }
+  int getchar(){
+    return fgetc(f);
+  }
+  //Could store the last read char and default to ungetting that.
+  void ungetchar(int c){
+    ungetc(c, f);
   }
   FILE_wrapper& print(std::string_view sv){
     write(sv.data(), sv.size());
@@ -182,6 +200,7 @@ file_to_lines(const fs::path &path, char delim = '\n') noexcept;
 bool write_to_file(const fs::path &path, const std::string_view data);
 bool write_to_file(const fs::path &path,
                    std::initializer_list<std::string_view> data);
+#endif
 #if 0
 //TODO: Need to figure out how to do this efficently but still keep
 //it small enough to fit in the header.

@@ -1,99 +1,4 @@
 #include "util.h"
-#if (defined WHOREMASTER)
-#ifdef PLATFORM_UNIX
-#include <sys/stat.h>
-#else
-#ifndef PATH_MAX
-#ifdef MAX_PATH
-#define PATH_MAX MAX_PATH
-#else
-#define MAX_PATH 4096
-#endif // MAX_PATH
-#endif // PATH_MAX
-#endif // PLATFORM_UNIX
-static fs::path build_fs_path_slow(std::initializer_list<const char *> &comps);
-fs_path build_fs_path(std::initializer_list<const char *> comps){
-  //We build the path ourselves to avoid unecessary allocation.
-  //we allocate PATH_MAX bytes on the stack, this should be enough for
-  //most cases, if not we call another function which
-  //dynamically allocates enough memory.
-  char buf[PATH_MAX];
-  size_t used = 0;
-  for(auto s : comps){
-    size_t len = strlen(s);
-    if((used + len + 1) >= PATH_MAX){
-      return build_fs_path_slow(comps);
-    } else {
-      memcpy(buf + used, s, len);
-      used += len;
-      buf[used++] = '/';
-    }
-  }
-  //use a string_view to avoid redundant strlen in path constructor,
-  //subtract 1 from used to exclude the extra '/' we tacked on.
-  std::string_view v = std::string_view(buf, used-1);
-  return fs::path(v);
-}
-#ifdef PLATFORM_WINDOWS
-char *stpcpy(char *dest, const char *src){
-  size_t len = strlen(src);
-  //POSIX stpcpy copys the null byte
-  memcpy(dest, src, len+1);
-  return (dest + len);
-}
-#endif
-static fs::path build_fs_path_slow(std::initializer_list<const char *> &comps) {
-  size_t sz = comps.size();//the number of extra '/' characters.
-  for(auto s : comps){
-    sz += strlen(s);
-  }
-  char *buf = (char*)malloc(sz+1);
-  char *bufptr = buf;
-  for(auto s : comps){
-    //we can use this since we know buf is big enough (we allocated it afterall)
-    buf = stpcpy(buf, s);
-    *buf++ = '/';
-  }
-  std::string_view v = std::string_view(buf, sz-1);
-  fs::path p = fs::path(v);
-  free(buf);
-  return p;
-}
-#if (defined PLATFORM_WINDOOWS)
-bool get_fs_status(const fs_path &p, fs_status *st){
-  std::error_code ec;
-  bool ret = fs::status(p, ec);
-  return (ret && !ec);
-}
-bool fs_is_readable(const fs_status &st) {
-  return true;
-}
-bool fs_is_directory(const fs_status &st) {
-  return fs::is_directory(st);
-}
-bool fs_is_regular_file(const fs_status &st) {
-  return fs::is_regular_file(st);
-}
-#else
-bool get_fs_status(const fs_path &p, struct stat *st){
-  return !stat(p.c_str(), st);
-}
-bool fs_is_readable(const struct stat &st) {
-  //only checks user/other permission bits, checks execute bit
-  //for directories. Assumes if oth can read/execute so can user.
-  mode_t m = st.st_mode;
-  return (S_ISDIR(m) ?
-          ((m & S_IXOTH) || (st.st_uid & getuid() && (m & S_IXUSR))) :
-          ((m & S_IROTH) || (st.st_uid & getuid() && (m & S_IRUSR))));
-}
-bool fs_is_directory(const struct stat &st) {
-  return S_ISDIR(st.st_mode);
-}
-bool fs_is_regular_file(const struct stat &st) {
-  return S_ISREG(st.st_mode);
-}
-#endif
-#endif //WHOREMASTER
 
 std::string_view string_trim(const std::string &str,
                              const char* delim){
@@ -618,21 +523,7 @@ char* int_to_string(char *start, char *end,
   }
 }
 
-template <typename T> const char *printf_spec = nullptr;
-template <> const char *printf_spec<char> = "%c";
-template <> const char *printf_spec<signed char> = "%hhd";
-template <> const char *printf_spec<unsigned char> = "%hhu";
-template <> const char *printf_spec<int> = "%d";
-template <> const char *printf_spec<unsigned int> = "%u";
-template <> const char *printf_spec<long> = "%ld";
-template <> const char *printf_spec<unsigned long> = "%lu";
-template <> const char *printf_spec<long long> = "%lld";
-template <> const char *printf_spec<unsigned long long> = "%llu";
-template <> const char *printf_spec<size_t> = "%zu";
-template <> const char *printf_spec<ssize_t> = "%zd";
-template <> const char *printf_spec<double> = "%f";
-template <> const char *printf_spec<float> = "%f";
-template <> const char *printf_spec<void*> = "%p";
+
 
 template <typename T>
 char *to_chars_static(T val){

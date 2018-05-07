@@ -16,14 +16,19 @@
 #include <map>
 #include <type_traits>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <utility>
 #include <unordered_map>
 
 #include "macros.h"
 #include "templates.h"
-//#include "my_array.h"
-//#include "svector.h"
+#include "range.h"
+#include "my_array.h"
+#include "svector.h"
+using namespace std::literals::string_view_literals;
+using namespace std::literals::string_literals;
+
 /*
   Low level bit manipulation, using compiler intrinsics
 */
@@ -320,47 +325,21 @@ const std::string format_ordinal_number(long number);
 std::string_view string_trim(const std::string &str,
                              const char* delim = " \n\t");
 /*
-  Filesystem convience functions, maybe move to seperate header.
+  mempcpy and stpcpy for non gnuc compiliers.
 */
-#if (defined WHOREMASTER)
-#ifdef PLATFORM_WINDOWS
+#ifndef __GNUC__
 typedef fs::file_status fs_status;
+static inline void* mempcpy(void *dest, const void* src, size_t n){
+  memcpy(dest, src, n);
+  return dest + n;
+}
 //defined in util.cpp as a helper function, may as well export it.
-char *stpcpy(char *dest, const char *src);
-#else
-#include <sys/stat.h>
-typedef struct stat fs_status;
+static inline char* stpcpy(char *dest, const char *src){
+  size_t len = strlen(src);
+  return (char*)mempcpy(dest, src, len);
+} 
 #endif
-typedef fs::path fs_path;
-template<typename ... Components>
-fs_path build_fs_path(Components&& ... comps){
-  fs_path p;
-  //C++17 fold expression
-  return (p /= ... /= comps);
-}
-fs_path build_fs_path(std::initializer_list<const char *> comps);
-//Simple functions to test if a file is readable and if it's a directory
-//or a regular file. This is generally all we need to know.
-bool get_fs_status(const fs_path &p, fs_status *st);//doubles as existence test.
 
-bool fs_is_readable(const fs_status &st);
-static inline bool fs_is_readable(const fs_path &p){
-  fs_status st;
-  return (get_fs_status(p, &st) ? fs_is_readable(st) : false);
-}
-
-bool fs_is_directory(const fs_status &st);
-static inline bool fs_is_directory(const fs_path &p){
-  fs_status st;
-  return (get_fs_status(p, &st) ? fs_is_directory(st) : false);
-}
-
-bool fs_is_regular_file(const fs_status &st);
-static inline bool fs_is_regular_file(const fs_path &p){
-  fs_status st;
-  return (get_fs_status(p, &st) ? fs_is_directory(st) : false);
-}
-#endif
 //Convert a number into a string stored in a static buffer. This is
 //only meant to be used in cases where the result is immediately copied,
 //eg. by appending it to another string.
@@ -438,7 +417,7 @@ uint64_t fnv_hash(const T& key){
 }
     
 template<>
-uint64_t fnv_hash(const char* const& key){
+inline uint64_t fnv_hash(const char* const& key){
   return fnv_hash(key, strlen(key));
 }
 /*
@@ -545,84 +524,21 @@ struct cpu_timer {
 };
 }
 #endif /* NEED_TIMERS */
-#if 0
 namespace util {
-/*
-  A struct representing a date in a calendar with
-  12 months of 30 days each per year.
-  -Years are unbounded and can be negitive.
-  -day and month are normalized after any operation
-  -addition and subtraction operators are overloaded on integers
-    to adjust by day.
-*/
-struct simple_date {
-  int year = 0;
-  int month = 0;
-  int day = 0;
-  void normalize() {
-    if (day < 1) {
-      do {
-        day += 30;
-        month--;
-      } while (day < 1);
-    } else if (day > 30) {
-      do {
-        day -= 30;
-        month++;
-      } while (day > 30);
-    }
-    if(month < 1){
-      do {
-        month += 12;
-        year--;
-      } while(month < 1);
-    } else if (month > 12) {
-      do {
-        month -= 12;
-        year++;
-      } while(month > 12);
-    }
-  }
-  void adjust_day(int amt){
-    day += amt;
-    normalize();
-  }
-  void adjust_month(int amt){
-    month += amt;
-    normalize();
-  }
-  void adjust_year(int amt){
-    year += amt;
-  }
-  simple_date operator+= (int amt) {
-    adjust_day(amt);
-    return *this;
-  }
-  simple_date operator-= (int amt) {
-    //I'm not sure if the 'this->' is necessary or not.
-    return this->operator+=(-amt);
-  }
-  simple_date operator++() {
-    return this->operator+=(1);
-  }
-  simple_date operator++(int) {
-    auto ret = *this;
-    this->operator+=(1);
-    return ret;
-  }
-  simple_date operator--(int) {
-    auto ret = *this;
-    this->operator+=(-1);
-    return ret;
-  }
+template <typename T> inline const char *printf_spec = nullptr;
+template <> inline const char *printf_spec<char> = "%c";
+template <> inline const char *printf_spec<signed char> = "%hhd";
+template <> inline const char *printf_spec<unsigned char> = "%hhu";
+template <> inline const char *printf_spec<int> = "%d";
+template <> inline const char *printf_spec<unsigned int> = "%u";
+template <> inline const char *printf_spec<long> = "%ld";
+template <> inline const char *printf_spec<unsigned long> = "%lu";
+template <> inline const char *printf_spec<long long> = "%lld";
+template <> inline const char *printf_spec<unsigned long long> = "%llu";
+//template <> inline const char *printf_spec<size_t> = "%zu";
+//template <> inline const char *printf_spec<ssize_t> = "%zd";
+template <> inline const char *printf_spec<double> = "%f";
+template <> inline const char *printf_spec<float> = "%f";
+template <> inline const char *printf_spec<void*> = "%p";
 }
-enum class Number_Parse_Error {
-  SUCCESS = 0,
-  OVERFLOW,
-  UNDERFLOW,
-  INVALID
-};
-
-};
-#endif
-#endif
+#endif /* __UTIL_H__ */

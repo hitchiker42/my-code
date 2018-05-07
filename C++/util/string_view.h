@@ -33,9 +33,35 @@ struct string_view {
   typedef pointer iterator;
 
   const char* ptr;
+    //We could store the flag bits in the top 2 bits of the size, this
+  //would get us a 62 bit size type, at the cost of code complexity
+  //and overhead in masking/unmasking the flag bits.
+  // struct size_and_flags {
+  //   constexpr uint64_t mask = (0x3ull << 62);
+  //   uint64_t val;
+  //   size_and_flags(uint64_t sz, uint8_t flags)
+  //     : val{sz & (((uint64_t)flags) << 62)} {};
+  //   uint64_t size(){
+  //     return val & ~mask;
+  //   }
+  //   uint8_t flags(){
+  //     return (uint8_t)(val >> 62);
+  //   }
+  //   uint64_t set_size(uint64_t sz){
+  //     val &= mask; //clear old size
+  //     val |= sz; //set new size
+  //     return sz;
+  //   }
+  //   uint8_t set_flags(uint8_t flags){
+  //     val &= ~mask;
+  //     val |= ((uint64_t)flags << 62);
+  //   }
+  // };
+
   size_type sz;
   uint8_t flags;
   //int padding : 24;
+  //Maybe TODO: make flags into an enum.
   static constexpr uint8_t flag_owned = 0x1;
   static constexpr uint8_t flag_null_terminated = 0x2;
   static constexpr uint8_t flag_both = 0x3;
@@ -43,17 +69,17 @@ struct string_view {
   constexpr string_view() noexcept : ptr{nullptr}, sz{0}, flags{0} {}
   //This is the only constructor that lets you transfer ownership of memory
   //to a string_view, this is rarely useful outside of the move constructor.
-  constexpr string_view(const char *ptr, size_type sz, uint8_t flags) noexcept
-    : ptr{ptr}, sz{sz}, flags{flags} {}
+  constexpr string_view(const char *ptr, size_t sz, uint8_t flags) noexcept
+    : ptr{ptr}, sz{(size_type)sz}, flags{flags} {}
   //verison that takes a void* so we don't need to cast the
   //return value of malloc
-  constexpr string_view(void *ptr, size_type sz, uint8_t flags) noexcept
-    : ptr{(const char *)ptr}, sz{sz}, flags{flags} {}
-  //main constructor, potentially allocates a new string.
+  constexpr string_view(void *ptr, size_t sz, uint8_t flags) noexcept
+    : ptr{(const char *)ptr}, sz{(size_type)sz}, flags{flags} {}
+  //main constructor, allocates a new string if copy is true.
   //null_terminated as argument is only relevent if copy is false.
-  constexpr string_view(const char *ptr, size_type sz, bool copy = false,
+  constexpr string_view(const char *ptr, size_t sz, bool copy = false,
                         bool null_terminated = true) noexcept
-    : ptr{(copy ? copy_string(ptr, sz) : ptr)}, sz{sz},
+    : ptr{(copy ? copy_string(ptr, (size_type)sz) : ptr)}, sz{(size_type)sz},
       flags{(uint8_t)(copy | ((uint8_t)(null_terminated || copy) << 1))} {}
 
   //Copying a string_view to another string view implicitly will always
@@ -76,14 +102,15 @@ struct string_view {
   }
   string_view& operator=(string_view &&other) {
     this->~string_view();
-    new(this) string_view(other);
+    //Need to make sure to use std::move here (which is kinda weird).
+    new(this) string_view(std::move(other));
     return *this;
   }
 
-  //Constructing a string_view from a std::string, cstring, or
-  //std::string_view must be done explicitly (why?)
-  explicit constexpr string_view(const char* cstr, bool copy = false) noexcept
+  constexpr string_view(const char* cstr, bool copy = false) noexcept
     : string_view(cstr, constexpr_strlen(cstr), copy, true) {}
+  //Constructing a string_view from a std::string or
+  //std::string_view must be done explicitly (why?)
   explicit string_view(const std::string& str, bool copy = false) noexcept
     : string_view(str.data(), (size_type)str.size(), copy, true) {}
   //when using a string_view we can only guarantee that we're null terminated
@@ -155,6 +182,36 @@ struct string_view {
       return cmp_result;
     }
   }
+  int compare(const std::string &other) const {
+    return other.compare(this->to_std_string_view());
+  }
+  constexpr int compare(const std::string_view &other) const {
+    return other.compare(this->to_std_string_view());
+  }
+  constexpr int compare(const char *other) const {
+    size_t len = strlen(other);
+    int cmp_result = strncmp(data(), other, std::min(size(), len));
+    return (cmp_result ? cmp_result : three_way_compare(size(), len));
+  }
+  
+  friend bool operator==(const util::string_view& lhs, const std::string_view rhs){
+    return lhs.compare(rhs) == 0;
+  }
+  friend bool operator==(const std::string_view lhs, const util::string_view& rhs){
+    return rhs.compare(lhs) == 0;
+  }
+  friend bool operator==(const util::string_view& lhs, const std::string rhs){
+    return lhs.compare(rhs) == 0;
+  }
+  friend bool operator==(const std::string lhs, const util::string_view& rhs){
+    return rhs.compare(lhs) == 0;
+  }
+  friend bool operator==(const util::string_view& lhs, const char* rhs){
+    return lhs.compare(rhs) == 0;
+  }
+  friend bool operator==(const char* lhs, const util::string_view& rhs){
+    return rhs.compare(lhs) == 0;
+  }  
   #define do_cmp(lhs, rhs) lhs.compare(rhs)
   generate_comparison_operators_via_compare(string_view, do_cmp);
   #undef do_cmp
@@ -179,7 +236,7 @@ struct string_view {
 //string_view can't be a literal b/c of non-trival destructor.
 namespace literals {
 inline namespace string_literals {
-  string_view operator "" _sv(const char *str, size_t sz){
+  inline string_view operator "" _sv(const char *str, size_t sz){
     return string_view{str, string_view::size_type(sz), false, true};
   }
 }

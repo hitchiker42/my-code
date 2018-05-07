@@ -36,7 +36,8 @@ constexpr void constexpr_va_init(T *ptr, U val, Us ... Args){
      c-style or std::arrays you'd need a sentinal value or something similar
      to determine when an array ended).
    Emulating a vector, except with a fixed maximum size and allocated on
-     the stack.
+     the stack. Note however that regardless of the type it will be
+     treated as just bytes.
 */
 template<class T, size_t N>
 struct array {
@@ -69,10 +70,11 @@ struct array {
       *ptr++ = x;
     }
   }
+  /*
   template<typename ...Ts>
   explicit constexpr array(const Ts ... Args) : length(sizeof...(Ts)) {
     constexpr_va_init(arr, Args...);
-  }
+    }*/
     
   constexpr array(array&) = default;
   array& operator= (const array&) = default;
@@ -132,11 +134,11 @@ struct array {
   }
 
   constexpr iterator end() noexcept {
-    return iterator(data() + length);
+    return iterator(data() + size());
   }
 
   constexpr const_iterator end() const noexcept {
-    return const_iterator(data() + length);
+    return const_iterator(data() + size());
   }
 
   constexpr reverse_iterator rbegin() noexcept {
@@ -179,7 +181,10 @@ struct array {
   constexpr size_type max_size() const noexcept {
     return N;
   }
-
+  //Different idea of capacity than std::vector.
+  constexpr size_type capacity() const noexcept {
+    return (max_size() - size());
+  }
   constexpr bool empty() const noexcept {
     return size() == 0;
   }
@@ -219,6 +224,9 @@ struct array {
   constexpr const_pointer data() const noexcept {
     return arr;
   }
+  constexpr void clear() noexcept {
+    length = 0;
+  }
   //Returns false if val could not be inserted because length == N
   bool push_back(const T &val) {
     if(length == N){
@@ -240,6 +248,18 @@ struct array {
   }
   T pop(){
     return arr[--length];
+  }
+  //explicitly set length.
+  bool set_length(size_t len){
+    assert(len <= max_size());
+    length = len;
+    
+    // if(len > max_size()){
+    //   return false;
+    // } else {
+    //   length = len;
+    //   return true;
+    // }
   }
 };
 template<typename ... Ts>
