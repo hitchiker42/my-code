@@ -13,6 +13,36 @@ static constexpr std::string_view sql_insert_vn =
         @votecount, @screens, @staff, "[]", "[]" ,"[]",
         -1, -1, @date, 0)EOF"sv;
 
+//add a vn given as json into the database
+//This will probably be a member function so stmt will likely
+//not be a parameter but a member variable.
+int sqlite_insert_vn(json vn, sqlite3_stmt_wrapper& stmt){
+  int idx = 0;
+  stmt.bind(idx++, vn["id"].get<int>())
+  stmt.bind(idx++, vn["title"].get_ref<json::string_t>());
+  stmt.bind(idx++, vn["original_title"].get_ref<json::string_t>());
+  stmt.bind(idx++, vn["date"].get<json::string_t>());
+  stmt.bind(idx++, vn["languages"]);
+  stmt.bind(idx++, vn["orig_lang"]);
+  stmt.bind(idx++, vn["platforms"]);
+  stmt.bind(idx++, vn["aliases"].get<json::string_t>());
+  stmt.bind(idx++, vn["length"].get<int>());
+  stmt.bind(idx++, vn["description"].get<json::string_t>());
+  stmt.bind(idx++, vn["links"]);
+  stmt.bind(idx++, vn["image_link"].get<json::string_t>());
+  stmt.bind(idx++, vn["image_nsfw"].get<json::boolean_t>());
+  stmt.bind(idx++, vn["anime"]);
+  stmt.bind(idx++, vn["relations"]);
+  stmt.bind(idx++, vn["tags"]);
+  stmt.bind(idx++, vn["popularity"].get<int>());
+  stmt.bind(idx++, vn["rating"].get<int>());
+  stmt.bind(idx++, vn["votecount"].get<int>());
+  stmt.bind(idx++, vn["screens"]);
+  stmt.bind(idx++, vn["staff"]);
+  //PLACEHOLDER: this should bind the current date/time.
+  stmt.bind(idx++, gettimeofday());
+}
+  
 //Get the current row that stmt refers to, will all values converted to strings.
 static vector<string> sqlite3_stmt_get_row(sqlite3_stmt* stmt){
   int ncols = sqlite3_data_count(stmt);
@@ -58,6 +88,14 @@ int sqlite3_stmt_bind(sqlite3_stmt *stmt, int idx, int64_t val){
 }
 int sqlite_stmt_bind(sqlite3_stmt *stmt, int idx, std::string_view sv){
   return sqlite3_bind_text(stmt, idx, sv.data(), sv.size(), SQLITE_TRANSIENT);
+}
+int sqlite_stmt_bind(sqlite3_stmt *stmt, int idx, json j){
+  util::svector<char> buf;
+  auto it = std::back_inserter(buf);
+  json.write(it);
+  size_t sz = buf.size();
+  const char* str = buf.take_memory();
+  return sqlite3_bind_text(stmt, idx, str, sz, free);
 }
 template<typename T>
 int sqlite_stmt_named_bind(sqlite3_stmt *stmt, std::string_view name, T val){
