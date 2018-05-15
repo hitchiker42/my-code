@@ -26,12 +26,6 @@
 *.xz
 *.tgz
 
-# Logs and databases #
-######################
-*.log
-*.sql
-*.sqlite
-
 # OS generated files #
 ######################
 .DS_Store
@@ -67,3 +61,7 @@ Makefile.in
 .\#*
 
 # This dir#
+
+# Ignore postscript/pdf files 
+*.pdf
+*.ps

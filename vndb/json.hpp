@@ -948,6 +948,16 @@ void from_json(const BasicJsonType& j, typename BasicJsonType::string_t& s)
     }
     s = *j.template get_ptr<const typename BasicJsonType::string_t*>();
 }
+//Add string view conversion
+template<typename BasicJsonType>
+void from_json(const BasicJsonType& j, typename BasicJsonType::string_view_t& s)
+{
+    if (JSON_UNLIKELY(!j.is_string()))
+    {
+        JSON_THROW(type_error::create(302, "type must be string, but is " + std::string(j.type_name())));
+    }
+    s = *j.template get_ptr<const typename BasicJsonType::string_view_t*>();
+}
 
 template<typename BasicJsonType>
 void from_json(const BasicJsonType& j, typename BasicJsonType::number_float_t& val)
@@ -10243,6 +10253,9 @@ class basic_json
     */
     using string_t = StringType;
 
+//Hack to add string_view type
+    using string_view_t = std::string_view;
+
     /*!
     @brief a type for a boolean
 
@@ -12076,6 +12089,11 @@ class basic_json
     {
         return is_string() ? m_value.string : nullptr;
     }
+    /// get a pointer to the value (string_view)
+    constexpr const string_view_t* get_impl_ptr(const string_view_t* /*unused*/) const noexcept
+    {
+      return is_string() ? static_cast<string_view_t>(m_value.string) : nullptr;
+    }
 
     /// get a pointer to the value (boolean)
     boolean_t* get_impl_ptr(boolean_t* /*unused*/) noexcept
@@ -12394,6 +12412,7 @@ class basic_json
             std::is_same<object_t, pointee_t>::value
             or std::is_same<array_t, pointee_t>::value
             or std::is_same<string_t, pointee_t>::value
+            or std::is_same<string_view_t, pointee_t>::value
             or std::is_same<boolean_t, pointee_t>::value
             or std::is_same<number_integer_t, pointee_t>::value
             or std::is_same<number_unsigned_t, pointee_t>::value
@@ -12426,6 +12445,7 @@ class basic_json
             std::is_same<object_t, pointee_t>::value
             or std::is_same<array_t, pointee_t>::value
             or std::is_same<string_t, pointee_t>::value
+            or std::is_same<string_view_t, pointee_t>::value
             or std::is_same<boolean_t, pointee_t>::value
             or std::is_same<number_integer_t, pointee_t>::value
             or std::is_same<number_unsigned_t, pointee_t>::value

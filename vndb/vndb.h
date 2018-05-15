@@ -20,21 +20,27 @@
 #include "string_buf.h"
 #include "filesystem.h"
 #include "json.hpp"
+
 static SSL_CTX* vndb_ctx;
 bool init_vndb_ssl_ctx();
 void free_vndb_ssl_ctx();
 
 using string_buf = util::string_buf;
 
+//json aliases
 namespace json_ns = nlohmann;
 using json = json_ns::basic_json<>;
 using json_parser = json_ns::detail::parser<json>;
+//json null constant, for convience.
 static const json json_null = json(json::value_t::null);
-//Constants for the hostname, ports and login command.
+//Constants for the hostname & ports
 static constexpr const char* vndb_port_number = "19534";
 static constexpr const char* vndb_tls_port_number = "19535";
 static constexpr const char* vndb_hostname = "api.vndb.org";
+//default name for the database file
+static constexpr const char* default_db_file = "vn.db";
 
+//struct dealing with SSL details.
 struct BIO_wrapper {
   BIO* bio = NULL;
   BIO_wrapper() = default;
@@ -67,8 +73,9 @@ enum class object_type {
   staff
 };
 }
+//Struct dealing with communication with the vndb server.
 struct vndb_connection {
-  static constexpr char EOT = 0x4; // message terminator 
+  static constexpr char EOT = 0x4; // message terminator
   BIO_wrapper bio;
   string_buf buf;
   std::string username;
@@ -89,7 +96,7 @@ struct vndb_connection {
   //server, and read the results. If more than one page of results
   //is available repeat until there are no more results left.
   //The value returned from the server is checked for errors.
-  //returns number of results, or -1 on error, on error any 
+  //returns number of results, or -1 on error, on error any
   //results already retrieved are kept.
   int send_get_command(std::vector<json>& results,
                        util::string_view sort_by = "id");
@@ -130,10 +137,12 @@ struct vndb_connection {
   }
   json dbstats();
 };
+
+//struct dealing with generic sqlite connection.
 struct sqlite3_wrapper {
   sqlite3 *db;
   //Set to the result of the last sqlite function
-  int err = SQLITE_OK;
+  int db_err = SQLITE_OK;
   sqlite3_wrapper(std::string_view filename,
                   int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE){
     err = sqlite3_open_v2(filename.data(), &db, flags, NULL);
@@ -141,18 +150,347 @@ struct sqlite3_wrapper {
   ~sqlite3_wrapper(){
     sqlite3_close(db);
   }
+  //Conversion to bool to check for error
   operator bool(){
-    return err != SQLITE_OK;
+    return db_err != SQLITE_OK;
   }
+  //implicit conversion to underlying pointer
   operator sqlite3*(){
     return db;
   }
+  //Gets the last result from a sqlite3 call in a member function,
+  //usually this is used to get an error code. But it will return
+  //SQLITE_OK if the last function was successful.
+  int err() const {
+    return db_err;
+  }
+  //Gets the last error from any function that uses this connection,
+  //undefined if the last function was successful.
+  int errcode() const {
+    return sqlite3_errcode(db);
+  }
+  //gets the string version of errcode();
+  const char* errmsg(){
+    return sqlite3_errmsg(db);
+  }
+  //errstr gets string version of this->err
+  const char* errstr(){
+    return sqlite3_errstr(db_err);
+  }
+  //get the string version of the given error code.
+  static const char* errstr(int errno){
+    return sqlite3_errstr(errno);
+  }
+  //evaluate the sql in 'sql', the sql is executed for side effects only.
+  int exec(const char *sql){
+    return sqlite3_exec(db, sql, NULL, NULL);
+  }
+  int begin_transaction(){
+    return exec("BEGIN TRANSACTION;");
+  }
+  int rollback_transaction(){
+    return exec("ROLLBACK TRANSACTION;");
+  }
+  int commit_transaction(){
+    return exec("COMMIT TRANSACTION;");
+  }
+  int set_read_only(){
+    return exec("PRAGMA query_only = true");
+  }
+  int clear_read_only(){
+    return exec("PRAGMA query_only = false");
+  }
+  int toggle_read_only(bool toggle){
+    return (toggle ? set_read_only() : clear_read_only());
+  }
+  sqlite3_stmt_wrapper prepare_stmt(const std::string_view& sv){
+    
+    return prepare_stmt(sv.data(), sv.size(), nullptr);
+  }
+  sqlite3_stmt_wrapper prepare_stmt(const char* sql, int len = -1,
+                                    const char** tail = nullptr){
+    sqlite3_stmt *stmt;
+    db_err = sqlite3_prepare(db, sql, len, &stmt, tail);
+    return sqlite3_stmt_wrapper(stmt);
+  }
 };
 struct sqlite3_stmt_wrapper {
-  sqlite3_stmt* stmt;
-  sqlite3_stmt_wrapper(std::string_view sql, sqlite3* db);
-  
+  sqlite3_stmt* stmt = nullptr;
+  sqlite3_stmt_wrapper(sqlite3_stmt *stmt) : stmt{stmt} {}
+  //apperently if you have a null terminated string including it in the
+  //size will be faster. so keep that in mind.
+  sqlite3_stmt_wrapper(std::string_view sql, sqlite3* db,
+                       bool persistant = false){
+    sqlite3_prepare_v3(db, sql.data(), sql.size(),
+                       (persistant ? SQLITE_PREPARE_PERSISTANT : 0),
+                       &stmt, nullptr);
+  }
+  //if 'sql' contains multiple sql stamtement this should be used,
+  //it will modify 'sql' so it contains the unused portion of it's 
+  //original value.
+  sqlite3_stmt_wrapper(std::string_view *sql, sqlite3* db,
+                       bool persistant = false){
+    char *tail;
+    int err = sqlite3_prepare_v3(db, sql.data(), sql.size(),
+                                 (persistant ? SQLITE_PREPARE_PERSISTANT : 0),
+                                 &stmt, &tail);
+    if(err == SQLITE_OK){
+      std::string_view sql_tail(tail, sql.size() - (tail - sql.data()));
+      *sql = sql_tail;
+    }
+  }
+  //same parameters as underlying sqlite function,
+  //Conversion to bool to check for error
+  operator bool(){
+    return stmt;
+  }
+  //implict conversion to underlying pointer
+  operator sqlite3*(){
+    return stmt;
+  }
+  //This is convient but doesn't offer a way to tell between an error
+  //and successful terminaton.
+  bool step(){
+    int res = sqlite3_step(stmt);
+    return res == SQLITE_ROW;
+  }
+  //returns SQLITE_OK (0) if there were no errors in step, and nonzero
+  //if the last step caused an error. So you need to check the return
+  //value of this to test for error.
+  int reset(){
+    int ret = sqlite3_reset(stmt);
+    //Not sure what happens when you call this after an error
+    //but I doubt it'll do anything that bad.
+    sqlite3_clear_bindings(stmt);
+    return ret;
+  }
+  //there's no need to call this since the destructor will do it for you,
+  //but it can be called manualy to check for errors.
+  int finalize(){
+    int ret = sqlite3_finalize(stmt);
+    //Make sure to set stmt to NULL to prevent the destructor
+    //from causing a double free.
+    stmt = nullptr;
+    return ret;
+  }
+  //Run this statement to completion for side effects only
+  int exec(bool should_reset = true){
+    while((err = sqlite3_step(stmt)) == SQLITE_ROW); //execute the sql
+    if(should_reset){
+      return reset();
+    } else {
+      return (err == SQLITE_DONE ? SQLITE_OK : err);
+    }
+  }
+  //Convience function to execute a complete statement, the callback
+  //is given '*this' as its argument. returns SQLITE_OK on success,
+  //or an error code if there was an error, returns SQLITE_ABORT if
+  //the callback returns a non-zero value, like sqlite3_exec does.
+  int exec(std::function<int(sqlite_stmt_wrapper&)> &f,
+           bool should_reset = true){
+    int err;
+    while((err = sqlite3_step(stmt)) == SQLITE_ROW){
+      err = f(*this);
+      if(err != 0){ return SQLITE_ABORT; }
+    }
+    //Don't just return err, since on success it will be SQLITE_DONE,
+    //which is non-zero, and we want to return 0 on success.
+    if(should_reset){
+      return reset();
+    } else {
+      return (err == SQLITE_DONE ? SQLITE_OK : err);
+    }
+  }
+  //Convience function to execute a complete statement, follows
+  //the api of the builtin sqlite3_exec, with the char**s replaced
+  //with vectors of std::string_views, the views need to be copied
+  //if you want to save the text.
+  int exec(std::function<int(int, std::vector<std::string_view>&,
+                             std::vector<std::string_view>&)> &f,
+           bool should_reset = true){
+    int err;
+    std::vector<std::string_view> row_text, row_names;
+    while((err = sqlite3_step(stmt)) == SQLITE_ROW){
+      row_text = get_row_text(row_text);
+      row_names = get_row_names(row_names);
+      err = f(get_ncolumns(), row_text, row_names);
+      if(err != 0){ return SQLITE_ABORT; }
+    }
+    if(should_reset){
+      return reset();
+    } else {
+      return (err == SQLITE_DONE ? SQLITE_OK : err);
+    }
+  }
+  //Same as above but without the column names.
+  int exec(std::function<int(int, std::vector<std::string_view>&)> &f,
+           bool should_reset = true){
+    int err;
+    std::vector<std::string_view> row_text;
+    while((err = sqlite3_step(stmt)) == SQLITE_ROW){
+      row_text = get_row_text(row_text);
+      err = f(get_ncolumns(), row_text);
+      if(err != 0){ return SQLITE_ABORT; }
+    }
+    if(should_reset){
+      return reset();
+    } else {
+      return (err == SQLITE_DONE ? SQLITE_OK : err);
+    }
+  }
+  //base template for getting columns, specializations are below.
+  template<typename T>
+  T get_column(int idx);
+  template<typename T>
+  T get_column_default(int idx, const T deflt){
+    return (sqlite_column_type(stmt, idx) == SQLITE_NULL ?
+            deflt : get_column<T>(idx));
+  }
+  //Get the number of columns in the current row.
+  int get_ncolumns(){
+    return sqlite3_data_count(stmt);
+  }
+  //returns a vector of all the columns of the current row converted into
+  //text. The text is not copied so is only valid until the next call
+  //to step (or reset/finalize).
+  //by default sql nulls are translated into nullptrs, but nullstr can
+  //be used to provide an alternate value (i.e "NULL").
+  std::vector<std::string_view> get_row_text(const char *nullstr = nullptr){
+    std::vector<std::string_view> ret;
+    return get_row_text(ret, nullstr);
+  }
+  std::vector<std::string_view>& get_row_text(std::vector<std::string_view>& row,
+                                         const char *nullstr = nullptr){
+    int ncols = sqlite3_data_count(stmt);
+    row.clear();
+    if(ncols <= 0){
+      return row;
+    }
+    row.reserve(ncols);
+    std::string_view nullsv;
+    if(nullstr){
+      nullsv = std::string_view(nullstr, strlen(nullstr));
+    }
+    for(int i = 0; i < ncols; i++){
+      const char *str = sqlite3_column_text(stmt, i);
+      if(str){
+        row.emplace_back(str, sqlite3_column_bytes(stmt, i));
+      } else {
+        row.emplace_back(nullsv);
+      }
+    }
+    return row;
+  }
+  std::vector<std::string_view> get_row_names(){
+    std::vector<std::string_view> ret;
+    return get_row_names();
+  }
+  std::vector<std::string_view>& get_row_names(std::vector<std::string_view>& row){
+    int ncols = sqlite3_data_count(stmt);
+    row.clear();
+    for(int i = 0; i < ncols; i++){
+      row.emplace_back(sqlite3_column_name(stmt, i));
+    }
+    return row;
+  }
+  //Single overloaded function to replace the sqlite_bind_type functions.
+  int bind(int idx, double val){
+    return sqlite3_bind_double(stmt, idx, val);
+  };
+  int bind(int idx, int val){
+    return sqlite3_bind_int(stmt, idx, val);
+  }
+  int bind(int idx, int64_t val){
+    return sqlite3_bind_int64(stmt, idx, val);
+  }
+  int bind(int idx, uint64_t val){
+    return sqlite3_bind_int64(stmt, idx, val);
+  }
+  //This works for any string type, but always makes a copy
+  int bind(int idx, std::string_view sv){
+    return sqlite3_bind_text(stmt, idx, sv.data(), sv.size(), SQLITE_TRANSIENT);
+  }
+  int bind_null(int idx){
+    return sqlite3_bind_null(stmt, idx);
+  }
+  //bind a potentially null pointer, if ptr == nullptr, the index is bound
+  //to NULL, otherwise it is bound to *ptr
+  template<typename T>
+  int bind(int idx, const T* ptr){
+    if(ptr){
+      return bind(idx, *ptr);
+    } else {
+      return bind_null(idx);
+    }
+  }
+  //direct access to sqlite_bind_text to allow binding a static string
+  //or transfering ownership of a string to sqlite.
+  int bind(int idx, const char* str, int len,
+           void(*destroy)(void*)){
+    return sqlite3_bind_text(stmt, idx, str, len, destroy);
+  }
+  //bind json by converting it into a string.
+  int bind(int idx, json j){
+    if(j.is_null()){
+      return bind_null();
+    }
+    util::svector<char> buf;
+    auto it = std::back_inserter(buf);
+    json.write(it);
+    size_t sz = buf.size();
+    //Transfer ownership of the string to sqlite.
+    const char* str = buf.take_memory();
+    return sqlite3_bind_text(stmt, idx, str, sz, free);
+  }
+  template<typename T>
+  int bind_name(std::string_view name, T val){
+    sqlite3_stmt_bind(stmt, sqlite3_bind_parameter_index(stmt, name.data()), val);
+  }
+  template<typename T>
+  int multibind_impl(int idx, T val){
+    return bind(idx, val);
+  }
+  template<typename T, typename ... Ts>
+  int multibind_impl(int idx, T val, Ts&&... rest){
+    int err = bind(idx, val);
+    if(err != SQLITE_OK){
+      return err;
+    } else {
+      return multibind_impl(stmt, idx+1, rest...);
+    }
+  }
+  template<typename ... Ts>
+  int multibind(Ts&& ... args){
+    return multibind_impl(stmt, 0, std::forward<Ts>(args)...);
+  }
 };
+template<>
+inline int sqlite3_stmt_wrapper::get_column(int idx){
+  return sqlite3_column_int(this->stmt, idx);
+}
+template<>
+inline double sqlite3_stmt_wrapper::get_column(int idx){
+  return sqlite3_column_double(this->stmt, idx);
+}
+template<>
+inline int64_t sqlite3_stmt_wrapper::get_column(int idx){
+  return sqlite3_column_int64(this->stmt, idx);
+}
+//Be careful this returns a nullptr if the column is NULL.
+template<>
+inline const char* sqlite3_stmt_wrapper::get_column(int idx){
+  return static_cast<const char*>(sqlite3_column_text(this->stmt, idx));
+}
+template<>
+inline std::string_view sqlite3_stmt_wrapper::get_column(int idx){
+  return std::string_view(this->get_column<const char*>(idx),
+                          sqlite3_column_bytes(this->stmt, idx));
+}
+template<>
+inline json sqlite3_stmt_wrapper::get_column(int idx){
+  return json::parse(this->get_column<std::string_view>(idx));
+}
+
 namespace vndb {
 using string = std::string;
 using date = string;
@@ -167,29 +505,32 @@ using vector = std::vector<T>;
 };*/
 //Things stored here as json could be changed to use a more specific datatype
 struct VN {
+  VN() = default;
+  VN(json);
+  VN(sqlite3_stmt_wrapper&);
   //Values obtained from vndb get vn command.
   int id;
   string title;
-  string original_title = "";
+  string original;// = "";
   date released;
   //Could probably get rid of these next 3
-  json languages{json::value_t::array};
-  json orig_lang{json::value_t::array};
-  json platforms{json::value_t::array};
-  string aliases = "";
-  int length = 0;
-  string description = "";
-  json links{json::value_t::object};//could probably remove.
-  string image_link = "";
+  json languages;
+  json orig_lang;
+  json platforms;
+  string aliases;// = "";
+  int length;// = 0;
+  string description;// = "";
+  json links;//{json::value_t::object};//could probably remove.
+  string image;// = "";
   bool image_nsfw;
-  json anime{json::value_t::array};//could probably remove.
-  json relations{json::value_t::array};
-  json tags{json::value_t::array};
+  json anime;//{json::value_t::array};//could probably remove.
+  json relations;//{json::value_t::array};
+  json tags;//{json::value_t::array};
   int popularity;
   int rating;
   int votecount;
-  json screens{json::value_t::array};
-  json staff{json::value_t::array};
+  json screens;//{json::value_t::array};
+  json staff;//{json::value_t::array};
   //Values from other vndb get commands.
   //Stored in SQL table as json arrays.
   vector<int> releases;
@@ -200,7 +541,7 @@ struct VN {
   json list_info;
   //Extra info
   date last_cached;
-  int times_accessed = 0;  
+  int times_accessed;// = 0;
 };
 //For my purposes releases aren't really that important, but
 //they are the only way to connect vns and producers using the vndb api.
@@ -216,10 +557,13 @@ struct Release {
 struct Producer {
   int id;
   string name;
-  string original_name = "";
+  string original = "";
   string type; //amateur/profesional
+  //string language; //primary language
+  //json links; //link to homepage and/or wikipedia, or neither
   vector<string> aliases; //maybe change to json
-  json relations{json::value_t::object};
+  //string description.
+  json relations{json::value_t::object};//related producers
 };
 struct Character {
   //There are lots of details that vndb stores we don't really care about
@@ -257,7 +601,7 @@ struct Tag {
   vector<int> parents;
 };
 struct Trait {
-  
+
 struct vndb_object {
   object_type type;
   union {
@@ -267,7 +611,7 @@ struct vndb_object {
     Character *character;
     Staff *staff;
   };
-    
+
 }
 */
 #endif /* __VNDB_H__ */
