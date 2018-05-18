@@ -3131,7 +3131,7 @@ class parser
     /// a parser reading from an input adapter
     explicit parser(detail::input_adapter_t adapter,
                     const parser_callback_t cb = nullptr,
-                    const bool allow_exceptions_ = true)
+                    const bool allow_exceptions_ = false)
         : callback(cb), m_lexer(adapter), allow_exceptions(allow_exceptions_)
     {}
 
@@ -3163,7 +3163,7 @@ class parser
         // in case of an error, return discarded value
         if (errored)
         {
-            result = value_t::discarded;
+          result = value_t::discarded;
             return;
         }
 
@@ -3179,9 +3179,30 @@ class parser
     bool at_eof(){
       return last_token == token_type::end_of_input;
     }
+    bool test_eof(){
+      get_token;
+      return last_token == token_type::end_of_input;
+    }
     void init(){
       get_token();
     }
+  //Try to parse a value, return false if parsing failed, use when
+  //you're not sure if the input is json and it's ok if it's not.
+    bool try_parse(BasicJsonType& result, const bool strict = true){
+      get_token();
+      parse_internal(true, result);
+      if (errored){
+        goto error;
+      }
+      if(strict && test_eof()){
+        goto error;
+      }
+      return true;
+     error:
+      result = value_t::discarded;
+      return false;
+    }
+  
     BasicJsonType parse(const bool strict = true){
       BasicJsonType ret;
       parse(strict, ret);

@@ -1,10 +1,11 @@
 #include "vndb.h"
+#include "sql.h"
 //Get 100 VNs from server and write into outfile
 bool test_connection(const char *outfile, int start = 1){
   vndb_connection conn;
   if(!conn.logged_in){
     if(conn.error){
-      fprintf(stderr, "Error failed to login with error:\n");      
+      fprintf(stderr, "Error failed to login with error:\n");
       json err = conn.get_error();
       err.print(stdout);
     } else {
@@ -33,7 +34,48 @@ bool test_connection(const char *outfile, int start = 1){
   vns.print(f.unwrap());
   return true;
 }
-int main(int argc, char* argv[]){
+//Read a list of vns as json from a file (likely created as a result of
+//the above test_connection function) and insert them into the given database.
+//stmt needs to be a statement to insert a vn.
+bool test_insert_vns(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
+                     const char *json_file){
+  FILE_wrapper f(json_file, "r");
+  if(!f){
+    fprintf(stderr, "Error opening %s\n", json_file);
+    return false;
+  }
+  fprintf(stderr, "Parsing json file\n");
+  json vns_json = json::parse(f);
+  if(vns_json.is_null()){
+    fprintf(stderr, "Error parsing json\n");
+    return false;
+  }
+  //It's assumed that there are 100 VNs, but its written
+  //to support any number.
+  json::array_t &vns = vns_json.get_ref<json::array_t>();
+  int num_vns = vns.size();
+  int err = SQLITE_OK;
+  //insert first 10 as indivual insert statements.
+  fprintf(stderr, "Begining to insert VNs.\n");
+  for(int i = 0; i < std::min(10, num_vns); i++){
+    if((err = sqlite_insert_vn(vns[i], stmt)) != SQLITE_OK){ goto error; }
+  }
+  fprintf(stderr, "Inserted first 10 VNs.\n");
+  //Insert the rest of the vns using transactions, 10 vns per transaction.
+  for(int i = 10; i < num_vns; i+=10){
+    if((err = db.begin_transaction()) != SQLITE_OK){ goto error; }
+    for(int j = i; j < std::min(num_vns, i + 10); j++){
+      if((err = sqlite_insert_vn(vns[j], stmt)) != SQLITE_OK){ goto error; }
+    }
+    if((err = db.commit_transaction()) != SQLITE_OK){ goto error; }
+  }
+  fprintf(stderr, "Finished inserting VNs.\n");
+  return true;
+ error:
+  db.print_errmsg("Recieved sqlite error");
+  return false;
+}
+int run_connection_test(){
   if(!init_vndb_ssl_ctx()){
     fprintf(stderr, "Error, failed to initialize ssl context\n");
     return -1;
@@ -48,12 +90,36 @@ int main(int argc, char* argv[]){
   printf("Test seemed to succeed, results in %s\n",outfile);
   return 0;
 }
+int run_insertion_test(){
+  sqlite3_wrapper db("test.db");
+  FILE_wrapper db_init(db_init_file, "r");
+  if(!db_init){
+    fprintf(stderr, "Error opening %s\n", db_init_file);
+    return -1;
+  }
+  std::string init_sql = db_init.to_string();
+  if(db.exec(init_sql.c_str()) != SQLITE_OK){
+    db.print_errmsg("Error initializing datbase");
+    return -1;
+  }
+  sqlite3_stmt_wrapper stmt = dp.prepare_stmt(sql_insert_vn);
+  if(!stmt){
+    db.print_errmsg("Error compiling sql statement");
+    return -1;
+  }
+  //negate return value since 0 is success for the shell.
+  return !test_insert_vns(db, stmt, "conn_test.out");
+}
+int main(int argc, char* argv[]){
+  return run_insertion_test();
+}
+
 #if 0
 int main(int argc, char* argv[]){
 
   /*
-    Simple interactive loop, read until we encounter a semicolon, it's not 
-    the most elegent solution but it allows multi-line commands without 
+    Simple interactive loop, read until we encounter a semicolon, it's not
+    the most elegent solution but it allows multi-line commands without
     having to actually parse the input.
 
     Input takes the form of: <command> <arguments>*
@@ -67,7 +133,7 @@ int main(int argc, char* argv[]){
 
     TODO: need commands to modify vnlist/wishlist, which will
       require an active vndb connection.
-    
+
     variables are fairly simple, the only operations you can perform
     on a variable are to print it or access a part of it.
 
@@ -101,7 +167,7 @@ int main(int argc, char* argv[]){
       util::string_view sv = buf.move_to_string_view();
       //Unset the owned flag of sv so it doesn't get freed.
       add_history(str.data());
-      
+
       //Exectute whatever command was in sv & print the results or whatever.
     }
   }

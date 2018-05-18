@@ -39,7 +39,7 @@ times_accessed integer default 0
 -- for sorting by title, which we often want to do
 create index if not exists VN_title_idx on VNs (title);
 create index if not exists VN_date_idx on VNs (released);
-create index if not exists VN_rating on VNs (reating);
+create index if not exists VN_rating on VNs (rating);
 
 create table if not exists  producers (
 id integer primary key not null,
@@ -52,6 +52,7 @@ aliases string,
 description text,
 relations json
 );
+create index if not exists producer_name_idx on producers (name);
 
 create table if not exists releases (
 id integer primary key not null,
@@ -100,11 +101,12 @@ category string not null,
 aliases json not null, -- array of strings
 parents json not null -- array of ints
 );
+create index if not exists tag_name_idx on tags(name);
 
 create table if not exists  traits (
 id integer primary key not null,
 name text not null,
-canonical_name text unique not null,
+full_name text unique not null,
 description text not null,
 meta bool not null,
 -- may replace with array of ints
@@ -112,6 +114,8 @@ chars integer not null,
 aliases json not null, -- array of strings
 parents json not null -- array of ints
 );
+create index if not exists traits_name_idx on traits(name);
+create index if not exists traits_full_name_idx on traits(full_name);
 
 --table which relates vns and tags
 create table if not exists vn_tags (

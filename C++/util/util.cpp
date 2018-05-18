@@ -1,5 +1,4 @@
 #include "util.h"
-
 std::string_view string_trim(const std::string &str,
                              const char* delim){
   const char *begin = str.data();
@@ -132,6 +131,7 @@ static int string_compare_natural_nondigits(const char *a, const char *b,
     return *a - *b;
   }
 }
+#if 0
 std::string format_countable_noun(const std::string &article,
                                   const std::string &noun, int count,
                                   const std::string &plural){
@@ -328,6 +328,7 @@ const std::string format_ordinal_number (long number) {
     }
   }
 }
+#endif
 bool strtol_checked(long *value, const char *str,
                     const char** endptr = nullptr, int base = 0){
   errno = 0;

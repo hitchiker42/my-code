@@ -177,6 +177,11 @@ T find_or_default(const Container<T>& container, const T& val,
     return (*it);
   }
 }
+template< class ForwardIt1, class ForwardIt2 >
+ForwardIt1 find_first_of_not(ForwardIt1 first, ForwardIt1 last,
+                             ForwardIt2 s_first, ForwardIt2 s_last){
+  return find_first_of(first, last, s_first, s_last, std::not_equal_to<>());
+}
 //Version which takes a container
 template<class T, class U = typename T::value_type>
 ssize_t position(const T& container, const U& value){
@@ -709,7 +714,30 @@ template<typename T, typename U,
 const U convert(const T arg){
   return static_cast<U>(arg);
 }
-
+template<typename T, typename U, typename V>
+std::function<T(V,U)> flip(const std::function<T(U,V)> &fn){
+  return [&fn](V arg1, U arg2){return fn(arg2, arg1);};
+}
+/*
+namespace util {
+  namespace detail {
+  template<typename F1, typename F2>
+  struct composition {
+    const F1 &f1;
+    const F2 &f2;
+    template<typename ... Ts>
+    auto operator()(Ts&&... Args){
+      return f1(f2(std::forward<Ts>(Args)...));
+    }
+  };
+  };
+}
+template<typename F1, typename F2>
+decltype(auto) compose(const F1& f1, const F2& f2){
+  util::detail::composition<F1,F2> ret = {f1, f2};
+  return std::function(ret);
+}
+*/
 /*
   Iterators
 */

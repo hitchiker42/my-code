@@ -39,6 +39,8 @@ static constexpr const char* vndb_tls_port_number = "19535";
 static constexpr const char* vndb_hostname = "api.vndb.org";
 //default name for the database file
 static constexpr const char* default_db_file = "vn.db";
+//file of sql code used to initialize the database tables.
+static constexpr const char* db_init_file = "database_init.sql";
 
 //struct dealing with SSL details.
 struct BIO_wrapper {
@@ -70,8 +72,12 @@ enum class object_type {
   release,
   producer,
   character,
-  staff
+  staff,
+//Not obtained by the api, but rather from complete dumps that are downloaded.
+  tag,
+  trait
 };
+constexpr int num_object_types = to_underlying(object_type::trait)+1;
 }
 //Struct dealing with communication with the vndb server.
 struct vndb_connection {
@@ -137,7 +143,16 @@ struct vndb_connection {
   }
   json dbstats();
 };
-
+//being written it C sqlite uses cpp defines for constants, which
+//makes sense, but in C++ we have the benifit enums being compile
+//time constants, so use that.
+enum class sqlite3_type {
+  integer = SQLITE_INTEGER,
+  floating = SQLITE_FLOAT,
+  text = SQLITE_TEXT,
+  blob = SQLITE_BLOB,
+  null = SQLITE_NULL
+};
 //struct dealing with generic sqlite connection.
 struct sqlite3_wrapper {
   sqlite3 *db;
@@ -172,6 +187,14 @@ struct sqlite3_wrapper {
   //gets the string version of errcode();
   const char* errmsg(){
     return sqlite3_errmsg(db);
+  }
+  //Like perror
+  void print_errmsg(const char *s){
+    if(s && *s){
+      fprintf(stderr, "%s: %s\n", s, sqlite3_errmsg(db));
+    } else {
+      fprintf(stderr, "%s\n", sqlite3_errmsg(db));
+    }
   }
   //errstr gets string version of this->err
   const char* errstr(){
@@ -346,9 +369,19 @@ struct sqlite3_stmt_wrapper {
     return (sqlite_column_type(stmt, idx) == SQLITE_NULL ?
             deflt : get_column<T>(idx));
   }
+  //Get length of a text/blob typed column
+  size_t get_column_bytes(int idx){
+    return sqlite3_column_bytes(stmt, idx);
+  }
   //Get the number of columns in the current row.
   int get_ncolumns(){
-    return sqlite3_data_count(stmt);
+    return sqlite3_data_count(stmt);    
+  }
+  std::string_view column_name(int i){
+    return sqlite3_column_name(stmt, i);
+  }
+  sqlite3_type column_type(int i){
+    return sqlite3_type(sqlite3_column_type(i));
   }
   //returns a vector of all the columns of the current row converted into
   //text. The text is not copied so is only valid until the next call
@@ -360,39 +393,21 @@ struct sqlite3_stmt_wrapper {
     return get_row_text(ret, nullstr);
   }
   std::vector<std::string_view>& get_row_text(std::vector<std::string_view>& row,
-                                         const char *nullstr = nullptr){
-    int ncols = sqlite3_data_count(stmt);
-    row.clear();
-    if(ncols <= 0){
-      return row;
-    }
-    row.reserve(ncols);
-    std::string_view nullsv;
-    if(nullstr){
-      nullsv = std::string_view(nullstr, strlen(nullstr));
-    }
-    for(int i = 0; i < ncols; i++){
-      const char *str = sqlite3_column_text(stmt, i);
-      if(str){
-        row.emplace_back(str, sqlite3_column_bytes(stmt, i));
-      } else {
-        row.emplace_back(nullsv);
-      }
-    }
-    return row;
-  }
+                                         const char *nullstr = nullptr);
+
   std::vector<std::string_view> get_row_names(){
     std::vector<std::string_view> ret;
     return get_row_names();
   }
   std::vector<std::string_view>& get_row_names(std::vector<std::string_view>& row){
-    int ncols = sqlite3_data_count(stmt);
+    int ncols = get_ncolumns();
     row.clear();
     for(int i = 0; i < ncols; i++){
-      row.emplace_back(sqlite3_column_name(stmt, i));
+      row.emplace_back(column_name(i));
     }
     return row;
   }
+  json get_row_json();
   //Single overloaded function to replace the sqlite_bind_type functions.
   int bind(int idx, double val){
     return sqlite3_bind_double(stmt, idx, val);
@@ -465,31 +480,65 @@ struct sqlite3_stmt_wrapper {
   }
 };
 template<>
-inline int sqlite3_stmt_wrapper::get_column(int idx){
+inline int sqlite3_stmt_wrapper::get_column<int>(int idx){
   return sqlite3_column_int(this->stmt, idx);
 }
 template<>
-inline double sqlite3_stmt_wrapper::get_column(int idx){
+inline double sqlite3_stmt_wrapper::get_column<double>(int idx){
   return sqlite3_column_double(this->stmt, idx);
 }
 template<>
-inline int64_t sqlite3_stmt_wrapper::get_column(int idx){
+inline int64_t sqlite3_stmt_wrapper::get_column<int64_t>(int idx){
   return sqlite3_column_int64(this->stmt, idx);
 }
 //Be careful this returns a nullptr if the column is NULL.
 template<>
-inline const char* sqlite3_stmt_wrapper::get_column(int idx){
+inline const char* sqlite3_stmt_wrapper::get_column<const char*>(int idx){
   return static_cast<const char*>(sqlite3_column_text(this->stmt, idx));
 }
 template<>
-inline std::string_view sqlite3_stmt_wrapper::get_column(int idx){
+inline std::string_view sqlite3_stmt_wrapper::get_column<std::string_view>(int idx){
   return std::string_view(this->get_column<const char*>(idx),
                           sqlite3_column_bytes(this->stmt, idx));
 }
+//Void* indicates a blob
 template<>
-inline json sqlite3_stmt_wrapper::get_column(int idx){
+inline void* sqlite3_stmt_wrapper::get_column<void*>(int idx){
+  return static_cast<const char*>(sqlite3_column_blob(this->stmt, idx));
+}
+template<>
+inline json sqlite3_stmt_wrapper::get_column<json>(int idx){
   return json::parse(this->get_column<std::string_view>(idx));
 }
+//Contains the objects associated with inserting and querying the database
+struct vndb_sql_context {  
+  sqlite3_wrapper db;
+  //These are not automatically initialized, you need to explicitly initialize
+  //them, this is to avoid the overhead of creating prepared statments you
+  //may never use.
+  std::array<sqlite3_stmt_wrapper, vndb::num_object_types> get_by_id_stmts = {{}};
+  std::array<sqlite3_stmt_wrapper, vndb::num_object_types> insert_stmts = {{}};
+  
+  json get_by_id(int id, vndb::object_type what){
+    
+  int insert(json object, vndb::object_type what);
+
+  sqlite3_wrapper get_db(){
+    return db;
+  }
+  //not called get_get_by_id_stmt, because that sounds really silly.
+  sqlite3_stmt_wrapper get_select_by_id_stmt(vndb::object_type what){
+    return get_by_id_stmts[to_underlying(what)];
+  }
+  sqlite3_stmt_wrapper get_insert_stmt(vndb::object_type what){
+    return get_by_id_stmts[to_underlying(what)];
+  }
+
+  int exec(std::string_view sql);//execute sql for side effects
+  //execute sql calling f after each row
+  int exec(std::string_view sql, std::function<int(sqlite_stmt_wrapper&)> &f);
+  //execute sql and parse into a json array.
+  json exec_json(std::string_view sql);
 
 namespace vndb {
 using string = std::string;
@@ -501,7 +550,9 @@ using vector = std::vector<T>;
   release,
   producer,
   character,
-  staff
+  staff,
+  tag,
+  trait
 };*/
 //Things stored here as json could be changed to use a more specific datatype
 struct VN {

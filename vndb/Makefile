@@ -14,7 +14,7 @@ connection.o : connection.cpp vndb.h json.hpp
 sqlite.o : sqlite.cpp vndb.h json.hpp
 sqlite_ext.o: sqlite_ext.c
 
-vndb_cpp: vndb.o connection.o #sqlite.o sqlite_ext.o
+vndb_cpp: vndb.o connection.o sqlite.o # sqlite_ext.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
 

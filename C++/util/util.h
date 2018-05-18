@@ -28,7 +28,7 @@
 #include "svector.h"
 using namespace std::literals::string_view_literals;
 using namespace std::literals::string_literals;
-
+namespace util {
 /*
   Low level bit manipulation, using compiler intrinsics
 */
@@ -113,7 +113,6 @@ constexpr int lg2(T x){
   return (std::max(sizeof(T),sizeof(int))*CHAR_BIT) - (clz(x) + 1);
 }
 //Functions and classes in namespace util.
-namespace util {
 template <typename T>
 int compare(const T& lhs, const T& rhs){
   return three_way_compare(lhs, rhs);
@@ -196,40 +195,7 @@ static inline std::string string_tolower(const std::string_view str){
   }
   return ret;
 }
-//These functions which ignore spaces exist because item names
-//are compared ignoring spaces for some reason, and there actually
-//exist items which differ only by spaces which should be compared as
-//equal so it's not just a theoretical issue.
-static inline std::string string_nospace(const std::string_view str){
-  std::string ret(str.size(), '\0');
-  int idx = 0;
-  for(auto c : str){
-    if(c != ' '){
-      ret[idx++] = c;
-    }
-  }
-  ret.resize(idx);
-  return ret;
-}
-static inline std::string string_tolower_nospace(const std::string_view str){
-  std::string ret(str.size(), '\0');
-  int idx = 0;
-  for(auto c : str){
-    if(c != ' '){
-      ret[idx++] = tolower_ascii(c);
-    }
-  }
-  ret.resize(idx);
-  return ret;
-}
 
-//compares str1 and str2 as if by strcmp but ignoring any spaces.
-int strcmp_nospace(const char *str1, const char *str2);
-//same as above, but additionally ignores case.
-int strcasecmp_nospace(const char *str1, const char *str2);
-#ifdef PLATFORM_WINDOWS
-int strcasecmp(const char *str1, const char *str2);
-#endif
 int string_compare_natural(const char *a, const char *b,
                            bool foldcase = false, bool ignore_leading_zeros = false);
 int string_compare_natural(const std::string &a, const std::string &b,
@@ -238,8 +204,6 @@ int string_compare_natural(const std::string &a, const std::string &b,
 static inline bool strcmp_less(const char *str1, const char *str2){
   return strcmp(str1, str2) < 0;
 }
-
-
 static inline bool is_nonempty_string(const char *s){
   return (s && s[0]);
 }
@@ -257,73 +221,6 @@ static constexpr int constexpr_strncmp(const char *s, const char *s2, size_t n){
   return (*s == *s2 ?
           ((n && *s) ? constexpr_strncmp(s+1,s2+1,n-1) : 0) : (*s - *s2));
 }
-/**
- Creates a string to refer to 'count' instances of 'noun'
- If count == 1 outputs "'article' 'noun'",
-  otherwise outputs "'count' 'noun''plural'".
- If 1 < count < 10, count is output as a word (eg "one", "two"),
- otherwise it is output as a number.
-
- Grammar is complicated, so trying to make this do anymore work than just
- selecting between singular and plural is a bad idea.
-*/
-std::string format_countable_noun(const std::string &article,
-                                  const std::string &noun, int count,
-                                  const std::string &plural = "s");
-
-static inline std::string& capitalize(std::string *str){
-  str->front() = std::toupper(str->front());
-  return (*str);
-}
-static inline const char* possessive_suffix(const std::string &s){
-  return (s.back() == 's' ? "'" : "'s");
-}
-constexpr const char* possessive_suffix(const char *s){
-  if(*(s + (constexpr_strlen(s)-1)) == 's'){
-    return "'";
-  } else {
-    return "'s";
-  }
-}
-static inline std::string make_possessive(const std::string &s){
-  return s + possessive_suffix(s);
-}
-/*
-  Functions for uniform operations on std::strings, C strings, and std::string_views.
-*/
-static constexpr const char* as_c_str(const char *s){
-  return s;
-}
-static constexpr size_t string_length(const char *s){
-  return constexpr_strlen(s);
-}
-static inline const char* as_c_str(const std::string& s){
-  return s.c_str();
-}
-static inline size_t string_length(const std::string& s){
-  return s.size();
-}
-static constexpr size_t string_length(const std::string_view &s){
-  return s.size();
-}
-//WARNING: There is no string_view c_str method, so this may cause errors
-//if the string_view was not created from a c string.
-static constexpr const char* as_c_str(const std::string_view &s){
-  return s.data();
-}
-
-/*
-  Convert a number into english.
-*/
-const std::string format_cardinal_number(long number);
-const std::string format_ordinal_number(long number);
-/*
-  String trim function which returns a view into the string, rather
-  than a copy.
-  //TODO: regex version.
-*/
-std::string_view string_trim(const std::string &str,
-                             const char* delim = " \n\t");
 /*
   mempcpy and stpcpy for non gnuc compiliers.
 */
@@ -420,6 +317,7 @@ template<>
 inline uint64_t fnv_hash(const char* const& key){
   return fnv_hash(key, strlen(key));
 }
+//
 /*
   These functions all behave in the same way, they set errno to 0,
   call the underlying function, set *value to its result, and if

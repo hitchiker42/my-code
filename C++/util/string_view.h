@@ -25,12 +25,12 @@ namespace util {
   When copying a null terminated string the null terminator is also copied.
 */
 struct string_view {
-  typedef const char* pointer;
-  typedef const char& reference;
-  typedef char value_type;
-  typedef uint32_t size_type;
-  typedef ptrdiff_t difference_type;
-  typedef pointer iterator;
+  using pointer =  const char*;
+  using reference = const char&;
+  using value_type = char;
+  using size_type = uint32_t;
+  using difference_type = ptrdiff_t;
+  using iterator =  pointer;
 
   const char* ptr;
     //We could store the flag bits in the top 2 bits of the size, this
@@ -218,22 +218,27 @@ struct string_view {
 
   //Substring functions
   string_view substr(size_t start) const {
-    return substr(start, sz);
+    return string_view(ptr + start, stop - start, false, is_null_terminated());
   }
-  string_view substr(size_type start, size_type end) const {
-    return string_view(ptr + start, end - start, false, false);
+  string_view substr(size_type start, size_type stop) const {
+    return string_view(ptr + start, stop - start, false, false);
+  }
+  string_view substr(iterator start) const {
+    return string_view(start, end() - start, false, is_null_terminated());
+  }
+  string_view substr(iterator start, iterator stop) const {
+    return string_view(start, stop - start, false, false);
   }
   //Substring functions which return a copy, this is the only way to get
-  //null terminated substrings.
+  //arbitrary null terminated substrings.
   string_view substr_copy(size_t start) const {
     return substr_copy(start, sz);
   }
-  string_view substr_copy(size_type start, size_type end) const {
-    return string_view(ptr + start, end - start, true);
+  string_view substr_copy(size_type start, size_type stop) const {
+    return string_view(ptr + start, stop - start, true);
   }
 };
 //Copying the std libraries naming hierarchy.
-//string_view can't be a literal b/c of non-trival destructor.
 namespace literals {
 inline namespace string_literals {
   inline string_view operator "" _sv(const char *str, size_t sz){

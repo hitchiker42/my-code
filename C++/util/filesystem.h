@@ -29,7 +29,7 @@ namespace fs {
   using path = std::string;
 }
 #endif //Filesystem
-#else /* NEEED_FILESYSTEM_LIB_ */
+#else /* NEEED_FILESYSTEM_LIB */
 #define NO_FS_LIB
 namespace fs {
   using path = std::string;
@@ -48,14 +48,14 @@ struct FILE_wrapper {
   FILE_wrapper(std::string_view path, const char* mode) noexcept
     : f{fopen(path.data(), mode)} {};
   //Takes ownership of the given FILE pointer.
-  explicit FILE_wrapper(FILE *f) noexcept 
+  explicit FILE_wrapper(FILE *f) noexcept
     : f{f} {};
   /* How a copy constructor could be implemented, if you really wanted.
    explicit FILE_wrapper(const FILE_wrapper &other) noexcept
      : mode{mode} {
        if(!other){
          return;
-       } else {      
+       } else {
          int fd = fileno(f);
          int fd2 = dup(fd);
          f = fdopen(fd2, mode);
@@ -72,7 +72,7 @@ struct FILE_wrapper {
 
   FILE_wrapper& operator=(const FILE_wrapper& other) = delete;
   //Its usually a bad idea to assign to a FILE_wrapper, even via move-assignment,
-  //but it's provided anyway.  
+  //but it's provided anyway.
   FILE_wrapper& operator=(FILE_wrapper&& other){
     if(&(other) == this){
       return (*this);
@@ -80,7 +80,7 @@ struct FILE_wrapper {
       this->~FILE_wrapper();
       new (this) FILE_wrapper(std::move(other));
     }
-  }      
+  }
   ~FILE_wrapper(){
     if(f){fclose(f);}
   }
@@ -142,7 +142,7 @@ struct FILE_wrapper {
   }
   //Returns the number of characters read, including the delimiter, or
   //0 at end of file.
-  //This allows: while(f.getline(str)){..} to work as expected, whereas 
+  //This allows: while(f.getline(str)){..} to work as expected, whereas
   //posix getline which returns -1 on end of file requires adding ' '> 0'
   //to the conditional, which is easily forgetten (at least in my experience)
   size_t getline(std::string &lineptr, char delim = '\n',
@@ -157,7 +157,7 @@ struct FILE_wrapper {
         }
         //Make sure we return non-zero even if we only read a delimiter
         return lineptr.size() + !store_delim;
-      }          
+      }
       lineptr.push_back(ch);
     }
     return lineptr.size();
@@ -174,26 +174,75 @@ struct FILE_wrapper {
   long getpos() const {
     return ftell(f);
   }
+  //Like fseek, but returns the new position on success.
+  long setpos(long offset, int whence){
+    if(fseek(f, offset, whence) < 0){
+      return -1;
+    } else {
+      return ftell(f);
+    }
+  }
   //If relative is true then the position is set to getpos() + offset,
-  //otherwise the position as set to offset if it is positive and
-  //to size() + offset if it is negitive. 
+  //otherwise the position as set to offset if it is positive or zero and
+  //to size() + offset if it is negitive (to be clear this means
+  //passing -1 as offset is the same as using SEEK_END whth a 0 offset)
   //This is to avoid using SEEK_{SET,CUR,END}, which are kinda clumsy
   long setpos(long offset, bool relative = true){
     if(relative){
-      return fseek(f, offset, SEEK_CUR);
+      return setpos(offset, SEEK_CUR);
     } else {
-      if(offset > 0){
-        return fseek(f, offset, SEEK_SET);
+      if(offset >= 0){
+        return setpos(offset, SEEK_SET);
       } else {
-        return fseek(f, offset, SEEK_END);
+        return setpos(offset+1, SEEK_END);
       }
     }
-  } 
+  }
+
+  void to_string(char **buf, size_t *n) const {
+    *buf = nullptr; //Make sure *buf is null if we hit an error.
+    *n = 0;
+    long orig_pos = getpos();
+    //I'm just going to assume fseek succeeds, since if it fails
+    //something else has probably already gone wrong.
+    fseek(f, 0, SEEK_END);
+    //if(fseek(f, 0, SEEK_END) < 0){ return; }
+    *n = getpos();
+    fseek(f, 0, SEEK_SET);
+    //if(fseek(f, 0, SEEK_SET) < 0){ return; }
+    *buf = (char*)malloc((*n) + 1);
+    fread(*buf, *n, 1, f);
+    *buf[*n] = '\0';
+    fseek(f, orig_pos, SEEK_SET);
+    return;
+  }
+  std::string to_string() const {
+    long orig_pos = getpos();
+    //I'm just going to assume fseek succeeds, since if it fails
+    //something else has probably already gone wrong.
+    fseek(f, 0, SEEK_END);
+    //if(fseek(f, 0, SEEK_END) < 0){ return; }
+    size_t sz = getpos();
+    fseek(f, 0, SEEK_SET);
+    std::string ret(sz, '\0');
+    fread(ret.data(), sz, 1, f);
+    fseek(f, orig_pos, SEEK_SET);
+    return ret;
+  }
+  const char* c_str(){
+    char *ret;
+    size_t n;
+    to_string(&ret, &n);
+    return ret;
+  }
+
 };
 
 //Read an entire file into a string/vector of lines, returns result as in a
 //std::optional wrapper to indicate error.
-std::optional<std::string> file_to_string(const fs::path &path) noexcept;
+bool file_to_string(const fs::path &path, char **strptr, size_t *sz_ptr) noexcept;
+const char* file_to_string(const fs::path &path) noexcept;
+std::optional<std::string> file_to_string_opt(const fs::path &path) noexcept;
 std::optional<std::vector<std::string>>
 file_to_lines(const fs::path &path, char delim = '\n') noexcept;
 

@@ -1,27 +1,9 @@
 #include "vndb.h"
+#include "sql.h"
 template<typename T>
 using vector = util::svector<T>;//can change to std::vector
 using string = util::string;//can change to std::string
-static constexpr std::string_view sql_select_by_id =
-  "select * from @table where id = @id;"sv;
-static constexpr std::string_view sql_insert_vn =
-  R"EOF(insert or replace into VNs values (
-        @id, @title, @original, @released,
-        @languages, @orig_lang, @platform, @aliases,
-        @length, @description, @links, @image, @image_nsfw,
-        @anime, @relations, @tags, @popularity, @rating,
-        @votecount, @screens, @staff, '[]', '[]' ,'[]',
-        -1, -1, @date, 0)EOF"sv;
-static constexpr std::string_view sql_insert_producer =
-  R"EOF(insert or relpace into producers values (
-        @id, @name, @original, @type, @language,
-        @links, @aliases, @description, @relations)EOF"sv;
-static constexpr std::string_view sql_insert_release =
-  R"EOF(insert or relpace into releases values (
-        @id, @title, @original, @released, @type,
-        @patch, @languages, @website, @notes, @minage,
-        @platforms, @resolution, @voiced, @animation,
-        @vn, @producers)EOF"sv;
+
 // Open an in memory database and copy the contents of the datebase located
 // in filename into it. Written using a simlar interface as most sqlite3 api
 // functions.
@@ -30,7 +12,7 @@ int sqlite_open_db_in_memory(const char* filename, sqlite3 **db_ptr){
   sqlite3 *file = nullptr;
   //insure calling sqlite3_close on *dp_ptr after an error will work.
   *dp_ptr = nullptr;
-  int err = sqlite3_open_v2(filename.data(), &file, 
+  int err = sqlite3_open_v2(filename.data(), &file,
                             SQLITE_OPEN_READWRITE, nullptr);
   if(err != SQLITE_OK){ goto end; }
 
@@ -46,7 +28,7 @@ int sqlite_open_db_in_memory(const char* filename, sqlite3 **db_ptr){
   err = sqlite3_backup_step(bkup, -1);  //Copy all the pages at once.
   //we just opened both db connections, so these should be impossible
   assert(err != SQLITE_BUSY && err != SQLITE_LOCKED);
-  
+
   //returns SQLITE_OK if there were no errors on bkup
   err = sqlite3_backup_finish(bkup);
 
@@ -54,11 +36,8 @@ int sqlite_open_db_in_memory(const char* filename, sqlite3 **db_ptr){
   sqlite3_close(file);
   return err;
 }
-}  
-  
-  
-  
 }
+
 //Convert a list stored in a string using delim as a seperator into a
 //json array. eg "a,b,c",',' -> ["a","b","c"];
 json parse_delimted_string(const char *str, char delim){
@@ -104,12 +83,13 @@ int sqlite_insert_vn(json vn, sqlite3_stmt_wrapper& stmt){
   stmt.bind(idx++, vn["staff"]);
   //PLACEHOLDER: this should bind the current date/time.
   stmt.bind(idx++, time());
+  return stmt.exec();
 }
-int sqlite_insert_vn_tags(json vn, 
+int sqlite_insert_vn_tags(json vn,
                           sqlite3_wrapper &db){
   return sqlite_insert_vn_tags(vn["id"].get<int>(), vn["tags"], db);
 }
-int sqlite_insert_vn_tags(int vn_id, json vn_tags, 
+int sqlite_insert_vn_tags(int vn_id, json vn_tags,
                           sqlite3_wrapper &db){
   //We make the vn_id part of the command, and use a parameter for the tags,
   //this is a compromise between the two extremes.
@@ -185,51 +165,235 @@ int sqlite_insert_producer(json producer, sqlite3_stmt_wrapper& stmt){
   stmt.bind(idx++, producer["name"].get<json::string_t>());
   stmt.bind(idx++, producer["original"].get<json::string_t>());
   stmt.bind(idx++, producer["original"].get<json::string_t>());
-
-
-//should probably move to seperate file
-json parse_json_path_acc(json val, const char *path);
-/*
-  Find the location refered to by the given path, path has the form
-  $(.{objectname}|[{index}])+
-
-*/
-json parse_json_path(json val, const char *path){
-  if(*path != '$'){
-    //invalid path;
-    return json_null;
-  } else {
-    return parse_json_path_acc(val, path + 1);
-  }
 }
 
-json parse_json_path_acc(json val, const char *path){
-  json next;
-  if(*path == '['){
-    int idx = strtol(path + 1, &path, 0);
-    if(*path != ']'){
-      //Issue error message.
-      return json_null;
-    }
-    path++;
-    //check that idx is valid.
-    next = val[idx];
-  } else if(*path == '.'){
-    path++;
-    const char* start;
-    while(*path && *path != '[' && *path != '.'){
-      ++path;
-    }
-    std::string_view name(start, path - start);
-    //check that name is in the json object.
-    next = val[name];
-  } else {
-    //invalid path
-    return json_null;
+
+std::vector<std::string_view>&
+sqlite3_stmt_wrapper::get_row_text(std::vector<std::string_view>& row,
+                                   const char *nullstr = nullptr){
+  int ncols = this->column_names();
+  row.clear();
+  if(ncols <= 0){
+    return row;
   }
-  if(*path == '\0'){
-    return next;
+  row.reserve(ncols);
+  std::string_view nullsv;
+  if(nullstr){
+    nullsv = std::string_view(nullstr, strlen(nullstr));
+  }
+  for(int i = 0; i < ncols; i++){
+    const char *str = sqlite3_column_text(stmt, i);
+    if(str){
+      row.emplace_back(str, sqlite3_column_bytes(stmt, i));
+    } else {
+      row.emplace_back(nullsv);
+    }
+  }
+  return row;
+}
+//Given a string that may or may not represent a json array/object
+//return a json value that is either the value obtained by parsing
+//the string if it is valid json or just the string itself if it isn't.
+static json parse_possible_json(std::string_view text){
+  //Only arrays and objects are stored as json, so if it
+  //can't be one of those it must just be a string.
+  if(text[0] != '[' && text[0] != '{'){
+    json(text);
+  }
+  json_parser p(text);
+  json j;
+  bool is_json = p.try_parse(j);
+  if(is_json){
+    return j;
   } else {
-    return parse_json_path_acc(next, path);
+    return json(text);
   }
 }
+json sqlite3_stmt_wrapper::get_row_json(){
+  int ncols = this->get_ncolumns();
+  json::object_t obj;
+  for(int i = 0; i < ncols; i++){
+    auto name = this->column_name()
+    switch(column_type(i)){
+      case(sqlite3_type::integer):
+        obj.emplace(name, json(get_column<int>(i)));
+        break;
+      case sqlite3_type::floating:
+        obj.emplace(name, json(get_column<double>(i)));
+        break;
+      case sqlite3_type::null:
+        obj.emplace(name, json_null);
+        break;
+      //I know this will never come up in this application, 
+      //if this were possible I'd probably encode the input in base64,
+      case sqlite_type::blob:{
+        fprintf(stderr, "Error found unexpectd blob type in sql table %s\n",
+                sqlite3_column_table_name(this->stmt, i));
+        return json_null;        /*
+          //Super inefficent implementation that converts the blob
+          //into an array of bytes
+        json::array_t bytes;
+        size_t blob_size = this->get_column_bytes(i);
+        unsigned char* blob = (unsigned char*)get_column<void*>(i);
+        for(size_t j = 0; j < blob_size; j++){
+          bytes.emplace_back((int)blob[j]);
+        }
+        obj.emplace(name, bytes);
+        */
+      }
+      //This is the most complicated, since we need to determine
+      //if the column is meant to be json or just a string.
+      case sqlite3_type::text {
+        std::string_view col_text = get_column<std::string_view>(i);
+        obj.emplace(name, parse_possible_json(col_text));
+        break;
+      }
+    }
+  }
+  return json(std::move(obj));
+}
+
+
+//Fairly unoptimized version of the json path type used by the sqlite json
+//extension. Just uses a json array to hold the path elements, which isn't
+//super efficent, a tagged pointer would be better than json, since there are only
+//two possible types.
+struct json_path {
+  std::vector<json> path;
+  json_path() = default;
+  json_path(const json_path &other) = default;
+  json_path(json_path &&other) = default;
+
+  //Appending elements to the path
+  json_path& append(std::string_view obj_name){
+    path.emplace_back(obj_name);
+    return *this;
+  }
+  json_path& append(int64_t idx){
+    path.emplace_back(idx);
+    return *this;
+  }
+  json_path& append(const json_path &p){
+    path.append(p.path);
+    return *this;
+  }
+  json_path& operator/=(std::string_view obj_name){
+    return append(obj_name);
+  }
+  json_path& operator/=(int64_t idx){
+    return append(idx);
+  }
+  json_path& operator/=(const json_path &p){
+    append(p);
+  }
+  json_path& operator/(int64_t idx){
+    json_path p(*this);
+    return p.append(idx);
+  }
+  json_path& operator/(std::string_view obj_name){
+    json_path p(*this);
+    return p.append(obj_name);
+  }
+  json_path& operator/(const json_path &p){
+    json_path p2(*this);
+    return p2.append(p);
+  }
+  //Convert a path into a string
+  std::string to_string(){
+    std::string ret("$");
+    char buf[64] num_to_string_buf;
+    for(auto&& elt : path){
+      if(!append_path_element_to_string(elt, num_to_string_buf)){
+        return "";
+      }
+    }
+    return ret;
+  }
+  char* format_int(int val, char *buf){
+    snprintf(buf, 64, "%d", val);
+    return buf;
+  }
+  bool append_path_element_to_string(std::string &str, json elt,
+                                     char *buf){
+    if(elt.is_string()){
+      str.push_back('.');
+      str.append(elt.get<json::string_view_t>());
+      return true;
+    } else if (elt.is_number_integer()){
+      int idx = elt.get<int>();
+      assert(idx >= 0);
+      str.push_back('[');
+      str.append(format_int(idx));
+      str.push_back(']');
+      return true;
+    } else {
+      fprintf(stderr, "Error unexpected type in json_path : %s\n");
+      return false;
+    }
+  }
+  //parse a path given as a string.
+  bool parse(const char *str){
+    const char *start;//for use in printing error messages.
+    if(*str++ != '$'){
+      return false;
+    }
+    char c;
+    while((c = *str) != '\0'){
+      if(*str == '.'){
+        char *obj_name = ++str;
+        //I'm not going to verify that this is a valid object name, I'll
+        //just deal with that when looking for the object.
+        while((c = *str)){
+          if(c == '.' || c == '['){ break; }
+          ++str;
+        }
+        path.emplace_back(std::string_view(obj_name, str));
+      } else if(*str == ']'){
+        char *idx_str = ++str;
+        long idx = strtol(idx_str, &str, 10);
+        if(*str != ']' && *str != '\0' || idx < 0){
+          fprintf(stderr,
+                  "Error parsing number in json path %s at index %d\n",
+                  start, str - start);
+          return false;
+        }
+        path.emplace_back(idx);
+      } else {
+        fprintf(stderr,
+                "Error malformed json path %s, error at index %d\n",
+                start, str-start);
+        return false;
+      }
+    }
+    return true;
+  }
+  //Return the a pointer to the value the json object pointed 
+  //to by 'ptr' has at the location given by this path, or nullptr if
+  //no such location exists.
+  json* follow(json *ptr){
+    for(auto &&elt : path){
+      if(elt.is_int()){
+        if(!ptr->is_array() || elt >= ptr->size()){
+          return nullptr;
+        } else {
+          ptr = &((*ptr)[elt.get<int>()]);
+        }
+      } else {//elt.is_string()
+        //json::find is defined to always return json::end when called on
+        //a non object type.
+        auto it = ptr->find(elt.get<json::string_view_t>());
+        if(it == ptr->end()){
+          return nullptr;
+        }
+        ptr = &(*it);
+      }
+    }
+    return ptr;
+  }
+  //version of follow_path that takes its argument by value, the only
+  //difference is that this will als return nullptr for an empty path.
+  json* follow(json val){
+    if(path.empty()){ return nullptr; }
+    return follow(&val);
+  }
+};
