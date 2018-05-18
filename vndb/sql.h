@@ -4,7 +4,7 @@
   Text of sql prepared statments.
 */
 #include <string_view>
-using std::literals::string_view_literals;
+using namespace std::literals::string_view_literals;
 //Select X by id.
 static constexpr std::string_view sql_select_vn_by_id =
   "select * from VNs where id = @id;"sv;
@@ -24,24 +24,24 @@ static constexpr std::string_view sql_insert_vn =
         @length, @description, @links, @image, @image_nsfw,
         @anime, @relations, @tags, @popularity, @rating,
         @votecount, @screens, @staff, '[]', '[]' ,'[]',
-        -1, -1, @date, 0)EOF"sv;
+        -1, -1, @date, 0);)EOF"sv;
 static constexpr std::string_view sql_insert_producer =
   R"EOF(insert or relpace into producers values (
         @id, @name, @original, @type, @language,
-        @links, @aliases, @description, @relations)EOF"sv;
+        @links, @aliases, @description, @relations);)EOF"sv;
 static constexpr std::string_view sql_insert_release =
   R"EOF(insert or relpace into releases values (
         @id, @title, @original, @released, @type,
         @patch, @languages, @website, @notes, @minage,
         @platforms, @resolution, @voiced, @animation,
-        @vn, @producers)EOF"sv;
+        @vn, @producers);)EOF"sv;
 static constexpr std::string_view sql_insert_trait =
   R"EOF(insert or replace into traits values (
         @id, @name, @full_name, @description,
-        @meta, @chars, @aliases, @parents)EOF"sv;
+        @meta, @chars, @aliases, @parents);)EOF"sv;
 static constexpr std::string_view sql_insert_tag =
   R"EOF(insert or replace into traits values (
         @id, @name, @description, @meta, @vns,
-        @category, @aliases, @parents)EOF"sv;
+        @category, @aliases, @parents);)EOF"sv;
 
 #endif /* __SQL_H__ */

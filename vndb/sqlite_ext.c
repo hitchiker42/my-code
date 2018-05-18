@@ -96,3 +96,36 @@ int init_sqlite_ext(sqlite3 *db){
   //initialize other extensions
   return ret;
 }
+// Open an in memory database and copy the contents of the datebase located
+// in filename into it. Written using a simlar interface as most sqlite3 api
+// functions.
+int sqlite_open_db_in_memory(const char* filename, sqlite3 **db_ptr){
+  sqlite3 *file = nullptr;
+  //insure calling sqlite3_close on *dp_ptr after an error will work.
+  *db_ptr = nullptr;
+  int err = sqlite3_open_v2(filename, &file,
+                            SQLITE_OPEN_READWRITE, nullptr);
+  //This doesn't work in C++ since this jump skips the initialization
+  //of mem & bkup.
+  if(err != SQLITE_OK){ goto end; }
+
+  err = sqlite3_open_v2(":memory:", db_ptr, SQLITE_OPEN_READWRITE, nullptr);
+  if(err != SQLITE_OK){ goto end; }
+
+  sqlite3 *mem = *db_ptr;
+  sqlite3_backup *bkup = sqlite3_backup_init(mem, "main", file, "main");
+  if(!bkup){
+    err = sqlite3_errcode(mem);
+    goto end;
+  }
+  err = sqlite3_backup_step(bkup, -1);  //Copy all the pages at once.
+  //we just opened both db connections, so these should be impossible
+  assert(err != SQLITE_BUSY && err != SQLITE_LOCKED);
+
+  //returns SQLITE_OK if there were no errors on bkup
+  err = sqlite3_backup_finish(bkup);
+
+ end:
+  sqlite3_close(file);
+  return err;
+}

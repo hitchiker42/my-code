@@ -28,6 +28,7 @@ bool test_connection(const char *outfile, int start = 1){
   json vns = conn.get_vns(start, 100);
   if(conn.error){
     fprintf(stderr, "Error sending/receiving to/from server\n");
+    fprintf(stderr, "%s\n", conn.buf.c_str());
     return false;
   }
   printf("Got %ld vns from server.\n", vns.size());
@@ -45,7 +46,7 @@ bool test_insert_vns(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
     return false;
   }
   fprintf(stderr, "Parsing json file\n");
-  json vns_json = json::parse(f);
+  json vns_json = json::parse(f.unwrap());
   if(vns_json.is_null()){
     fprintf(stderr, "Error parsing json\n");
     return false;
@@ -102,7 +103,7 @@ int run_insertion_test(){
     db.print_errmsg("Error initializing datbase");
     return -1;
   }
-  sqlite3_stmt_wrapper stmt = dp.prepare_stmt(sql_insert_vn);
+  sqlite3_stmt_wrapper stmt = db.prepare_stmt(sql_insert_vn);
   if(!stmt){
     db.print_errmsg("Error compiling sql statement");
     return -1;
@@ -111,9 +112,15 @@ int run_insertion_test(){
   return !test_insert_vns(db, stmt, "conn_test.out");
 }
 int main(int argc, char* argv[]){
+  if(argc > 1){
+    if(argv[1][0] == 'c'){
+      return run_connection_test();
+    } else {
+      return run_insertion_test();
+    }
+  }
   return run_insertion_test();
 }
-
 #if 0
 int main(int argc, char* argv[]){
 

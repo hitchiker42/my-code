@@ -218,7 +218,7 @@ struct string_view {
 
   //Substring functions
   string_view substr(size_t start) const {
-    return string_view(ptr + start, stop - start, false, is_null_terminated());
+    return substr(start, size());
   }
   string_view substr(size_type start, size_type stop) const {
     return string_view(ptr + start, stop - start, false, false);

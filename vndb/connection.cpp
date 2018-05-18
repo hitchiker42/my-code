@@ -205,6 +205,7 @@ json vndb_connection::get_error(){
 //  DEBUG_PRINTF("Recieved error %s\n", response.data());
   assert(has_prefix(response, "error"));
   this->error = true;
+  fprintf(stderr, "%.*s\n", response.size(),response.data());
   return json::parse(response.substr(constexpr_strlen("error")));
 }
 

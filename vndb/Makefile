@@ -9,9 +9,9 @@ LDFLAGS=-lssl -lcrypto -lsqlite3 -lpcre
 
 all: vndb_cpp
 
-vndb.o : vndb.cpp vndb.h json.hpp
+vndb.o : vndb.cpp vndb.h json.hpp sql.h
 connection.o : connection.cpp vndb.h json.hpp
-sqlite.o : sqlite.cpp vndb.h json.hpp
+sqlite.o : sqlite.cpp vndb.h json.hpp sql.h
 sqlite_ext.o: sqlite_ext.c
 
 vndb_cpp: vndb.o connection.o sqlite.o # sqlite_ext.o

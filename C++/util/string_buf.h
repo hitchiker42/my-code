@@ -411,7 +411,7 @@ gen_append_fn(append_hex, double, "%a");
               "format string was \"%s\".\n", fmt);
       return (*this);
     }
-    if(nbytes >= space_left){
+    if((size_t)nbytes >= space_left){
       buf.reserve(nbytes+1);
       nbytes = snprintf(buf.end(), nbytes + 1,
                         fmt,  args...);
