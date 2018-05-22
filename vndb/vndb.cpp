@@ -76,16 +76,26 @@ bool test_insert_vns(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
   db.print_errmsg("Recieved sqlite error");
   return false;
 }
-int run_connection_test(){
-  if(!init_vndb_ssl_ctx()){
-    fprintf(stderr, "Error, failed to initialize ssl context\n");
-    return -1;
+bool test_connect_and_insert(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
+                             int start = 100, int count = 100){
+  vndb_connection conn;
+  if(!conn.logged_in){
+    if(conn.error){
+      fprintf(stderr, "Error failed to login with error:\n");
+      json err = conn.get_error();
+      err.print(stdout);
+    } else {
+      fprintf(stderr, "Error failed to connect to server\n");
+    }
+    return false;
   }
+}
+int run_connection_test(){
+
   //TODO: add argument parsing
   const char *outfile = "conn_test.out";
   printf("Running connection test\n");
   if(!test_connection(outfile)){
-    free_vndb_ssl_ctx();
     return -1;
   }
   printf("Test seemed to succeed, results in %s\n",outfile);
@@ -93,14 +103,16 @@ int run_connection_test(){
 }
 int run_insertion_test(){
   sqlite3_wrapper db("test.db");
-  FILE_wrapper db_init(db_init_file, "r");
-  if(!db_init){
-    fprintf(stderr, "Error opening %s\n", db_init_file);
-    return -1;
+  if(!db){
+    fprintf(stderr, "Error opening sqlite database.\n");
   }
-  std::string init_sql = db_init.to_string();
-  if(db.exec(init_sql.c_str()) != SQLITE_OK){
-    db.print_errmsg("Error initializing datbase");
+  int err;
+  if((err = db.exec_file(db_init_file)) != SQLITE_OK){
+    //IF err == SQLITE_CANTOPEN there was an error opening db_init_file
+    //and an error message was already printed.
+    if(err != SQLITE_CANTOPEN){
+      db.print_errmsg("Error initializing datbase");
+    }
     return -1;
   }
   sqlite3_stmt_wrapper stmt = db.prepare_stmt(sql_insert_vn);
@@ -112,6 +124,11 @@ int run_insertion_test(){
   return !test_insert_vns(db, stmt, "conn_test.out");
 }
 int main(int argc, char* argv[]){
+  if(!init_vndb_ssl_ctx()){
+    fprintf(stderr, "Error, failed to initialize ssl context\n");
+    return -1;
+  }
+  atexit(free_vndb_ssl_ctx);
   if(argc > 1){
     if(argv[1][0] == 'c'){
       return run_connection_test();

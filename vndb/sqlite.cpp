@@ -23,7 +23,7 @@ json parse_delimted_string(const char *str, char delim){
 //This will probably be a member function so stmt will likely
 //not be a parameter but a member variable.
 int sqlite_insert_vn(json vn, sqlite3_stmt_wrapper& stmt){
-  int idx = 0;
+  int idx = 1;
   //get_ptr is used for values that might be null, get/get_ref are
   //used for values that can't be null.
   stmt.bind(idx++, vn["id"].get<int>());
@@ -47,8 +47,9 @@ int sqlite_insert_vn(json vn, sqlite3_stmt_wrapper& stmt){
   stmt.bind(idx++, vn["votecount"].get<int>());
   stmt.bind(idx++, vn["screens"]);
   stmt.bind(idx++, vn["staff"]);
-  //PLACEHOLDER: this should bind the current date/time.
+  //bind the current date/time, I may remove this.
   stmt.bind(idx++, time(NULL));
+//  DEBUG_PRINTF("Executing sql: %s\n", sqlite3_expanded_sql(stmt.unwrap()));
   return stmt.exec();
 }
 int sqlite_insert_vn_tags(int vn_id, json vn_tags,
@@ -82,7 +83,7 @@ int sqlite_insert_vn_tags(int vn_id, json vn_tags,
   if(err != SQLITE_OK){ return err; }
   for(auto&& tag : vn_tags){
     int tag_id = tag[0];
-    stmt.bind(0, tag_id);
+    stmt.bind(1, tag_id);
     if((err = stmt.exec()) != SQLITE_OK){
       db.rollback_transaction();
       return err;
@@ -93,7 +94,7 @@ int sqlite_insert_vn_tags(int vn_id, json vn_tags,
 //It's probably more useful to get a VN as json rather than a C++ object
 json sqlite_get_VN(sqlite3_stmt_wrapper &stmt){
   json ret;
-  int idx = 0;
+  int idx = 1;
   //We don't need to deal with NULL for most values since the api returns
   //empty arrays / objects instead of NULL, so only scalar values can be NULL.
   ret.emplace("id", stmt.get_column<int>(idx++));

@@ -950,13 +950,14 @@ void from_json(const BasicJsonType& j, typename BasicJsonType::string_t& s)
 }
 //Add string view conversion
 template<typename BasicJsonType>
-void from_json(const BasicJsonType& j, typename BasicJsonType::string_view_t& s)
+void from_json(const BasicJsonType& j, typename BasicJsonType::string_view_t& sv)
 {
     if (JSON_UNLIKELY(!j.is_string()))
     {
         JSON_THROW(type_error::create(302, "type must be string, but is " + std::string(j.type_name())));
     }
-    s = *j.template get_ptr<const typename BasicJsonType::string_view_t*>();
+    auto *s = j.template get_ptr<const typename BasicJsonType::string_t*>();
+    sv = typename BasicJsonType::string_view_t(s->data(), s->size());
 }
 
 template<typename BasicJsonType>
@@ -10275,7 +10276,7 @@ class basic_json
     using string_t = StringType;
 
 //Hack to add string_view type
-    using string_view_t = std::string_view;
+    using string_view_t = std::basic_string_view<typename string_t::value_type>;
 
     /*!
     @brief a type for a boolean

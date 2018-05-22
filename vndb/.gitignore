@@ -1,0 +1,5 @@
+# generated object files
+vndb_cpp
+tag_trait_parser
+# database files
+*.db

@@ -20,7 +20,7 @@
 #include "filesystem.h"
 #include "json.hpp"
 
-static SSL_CTX* vndb_ctx;
+extern SSL_CTX* vndb_ctx;
 bool init_vndb_ssl_ctx();
 void free_vndb_ssl_ctx();
 
@@ -40,13 +40,36 @@ static constexpr const char* vndb_hostname = "api.vndb.org";
 static constexpr const char* default_db_file = "vn.db";
 //file of sql code used to initialize the database tables.
 static constexpr const char* db_init_file = "database_init.sql";
-
+/*
+struct SSL_CTX_wrapper {
+  SSL_CTX *ctx = nullptr;
+  //Default constructor doesn't do anything, since I need a static
+  //one of these.
+  SSL_CTX_wrapper() = default;
+  //There's no reason to ever pass a false argument to this,
+  //it just takes an argument to differentate it from the default
+  //constructor.
+  SSL_CTX_wrapper(bool init){
+    if(init){
+      this->init();
+    }
+  }
+  ~SSL_CTX_wrapper(){
+    SSL_CTX_free(ctx);
+  }
+  bool init();
+}
+static SSL_CTX_wrapper vndb_ctx;
+*/
 //struct dealing with SSL details.
 struct BIO_wrapper {
   BIO* bio = NULL;
   BIO_wrapper() = default;
   BIO_wrapper(const char* hostname, const char* port,
               SSL_CTX* ctx = vndb_ctx);
+  BIO_wrapper(std::string_view hostname, std::string_view port, 
+              SSL_CTX* ctx = vndb_ctx)
+    : BIO_wrapper(hostname.data(), port.data(), ctx) {}
   ~BIO_wrapper();
   bool is_encrypted();
   void reset();
@@ -56,8 +79,22 @@ struct BIO_wrapper {
     return connect();
   }
   ssize_t write(std::string_view msg);
+  //Read upto len bytes into buf, if BIO_read returns 0 an error message
+  //is printed (though you don't need to treat it as an error).
   ssize_t read(char *buf, size_t len);
+  //Read exactly n bytes into buf.
+  ssize_t read_n(char *buf, size_t n);
+  //these next two functions repeatidly call BIO_read, if there is an error 
+  //the length of buf is set to 0 and the error code is returned, otherwise
+  //the total number of bytes read is returned.
+
+  //read until BIO_read returns 0.
+  ssize_t read_all(util::svector<char> &buf);
+  //read until delim is read, delim is assumed to be the last character of
+  //the message, so only the last character read is ever checked.
   ssize_t read_delim(util::svector<char> &buf, char delim);
+  //read until delim is read, delim is assumed to be a suffix of the message.
+  ssize_t read_delim(util::svector<char> &buf, const char* delim);
   //  ssize_t read_delim(const char **buf, size_t *bufsz, char delim);
   operator BIO*() const noexcept {
     return bio;
@@ -78,6 +115,37 @@ enum class object_type {
 };
 constexpr int num_object_types = to_underlying(object_type::trait)+1;
 }
+struct http_connection {
+  //For vndb we need to exclude the www, since I'm not going to handle
+  //redirects, and www.vndb.org will give a redirect response.
+  std::string hostname = "vndb.org";
+  std::string port = "443";
+  BIO_wrapper bio;
+  int err = 0;
+  http_connection()
+    : bio(hostname.c_str(), port.c_str(), vndb_ctx) {
+    init();
+  }
+  http_connection(std::string_view hostname, std::string_view port)
+    : hostname{hostname}, port{port}, bio(hostname, port, vndb_ctx) {
+      init();
+    }
+  void init(){
+    if(bio){
+      err = !bio.connect();
+    } else {
+      err = 1;
+    }
+  }
+  //Perform an http get request for 'uri' and copy the response body into buf.
+  //return 0 for a 200 response, a negitive number if there was an error in
+  //the underlying connection and return the http response code otherwise.
+  int http_get(std::string_view uri, util::svector<char>& buf);
+  //indicates if there was an error in the constructor.
+  operator bool(){
+    return err == 0;
+  }
+};
 //Struct dealing with communication with the vndb server.
 struct vndb_connection {
   static constexpr char EOT = 0x4; // message terminator
@@ -177,6 +245,9 @@ struct sqlite3_stmt_wrapper {
       *sql = sql_tail;
     }
   }
+  ~sqlite3_stmt_wrapper(){
+    sqlite3_finalize(stmt);
+  }
   //same parameters as underlying sqlite function,
   //Conversion to bool to check for error
   operator bool(){
@@ -184,6 +255,9 @@ struct sqlite3_stmt_wrapper {
   }
   //implict conversion to underlying pointer
   operator sqlite3_stmt*(){
+    return stmt;
+  }
+  sqlite3_stmt* unwrap(){
     return stmt;
   }
   //This is convient but doesn't offer a way to tell between an error
@@ -443,9 +517,9 @@ struct sqlite3_wrapper {
   ~sqlite3_wrapper(){
     sqlite3_close(db);
   }
-  //Conversion to bool to check for error
+  //Conversion to bool to check for error in constructor
   operator bool(){
-    return db_err != SQLITE_OK;
+    return db;
   }
   //implicit conversion to underlying pointer
   operator sqlite3*(){
@@ -469,9 +543,11 @@ struct sqlite3_wrapper {
   //Like perror
   void print_errmsg(const char *s){
     if(s && *s){
-      fprintf(stderr, "%s: %s\n", s, sqlite3_errmsg(db));
+      fprintf(stderr, "%s: %s(%d)\n", s, sqlite3_errmsg(db), 
+              sqlite3_extended_errcode(db));
     } else {
-      fprintf(stderr, "%s\n", sqlite3_errmsg(db));
+      fprintf(stderr, "%s(%d)\n", sqlite3_errmsg(db),
+              sqlite3_extended_errcode(db));
     }
   }
   //errstr gets string version of this->err
@@ -485,6 +561,17 @@ struct sqlite3_wrapper {
   //evaluate the sql in 'sql', the sql is executed for side effects only.
   int exec(const char *sql){
     return sqlite3_exec(db, sql, NULL, NULL, NULL);
+  }
+  //Execute the sql code stored in filename, return 0 on success and an error
+  //code on failure. If 'filename' can not be opened return SQLITE_CANTOPEN.
+  int exec_file(const char *filename){
+    FILE_wrapper sql_file(filename, "r");
+    if(!sql_file){
+      fprintf(stderr, "Error opening %s\n", filename);
+      return SQLITE_CANTOPEN;
+    }
+    std::string sql = sql_file.to_string();
+    return exec(sql.c_str());
   }
   int begin_transaction(){
     return exec("BEGIN TRANSACTION;");

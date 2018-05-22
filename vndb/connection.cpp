@@ -1,4 +1,5 @@
 #include "vndb.h"
+SSL_CTX* vndb_ctx = nullptr;
 //static const char *login_anon =
 //  R"(login {"protocol":1, "client":"vndb-cpp", "clientver":0.1})";
 static const char *login_prefix =
@@ -21,6 +22,7 @@ void print_ssl_errors(const char *fmt, Ts&&... Args){
   fprintf(stderr, fmt, std::forward<Ts>(Args)...);
   ERR_print_errors_fp(stderr);
 }
+//bool SSL_CTX_wrapper::init(){
 static SSL_CTX* init_ssl_ctx(){
   SSL_CTX *ctx  = SSL_CTX_new(TLS_client_method());
   if(!ctx){ goto error; }
@@ -43,7 +45,9 @@ static SSL_CTX* init_ssl_ctx(){
   return nullptr;
 }
 bool init_vndb_ssl_ctx(){
+  DEBUG_PRINTF("Initializing SSL context.\n");
   vndb_ctx = init_ssl_ctx();
+  DEBUG_PRINTF("SSL context = %p.\n", vndb_ctx);
   return vndb_ctx;
 }
 void free_vndb_ssl_ctx(){
@@ -102,29 +106,243 @@ ssize_t BIO_wrapper::write(std::string_view msg){
   }
   return nbytes;
 }
+//repeaditly call read until exactly n bytes have been read
+ssize_t BIO_wrapper::read_n(char *buf, size_t len){
+  size_t nbytes = 0;
+  while(nbytes < len){
+    ssize_t nbytes_read = BIO_read(this->bio, buf + nbytes, len - nbytes);
+    if(nbytes_read <= 0){
+      print_ssl_errors("Error reading from bio.\n");
+      return nbytes_read;
+    }
+    nbytes += nbytes_read;
+  }
+  return nbytes;
+}
+//Internal function to read from a bio into a buffer, if the buffer
+//is more than half full it is resized before reading data, the length
+//of the buffer is increased by the number of bytes read and the
+//result of the read call is returned..
+static ssize_t buf_read(BIO_wrapper &bio, char *& buf, 
+                        size_t& buflen, size_t& bufsz){
+  if((bufsz - buflen) < (bufsz / 2)){
+    buf = (char*)realloc(buf, bufsz*2);
+    bufsz *= 2;
+  }
+  //leave space in buf for a null terminator, its kinda lame, but I need to.
+  ssize_t nbytes =  bio.read(buf + buflen, bufsz - buflen - 1);
+  //Assume that if nbytes < 0 that the caller doesn't really care
+  //about buflen anymore so it doesn't matter if we make it smaller.
+  buflen += nbytes;
+  return nbytes;
+}
+ssize_t BIO_wrapper::read_all(util::svector<char> &buf){
+  static constexpr size_t min_bufsz = 1024;
+  size_t bufsz = buf.capacity();
+  if(bufsz < min_bufsz){
+    buf.reserve(min_bufsz);
+    bufsz = min_bufsz;
+  }
+  char *ptr = buf.data();
+  ssize_t nbytes = 0, nbytes_total = 0;
+  while((nbytes = BIO_read(this->bio, ptr + nbytes, bufsz - nbytes)) > 0){
+    nbytes_total += nbytes;
+    if((bufsz - nbytes) < (bufsz / 2)){
+      ptr = (char*)realloc(ptr, bufsz*2);
+      bufsz *= 2;
+    }
+  }
+  if(nbytes < 0){
+    print_ssl_errors("Error reading from bio.\n");
+    buf.set_contents(ptr, 0, bufsz);
+    return nbytes;
+  } else {
+    buf.set_contents(ptr, nbytes_total, bufsz);
+    return nbytes_total;
+  }
+}
 //Repeatedly calls read until the delimiter character is read,
 //it is assumed that the delimiter will be at the end of the
 //message, so only the last byte is checked after each read.
 //The data is stored in buf which is resized if needed.
 ssize_t BIO_wrapper::read_delim(util::svector<char> &buf, char delim){
-  size_t nbytes = 0;
+  size_t buflen = 0;
   size_t bufsz = buf.capacity();
   char *ptr = buf.data();
   do {
-    if((bufsz - nbytes) < (bufsz / 2)){
-      ptr = (char*)realloc(ptr, bufsz*2);
-      bufsz *= 2;
-    }
-    ssize_t nbytes_read = this->read(ptr + nbytes, bufsz - nbytes);
-    if(nbytes_read <= 0){
+    ssize_t nbytes = buf_read(*this, ptr, buflen, bufsz);
+    if(nbytes <= 0){
       buf.set_contents(ptr, 0, bufsz);
-      return nbytes_read;
+      return nbytes;
     }
-    nbytes += nbytes_read;
-  } while(ptr[nbytes-1] != delim);
-  buf.set_contents(ptr, nbytes, bufsz);
-  return nbytes;
+  } while(ptr[buflen-1] != delim);
+  buf.set_contents(ptr, buflen, bufsz);
+  return buflen;
 }
+//Same as above but using a multicharacter string as the delimiter.
+ssize_t BIO_wrapper::read_delim(util::svector<char> &buf, const char* delim){
+  size_t buflen = 0;
+  size_t bufsz = buf.capacity();
+  char *ptr = buf.data();
+  size_t delim_len = strlen(delim);
+  do {
+    ssize_t nbytes = buf_read(*this, ptr, buflen, bufsz);
+    if(nbytes <= 0){
+      buf.set_contents(ptr, 0, bufsz);
+      return nbytes;
+    }
+  } while(memcmp(ptr + (buflen-delim_len), delim, delim_len) != 0);
+  buf.set_contents(ptr, buflen, bufsz);
+  return buflen;
+}
+#if 0
+int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
+  static constexpr std::string_view success_response = "HTTP/1.1 200 OK\r\n"sv;
+  static constexpr std::string_view length_field = "Content-Length: "sv;
+  buf.clear();
+  buf.reserve(1024);
+  //Due to how I've written things I can't read until a delmiter unless
+  //its at the end of the message, so I make a head request to get the
+  //header length (and content length) so I can skip over it 
+  int nbytes = snprintf(buf.data(), buf.capacity(),
+                        "HEAD %s HTTP/1.1\r\nHost: %s\r\n\r\n", 
+                        uri.data(), hostname.data());
+  DEBUG_PRINTF("Sending http HEAD request:\n%.*s\n", nbytes, buf.data());
+  if(bio.write(std::string_view(buf.data(), nbytes)) < 0){
+    return -1;
+  }
+  DEBUG_PRINTF("Reading response.\n");
+  int header_length = (int)bio.read_delim(buf, "\r\n\r\n");
+  if(header_length <= 0){
+    //Return -1 for 0 bytes read.
+    return (header_length ? -1 : header_length);
+  }
+  DEBUG_PRINTF("HEAD response:\n%.*s\n", header_length, buf.data());
+  //Check the status line, I'm assuming if that's ok then the rest of the
+  //header is fine too.
+  if(memcmp(buf.data(), success_response.data(),
+            std::min(buf.size(), success_response.size()) != 0)){
+    char *status_code_offset = (char*)memchr(buf.data(), ' ', buf.size());
+    if(status_code_offset){
+      int status_code = strtol(status_code_offset, &status_code_offset, 10);
+      if(status_code > 0){
+        return status_code;
+      }
+    }
+    fprintf(stderr, "Error malformed http status line %.*s.\n", 
+            (int)buf.size(), buf.data());
+    return -1;
+  }
+  buf[header_length-1] = '\0';//avoid possible buffer overrun in strstr.
+  char *length_offset = strstr(buf.data(), length_field.data());
+  if(!length_offset){
+    fprintf(stderr, "Error could not find Content-Length in header.\n");
+    return -1;
+  }
+  int content_length = strtol(length_offset + length_field.size(), 
+                              &length_offset, 0);
+  if(content_length == 0){
+    fprintf(stderr, "Error parsing content length, or content length was 0.\n");
+    return -1;
+  }
+  buf.clear();
+  buf.reserve(content_length + 1);//leave space for null terminator, because why not.
+  nbytes = snprintf(buf.data(), buf.capacity(),
+                    "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n", 
+                    uri.data(), hostname.data());
+  DEBUG_PRINTF("Sending http GET request:\n%.*s\n", nbytes, buf.data());
+  if(bio.write(std::string_view(buf.data(), nbytes)) <= 0){
+    return -1;
+  }
+  nbytes = bio.read_n(buf.data(), header_length);
+  if(nbytes <= 0){
+    return (nbytes ? -1 : nbytes);
+  }
+  assert(nbytes == header_length);
+  nbytes = bio.read_n(buf.data(), content_length);
+  if(nbytes <= 0){
+    return (nbytes ? -1 : nbytes);
+  }
+  assert(nbytes == content_length);
+  buf.set_length(nbytes);
+  return 0;
+}
+#endif
+#if 1
+//Issue an http get request for 'uri'.
+//We read the http header into a stack allocated buffer to figure out
+//the size of the actual content, then read the content into buf.
+int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
+  static constexpr std::string_view success_response = "HTTP/1.1 200 OK\r\n"sv;
+  static constexpr std::string_view length_field = "Content-Length: "sv;
+  static constexpr std::string_view header_delim = "\r\n\r\n"sv;
+  //This is the maximum http header size for most servers, if we get a
+  //header thats larger than this we can just crash.
+  static constexpr size_t tmp_buf_sz = 8096;
+  char tmp_buf[tmp_buf_sz];//Stack allocated buffer for the header.
+  int tmp_buf_len = 0;
+  int nbytes = snprintf(tmp_buf, tmp_buf_sz,
+                        "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n", 
+                        uri.data(), hostname.data());
+//  DEBUG_PRINTF("Sending http GET request:\n%s\n", tmp_buf);
+  if(bio.write(std::string_view(tmp_buf, nbytes)) < 0){
+    return -1;
+  }
+//  DEBUG_PRINTF("Reading response.\n");
+  //This should be enough to read the whole header, without reading 
+  //too much actual content.
+  nbytes = bio.read(tmp_buf, 512);
+  if(nbytes <= 0){ return (nbytes ? -1 : nbytes); }
+  tmp_buf_len = nbytes;
+  tmp_buf[tmp_buf_len] = '\0';
+  //Check for a 200 OK response, return response code if we get something else.
+  if(strncmp(tmp_buf, success_response.data(), success_response.size()) != 0){
+    char *status_code_offset = (char*)strchr(tmp_buf, ' ');
+    if(status_code_offset){
+      int status_code = strtol(status_code_offset, &status_code_offset, 10);
+      if(status_code > 0){
+        return status_code;
+      }
+    }
+    fprintf(stderr, "Error malformed http status line %s.\n", tmp_buf);
+    return -1;
+  }
+  //Find the end of the header (two empty lines in a row)
+  char *header_end = strstr(tmp_buf, header_delim.data());
+  while(header_end == nullptr){
+    nbytes = bio.read(tmp_buf + tmp_buf_len, tmp_buf_sz - tmp_buf_len -1);
+    if(nbytes <= 0){  return (nbytes ? -1 : nbytes); }
+    tmp_buf_len += nbytes;
+    tmp_buf[tmp_buf_len] = '\0';
+    header_end = strstr(tmp_buf, header_delim.data());    
+  }
+  //Figure out content length and copy any content we already read from
+  //tmp_buf into buf.
+  int header_length = (header_end - tmp_buf) + header_delim.size();
+//  DEBUG_PRINTF("Response header:\n%.*s\n", header_length, tmp_buf);
+  char *length_offset = strstr(tmp_buf, length_field.data());
+  if(!length_offset){
+    fprintf(stderr, "Error could not find Content-Length in header.\n");
+    return -1;
+  }
+  int content_length = strtol(length_offset + length_field.size(), 
+                              &length_offset, 0);
+  if(content_length == 0){
+    fprintf(stderr, "Error parsing content length, or content length was 0.\n");
+    return -1;
+  }
+  buf.clear();
+  buf.reserve(content_length);
+  int content_read = tmp_buf_len - header_length;
+  memcpy(buf.data(), tmp_buf + header_length, content_read);
+  
+  nbytes = bio.read_n(buf.data() + content_read, content_length - content_read);
+  if(nbytes <= 0){  return (nbytes ? -1 : nbytes); }  
+  assert((nbytes + content_read) == content_length);
+  buf.set_length(content_length);
+  return 0;
+}
+#endif
 vndb_connection::vndb_connection(std::string_view username,
                                  std::string_view passwd)
   : bio(vndb_hostname, vndb_tls_port_number, vndb_ctx),
@@ -168,7 +386,7 @@ bool vndb_connection::login(){
 }
 int vndb_connection::write(const char *str, size_t len){
 //  DEBUG_PRINTF("Writing |%.*s|\n", len, str);
-//  if(str[len-1] != this->EOT){    
+//  if(str[len-1] != this->EOT){
 //    DEBUG_PRINTF("Error missing end of message character, got '%d'\n", str[len-1]);
 //    return -1;
 //  }
@@ -200,12 +418,12 @@ int vndb_connection::read(){
 //  DEBUG_PRINTF("Read |%s|\n", this->buf.c_str());
   return nbytes;
 };
-json vndb_connection::get_error(){  
+json vndb_connection::get_error(){
   util::string_view response = this->buf.to_string_view();
 //  DEBUG_PRINTF("Recieved error %s\n", response.data());
   assert(has_prefix(response, "error"));
   this->error = true;
-  fprintf(stderr, "%.*s\n", response.size(),response.data());
+  fprintf(stderr, "%.*s\n", (int)response.size(),response.data());
   return json::parse(response.substr(constexpr_strlen("error")));
 }
 

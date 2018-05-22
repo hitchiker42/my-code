@@ -40,7 +40,7 @@ static constexpr std::string_view sql_insert_trait =
         @id, @name, @full_name, @description,
         @meta, @chars, @aliases, @parents);)EOF"sv;
 static constexpr std::string_view sql_insert_tag =
-  R"EOF(insert or replace into traits values (
+  R"EOF(insert or replace into tags values (
         @id, @name, @description, @meta, @vns,
         @category, @aliases, @parents);)EOF"sv;
 
