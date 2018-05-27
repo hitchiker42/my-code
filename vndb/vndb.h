@@ -67,7 +67,7 @@ struct BIO_wrapper {
   BIO_wrapper() = default;
   BIO_wrapper(const char* hostname, const char* port,
               SSL_CTX* ctx = vndb_ctx);
-  BIO_wrapper(std::string_view hostname, std::string_view port, 
+  BIO_wrapper(std::string_view hostname, std::string_view port,
               SSL_CTX* ctx = vndb_ctx)
     : BIO_wrapper(hostname.data(), port.data(), ctx) {}
   ~BIO_wrapper();
@@ -84,7 +84,7 @@ struct BIO_wrapper {
   ssize_t read(char *buf, size_t len);
   //Read exactly n bytes into buf.
   ssize_t read_n(char *buf, size_t n);
-  //these next two functions repeatidly call BIO_read, if there is an error 
+  //these next two functions repeatidly call BIO_read, if there is an error
   //the length of buf is set to 0 and the error code is returned, otherwise
   //the total number of bytes read is returned.
 
@@ -100,21 +100,6 @@ struct BIO_wrapper {
     return bio;
   }
 };
-//definition of different vndb objects, since we need this in
-//vndb_connection.
-namespace vndb {
-enum class object_type {
-  VN = 0,
-  release,
-  producer,
-  character,
-  staff,
-//Not obtained by the api, but rather from complete dumps that are downloaded.
-  tag,
-  trait
-};
-constexpr int num_object_types = to_underlying(object_type::trait)+1;
-}
 struct http_connection {
   //For vndb we need to exclude the www, since I'm not going to handle
   //redirects, and www.vndb.org will give a redirect response.
@@ -146,6 +131,21 @@ struct http_connection {
     return err == 0;
   }
 };
+//definition of different vndb objects, since we need this in
+//vndb_connection.
+namespace vndb {
+enum class object_type {
+  VN = 0,
+  release,
+  producer,
+  character,
+  staff,
+//Not obtained by the api, but rather from complete dumps that are downloaded.
+  tag,
+  trait
+};
+constexpr int num_object_types = to_underlying(object_type::trait)+1;
+}
 //Struct dealing with communication with the vndb server.
 struct vndb_connection {
   static constexpr char EOT = 0x4; // message terminator
@@ -155,9 +155,40 @@ struct vndb_connection {
   std::string passwd;
   bool logged_in = false;
   bool error = false;//set to true if server returns an error
+  bool wait_on_throttle = true;
+  bool throttled = false;
   static constexpr const char *hostname = vndb_hostname;
   static constexpr const char *port = vndb_tls_port_number;
-  vndb_connection(std::string_view username, std::string_view passwd);
+  //Get commands, without the filter or options, to get all possible
+  //information for the different types of vndb objects.
+  static constexpr std::string_view get_vn_command_base =
+    "get vn basic,details,anime,relations,tags,stats,screens,staff "sv;
+  static constexpr std::string_view get_release_command_base =
+    "get release basic,details,vn,producers "sv;
+  static constexpr std::string_view get_producer_command_base =
+    "get producer basic,details,relations "sv;
+  //Excludes the character measurements, since I really don't need them.
+  static constexpr std::string_view get_character_command_base =
+    "get character basic,details,traits,vns,voiced "sv;
+  static constexpr std::string_view get_staff_command_base =
+    "get staff basic,details,aliases,vns,voiced "sv;
+  static constexpr std::string_view get_get_command_base(vndb::object_type what){
+    assert(what != vndb::object_type::tag);
+    assert(what != vndb::object_type::trait);
+    switch(what){
+      case(vndb::object_type::VN): return get_vn_command;
+      case(vndb::object_type::release): return get_release_command;
+      case(vndb::object_type::producer): return get_producer_command;
+      case(vndb::object_type::character): return get_character_command;
+      case(vndb::object_type::staff):  return get_staff_command;
+      default:
+        assert(false);
+    }
+  }
+
+
+  vndb_connection(std::string_view username, std::string_view passwd,
+                  bool wait = true);
   vndb_connection();
 
   //both write and write_buf will append an EOT if it is missing
@@ -170,8 +201,16 @@ struct vndb_connection {
   //is available repeat until there are no more results left.
   //The value returned from the server is checked for errors.
   //returns number of results, or -1 on error, on error any
-  //results already retrieved are kept.
+  //results already retrieved are kept, and the json object containing
+  //the error response can be obtained using get_error;
   int send_get_command(std::vector<json>& results,
+                       util::string_view sort_by = "id");
+  //Run a get command and call 'callback' with each page of results as
+  //they are retrieved. The callback is free to modify the vector of items
+  //it is given. If 'callback' returns a nonzero value then the function
+  //will immediately terminate and return that value.
+  using get_callback = std::function<int(std::vector<json>&)>;
+  int send_get_command(get_callback &callback,
                        util::string_view sort_by = "id");
   //Internal helper function for send_get_command.
   json send_get_command_once(int page_no,
@@ -193,11 +232,15 @@ struct vndb_connection {
           std::vector<json>& results){
     return get(what, start, start + 25, results);
   }
+  int get(vndb::object_type what, int start, int stop,
+          get_callback& callback);
+  int get_all(vndb::object_type what, get_callback& callback);
   //Get a number of vns from the server starting at a given id
   //and ending at either a given id, or id+25 (which is the max
   //number of vns we can get per response.
-  int get_vns(int start, int stop, std::vector<json>& vec);
-
+  int get_vns(int start, int stop, std::vector<json>& vec){
+   return get(vndb::object_type::VN, start, stop, vec);
+  }
   int get_vns(int start, std::vector<json>& vec){
     return get_vns(start, start + 25, vec);
   }
@@ -209,6 +252,29 @@ struct vndb_connection {
     return ret;
   }
   json dbstats();
+  //TODO: change these so they get 100 results at a time, since
+  //thats allowed.
+  json get_vnlist(std::vector<json>& vec){
+    buf.append("get vnlist (uid = 0)");
+    return send_get_command(vec);
+  }
+  json get_wishlist(std::vector<json>& vec){
+    buf.append("get wishlist (uid = 0)");
+    return send_get_command(vec);
+  }
+  //Functions to add/remove/modify votes / entries on user lists.
+  //value is a score on [10,100]
+  bool send_set_command();
+  bool set_vote(int vn_id, int value);
+  bool remove_vote(int vn_id);
+  //priority is 0:high, 1:medium, 2:low, 3:blacklist
+  bool set_wishlist(int vn_id, int priority);
+  bool remove_from_wishlist(int vn_id);
+  //status 0=Unknown, 1=playing, 2=finished, 3=stalled, 4=dropped.
+  bool set_vnlist(int vn_id, int status = 0);
+  //I've never set a note on my vnlist, so I doubt I'll use this
+  bool set_vnlist(int vn_id, std::string_view note, int status = 0);
+  bool remove_from_vnlist(int vn_id);
 };
 //being written it C sqlite uses cpp defines for constants, which
 //makes sense, but in C++ we have the benifit enums being compile
@@ -232,7 +298,7 @@ struct sqlite3_stmt_wrapper {
                        &stmt, nullptr);
   }
   //if 'sql' contains multiple sql stamtement this should be used,
-  //it will modify 'sql' so it contains the unused portion of it's 
+  //it will modify 'sql' so it contains the unused portion of it's
   //original value.
   sqlite3_stmt_wrapper(std::string_view *sql, sqlite3* db,
                        bool persistant = false){
@@ -365,7 +431,7 @@ struct sqlite3_stmt_wrapper {
   }
   //Get the number of columns in the current row.
   int get_ncolumns(){
-    return sqlite3_data_count(stmt);    
+    return sqlite3_data_count(stmt);
   }
   std::string_view column_name(int i){
     return sqlite3_column_name(stmt, i);
@@ -387,7 +453,7 @@ struct sqlite3_stmt_wrapper {
 
   std::vector<std::string_view> get_row_names(){
     std::vector<std::string_view> ret;
-    return get_row_names();
+    return get_row_names(ret);
   }
   std::vector<std::string_view>& get_row_names(std::vector<std::string_view>& row){
     int ncols = get_ncolumns();
@@ -510,6 +576,8 @@ struct sqlite3_wrapper {
   sqlite3 *db;
   //Set to the result of the last sqlite function
   int db_err = SQLITE_OK;
+  
+  bool in_transaction = false;
   sqlite3_wrapper(std::string_view filename,
                   int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE){
     db_err = sqlite3_open_v2(filename.data(), &db, flags, NULL);
@@ -543,7 +611,7 @@ struct sqlite3_wrapper {
   //Like perror
   void print_errmsg(const char *s){
     if(s && *s){
-      fprintf(stderr, "%s: %s(%d)\n", s, sqlite3_errmsg(db), 
+      fprintf(stderr, "%s: %s(%d)\n", s, sqlite3_errmsg(db),
               sqlite3_extended_errcode(db));
     } else {
       fprintf(stderr, "%s(%d)\n", sqlite3_errmsg(db),
@@ -592,7 +660,7 @@ struct sqlite3_wrapper {
     return (toggle ? set_read_only() : clear_read_only());
   }
   sqlite3_stmt_wrapper prepare_stmt(const std::string_view& sv){
-    
+
     return prepare_stmt(sv.data(), sv.size(), nullptr);
   }
   sqlite3_stmt_wrapper prepare_stmt(const char* sql, int len = -1,
@@ -602,19 +670,31 @@ struct sqlite3_wrapper {
     return sqlite3_stmt_wrapper(stmt);
   }
 };
+
 int sqlite_insert_vn(json vn, sqlite3_stmt_wrapper& stmt);
-#if 0
 //Contains the objects associated with inserting and querying the database
-struct vndb_sql_context {  
+struct vndb_sql_context {
+  enum class tables {
+    VNs,
+    producers,
+    releases,
+    staff,
+    characters,
+    tags,
+    traits,
+    relations,
+    vn_tags,
+    vn_images
+  };
   sqlite3_wrapper db;
   //These are not automatically initialized, you need to explicitly initialize
   //them, this is to avoid the overhead of creating prepared statments you
   //may never use.
   std::array<sqlite3_stmt_wrapper, vndb::num_object_types> get_by_id_stmts = {{}};
   std::array<sqlite3_stmt_wrapper, vndb::num_object_types> insert_stmts = {{}};
-  
+
   json get_by_id(int id, vndb::object_type what){}
-    
+
   int insert(json object, vndb::object_type what);
 
   sqlite3_wrapper get_db(){
@@ -627,13 +707,8 @@ struct vndb_sql_context {
   sqlite3_stmt_wrapper get_insert_stmt(vndb::object_type what){
     return get_by_id_stmts[to_underlying(what)];
   }
-
-  int exec(std::string_view sql);//execute sql for side effects
-  //execute sql calling f after each row
-  int exec(std::string_view sql, std::function<int(sqlite_stmt_wrapper&)> &f);
-  //execute sql and parse into a json array.
-  json exec_json(std::string_view sql);
-  }
+  std::function<int(std::vector<json>)> gen_insert_callback(vndb::object_type what);
+}
 #endif
 namespace vndb {
 using string = std::string;

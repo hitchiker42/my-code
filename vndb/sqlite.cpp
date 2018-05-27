@@ -1,28 +1,34 @@
 #include "vndb.h"
 #include "sql.h"
+
 template<typename T>
 using vector = util::svector<T>;//can change to std::vector
 using string = util::string;//can change to std::string
 
 //Convert a list stored in a string using delim as a seperator into a
 //json array. eg "a,b,c",',' -> ["a","b","c"];
-json parse_delimted_string(const char *str, char delim){
-  std::vector<std::string> arr;
+static json parse_delimted_string(const char *str, char delim){
+  json::array_t arr;
   while(*str){
     const char *start = str;
     while(*str && *str != delim){
       ++str;
     }
-    arr.emplace_back(start, str - start);
+    arr.emplace_back(json::string_t(start, str - start));
     if(*str == '\0'){ break; }
     ++str;//skip past newline
   }
   return json(std::move(arr));
 }
+static json parse_delimted_string(const std::string *str, char delim){
+  if(!str){
+    return json(json::value_t::array);
+  } else {
+    return parse_delimted_string(str.c_str(), delim);
+  }
+}
 //add a vn given as json into the database
-//This will probably be a member function so stmt will likely
-//not be a parameter but a member variable.
-int sqlite_insert_vn(json vn, sqlite3_stmt_wrapper& stmt){
+int sqlite_insert_vn(const json &vn, sqlite3_stmt_wrapper& stmt){
   int idx = 1;
   //get_ptr is used for values that might be null, get/get_ref are
   //used for values that can't be null.
@@ -33,7 +39,8 @@ int sqlite_insert_vn(json vn, sqlite3_stmt_wrapper& stmt){
   stmt.bind(idx++, vn["languages"]);
   stmt.bind(idx++, vn["orig_lang"]);
   stmt.bind(idx++, vn["platforms"]);
-  stmt.bind(idx++, vn["aliases"].get_ptr<json::string_t>());
+  stmt.bind(idx++, 
+            parse_delimted_string(vn["aliases"].get_ptr<json::string_t>()), '\n');
   stmt.bind(idx++, vn["length"].get_ptr<int64_t>());
   stmt.bind(idx++, vn["description"].get_ptr<json::string_t>());
   stmt.bind(idx++, vn["links"]);
@@ -42,14 +49,108 @@ int sqlite_insert_vn(json vn, sqlite3_stmt_wrapper& stmt){
   stmt.bind(idx++, vn["anime"]);
   stmt.bind(idx++, vn["relations"]);
   stmt.bind(idx++, vn["tags"]);
-  stmt.bind(idx++, vn["popularity"].get<int>());
-  stmt.bind(idx++, vn["rating"].get<int>());
+  stmt.bind(idx++, vn["popularity"].get<double>());
+  stmt.bind(idx++, vn["rating"].get<double>());
   stmt.bind(idx++, vn["votecount"].get<int>());
   stmt.bind(idx++, vn["screens"]);
   stmt.bind(idx++, vn["staff"]);
   //bind the current date/time, I may remove this.
   stmt.bind(idx++, time(NULL));
 //  DEBUG_PRINTF("Executing sql: %s\n", sqlite3_expanded_sql(stmt.unwrap()));
+  return stmt.exec();
+}
+//insert a release into the database.
+int sqlite_insert_release(const json &release,
+                          sqlite3_stmt_wrapper& stmt){
+  int idx = 1;
+  stmt.bind(idx++, release["id"].get<int>());
+  stmt.bind(idx++, release["title"].get_ref<json::string_t>());
+  stmt.bind(idx++, release["original"].get_ptr<json::string_t>());
+  stmt.bind(idx++, release["released"].get_ptr<json::string_t>());
+  stmt.bind(idx++, release["type"].get<std::string_view>());
+  stmt.bind(idx++, release["patch"].get<bool>());
+  stmt.bind(idx++, release["languages"]);
+  stmt.bind(idx++, release["website"].get_ptr<json::string_t>());
+  stmt.bind(idx++, release["notes"].get_ptr<json::string_t>());
+  stmt.bind(idx++, release["minage"].get_ptr<int64_t>());
+  stmt.bind(idx++, release["platforms"]);
+  stmt.bind(idx++, release["resolution"].get_ptr<json::string_t>());
+  stmt.bind(idx++, release["voiced"].get_ptr<int64_t>());
+  stmt.bind(idx++, release["animation"]);
+  stmt.bind(idx++, release["vn"]);
+  stmt.bind(idx++, release["producers"]);
+  return stmt.exec();
+}
+// Add relations between each VN and producer from release.
+// Since the relations table use foreign keys it is an error
+// to try and add a relation for a non-existant VN/producer.
+int sqlite_insert_relations(const json& release,
+                            sqlite3_stmt_wrapper& stmt){
+  json& vns = release["vn"];
+  json& producers = release["producers"];
+  //I'm pretty sure vns can't be empty, but it doesn't really matter.
+  if(vns.empty() || producers.empty()){
+    return SQLITE_OK;
+  }
+  //order of columns is vn, producer, release.
+  stmt.bind(3, release["id"].get<int>());
+  for(auto &&vn : vns){
+    stmt.bind(1, vn["id"].get<int>());
+    for(auto &&producer : producers){
+      stmt.bind(2, producer["id"].get<int>());
+      err = stmt.exec(false);//Don't reset the bindings
+      if(err != SQLITE_OK){
+        return err;
+      }
+    }
+  }
+  return SQLITE_OK;
+}
+int sqlite_insert_producer(const json& producer,
+                           sqlite3_stmt_wrapper& stmt){
+  int idx = 1;
+  stmt.bind(idx++, producer["id"].get<int>());
+  stmt.bind(idx++, producer["name"].get<std::string_view>());
+  stmt.bind(idx++, producer["original"].get_ptr<json::string_t>());
+  stmt.bind(idx++, producer["type"].get_ptr<json::string_t>());
+  stmt.bind(idx++, producer["language"].get_ptr<json::string_t>());
+  stmt.bind(idx++, producer["links"]);
+  stmt.bind(idx++, 
+            parse_delimted_string(producer["aliases"].get_ptr<json::string_t>(), '\n'))
+  stmt.bind(idx++, producer["description"].get_ptr<json::string_t>());
+  //This gives the relationship between this producer and other producers not vns.
+  stmt.bind(idx++, producer["relations"].get_ptr<json::string_t>());
+  return stmt.exec();
+}
+int sqlite_insert_staff(const json& staff,
+                        sqlite3_stmt_wrapper& stmt){
+  stmt.bind(idx++, staff["id"].get<int>());
+  stmt.bind(idx++, staff["name"].get<std::string_view>());
+  stmt.bind(idx++, staff["original"].get_ptr<json::string_t>());
+  stmt.bind(idx++, staff["language"].get_ptr<json::string_t>());
+  stmt.bind(idx++, staff["gender"].get_ptr<json::string_t>());
+  stmt.bind(idx++, 
+            parse_delimted_string(staff["aliases"].get_ptr<json::string_t>(), '\n'))
+  stmt.bind(idx++, staff["description"].get_ptr<json::string_t>());
+  stmt.bind(idx++, staff["image"].get_ptr<json::string_t>());
+  stmt.bind(idx++, staff["traits"]);
+  stmt.bind(idx++, staff["vns"]);
+  stmt.bind(idx++, staff["voiced"]);
+  return stmt.exec();
+}
+int sqlite_insert_character(const json& chara,
+                           sqlite3_stmt_wrapper& stmt){
+  stmt.bind(idx++, chara["id"].get<int>());
+  stmt.bind(idx++, chara["name"].get<std::string_view>());
+  stmt.bind(idx++, chara["original"].get_ptr<json::string_t>());
+  stmt.bind(idx++, chara["gender"].get_ptr<json::string_t>());
+  stmt.bind(idx++, 
+            parse_delimted_string(chara["aliases"].get_ptr<json::string_t>(), '\n'))
+  stmt.bind(idx++, chara["description"].get_ptr<json::string_t>());
+  stmt.bind(idx++, chara["image"].get_ptr<json::string_t>());
+  stmt.bind(idx++, chara["traits"]);
+  stmt.bind(idx++, chara["vns"]);
+  stmt.bind(idx++, chara["voiced"]);
   return stmt.exec();
 }
 int sqlite_insert_vn_tags(int vn_id, json vn_tags,
@@ -61,7 +162,6 @@ int sqlite_insert_vn_tags(json vn,
 int sqlite_insert_vn_tags(int vn_id, json vn_tags,
                           sqlite3_wrapper &db){
   //We make the vn_id part of the command, and use a parameter for the tags,
-  //this is a compromise between the two extremes.
   static constexpr const char *fmt_template =
     "(insert or replace into vn_tags values (%d, @tag))";
   static constexpr int fmt_template_size = constexpr_strlen(fmt_template);
@@ -133,6 +233,8 @@ int sqlite_insert_producer(json producer, sqlite3_stmt_wrapper& stmt){
   stmt.bind(idx++, producer["original"].get<json::string_view_t>());
 }
 */
+int insert_callback_impl(std::vector<json>& items, sqlite3_wrapper &db){
+}
 
 
 std::vector<std::string_view>&
@@ -192,7 +294,7 @@ json sqlite3_stmt_wrapper::get_row_json(){
       case sqlite3_type::null:
         obj.emplace(name, json_null);
         break;
-      //I know this will never come up in this application, 
+      //I know this will never come up in this application,
       //if this were possible I'd probably encode the input in base64,
       case sqlite3_type::blob:{
         fprintf(stderr, "Error found unexpectd blob type in sql table %s\n",
@@ -335,7 +437,7 @@ struct json_path {
     }
     return true;
   }
-  //Return the a pointer to the value the json object pointed 
+  //Return the a pointer to the value the json object pointed
   //to by 'ptr' has at the location given by this path, or nullptr if
   //no such location exists.
   json* follow(json *ptr){

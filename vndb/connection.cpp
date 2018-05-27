@@ -1,4 +1,14 @@
 #include "vndb.h"
+#include <chrono>
+//Even though we include this we don't need to link with pthreads since
+//we don't actually use any thread functions.
+#include <thread>
+namespace util {
+void sleep(double seconds){
+  std::chrono::duration<double> dur(seconds);
+  std::this_thread::sleep_for(dur);
+}
+}
 SSL_CTX* vndb_ctx = nullptr;
 //static const char *login_anon =
 //  R"(login {"protocol":1, "client":"vndb-cpp", "clientver":0.1})";
@@ -344,10 +354,10 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
 }
 #endif
 vndb_connection::vndb_connection(std::string_view username,
-                                 std::string_view passwd)
+                                 std::string_view passwd, bool wait)
   : bio(vndb_hostname, vndb_tls_port_number, vndb_ctx),
     buf(4096),
-    username(username), passwd(passwd) {
+    username(username), passwd(passwd), wait_on_throttle{wait} {
   if(this->bio.connect()){
     this->logged_in = this->login();
   }
@@ -382,7 +392,6 @@ bool vndb_connection::login(){
     this->error = true;
     return false;
   }
-
 }
 int vndb_connection::write(const char *str, size_t len){
 //  DEBUG_PRINTF("Writing |%.*s|\n", len, str);
@@ -420,13 +429,43 @@ int vndb_connection::read(){
 };
 json vndb_connection::get_error(){
   util::string_view response = this->buf.to_string_view();
-//  DEBUG_PRINTF("Recieved error %s\n", response.data());
   assert(has_prefix(response, "error"));
-  this->error = true;
-  fprintf(stderr, "%.*s\n", (int)response.size(),response.data());
-  return json::parse(response.substr(constexpr_strlen("error")));
-}
+  DEBUG_PRINTF("Recieved error %s\n", response.data());
 
+  json ret = json::parse(response.substr(constexpr_strlen("error")));
+  if(ret["type"].get_ref<std::string>() == "throttled"){
+    this->throttled = true;
+    //If wait on throttle is true than we don't consider it an error,
+    //otherwise we do, since it will cause an early return.
+    this->error = !this->wait_on_throttle;
+  } else {
+    this->error = true;
+  }
+  return ret;
+}
+//If the last response to conn was an error due to the connection
+//being throttled then wait for the recommented amount of time and return true
+static bool wait_if_throttled(vndb_connection& conn){
+  if(!conn->wait_on_throttle ||
+     !strstr(conn->buf.c_str(), "throttled")){
+    goto error;
+  }
+  char *wait_offset = strstr(conn->buf.c_str(), "fullwait");
+  if(!wait_offset){ goto error; }//super unlikely
+  char *duration_offset = strchr(wait_offset, ':');
+  if(!duration_offset) { goto error; }
+  double duration = strtod(duration_offset + 1, nullptr);
+  if(!duration == 0.0) { goto error; }
+  util::sleep(duration);
+  this->error = false;
+  return true;
+ error:
+  conn->error = true;
+  return false;
+}
+static bool is_error_response(util::string_view response){
+  return has_prefix(response, "error");
+}
 json vndb_connection::send_get_command_once(int page_no,
                                             util::string_view sort_by){
   static const std::string_view options =
@@ -447,7 +486,10 @@ json vndb_connection::send_get_command_once(int page_no,
   }
   //maybe not the most elegant way to do this but it should work.
   util::string_view response = this->buf.to_string_view();
-  if(has_prefix(response, "error")){
+  if(is_error_response(response)){
+    //We can't retry the command if we get a throttled response, We could
+    //save the command after we send it, but that would defeat the 
+    //purpose of this function in the first place.
     return this->get_error();
   }
   if(!has_prefix(response, "results")){
@@ -460,8 +502,6 @@ json vndb_connection::send_get_command_once(int page_no,
   //skip over literal 'results' and parse json.
   return json::parse(response.substr(constexpr_strlen("results")));
 }
-
-
 int vndb_connection::send_get_command(std::vector<json>& results,
                                       util::string_view sort_by){
   std::string cmd = this->buf.to_std_string();//copy command
@@ -470,32 +510,111 @@ int vndb_connection::send_get_command(std::vector<json>& results,
   bool more = true;
   while(more){
     //Should proably reuse this storage.
-    json result = this->send_get_command_once(page_no++, sort_by);
+    json result = this->send_get_command_once(page_no++, sort_by); 
     if(this->error){
+      //Store the error in case the calling function wants more details.
       results.push_back(result);
       return -1;
     }
-    results.reserve(results.size() + result["num"].get<int>());
+    this->buf.clear();
+    this->buf.append(cmd);
+    //If wait_on_throttle is false then error gets set to true and
+    //we take the above branch, so no need to check that here.
+    if(this->throttled){
+      DEBUG_PRINTF("Received throttled error for %s, waiting %f seconds.\n",
+                   result["type"].get_ref<std::string>().c_str(),
+                   result["fullwait"].get<double>());
+
+      util::sleep(result["fullwait"].get<double>());
+      //we could avoid incrementing the page number until later and
+      //then remove this.
+      page_no--;
+      continue;
+    }
     //definately not the fastest way to do this
     json::array_t& items = result["items"].get_ref<json::array_t>();
     for(size_t i = 0; i < items.size(); i++){
       results.emplace_back(std::move(items[i]));
     }
     more = result["more"].get<bool>();
-    this->buf.clear();
-    this->buf.append(cmd);
   }
   return results.size();
 }
+int vndb_connection::send_get_command(get_callback& callback,
+                                      util::string_view sort_by){
+  std::string cmd = this->buf.to_std_string();//copy command
+  int page_no = 1;
+  int count = 0;
+  bool more = true;
+  while(more){
+    //Should proably reuse this storage.
+    json result = this->send_get_command_once(page_no++, sort_by); 
+    if(this->error){
+      return -1;
+    }
+    this->buf.clear();
+    this->buf.append(cmd);
+    //If wait_on_throttle is false then error gets set to true and
+    //we take the above branch, so no need to check that here.
+    if(this->throttled){
+      DEBUG_PRINTF("Received throttled error for %s, waiting %f seconds.\n",
+                   result["type"].get_ref<std::string>().c_str(),
+                   result["fullwait"].get<double>());
 
-int vndb_connection::get_vns(int start, int stop, std::vector<json>& vec){
-  static const std::string_view command =
-    R"||(get vn basic,details,anime,relations,tags,stats,screens,staff
-       (id >= %d and id <= %d))||"sv;
+      util::sleep(result["fullwait"].get<double>());
+      //we could avoid incrementing the page number until later and
+      //then remove this.
+      page_no--;
+      continue;
+    }
+    std::vector<json>& items = result["items"].get_ref<std::vector<json>>();
+    int err = callback(items);
+    if(err != 0){
+      return err;
+    }
+    count += items.size();
+    more = result["more"].get<bool>();
+  }
+  return count;
+}
+bool vndb_connection::send_set_command(){
+  this->buf.append(this->EOT);
+  if(this->write_buf() <= 0){
+    //bio method will print the errors
+    return false;
+  }
+  this->read();
+  if(memcmp(this->buf.data(), "ok", 2) == 0){
+    return true;
+  } else {
+    this->error = true;
+    return false;
+  }
+}  
+int vndb_connection::get(vndb::object_type what, int start, int stop, 
+                         std::vector<json>& vec){
   this->buf.clear();
-  this->buf.append_formatted(command.data(), start, stop, 0);
-  //TODO: optimize for the case where stop-start <= 25
+  std::string_view command_base = this->get_get_command_base(what);
+  buf.append(command_base);
+  buf.append_formatted("(id >= %d and id <= %d)", start, stop);
+  vec.reserve(stop - start);
   return this->send_get_command(vec);
+}
+int vndb_connection::get(vndb::object_type what, int start, int stop, 
+                         get_callback& callback){
+  this->buf.clear();
+  std::string_view command_base = this->get_get_command_base(what);
+  buf.append(command_base);
+  buf.append_formatted("(id >= %d and id <= %d)", start, stop);
+  return this->send_get_command(callback);
+}
+int vndb_connection::get_all(vndb::object_type what,
+                             get_callback& callback){
+  this->buf.clear();
+  std::string_view command_base = this->get_get_command_base(what);
+  buf.append(command_base);
+  buf.append("(id >= 0)");
+  return this->send_get_command(callback);
 }
 json vndb_connection::dbstats(){
   this->buf.clear();
@@ -503,7 +622,7 @@ json vndb_connection::dbstats(){
   this->write_buf();
   this->read();
   util::string_view response = this->buf.to_string_view();
-  if(has_prefix(response, "error")){
+  if(is_error_response(response)){
     return this->get_error();
   }
   if(!has_prefix(response, "dbstats")){
@@ -514,4 +633,87 @@ json vndb_connection::dbstats(){
     return json_null;
   }
   return json::parse(response.substr(constexpr_strlen("dbstats")));
+}
+bool set_vote(int vn_id, int value){
+  this->buf.clear();
+  this->buf.append_formatted("set votelist %d {\"vote\" : %d}",
+                             vn_id, value);
+  //TODO: Refactor this into aseperate functino some how.
+  if(this->send_set_command()){
+    return true;
+  } else if(wait_if_throttled(*this)){
+    //Try again if we got a throttled error
+    return this->set_vote(vn_id, value);
+  } else {
+    return false;
+  }
+}
+bool remove_vote(int vn_id){
+  this->buf.clear();
+  this->buf.append_formatted("set votelist %d", vn_id);
+  if(this->send_set_command()){
+    return true;
+  } else if(wait_if_throttled(*this)){
+    //Try again if we got a throttled error
+    return this->remove_vote(vn_id);
+  } else {
+    return false;
+  }
+}
+//priority is 0:high, 1:medium, 2:low, 3:blacklist
+bool set_wishlist(int vn_id, int priority){
+  assert(priority >= 0 && priority <= 3);
+  this->buf.clear();
+  this->buf.append_formated("set wishlist %d {\"priority\" : %d}",
+                            vn_id, priority);
+  if(this->send_set_command()){
+    return true;
+  } else if(wait_if_throttled(*this)){
+    //Try again if we got a throttled error
+    return this->set_wishlist(vn_id, priority);
+  } else {
+    return false;
+  }
+}
+  
+bool remove_from_wishlist(int vn_id){
+  this->buf.clear();
+  this->buf.append_formated("set wishlist %d", vn_id);
+  if(this->send_set_command()){
+    return true;
+  } else if(wait_if_throttled(*this)){
+    //Try again if we got a throttled error
+    return this->remove_from_wishlist(vn_id);
+  } else {
+    return false;
+  }
+}
+//status 0=Unknown, 1=playing, 2=finished, 3=stalled, 4=dropped.
+bool set_vnlist(int vn_id, int status = 0){
+  assert(status >= 0 && status <= 4);
+  this->buf.clear();
+  this->buf.append_formated("set vnlist %d {\"status\": %d}", vn_id, status);
+  if(this->send_set_command()){
+    return true;
+  } else if(wait_if_throttled(*this)){
+    //Try again if we got a throttled error
+    return this->set_vnlist(vn_id, status);
+  } else {
+    return false;
+  }
+}
+//I've never set a note on my vnlist, so I doubt I'll use this
+bool set_vnlist(int vn_id, std::string_view note, int status = 0);
+bool remove_from_vnlist(int vn_id){
+  assert(status >= 0 && status <= 4);
+  this->buf.clear();
+  this->buf.append_formated("set vnlist %d", vn_id);
+  if(this->send_set_command()){
+    return true;
+  } else if(wait_if_throttled(*this)){
+    //Try again if we got a throttled error
+    return this->remove_from_vnlist(vn_id);
+  } else {
+    return false;
+  }
 }

@@ -3181,7 +3181,7 @@ class parser
       return last_token == token_type::end_of_input;
     }
     bool test_eof(){
-      get_token;
+      get_token();
       return last_token == token_type::end_of_input;
     }
     void init(){
@@ -12551,18 +12551,20 @@ class basic_json
 
     @since version 1.0.0
     */
-    template < typename ValueType, typename std::enable_if <
-                   not std::is_pointer<ValueType>::value and
-                   not std::is_same<ValueType, detail::json_ref<basic_json>>::value and
-                   not std::is_same<ValueType, typename string_t::value_type>::value and
-                   not detail::is_basic_json<ValueType>::value
+    template <typename ValueType, 
+              typename std::enable_if<
+                !std::is_pointer<ValueType>::value &&
+                !std::is_same<ValueType, detail::json_ref<basic_json>>::value &&
+                !std::is_same<ValueType, typename string_t::value_type>::value &&
+                !detail::is_basic_json<ValueType>::value &&
 #ifndef _MSC_VER  // fix for issue #167 operator<< ambiguity under VS2015
-                   and not std::is_same<ValueType, std::initializer_list<typename string_t::value_type>>::value
+                !std::is_same<ValueType, 
+                              std::initializer_list<typename string_t::value_type>>::value &&
 #endif
 #if defined(JSON_HAS_CPP_17)
-                   and not std::is_same<ValueType, typename std::string_view>::value
+                !std::is_same<ValueType, typename std::string_view>::value &&
 #endif
-                   , int >::type = 0 >
+                true, int >::type = 0 >
     operator ValueType() const
     {
         // delegate the call to get<>() const

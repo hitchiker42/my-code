@@ -76,8 +76,13 @@ bool test_insert_vns(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
   db.print_errmsg("Recieved sqlite error");
   return false;
 }
-bool test_connect_and_insert(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
+bool test_connect_and_insert(sqlite3_wrapper &db,
                              int start = 100, int count = 100){
+  sqlite3_stmt_wrapper stmt = db.prepare_stmt(sql_insert_vn);
+  if(!stmt){
+    db.print_errmsg("Error compiling sql statement");
+    return -1;
+  }  
   vndb_connection conn;
   if(!conn.logged_in){
     if(conn.error){

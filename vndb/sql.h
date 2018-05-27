@@ -35,6 +35,9 @@ static constexpr std::string_view sql_insert_release =
         @patch, @languages, @website, @notes, @minage,
         @platforms, @resolution, @voiced, @animation,
         @vn, @producers);)EOF"sv;
+static constexpr std::string_view sql_insert_relation =
+  R"EOF(insert or relpace into relations values (
+        @vn_id, @producer_id, @release_id);)EOF"sv;
 static constexpr std::string_view sql_insert_trait =
   R"EOF(insert or replace into traits values (
         @id, @name, @full_name, @description,

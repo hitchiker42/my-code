@@ -1,4 +1,9 @@
+-- We don't really need foreign_keys since we rarely if ever delete anything,
+-- but I'm including them where they make sense, just as a kind of failsafe.
 pragma foreign_keys = true;
+
+
+-- Main tables
 
 create table if not exists VNs (
 id integer primary key not null,
@@ -8,7 +13,7 @@ released text, --date
 languages json, --json array of strings
 orig_lang json, --""
 platform json, --""
-aliases string, -- list of aliases, with some delimiter (may change to json)
+aliases json, -- list of aliases as a json array.
 -- length is a builtin function, so add a prefix for clarity.
 vn_length integer check (vn_length between 1 and 5),
 description text,
@@ -25,7 +30,7 @@ votecount integer not null,
 screens json, -- json array of objects
 -- may change to array of ints
 staff json, -- json array of objects
---Additional columns 
+--Additional columns
 releases json default '[]', -- json array of ints (mabybe make into an object?)
 producers json default '[]', -- ""
 characters json default '[]', -- ""
@@ -41,6 +46,7 @@ create index if not exists VN_title_idx on VNs (title);
 create index if not exists VN_date_idx on VNs (released);
 create index if not exists VN_rating on VNs (rating);
 
+
 create table if not exists  producers (
 id integer primary key not null,
 name text not null,
@@ -48,7 +54,7 @@ original text,
 type string,
 language string,
 links json,
-aliases string,
+aliases json,
 description text,
 relations json
 );
@@ -79,17 +85,36 @@ producers json not null --array of objects {id, developer (bool),
                         -- producer(bool), name, original, type}
 );
 
--- Table which relates vns, producers and releases 
--- release is a keyword, so add _id as a suffix.
-create table if not exists relations (
-release_id integer not null references releases (id),
-vn integer not null references VNs (id),
-producer integer not null references producers (id),
-primary key (release_id, vn, producer)
+create table if not exists characters (
+id integer primary key not null,
+name text not null,
+original text,
+gender text check (gender isnull or gender in ('m','f','u')),
+-- bloodt text check (bloodt isnull or bloodt in('a','b','ab','o'))
+-- birthday
+aliases json,
+description text,
+image text,
+traits json not null,
+vns json not null,
+voiced json not null
 );
---index vns and producers, no need to index releases
-create index if not exists relations_vn_idx on relations (vn);
-create index if not exists relations_producer_idx on relations (producer);
+create index if not exists character_name_idx on characters (name);
+
+create table if not exists staff (
+id integer primary key not null,
+name text not null,
+original text,
+gender text,
+language text not null,
+links json not null,
+description text,
+aliases json not null,
+main_alias integer not null unique,
+vns json not null,
+voiced json not null
+);
+
 
 create table if not exists tags (
 id integer primary key not null,
@@ -117,6 +142,68 @@ parents json not null -- array of ints
 create index if not exists traits_name_idx on traits(name);
 create index if not exists traits_full_name_idx on traits(full_name);
 
+-- Derived tables
+-- vndb uses postgres sql, which has array types, and has many fields
+-- that are arrays. We store these as json arrays / objects, but also
+-- have several derived tables for faster/eaiser queries.
+
+-- I've attempted to keep these tables as small as possible, more
+-- complex relations can be checked using the json stored in the
+-- main tables.
+
+-- Table which relates vns, producers and releases
+-- release is a keyword, so add _id as a suffix. (or just quote it)
+create table if not exists vn_producer_relations (
+vn integer not null references VNs (id),
+producer integer not null references producers (id),
+release_id integer not null references releases (id),
+primary key (vn, producer, release_id)
+);
+--index vns and producers, no need to index releases
+create index if not exists vp_relations_vn_idx
+       on vn_producer_relations (vn);
+create index if not exists vp_relations_producer_idx
+       on vn_producer_relations (producer);
+
+-- Relations between VNs, characters, and voice actors
+create table if not exists vn_character_actor_relations (
+vn integer not null references VNs (id),
+character integer not null references characters (id),
+actor integer not null references staff (id),
+-- Technically this isn't unique, you could have someone creditied
+-- twice for the same character in one vn under two different aliases.
+primary key (vn, character, voiced)
+);
+create index if not exists vca_relations_vn_idx
+       on vn_character_actor_relations (vn);
+create index if not exists vca_relations_character_idx
+       on vn_character_actor_relations (character);
+create index if not exists vca_relations_actor_idx
+       on vn_character_actor_relations (actor);
+
+-- Relations between VNs and staff (excluding voice actors)
+create table if not exists vn_staff_relations (
+vn integer not null references VNs (id),
+staff integer not null references staff (id),
+);
+create index if not exists vs_relations_vn_idx
+       on vn_staff_relations (vn);
+create index if not exists vs_relations_staff_idx
+       on vn_staff_relations (staff);
+
+-- Table which maps staff aliases (both ids and names) into staff ids.
+-- When looking for staff members by name use this table.
+create table if not exists staff_aliases (
+staff_id integer not null references staff (id),
+-- Since this is unqiue we may as well make it the primary key
+alias_id integer not null primary key,
+alias_name text not null
+);
+create index if not exists staff_aliases_staff_idx on staff_aliases (staff_id);
+create index if not exists staff_aliases_name_idx on staff_aliases (alias_name);
+-- I'm pretty sure this won't do anything since it's the primary key.
+create index if not exists staff_aliases_alias_idx on staff_aliases (alias_id);
+
 --table which relates vns and tags
 create table if not exists vn_tags (
 vn integer not null references VNs (id),
@@ -127,6 +214,48 @@ primary key (vn, tag)
 create index if not exists vn_tags_vn_idx on vn_tags (vn);
 create index if not exists vn_tags_tag_idx on vn_tags (tag);
 
+--table which relates characters and traits
+create table if not exists character_traits (
+character integer not null references characters (id),
+trait integer not null references traits (id),
+primary key (character, trait)
+);
+create index if not exists character_traits_character_idx
+       on character_traits (character);
+create index if not exists character_traits_trait_idx
+       on character_traits (trait);
+
+-- Tables to hold images for characters and vns, these store
+-- the raw jpeg image as a blob.
+create table if not exists vn_images (
+vn integer primary key not null references VNs (id),
+image blob
+);
+create table if not exists character_images (
+character integer primary key not null references characters (id),
+image blob
+);
+
+/*
+-- Tables for wishlist / vnlist
+create table if not exists vnlist (
+vn integer primary key not null references VNs (id),
+status integer check (status between 0 and 4),
+added integer, -- unix timestamp
+notes text, -- almost always, if not always, null,
+-- Information from votelist
+vote real,
+vote_added integer,
+-- personal info
+path text, -- where this vn is located
+-- If the VN doesn't work for some reason (text hooking, needs a crack, 
+-- locale issues, etc) this will be non null and explain the reason.
+not_playable text,
+);
+-- Indexes go here.
+
+create table if not exists wishlist
+*/
 -- Local Variables:
 -- sql-product: sqlite
 -- End:
