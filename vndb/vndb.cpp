@@ -1,5 +1,54 @@
 #include "vndb.h"
 #include "sql.h"
+bool vndb_main::init_insert_stmts(){
+  static constexpr std::array<std::string_view, this->num_tables_total> sql = {{
+      sql_insert_vn, sql_insert_release, sql_insert_producer, 
+      sql_insert_character, sql_insert_staff, sql_insert_tag, sql_insert_trait,
+      sql_insert_vn_producer_relation, sql_insert_vn_character_actor_relation,
+      sql_insert_staff_alias, sql_insert_vn_tags, sql_insert_character_traits
+    }};
+  using table_type = vndb_main::table_type;
+  static constexpr std::array<table_type, this->num_tables_total> types = {{
+      table_type::VN, table_type::release, table_type::producer,
+      table_type::character, table_type::staff, table
+      table_type::tags, table_type::traits,
+      table_type::vn_producer_relations, table_type::vn_character_actor_relations,
+      table_type::vn_staff_relations,table_type::staff_aliases,
+      table_type::vn_tags, table_type::character_traits,
+      table_type::vn_images, table_type::character_images
+    }};
+  for(int i = 0; i < 5; i ++){
+    auto stmt = this->db.prepare_stmt(sql[i]);
+    if(!stmt){
+      return false;
+    }
+    this->insert_stmts[to_underlying(types[i])] = stmt;
+  }
+  return true;
+}
+bool vndb_main::init_get_id_stmts(){
+  std::array<std::string_view, this->num_base_tables> sql = {{
+      sql_select_vn_by_id, sql_select_release_by_id,
+      sql_select_producer_by_id, sql_select_character_by_id,
+      sql_select_staff_by_id, sql_select_tag_by_id, 
+      sql_select_trait_by_id
+  }};
+  using table_type = vndb_main::table_type;
+  static constexpr std::array<table_type, this->num_base_tables> types = {{
+      table_type::VNs, table_type::releases, table_type::producers,
+      table_type::characters, table_type::staff, table_type::tags,
+      table_type::traits
+  }};
+  for(int i = 0; i < 5; i ++){
+    auto stmt = this->db.prepare_stmt(sql[i]);
+    if(!stmt){
+      return false;
+    }
+    this->get_by_id_stmts[to_underlying(types[i])] = stmt;
+  }
+  return true;
+}
+
 //Get 100 VNs from server and write into outfile
 bool test_connection(const char *outfile, int start = 1){
   vndb_connection conn;
@@ -66,7 +115,10 @@ bool test_insert_vns(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
   for(int i = 10; i < num_vns; i+=10){
     if((err = db.begin_transaction()) != SQLITE_OK){ goto error; }
     for(int j = i; j < std::min(num_vns, i + 10); j++){
-      if((err = sqlite_insert_vn(vns[j], stmt)) != SQLITE_OK){ goto error; }
+      if((err = sqlite_insert_vn(vns[j], stmt)) != SQLITE_OK){ 
+        db.rollback_transaction();
+        goto error; 
+      }
     }
     if((err = db.commit_transaction()) != SQLITE_OK){ goto error; }
   }
@@ -76,27 +128,28 @@ bool test_insert_vns(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
   db.print_errmsg("Recieved sqlite error");
   return false;
 }
-bool test_connect_and_insert(sqlite3_wrapper &db,
-                             int start = 100, int count = 100){
-  sqlite3_stmt_wrapper stmt = db.prepare_stmt(sql_insert_vn);
-  if(!stmt){
-    db.print_errmsg("Error compiling sql statement");
-    return -1;
-  }  
-  vndb_connection conn;
-  if(!conn.logged_in){
-    if(conn.error){
-      fprintf(stderr, "Error failed to login with error:\n");
-      json err = conn.get_error();
-      err.print(stdout);
-    } else {
-      fprintf(stderr, "Error failed to connect to server\n");
-    }
+bool download_all(const char *database_filename){
+  vndb_main vndb(database_filename);
+  //compile sql, connect to servert & get dbstats (for progress bars).
+  if(!vndb.db ||
+     !vndb.init_insert_stmts() ||
+     !vndb.connect() ||
+     !vndb.init_db_stats()){
     return false;
   }
+  printf("Downloading VNs\n");
+  if(!vndb.download_and_insert_all(vndb::object_type::VN)){ return false; }
+  printf("Downloading Releases\n");
+  if(!vndb.download_and_insert_all(vndb::object_type::release)){ return false; }
+  printf("Downloading Producers\n");
+  if(!vndb.download_and_insert_all(vndb::object_type::producer)){ return false; }
+  printf("Downloading Characters\n");
+  if(!vndb.download_and_insert_all(vndb::object_type::character)){ return false; }
+  printf("Downloading Staff\n");
+  if(!vndb.download_and_insert_all(vndb::object_type::staff)){ return false; }
+  return true;
 }
 int run_connection_test(){
-
   //TODO: add argument parsing
   const char *outfile = "conn_test.out";
   printf("Running connection test\n");
@@ -143,7 +196,7 @@ int main(int argc, char* argv[]){
   }
   return run_insertion_test();
 }
-#if 0
+
 int main(int argc, char* argv[]){
 
   /*

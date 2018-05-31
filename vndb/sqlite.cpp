@@ -39,7 +39,7 @@ int sqlite_insert_vn(const json &vn, sqlite3_stmt_wrapper& stmt){
   stmt.bind(idx++, vn["languages"]);
   stmt.bind(idx++, vn["orig_lang"]);
   stmt.bind(idx++, vn["platforms"]);
-  stmt.bind(idx++, 
+  stmt.bind(idx++,
             parse_delimted_string(vn["aliases"].get_ptr<json::string_t>()), '\n');
   stmt.bind(idx++, vn["length"].get_ptr<int64_t>());
   stmt.bind(idx++, vn["description"].get_ptr<json::string_t>());
@@ -115,7 +115,7 @@ int sqlite_insert_producer(const json& producer,
   stmt.bind(idx++, producer["type"].get_ptr<json::string_t>());
   stmt.bind(idx++, producer["language"].get_ptr<json::string_t>());
   stmt.bind(idx++, producer["links"]);
-  stmt.bind(idx++, 
+  stmt.bind(idx++,
             parse_delimted_string(producer["aliases"].get_ptr<json::string_t>(), '\n'))
   stmt.bind(idx++, producer["description"].get_ptr<json::string_t>());
   //This gives the relationship between this producer and other producers not vns.
@@ -129,7 +129,7 @@ int sqlite_insert_staff(const json& staff,
   stmt.bind(idx++, staff["original"].get_ptr<json::string_t>());
   stmt.bind(idx++, staff["language"].get_ptr<json::string_t>());
   stmt.bind(idx++, staff["gender"].get_ptr<json::string_t>());
-  stmt.bind(idx++, 
+  stmt.bind(idx++,
             parse_delimted_string(staff["aliases"].get_ptr<json::string_t>(), '\n'))
   stmt.bind(idx++, staff["description"].get_ptr<json::string_t>());
   stmt.bind(idx++, staff["image"].get_ptr<json::string_t>());
@@ -144,7 +144,7 @@ int sqlite_insert_character(const json& chara,
   stmt.bind(idx++, chara["name"].get<std::string_view>());
   stmt.bind(idx++, chara["original"].get_ptr<json::string_t>());
   stmt.bind(idx++, chara["gender"].get_ptr<json::string_t>());
-  stmt.bind(idx++, 
+  stmt.bind(idx++,
             parse_delimted_string(chara["aliases"].get_ptr<json::string_t>(), '\n'))
   stmt.bind(idx++, chara["description"].get_ptr<json::string_t>());
   stmt.bind(idx++, chara["image"].get_ptr<json::string_t>());
@@ -161,30 +161,20 @@ int sqlite_insert_vn_tags(json vn,
 }
 int sqlite_insert_vn_tags(int vn_id, json vn_tags,
                           sqlite3_wrapper &db){
-  //We make the vn_id part of the command, and use a parameter for the tags,
-  static constexpr const char *fmt_template =
-    "(insert or replace into vn_tags values (%d, @tag))";
-  static constexpr int fmt_template_size = constexpr_strlen(fmt_template);
-  static constexpr int bufsz = fmt_template_size + 32;
   if(vn_tags.empty()){
     return SQLITE_OK;
   }
-  char buf[bufsz];
-  int nbytes = snprintf(buf, bufsz, fmt_template, vn_id);
-  //according to the documentation we should include the null terminator in
-  //the size, if we know it's there, its weird.
-  sqlite3_stmt_wrapper stmt = db.prepare_stmt(std::string_view(buf, nbytes+1));
+  auto stmt = db.prepare_stmt(sql_insert_vn_tags);
   if(!stmt){
     return db.err();
   }
-  //vn_tags has the form [[tag_id, tag_score (0-3), spoiler_level(0-2)]*].
-  //we only care about the id here.
+  stmt.bind(1, vn_id);
   int err = db.begin_transaction();
   if(err != SQLITE_OK){ return err; }
-  for(auto&& tag : vn_tags){
+  for(auto &&tag : vn_tags){
     int tag_id = tag[0];
-    stmt.bind(1, tag_id);
-    if((err = stmt.exec()) != SQLITE_OK){
+    stmt.bind(2, tag_id);
+    if((err = stmt.exec(false)) != SQLITE_OK){
       db.rollback_transaction();
       return err;
     }
@@ -233,9 +223,6 @@ int sqlite_insert_producer(json producer, sqlite3_stmt_wrapper& stmt){
   stmt.bind(idx++, producer["original"].get<json::string_view_t>());
 }
 */
-int insert_callback_impl(std::vector<json>& items, sqlite3_wrapper &db){
-}
-
 
 std::vector<std::string_view>&
 sqlite3_stmt_wrapper::get_row_text(std::vector<std::string_view>& row,
@@ -260,7 +247,6 @@ sqlite3_stmt_wrapper::get_row_text(std::vector<std::string_view>& row,
   }
   return row;
 }
-#if 0
 //Given a string that may or may not represent a json array/object
 //return a json value that is either the value obtained by parsing
 //the string if it is valid json or just the string itself if it isn't.
@@ -284,12 +270,12 @@ json sqlite3_stmt_wrapper::get_row_json(){
   json::object_t obj;
   for(int i = 0; i < ncols; i++){
     auto name = this->column_name(i);
-    switch(column_type(i)){
+    switch(this->column_type(i)){
       case(sqlite3_type::integer):
-        obj.emplace(name, json(get_column<int>(i)));
+        obj.emplace(name, json(this->get_column<int>(i)));
         break;
       case sqlite3_type::floating:
-        obj.emplace(name, json(get_column<double>(i)));
+        obj.emplace(name, json(this->get_column<double>(i)));
         break;
       case sqlite3_type::null:
         obj.emplace(name, json_null);
@@ -300,22 +286,41 @@ json sqlite3_stmt_wrapper::get_row_json(){
         fprintf(stderr, "Error found unexpectd blob type in sql table %s\n",
                 sqlite3_column_table_name(this->stmt, i));
         return json_null;        /*
-          //Super inefficent implementation that converts the blob
-          //into an array of bytes
-        json::array_t bytes;
+        //Convert into
+        json::array_t arr;
         size_t blob_size = this->get_column_bytes(i);
-        unsigned char* blob = (unsigned char*)get_column<void*>(i);
-        for(size_t j = 0; j < blob_size; j++){
-          bytes.emplace_back((int)blob[j]);
+        uintptr_t* blob = (uintptr_t*)get_column<void*>(i);
+        for(size_t j = 0; j < (blob_size/8); j++){
+           arr.emplace_back(blob[j]);
         }
-        obj.emplace(name, bytes);
+        j *= 8;
+        uint8_t buf[sizeof(uinptr_t)] = {0};
+        if(j < blob_size){
+          uint8_t* tail = ((uint8_t*)blob) + j;
+          memcpy(buf, tail, blob_size - j);
+          arr.emplace_back(*((uintptr_t*)buf));
+        }
+        obj.emplace(name, arr);
         */
       }
-      //This is the most complicated, since we need to determine
-      //if the column is meant to be json or just a string.
+      //We need to determine if the column is meant to be json or just a string.
+      //sqlite doesn't have a json type, but the sqlite3_column_decltype function
+      //Lets us get the type the column was declared to have as a string, so
+      //we can use that to see if a column is supposed to be json. This is just
+      //an optimization, if we can't get the declared type we just try to parse 
+      //the string as json and insert it as a string if we fail.
       case sqlite3_type::text {
-        std::string_view col_text = get_column<std::string_view>(i);
-        obj.emplace(name, parse_possible_json(col_text));
+        std::string_view col_text = this->get_column<std::string_view>(i);
+        const char *col_type_name = sqlite3_column_decltype(this->stmt, i);
+        if(col_type_name){
+          if(sqlite3_stricmp(col_type_name, "json") == 0){
+            obj.emplace(name, json::parse(col_text));
+          } else {
+            obj.emplace(name, col_text);
+          }
+        } else {
+          obj.emplace(name, parse_possible_json(col_text));
+        }
         break;
       }
     }
@@ -323,7 +328,7 @@ json sqlite3_stmt_wrapper::get_row_json(){
   return json(std::move(obj));
 }
 
-
+#if 0
 //Fairly unoptimized version of the json path type used by the sqlite json
 //extension. Just uses a json array to hold the path elements, which isn't
 //super efficent, a tagged pointer would be better than json, since there are only

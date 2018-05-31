@@ -3,3 +3,4 @@ vndb_cpp
 tag_trait_parser
 # database files
 *.db
+TAGS

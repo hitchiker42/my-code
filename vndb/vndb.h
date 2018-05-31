@@ -14,10 +14,13 @@
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <sqlite3.h>
+//I assume SQLITE_OK == 0 at several points in my code, so make sure it is.
+static_assert(SQLITE_OK == 0);
 //local headers.
 #include "util.h"
 #include "string_buf.h"
 #include "filesystem.h"
+#include "progress_bar.h"
 #include "json.hpp"
 
 extern SSL_CTX* vndb_ctx;
@@ -107,13 +110,18 @@ struct http_connection {
   std::string port = "443";
   BIO_wrapper bio;
   int err = 0;
-  http_connection()
+  http_connection(bool do_connect = true)
     : bio(hostname.c_str(), port.c_str(), vndb_ctx) {
-    init();
-  }
-  http_connection(std::string_view hostname, std::string_view port)
-    : hostname{hostname}, port{port}, bio(hostname, port, vndb_ctx) {
+    if(do_connect){
       init();
+    }
+  }
+  http_connection(std::string_view hostname, std::string_view port, 
+                  bool do_connect = true)
+    : hostname{hostname}, port{port}, bio(hostname, port, vndb_ctx) {
+      if(do_connect){
+        init();
+      }
     }
   void init(){
     if(bio){
@@ -134,17 +142,17 @@ struct http_connection {
 //definition of different vndb objects, since we need this in
 //vndb_connection.
 namespace vndb {
+//Possible targets of the get command
 enum class object_type {
   VN = 0,
   release,
   producer,
   character,
-  staff,
-//Not obtained by the api, but rather from complete dumps that are downloaded.
-  tag,
-  trait
+  staff
 };
 constexpr int num_object_types = to_underlying(object_type::trait)+1;
+static constexpr std::array<std::string_view, num_object_types> 
+object_type_names = {{"VNs", "Releases", "Producers", "Characters", "Staff"}};
 }
 //Struct dealing with communication with the vndb server.
 struct vndb_connection {
@@ -188,8 +196,16 @@ struct vndb_connection {
 
 
   vndb_connection(std::string_view username, std::string_view passwd,
-                  bool wait = true);
-  vndb_connection();
+                  bool wait = true, bool login = true)
+      : bio(vndb_hostname, vndb_tls_port_number, vndb_ctx),
+        buf(4096),
+        username(username), passwd(passwd), wait_on_throttle{wait} {
+    if(login && this->bio.connect()){
+      this->logged_in = this->login();
+    }
+  }
+  vndb_connection(bool wait = true, bool login = true)
+    : vndb_connection("","",wait,login) {}
 
   //both write and write_buf will append an EOT if it is missing
   int write_buf();//write the contents of buf to bio.
@@ -218,6 +234,26 @@ struct vndb_connection {
   //assumes an error response is in buf, parses it as json.
   json get_error();
   bool login();
+  //returns true if already logged in, and if not tries to login and returns
+  //the result of that attempt.
+  bool ensure_logged_in(){
+    if(logged_in){ 
+      return true; 
+    } else {
+      return relogin();
+    }
+  }
+  //sets username and passwd, can be used to switch from an anonymous
+  //session to a specific user.
+  bool login(std::string_view username, std::string_view passwd){
+    this->username = username;
+    this->passwd = passwd;
+    return relogin();
+  }
+  //just a different name for the above function
+  bool relogin(std::string_view username, std::string_view passwd){
+    return login(username, passwd);
+  }
   bool relogin(){
     bool connected = bio.reconnect();
     logged_in = (connected ? login() : false);
@@ -331,6 +367,9 @@ struct sqlite3_stmt_wrapper {
   bool step(){
     int res = sqlite3_step(stmt);
     return res == SQLITE_ROW;
+  }
+  bool step_explicit(){
+    return sqlite3_step(stmt);
   }
   //returns SQLITE_OK (0) if there were no errors in step, and nonzero
   //if the last step caused an error. So you need to check the return
@@ -672,44 +711,202 @@ struct sqlite3_wrapper {
 };
 
 int sqlite_insert_vn(json vn, sqlite3_stmt_wrapper& stmt);
-//Contains the objects associated with inserting and querying the database
-struct vndb_sql_context {
-  enum class tables {
+int sqlite_insert_release(const json &release,
+                          sqlite3_stmt_wrapper& stmt);
+int sqlite_insert_producer(const json& producer,
+                           sqlite3_stmt_wrapper& stmt);
+int sqlite_insert_character(const json& chara,
+                           sqlite3_stmt_wrapper& stmt);
+int sqlite_insert_staff(const json& staff,
+                        sqlite3_stmt_wrapper& stmt);
+template<vndb::object_type what>
+int sqlite_insert_object(const json& obj, sqlite3_stmt_wrapper& stmt){
+  if constexpr(what == vndb::object_type::VN){
+    return sqlite_insert_vn(obj, stmt);
+  } else if(what == vndb::object_type::release){
+    return sqlite_insert_release(obj, stmt);
+  } else if(what == vndb::object_type::producer){
+    return sqlite_insert_prouducer(obj, stmt);
+  } else if(what == vndb::object_type::character){
+    return sqlite_insert_character(obj, stmt);
+  } else if(what == vndb::object_type::staff){
+    return sqlite_insert_staff(obj,stmt);
+  }
+}
+//structure holding the main program context.
+struct vndb_main {
+  enum class table_type {
+    //Base tables, hold the actual information in the database
     VNs,
-    producers,
     releases,
-    staff,
+    producers,
     characters,
+    staff,
     tags,
     traits,
-    relations,
+    num_base_tables = traits + 1,
+    //derived tables, define relations between the base tables.
+    vn_producer_relations = num_base_tables,
+    vn_character_actor_relations,
+    vn_staff_relations,
+    staff_aliases,
     vn_tags,
-    vn_images
+    character_traits,
+    //Auxiliary tables, for now just tables to hold image data.
+    vn_images,
+    character_images,
+    num_tables_total = character_images + 1
   };
+  static constexpr int num_base_tables = static_cast<int>(table_type::num_base_tables);
+  static constexpr int num_tables_total = static_cast<int>(table_type::num_tables_total);
+  static constexpr std::array<const char *,num_tables_total> table_names = {{
+      "VNs","releases", "producers", "characters", "staff", "tags", "traits",
+      "vn_producer_relations", "vn_character_actor_relations", "vn_staff_relations",
+      "vn_tags", "character_traits", "vn_images", "character_images"
+    }};
   sqlite3_wrapper db;
+  vndb_connection conn;  
+  //result of the dbstats command from the server, used for progress bars
+  json db_stats;
+  //function to access db_stats via table type, since the names of the tables
+  //don't all match up to the names in db_stats.
+  int db_stats_count(table_type what){
+    assert(to_underlying(what) < num_base_tables);
+    switch(what){
+      case table_type::VNs: return db_stats["vn"].get<int>();
+      case table_type::characters: return db_stats["chars"].get<int>();
+      default: return db_stats[table_names[to_underlying(what)]].get<int>();
+    }
+  }
   //These are not automatically initialized, you need to explicitly initialize
   //them, this is to avoid the overhead of creating prepared statments you
   //may never use.
-  std::array<sqlite3_stmt_wrapper, vndb::num_object_types> get_by_id_stmts = {{}};
-  std::array<sqlite3_stmt_wrapper, vndb::num_object_types> insert_stmts = {{}};
-
-  json get_by_id(int id, vndb::object_type what){}
-
-  int insert(json object, vndb::object_type what);
-
-  sqlite3_wrapper get_db(){
+  std::array<sqlite3_stmt_wrapper, num_base_tables> get_by_id_stmts = {{}};
+  std::array<sqlite3_stmt_wrapper, num_tables_total> insert_stmts = {{}};
+  vndb_main(std::string_view db_filename,
+            std::string_view username = "", std::string_view passwd = "", 
+            bool connect = false)
+    : db(db_filename), conn(username, passwd, true, connect) {}
+  bool init_insert_stmts();
+  bool init_get_id_stmts();
+  bool init_db_stats(){
+    if(!conn.ensure_logged_in()){
+      return false;
+    } else {
+      db_stats = conn->dbstats();
+      return !db_stats.is_null();
+    }
+  }
+  //Two names for the same function.
+  bool connect(){
+    return conn.login();
+  }
+  bool login(){
+    return conn.login();
+  }
+  bool init_db(){
+    return (db.exec_file(db_init_file) == SQLITE_OK);
+  }
+  json get_by_id(int id, table_type what){
+    auto stmt = get_by_id_stmts[];
+    stmt.bind(1, id);
+    json ret = json_null;
+    if(stmt.step()){
+      ret = stmt.get_row_json();
+      if(stmt.step()){
+        fprintf(stderr, "Error multiple rows returned from select by id statement.");
+        ret = json_null;
+      }
+    }
+    stmt.reset();
+    return ret;
+  }
+  int insert(json object, table_type what);
+  int update_db_info(){
+    return db.exec_file("update_db_info.sql");
+  }
+  sqlite3_wrapper& get_db(){
     return db;
   }
+  vndb_connection& get_connection(){
+    return conn;
+  }
   //not called get_get_by_id_stmt, because that sounds really silly.
-  sqlite3_stmt_wrapper get_select_by_id_stmt(vndb::object_type what){
-    return get_by_id_stmts[to_underlying(what)];
+  sqlite3_stmt_wrapper get_select_by_id_stmt(table_type what){
+    assert(to_underlying(what) > num_base_tables);
+    return &get_by_id_stmts[to_underlying(what)];
   }
-  sqlite3_stmt_wrapper get_insert_stmt(vndb::object_type what){
-    return get_by_id_stmts[to_underlying(what)];
+  sqlite3_stmt_wrapper get_insert_stmt(table_type what){
+    return insert_stmts[to_underlying(what)];
   }
-  std::function<int(std::vector<json>)> gen_insert_callback(vndb::object_type what);
-}
-#endif
+  std::function<int(std::vector<json>)> gen_insert_callback(vndb::object_type what,
+                                                            struct progress_bar *pb){
+    auto ins_stmt = get_insert_stmt(what);
+    auto callback = [ins_stmt, &db, pb](std::vector<json> items) -> int {
+      if(db.begin_transaction() != SQLITE_OK){ return -1; }
+      for(auto &&item : items){
+        if(sqlite_insert_object<what>(item, ins_stmt) != SQLITE_OK){
+          db.rollback_transaction();
+          return -1;
+        }
+      }
+      //SQLITE_OK == 0, so this will return nonzero on error
+      int ret = db.commit_transaction();
+      pb->update(items.size());
+      pb->display();
+      return ret;
+    };
+    return callback;
+  }
+  std::function<int(std::vector<json>)> gen_insert_callback(table_type what){
+    assert(to_underlying(what) <= num_base_tables);
+    return gen_insert_callback(vndb::object_type(to_underlying(what)));
+  }
+  
+  int download_and_insert(vndb::object_type what, int start, int stop){
+    progress_bar pb(db_stats_count(what), 
+                    vndb::object_type_names[to_underlying(what)]);
+    auto callback = gen_insert_callback(what, &pb);
+    return connection.get(what, callback, start, stop);
+  }
+  int download_and_insert_all(vndb::object_type what){
+    progress_bar pb(db_stats_count(what), 
+                    vndb::object_type_names[to_underlying(what)]);
+    auto callback = gen_insert_callback(what, &pb);
+    return connection.get(what, callback, start, stop);
+  }
+  int get_max_id(table_type what){
+    static constexpr bufsz = 256;
+    char buf[bufsz];
+    snprintf(buf, bufsz, "select max(id) from %s;", table_names[to_underlying(what)]);
+    auto stmt = db.prepare_stmt(buf);
+    if(!stmt){
+      return -1;
+    }
+    if(!stmt.step()){
+      return -1;
+    }
+    int max = stmt.get_column<int>(1);
+    if(stmt.step()){
+      return max;
+    } else {
+      fprintf(stderr, "Error multiple rows returned for get_max_id.\n");
+      return -1;
+    }
+  }
+};
+//Ensure that the values of vndb_main::table_type and vndb::object_type line up.
+static_assert(to_underlying(vndb::object_type::VN) == 
+              to_underlying(vndb_main::table_type::VNs));
+static_assert(to_underlying(vndb::object_type::release) == 
+              to_underlying(vndb_main::table_type::releases));
+static_assert(to_underlying(vndb::object_type::producer) == 
+              to_underlying(vndb_main::table_type::producers));
+static_assert(to_underlying(vndb::object_type::character) == 
+              to_underlying(vndb_main::table_type::characters));
+static_assert(to_underlying(vndb::object_type::staff) == 
+              to_underlying(vndb_main::table_type::staff));
+
 namespace vndb {
 using string = std::string;
 using date = string;

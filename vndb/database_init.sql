@@ -46,20 +46,6 @@ create index if not exists VN_title_idx on VNs (title);
 create index if not exists VN_date_idx on VNs (released);
 create index if not exists VN_rating on VNs (rating);
 
-
-create table if not exists  producers (
-id integer primary key not null,
-name text not null,
-original text,
-type string,
-language string,
-links json,
-aliases json,
-description text,
-relations json
-);
-create index if not exists producer_name_idx on producers (name);
-
 create table if not exists releases (
 id integer primary key not null,
 title text not null,
@@ -84,6 +70,19 @@ vn json not null, --array of objects {id, title original}
 producers json not null --array of objects {id, developer (bool),
                         -- producer(bool), name, original, type}
 );
+
+create table if not exists  producers (
+id integer primary key not null,
+name text not null,
+original text,
+type string,
+language string,
+links json,
+aliases json,
+description text,
+relations json
+);
+create index if not exists producer_name_idx on producers (name);
 
 create table if not exists characters (
 id integer primary key not null,
@@ -142,6 +141,22 @@ parents json not null -- array of ints
 create index if not exists traits_name_idx on traits(name);
 create index if not exists traits_full_name_idx on traits(full_name);
 
+-- Info about above tables, the max_id fields are given to make it
+-- easy to update the database with new info from the server
+create table if not exists db_stats (
+num_vns integer not null,
+max_vn_id integer not null,
+num_releases integer not null,       
+max_release_id integer not null,       
+num_producers integer not null,
+max_producer_id integer not null,
+num_characters integer not null,
+max_character_id integer not null,
+num_staff integer not null,
+max_staff_id integer not null,
+-- Limit table to only one row
+row_limiter integer not null primary key check (row_limiter = 1)
+);
 -- Derived tables
 -- vndb uses postgres sql, which has array types, and has many fields
 -- that are arrays. We store these as json arrays / objects, but also

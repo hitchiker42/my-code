@@ -353,16 +353,6 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
   return 0;
 }
 #endif
-vndb_connection::vndb_connection(std::string_view username,
-                                 std::string_view passwd, bool wait)
-  : bio(vndb_hostname, vndb_tls_port_number, vndb_ctx),
-    buf(4096),
-    username(username), passwd(passwd), wait_on_throttle{wait} {
-  if(this->bio.connect()){
-    this->logged_in = this->login();
-  }
-}
-vndb_connection::vndb_connection() : vndb_connection("","") {}
 //Login using username & passwd from conn.
 //true on success, false on connection/write failure.
 //sets error to true iff connection succeeded but login failed.
