@@ -13,11 +13,11 @@ SOURCES=$(wildcard *.cpp) $(wildcard *.h) $(wildcard *.c) json.hpp
 
 all: vndb_cpp tag_trait_parser
 
-vndb.o : vndb.cpp vndb.h json.hpp sql.h
-connection.o : connection.cpp vndb.h json.hpp
-sqlite.o : sqlite.cpp vndb.h json.hpp sql.h
+vndb.o : vndb.cpp vndb.h json.hpp sql.h sqlite_wrappers.h connection.h
+connection.o : connection.cpp vndb.h json.hpp connection.h sqlite_wrappers.h
+sqlite.o : sqlite.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
 sqlite_ext.o: sqlite_ext.c
-tag_trait_parser.o: tag_trait_parser.cpp vndb.h json.hpp sql.h
+tag_trait_parser.o: tag_trait_parser.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
 # the .o file doesn't actually depend on the .h file, but it
 # makes more sense to put the dependency here rather than vndb_cpp.
 progress_bar.o: progress_bar.c progress_bar.h

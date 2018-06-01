@@ -30,21 +30,21 @@ static constexpr std::string_view sql_insert_vn =
         @votecount, @screens, @staff, '[]', '[]' ,'[]',
         -1, -1, @date, 0);)EOF"sv;
 static constexpr std::string_view sql_insert_release =
-  R"EOF(insert or relpace into releases values (
+  R"EOF(insert or replace into releases values (
         @id, @title, @original, @released, @type,
         @patch, @languages, @website, @notes, @minage,
         @platforms, @resolution, @voiced, @animation,
         @vn, @producers);)EOF"sv;
 static constexpr std::string_view sql_insert_producer =
-  R"EOF(insert or relpace into producers values (
+  R"EOF(insert or replace into producers values (
         @id, @name, @original, @type, @language,
         @links, @aliases, @description, @relations);)EOF"sv;
 static constexpr std::string_view sql_insert_character =
-  R"EOF(insert or relpace into staff values (
+  R"EOF(insert or replace into staff values (
         @id, @name, @original, @gender, @language, @links,
         @description, @aliases, @main_ailas, @vns, @voiced);)EOF"sv;
 static constexpr std::string_view sql_insert_staff =
-  R"EOF(insert or relpace into characters values (
+  R"EOF(insert or replace into characters values (
         @id, @name, @original, @gender, @aliases,
         @description, @image, @traits, @vns, @voiced);)EOF"sv;
 static constexpr std::string_view sql_insert_trait =
@@ -56,17 +56,29 @@ static constexpr std::string_view sql_insert_tag =
         @id, @name, @description, @meta, @vns,
         @category, @aliases, @parents);)EOF"sv;
 //Insert statements for the derived tables (relations between tables)
-static constexpr std::string_view sql_insert_relation =
-  R"EOF(insert or relpace into relations values (
+static constexpr std::string_view sql_insert_vn_producer_relation =
+  R"EOF(insert or replace into vn_producer_relations values (
         @vn_id, @producer_id, @release_id);)EOF"sv;
-static constexpr std::string_view sql_insert_vn_tags =
-  R"EOF(insert or relpace into vn_tags (@vn_id, @tag_id);)EOF"sv;
-static constexpr std::string_view sql_insert_character_traits =
-  R"EOF(insert or relpace into character_traits (
+static constexpr std::string_view sql_insert_vn_tag =
+  R"EOF(insert or replace into vn_tags (@vn_id, @tag_id);)EOF"sv;
+static constexpr std::string_view sql_insert_character_trait =
+  R"EOF(insert or replace into character_traits (
         @character_id, @trait_id);)EOF"sv;
-static constexpr std::string_view sql_insert_vn_character_actor_relations =
-  R"EOF(insert or relpace into vn_character_actor_relations (
+static constexpr std::string_view sql_insert_vn_character_actor_relation =
+  R"EOF(insert or replace into vn_character_actor_relations (
         @vn_id, @character_id, @actor_id);)EOF"sv;
+static constexpr std::string_view sql_insert_vn_staff_relation =
+  R"EOF(insert or replace into vn_staff_relations (
+        @vn_id, @staff_id);)EOF"sv;
+static constexpr std::string_view sql_insert_staff_alias =
+  R"EOF(insert or replace into staff_aliases (
+        @staff_id, @alias_id);)EOF"sv;
+static constexpr std::string_view sql_insert_vn_image =
+  R"EOF(insert or replace into vn_images (
+        @vn_id, @image_blob);)EOF"sv;
+static constexpr std::string_view sql_insert_character_image =
+  R"EOF(insert or replace into character_images (
+        @character_id, @image_blob);)EOF"sv;
   
 #endif /* __SQL_H__ */
 

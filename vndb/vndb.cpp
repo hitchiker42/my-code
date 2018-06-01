@@ -5,12 +5,12 @@ bool vndb_main::init_insert_stmts(){
       sql_insert_vn, sql_insert_release, sql_insert_producer, 
       sql_insert_character, sql_insert_staff, sql_insert_tag, sql_insert_trait,
       sql_insert_vn_producer_relation, sql_insert_vn_character_actor_relation,
-      sql_insert_staff_alias, sql_insert_vn_tags, sql_insert_character_traits
+      sql_insert_staff_alias, sql_insert_vn_tag, sql_insert_character_trait
     }};
   using table_type = vndb_main::table_type;
   static constexpr std::array<table_type, this->num_tables_total> types = {{
-      table_type::VN, table_type::release, table_type::producer,
-      table_type::character, table_type::staff, table
+      table_type::VNs, table_type::releases, table_type::producers,
+      table_type::characters, table_type::staff,
       table_type::tags, table_type::traits,
       table_type::vn_producer_relations, table_type::vn_character_actor_relations,
       table_type::vn_staff_relations,table_type::staff_aliases,
@@ -20,6 +20,8 @@ bool vndb_main::init_insert_stmts(){
   for(int i = 0; i < 5; i ++){
     auto stmt = this->db.prepare_stmt(sql[i]);
     if(!stmt){
+      this->db.print_errmsg("Failed to compile statement");
+      fprintf(stderr, "%s\n", sql[i].data());
       return false;
     }
     this->insert_stmts[to_underlying(types[i])] = stmt;
@@ -40,11 +42,10 @@ bool vndb_main::init_get_id_stmts(){
       table_type::traits
   }};
   for(int i = 0; i < 5; i ++){
-    auto stmt = this->db.prepare_stmt(sql[i]);
-    if(!stmt){
+    this->get_by_id_stmts[to_underlying(types[i])] = this->db.prepare_stmt(sql[i]);
+    if(!this->get_by_id_stmts[to_underlying(types[i])]){
       return false;
     }
-    this->get_by_id_stmts[to_underlying(types[i])] = stmt;
   }
   return true;
 }
@@ -131,10 +132,24 @@ bool test_insert_vns(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
 bool download_all(const char *database_filename){
   vndb_main vndb(database_filename);
   //compile sql, connect to servert & get dbstats (for progress bars).
-  if(!vndb.db ||
-     !vndb.init_insert_stmts() ||
-     !vndb.connect() ||
-     !vndb.init_db_stats()){
+  if(!vndb.db){
+    fprintf(stderr, "Failed to open database file %s.\n", database_filename);
+    return false;
+  }
+  if(!vndb.init_db()){
+    fprintf(stderr, "Failed to run database_init.sql.\n");
+    return false;
+  }
+  if(!vndb.init_insert_stmts()){
+    fprintf(stderr, "Failed to compile sql insert statements.\n");
+    return false;
+  }
+  if(!vndb.connect()){
+    fprintf(stderr, "Failed to connect to vndb server.\n");
+    return false;
+  }
+  if(!vndb.init_db_stats()){
+    fprintf(stderr, "Failed to run dbstats command.\n");
     return false;
   }
   printf("Downloading VNs\n");
@@ -187,6 +202,8 @@ int main(int argc, char* argv[]){
     return -1;
   }
   atexit(free_vndb_ssl_ctx);
+  return download_all(default_db_file);
+/*
   if(argc > 1){
     if(argv[1][0] == 'c'){
       return run_connection_test();
@@ -195,8 +212,9 @@ int main(int argc, char* argv[]){
     }
   }
   return run_insertion_test();
+*/
 }
-
+#if 0
 int main(int argc, char* argv[]){
 
   /*

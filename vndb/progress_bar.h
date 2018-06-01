@@ -10,7 +10,7 @@ extern "C" int get_term_width();
 extern "C" void get_term_info(struct progress_bar *progress_bar);
 extern "C" void display_progress_bar(struct progress_bar *progress_bar);
 struct progress_bar {
-  char *title;
+  const char *title;
   char *buf;
   size_t title_size;
   //number of colmuns in the window, also used as the size of buf.
@@ -66,7 +66,7 @@ struct progress_bar {
     //If explicitly passed a null pointer for new_title, keep the old one.
     if(new_title == nullptr){ return; }
     title = new_title;
-    title_size = strlen(title_size);
+    title_size = strlen(title);
   }
 };
 static_assert(std::is_standard_layout_v<progress_bar>);

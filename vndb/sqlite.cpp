@@ -24,7 +24,7 @@ static json parse_delimted_string(const std::string *str, char delim){
   if(!str){
     return json(json::value_t::array);
   } else {
-    return parse_delimted_string(str.c_str(), delim);
+    return parse_delimted_string(str->c_str(), delim);
   }
 }
 //add a vn given as json into the database
@@ -33,18 +33,18 @@ int sqlite_insert_vn(const json &vn, sqlite3_stmt_wrapper& stmt){
   //get_ptr is used for values that might be null, get/get_ref are
   //used for values that can't be null.
   stmt.bind(idx++, vn["id"].get<int>());
-  stmt.bind(idx++, vn["title"].get_ref<json::string_t>());
-  stmt.bind(idx++, vn["original"].get_ptr<json::string_t>());
-  stmt.bind(idx++, vn["date"].get_ptr<json::string_t>());
+  stmt.bind(idx++, vn["title"].get_ref<const json::string_t>());
+  stmt.bind(idx++, vn["original"].get_ptr<const json::string_t>());
+  stmt.bind(idx++, vn["date"].get_ptr<const json::string_t>());
   stmt.bind(idx++, vn["languages"]);
   stmt.bind(idx++, vn["orig_lang"]);
   stmt.bind(idx++, vn["platforms"]);
   stmt.bind(idx++,
-            parse_delimted_string(vn["aliases"].get_ptr<json::string_t>()), '\n');
+            parse_delimted_string(vn["aliases"].get_ptr<const json::string_t>(), '\n'));
   stmt.bind(idx++, vn["length"].get_ptr<int64_t>());
-  stmt.bind(idx++, vn["description"].get_ptr<json::string_t>());
+  stmt.bind(idx++, vn["description"].get_ptr<const json::string_t>());
   stmt.bind(idx++, vn["links"]);
-  stmt.bind(idx++, vn["image"].get_ptr<json::string_t>());
+  stmt.bind(idx++, vn["image"].get_ptr<const json::string_t>());
   stmt.bind(idx++, vn["image_nsfw"].get<json::boolean_t>());
   stmt.bind(idx++, vn["anime"]);
   stmt.bind(idx++, vn["relations"]);
@@ -86,8 +86,8 @@ int sqlite_insert_release(const json &release,
 // to try and add a relation for a non-existant VN/producer.
 int sqlite_insert_relations(const json& release,
                             sqlite3_stmt_wrapper& stmt){
-  json& vns = release["vn"];
-  json& producers = release["producers"];
+  const json& vns = release["vn"];
+  const json& producers = release["producers"];
   //I'm pretty sure vns can't be empty, but it doesn't really matter.
   if(vns.empty() || producers.empty()){
     return SQLITE_OK;
@@ -98,7 +98,7 @@ int sqlite_insert_relations(const json& release,
     stmt.bind(1, vn["id"].get<int>());
     for(auto &&producer : producers){
       stmt.bind(2, producer["id"].get<int>());
-      err = stmt.exec(false);//Don't reset the bindings
+      int err = stmt.exec(false);//Don't reset the bindings
       if(err != SQLITE_OK){
         return err;
       }
@@ -116,7 +116,7 @@ int sqlite_insert_producer(const json& producer,
   stmt.bind(idx++, producer["language"].get_ptr<json::string_t>());
   stmt.bind(idx++, producer["links"]);
   stmt.bind(idx++,
-            parse_delimted_string(producer["aliases"].get_ptr<json::string_t>(), '\n'))
+            parse_delimted_string(producer["aliases"].get_ptr<json::string_t>(), '\n'));
   stmt.bind(idx++, producer["description"].get_ptr<json::string_t>());
   //This gives the relationship between this producer and other producers not vns.
   stmt.bind(idx++, producer["relations"].get_ptr<json::string_t>());
@@ -124,13 +124,14 @@ int sqlite_insert_producer(const json& producer,
 }
 int sqlite_insert_staff(const json& staff,
                         sqlite3_stmt_wrapper& stmt){
+  int idx = 1;
   stmt.bind(idx++, staff["id"].get<int>());
   stmt.bind(idx++, staff["name"].get<std::string_view>());
   stmt.bind(idx++, staff["original"].get_ptr<json::string_t>());
   stmt.bind(idx++, staff["language"].get_ptr<json::string_t>());
   stmt.bind(idx++, staff["gender"].get_ptr<json::string_t>());
   stmt.bind(idx++,
-            parse_delimted_string(staff["aliases"].get_ptr<json::string_t>(), '\n'))
+            parse_delimted_string(staff["aliases"].get_ptr<json::string_t>(), '\n'));
   stmt.bind(idx++, staff["description"].get_ptr<json::string_t>());
   stmt.bind(idx++, staff["image"].get_ptr<json::string_t>());
   stmt.bind(idx++, staff["traits"]);
@@ -140,12 +141,13 @@ int sqlite_insert_staff(const json& staff,
 }
 int sqlite_insert_character(const json& chara,
                            sqlite3_stmt_wrapper& stmt){
+  int idx = 1;
   stmt.bind(idx++, chara["id"].get<int>());
   stmt.bind(idx++, chara["name"].get<std::string_view>());
   stmt.bind(idx++, chara["original"].get_ptr<json::string_t>());
   stmt.bind(idx++, chara["gender"].get_ptr<json::string_t>());
   stmt.bind(idx++,
-            parse_delimted_string(chara["aliases"].get_ptr<json::string_t>(), '\n'))
+            parse_delimted_string(chara["aliases"].get_ptr<json::string_t>(), '\n'));
   stmt.bind(idx++, chara["description"].get_ptr<json::string_t>());
   stmt.bind(idx++, chara["image"].get_ptr<json::string_t>());
   stmt.bind(idx++, chara["traits"]);
@@ -164,7 +166,7 @@ int sqlite_insert_vn_tags(int vn_id, json vn_tags,
   if(vn_tags.empty()){
     return SQLITE_OK;
   }
-  auto stmt = db.prepare_stmt(sql_insert_vn_tags);
+  auto stmt = db.prepare_stmt(sql_insert_vn_tag);
   if(!stmt){
     return db.err();
   }
@@ -309,7 +311,7 @@ json sqlite3_stmt_wrapper::get_row_json(){
       //we can use that to see if a column is supposed to be json. This is just
       //an optimization, if we can't get the declared type we just try to parse 
       //the string as json and insert it as a string if we fail.
-      case sqlite3_type::text {
+      case sqlite3_type::text: {
         std::string_view col_text = this->get_column<std::string_view>(i);
         const char *col_type_name = sqlite3_column_decltype(this->stmt, i);
         if(col_type_name){

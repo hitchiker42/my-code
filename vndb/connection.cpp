@@ -435,23 +435,24 @@ json vndb_connection::get_error(){
 }
 //If the last response to conn was an error due to the connection
 //being throttled then wait for the recommented amount of time and return true
-static bool wait_if_throttled(vndb_connection& conn){
+static bool wait_if_throttled(vndb_connection* conn){
+  //We have several error returns, so set error to true by default, then
+  //we only need to do anything for the one successful return. I was
+  //using a 'goto error' before and the compilier yelled at me.
+  conn->error = true;
   if(!conn->wait_on_throttle ||
      !strstr(conn->buf.c_str(), "throttled")){
-    goto error;
+    return false;
   }
-  char *wait_offset = strstr(conn->buf.c_str(), "fullwait");
-  if(!wait_offset){ goto error; }//super unlikely
-  char *duration_offset = strchr(wait_offset, ':');
-  if(!duration_offset) { goto error; }
+  const char *wait_offset = strstr(conn->buf.c_str(), "fullwait");
+  if(!wait_offset){ return false; }//super unlikely
+  const char *duration_offset = strchr(wait_offset, ':');
+  if(!duration_offset) { return false; }
   double duration = strtod(duration_offset + 1, nullptr);
-  if(!duration == 0.0) { goto error; }
+  if(duration == 0.0) { return false; }
   util::sleep(duration);
-  this->error = false;
+  conn->error = false;
   return true;
- error:
-  conn->error = true;
-  return false;
 }
 static bool is_error_response(util::string_view response){
   return has_prefix(response, "error");
@@ -624,26 +625,26 @@ json vndb_connection::dbstats(){
   }
   return json::parse(response.substr(constexpr_strlen("dbstats")));
 }
-bool set_vote(int vn_id, int value){
+bool vndb_connection::set_vote(int vn_id, int value){
   this->buf.clear();
   this->buf.append_formatted("set votelist %d {\"vote\" : %d}",
                              vn_id, value);
   //TODO: Refactor this into aseperate functino some how.
   if(this->send_set_command()){
     return true;
-  } else if(wait_if_throttled(*this)){
+  } else if(wait_if_throttled(this)){
     //Try again if we got a throttled error
     return this->set_vote(vn_id, value);
   } else {
     return false;
   }
 }
-bool remove_vote(int vn_id){
+bool vndb_connection::remove_vote(int vn_id){
   this->buf.clear();
   this->buf.append_formatted("set votelist %d", vn_id);
   if(this->send_set_command()){
     return true;
-  } else if(wait_if_throttled(*this)){
+  } else if(wait_if_throttled(this)){
     //Try again if we got a throttled error
     return this->remove_vote(vn_id);
   } else {
@@ -651,14 +652,14 @@ bool remove_vote(int vn_id){
   }
 }
 //priority is 0:high, 1:medium, 2:low, 3:blacklist
-bool set_wishlist(int vn_id, int priority){
+bool vndb_connection::set_wishlist(int vn_id, int priority){
   assert(priority >= 0 && priority <= 3);
   this->buf.clear();
-  this->buf.append_formated("set wishlist %d {\"priority\" : %d}",
+  this->buf.append_formatted("set wishlist %d {\"priority\" : %d}",
                             vn_id, priority);
   if(this->send_set_command()){
     return true;
-  } else if(wait_if_throttled(*this)){
+  } else if(wait_if_throttled(this)){
     //Try again if we got a throttled error
     return this->set_wishlist(vn_id, priority);
   } else {
@@ -666,12 +667,12 @@ bool set_wishlist(int vn_id, int priority){
   }
 }
   
-bool remove_from_wishlist(int vn_id){
+bool vndb_connection::remove_from_wishlist(int vn_id){
   this->buf.clear();
-  this->buf.append_formated("set wishlist %d", vn_id);
+  this->buf.append_formatted("set wishlist %d", vn_id);
   if(this->send_set_command()){
     return true;
-  } else if(wait_if_throttled(*this)){
+  } else if(wait_if_throttled(this)){
     //Try again if we got a throttled error
     return this->remove_from_wishlist(vn_id);
   } else {
@@ -679,28 +680,30 @@ bool remove_from_wishlist(int vn_id){
   }
 }
 //status 0=Unknown, 1=playing, 2=finished, 3=stalled, 4=dropped.
-bool set_vnlist(int vn_id, int status = 0){
+bool vndb_connection::set_vnlist(int vn_id, int status){
   assert(status >= 0 && status <= 4);
   this->buf.clear();
-  this->buf.append_formated("set vnlist %d {\"status\": %d}", vn_id, status);
+  this->buf.append_formatted("set vnlist %d {\"status\": %d}", vn_id, status);
   if(this->send_set_command()){
     return true;
-  } else if(wait_if_throttled(*this)){
+  } else if(wait_if_throttled(this)){
     //Try again if we got a throttled error
     return this->set_vnlist(vn_id, status);
   } else {
     return false;
   }
 }
-//I've never set a note on my vnlist, so I doubt I'll use this
-bool set_vnlist(int vn_id, std::string_view note, int status = 0);
-bool remove_from_vnlist(int vn_id){
-  assert(status >= 0 && status <= 4);
+//I've never set a note on my vnlist, so I doubt I'll use this, currenly
+//I just ignore the note paramater.
+bool vndb_connection::set_vnlist(int vn_id, std::string_view note, int status){
+  return this->set_vnlist(vn_id, status);
+}
+bool vndb_connection::remove_from_vnlist(int vn_id){
   this->buf.clear();
-  this->buf.append_formated("set vnlist %d", vn_id);
+  this->buf.append_formatted("set vnlist %d", vn_id);
   if(this->send_set_command()){
     return true;
-  } else if(wait_if_throttled(*this)){
+  } else if(wait_if_throttled(this)){
     //Try again if we got a throttled error
     return this->remove_from_vnlist(vn_id);
   } else {

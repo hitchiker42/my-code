@@ -1246,13 +1246,6 @@ struct external_constructor<value_t::string>
         j.m_value = s;
         j.assert_invariant();
     }
-    template<typename BasicJsonType>
-    static void construct(BasicJsonType& j, const std::string_view& s)
-    {
-        j.m_type = value_t::string;
-        j.m_value = typename BasicJsonType::string_t(s);
-        j.assert_invariant();
-    }
 
     template<typename BasicJsonType>
     static void construct(BasicJsonType& j, typename BasicJsonType::string_t&& s)
@@ -3142,11 +3135,6 @@ class parser
                     const bool allow_exceptions_ = false)
         : callback(cb), m_lexer(adapter), allow_exceptions(allow_exceptions_)
     {}
-    explicit parser(detail::input_adapter adapter,
-                    const parser_callback_t cb = nullptr,
-                    const bool allow_exceptions_ = false)
-        : parser(static_cast<detail::input_adapter_t>(adapter), cb, allow_exceptions_)
-    {}
 
     /*!
     @brief public parser interface
@@ -3193,7 +3181,7 @@ class parser
       return last_token == token_type::end_of_input;
     }
     bool test_eof(){
-      get_token();
+      get_token;
       return last_token == token_type::end_of_input;
     }
     void init(){
@@ -11685,16 +11673,16 @@ class basic_json
         return result;
     }
   void print(detail::output_adapter<char,string_t> output_it,
-             const char indent_char = ' ', const int indent = 0) const {
+             const char indent_char = ' ', const int indent = 0){
     serializer s(detail::output_adapter<char, string_t>(output_it), indent_char);
     s.print(*this, indent);
   }
   void pprint(detail::output_adapter<char,string_t> output_it,
-             const char indent_char = ' ', const int indent = 2) const {
+             const char indent_char = ' ', const int indent = 2){
     serializer s(detail::output_adapter<char, string_t>(output_it), indent_char);
     s.pprint(*this, indent);
   }
-  void write(detail::output_adapter<char,string_t> output_it) const {
+  void write(detail::output_adapter<char,string_t> output_it){
     serializer s(detail::output_adapter<char, string_t>(output_it), ' ');
     s.write(*this);
   }
@@ -12456,8 +12444,8 @@ class basic_json
     */
     template<typename T,
              typename PointerType = 
-             std::conditional_t<std::is_pointer<T>::value, T,
-                                std::add_pointer_t<std::add_const_t<T>>>,
+             typename std::conditional<std::is_pointer<T>::value, T,
+                                       typename std::add_pointer<T>::type>::type,
              typename std::enable_if<
                  std::is_pointer<PointerType>::value and
                  std::is_const<typename std::remove_pointer<PointerType>::type>::value, int>::type = 0>
@@ -12510,7 +12498,7 @@ class basic_json
     @since version 1.1.0
     */
   template<typename T,
-           typename ReferenceType = std::add_lvalue_reference_t<T>,
+           typename ReferenceType = typename std::add_lvalue_reference<T>::type,
            typename std::enable_if<
                  std::is_reference<ReferenceType>::value, int>::type = 0>
     ReferenceType get_ref()
@@ -12524,7 +12512,7 @@ class basic_json
     @copydoc get_ref()
     */
     template<typename T,
-             typename ReferenceType = std::add_lvalue_reference_t<std::add_const_t<T>>,
+             typename ReferenceType = typename std::add_lvalue_reference<T>::type,
              typename std::enable_if<
                  std::is_reference<ReferenceType>::value and
                  std::is_const<typename std::remove_reference<ReferenceType>::type>::value, int>::type = 0>

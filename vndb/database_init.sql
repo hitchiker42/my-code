@@ -187,7 +187,7 @@ character integer not null references characters (id),
 actor integer not null references staff (id),
 -- Technically this isn't unique, you could have someone creditied
 -- twice for the same character in one vn under two different aliases.
-primary key (vn, character, voiced)
+primary key (vn, character, actor)
 );
 create index if not exists vca_relations_vn_idx
        on vn_character_actor_relations (vn);
@@ -199,7 +199,7 @@ create index if not exists vca_relations_actor_idx
 -- Relations between VNs and staff (excluding voice actors)
 create table if not exists vn_staff_relations (
 vn integer not null references VNs (id),
-staff integer not null references staff (id),
+staff integer not null references staff (id)
 );
 create index if not exists vs_relations_vn_idx
        on vn_staff_relations (vn);
