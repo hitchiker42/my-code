@@ -47,7 +47,7 @@ struct is_random_access_iterator :
                     iter_traits_iterator_category<It>> {};
 template <class It>
 inline constexpr bool is_random_access_iterator_v = is_random_access_iterator<It>::value;
-  
+
 /*
   Functions for mapping over stl containers.
 */

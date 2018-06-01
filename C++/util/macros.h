@@ -30,6 +30,7 @@
 #endif
 
 
+
 //If num is a power of 2 return it, otherwise return
 //the nearest power of 2 larger than num.
 #define NEAREST_POW_OF_2(num)                   \

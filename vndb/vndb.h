@@ -22,10 +22,15 @@ static_assert(SQLITE_OK == 0);
 #include "filesystem.h"
 #include "progress_bar.h"
 #include "json.hpp"
+#include "logger.h"
 
 extern SSL_CTX* vndb_ctx;
 bool init_vndb_ssl_ctx();
 void free_vndb_ssl_ctx();
+
+//This needs to be defined and initialized in whatever file has main.
+extern std::unique_ptr<util::logger> vndb_log;
+static constexpr const char* default_log_file = "vndb.log";
 
 using string_buf = util::string_buf;
 
@@ -43,6 +48,19 @@ static constexpr const char* vndb_hostname = "api.vndb.org";
 static constexpr const char* default_db_file = "vn.db";
 //file of sql code used to initialize the database tables.
 static constexpr const char* db_init_file = "database_init.sql";
+namespace vndb {
+//Possible targets of the get command
+enum class object_type {
+  VN = 0,
+  release,
+  producer,
+  character,
+  staff
+};
+constexpr int num_object_types = to_underlying(object_type::staff)+1;
+static constexpr std::array<std::string_view, num_object_types> 
+object_type_names = {{"VNs", "Releases", "Producers", "Characters", "Staff"}};
+}
 /*
 struct SSL_CTX_wrapper {
   SSL_CTX *ctx = nullptr;
@@ -104,19 +122,6 @@ struct vndb_main {
   vndb_connection conn;  
   //result of the dbstats command from the server, used for progress bars
   json db_stats;
-  //function to access db_stats via table type, since the names of the tables
-  //don't all match up to the names in db_stats.
-  int db_stats_count(vndb::object_type what){
-    return db_stats_count(table_type(to_underlying(what)));
-  }
-  int db_stats_count(table_type what){
-    assert(to_underlying(what) < num_base_tables);
-    switch(what){
-      case table_type::VNs: return db_stats["vn"].get<int>();
-      case table_type::characters: return db_stats["chars"].get<int>();
-      default: return db_stats[table_names[to_underlying(what)]].get<int>();
-    }
-  }
   //These are not automatically initialized, you need to explicitly initialize
   //them, this is to avoid the overhead of creating prepared statments you
   //may never use.
@@ -153,8 +158,21 @@ struct vndb_main {
     }
     return true;
   }
+  //function to access db_stats via table type, since the names of the tables
+  //don't all match up to the names in db_stats.
+  int db_stats_count(vndb::object_type what){
+    return db_stats_count(table_type(to_underlying(what)));
+  }
+  int db_stats_count(table_type what){
+    assert(to_underlying(what) < num_base_tables);
+    switch(what){
+      case table_type::VNs: return db_stats["vn"].get<int>();
+      case table_type::characters: return db_stats["chars"].get<int>();
+      default: return db_stats[table_names[to_underlying(what)]].get<int>();
+    }
+  }
   json get_by_id(int id, table_type what){
-    auto stmt = get_by_id_stmts[to_underlying(what)];
+    auto& stmt = get_by_id_stmts[to_underlying(what)];
     stmt.bind(1, id);
     json ret = json_null;
     if(stmt.step()){

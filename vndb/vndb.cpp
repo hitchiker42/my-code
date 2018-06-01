@@ -1,5 +1,7 @@
 #include "vndb.h"
 #include "sql.h"
+std::unique_ptr<util::logger> vndb_log;
+
 bool vndb_main::init_insert_stmts(){
   static constexpr std::array<std::string_view, this->num_tables_total> sql = {{
       sql_insert_vn, sql_insert_release, sql_insert_producer, 
@@ -18,13 +20,13 @@ bool vndb_main::init_insert_stmts(){
       table_type::vn_images, table_type::character_images
     }};
   for(int i = 0; i < 5; i ++){
-    auto stmt = this->db.prepare_stmt(sql[i]);
-    if(!stmt){
+    sqlite3_stmt *ptr = this->db.prepare_stmt_ptr(sql[i]);
+    if(!ptr){
       this->db.print_errmsg("Failed to compile statement");
       fprintf(stderr, "%s\n", sql[i].data());
       return false;
     }
-    this->insert_stmts[to_underlying(types[i])] = stmt;
+    this->insert_stmts[to_underlying(types[i])].stmt = ptr;
   }
   return true;
 }
@@ -42,10 +44,11 @@ bool vndb_main::init_get_id_stmts(){
       table_type::traits
   }};
   for(int i = 0; i < 5; i ++){
-    this->get_by_id_stmts[to_underlying(types[i])] = this->db.prepare_stmt(sql[i]);
-    if(!this->get_by_id_stmts[to_underlying(types[i])]){
+    sqlite3_stmt *ptr = this->db.prepare_stmt_ptr(sql[i]);
+    if(!ptr){
       return false;
     }
+    this->get_by_id_stmts[to_underlying(types[i])].stmt = ptr;
   }
   return true;
 }
@@ -202,6 +205,7 @@ int main(int argc, char* argv[]){
     return -1;
   }
   atexit(free_vndb_ssl_ctx);
+  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
   return download_all(default_db_file);
 /*
   if(argc > 1){

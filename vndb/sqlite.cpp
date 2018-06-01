@@ -35,7 +35,7 @@ int sqlite_insert_vn(const json &vn, sqlite3_stmt_wrapper& stmt){
   stmt.bind(idx++, vn["id"].get<int>());
   stmt.bind(idx++, vn["title"].get_ref<const json::string_t>());
   stmt.bind(idx++, vn["original"].get_ptr<const json::string_t>());
-  stmt.bind(idx++, vn["date"].get_ptr<const json::string_t>());
+  stmt.bind(idx++, vn["released"].get_ptr<const json::string_t>());
   stmt.bind(idx++, vn["languages"]);
   stmt.bind(idx++, vn["orig_lang"]);
   stmt.bind(idx++, vn["platforms"]);

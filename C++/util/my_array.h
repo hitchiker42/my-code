@@ -75,7 +75,7 @@ struct array {
   explicit constexpr array(const Ts ... Args) : length(sizeof...(Ts)) {
     constexpr_va_init(arr, Args...);
     }*/
-    
+
   constexpr array(array&) = default;
   array& operator= (const array&) = default;
 
@@ -181,7 +181,7 @@ struct array {
   constexpr size_type max_size() const noexcept {
     return N;
   }
-  //Different idea of capacity than std::vector.
+  //Different idea of capacity than std::vector, returns amount of space left
   constexpr size_type capacity() const noexcept {
     return (max_size() - size());
   }
@@ -250,16 +250,9 @@ struct array {
     return arr[--length];
   }
   //explicitly set length.
-  bool set_length(size_t len){
+  void set_length(size_t len){
     assert(len <= max_size());
     length = len;
-    
-    // if(len > max_size()){
-    //   return false;
-    // } else {
-    //   length = len;
-    //   return true;
-    // }
   }
 };
 template<typename ... Ts>
@@ -269,4 +262,3 @@ template <typename T, size_t N, size_t M = N>
 using array_2D = array<array<T,N>,M>;
 };
 #endif
-

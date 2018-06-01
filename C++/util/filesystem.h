@@ -79,6 +79,7 @@ struct FILE_wrapper {
     } else {
       this->~FILE_wrapper();
       new (this) FILE_wrapper(std::move(other));
+      return (*this);
     }
   }
   ~FILE_wrapper(){
@@ -92,6 +93,10 @@ struct FILE_wrapper {
   }
   FILE* unwrap(){
     return f;
+  }
+  //Use this if you don't want the FILE to close when this goes out of scope
+  void set_to_null(){
+    f = nullptr;
   }
 #if (defined unix) || (defined __unix) || (defined __unix__)
   int native_handle(){

@@ -147,7 +147,9 @@ struct unordered_map : std::unordered_map<K,V,Hash,KeyEq,Allocator> {
 //test if ptr is a tagged pointer, by default checks any of the bits
 //that would be 0 for a word aligned pointer (i.e last 2 bits for
 //a 32bit machine and last 3 for a 64 bit machine).
-constexpr bool test_ptr_tag(const void *ptr, 
+//These could be constexpr, except that you can't use reinterpret cast
+//in constexpr functions.
+inline /*constexpr*/ bool test_ptr_tag(const void *ptr, 
                             const int bit = 
                             (sizeof(uintptr_t) == 8 ? 0x7 : 0x3)){
   return (((uintptr_t)ptr) & bit);

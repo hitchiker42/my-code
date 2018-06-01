@@ -315,6 +315,10 @@ struct sqlite3_wrapper {
                   int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE){
     db_err = sqlite3_open_v2(filename.data(), &db, flags, NULL);
   }
+  sqlite3_wrapper(sqlite3_wrapper &&other)
+    : db{other.db}, db_err{other.db_err}, in_transaction{other.in_transaction} {
+      other.db = nullptr;
+  }    
   ~sqlite3_wrapper(){
     sqlite3_close(db);
   }
@@ -402,6 +406,16 @@ struct sqlite3_wrapper {
     db_err = sqlite3_prepare(db, sql, len, &stmt, tail);
     return sqlite3_stmt_wrapper(stmt);
   }
+  sqlite3_stmt* prepare_stmt_ptr(const std::string_view& sv){
+
+    return prepare_stmt_ptr(sv.data(), sv.size(), nullptr);
+  }
+  sqlite3_stmt* prepare_stmt_ptr(const char* sql, int len = -1,
+                                 const char** tail = nullptr){
+    sqlite3_stmt *stmt;
+    db_err = sqlite3_prepare(db, sql, len, &stmt, tail);
+    return stmt;
+  }
 };
 
 int sqlite_insert_vn(const json &vn, sqlite3_stmt_wrapper& stmt);
@@ -415,6 +429,9 @@ int sqlite_insert_staff(const json& staff,
                         sqlite3_stmt_wrapper& stmt);
 //template<vndb::object_type what>
 inline int sqlite_insert_object(vndb::object_type what, const json& obj, sqlite3_stmt_wrapper& stmt){
+  vndb_log->printf(util::log_level::debug, "Inserting %s, id = %d.\n",
+                   vndb::object_type_names[to_underlying(what)].data(),
+                   obj["id"].get<int>());
   if (what == vndb::object_type::VN){
     return sqlite_insert_vn(obj, stmt);
   } else if(what == vndb::object_type::release){

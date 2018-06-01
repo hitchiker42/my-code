@@ -78,19 +78,7 @@ struct http_connection {
 };
 //definition of different vndb objects, since we need this in
 //vndb_connection.
-namespace vndb {
-//Possible targets of the get command
-enum class object_type {
-  VN = 0,
-  release,
-  producer,
-  character,
-  staff
-};
-constexpr int num_object_types = to_underlying(object_type::staff)+1;
-static constexpr std::array<std::string_view, num_object_types> 
-object_type_names = {{"VNs", "Releases", "Producers", "Characters", "Staff"}};
-}
+
 //Struct dealing with communication with the vndb server.
 struct vndb_connection {
   static constexpr char EOT = 0x4; // message terminator

@@ -1,6 +1,7 @@
 #include "vndb.h"
 #include "sql.h"
 #include <zlib.h>
+std::unique_ptr<util::logger> vndb_log;
 static constexpr std::string_view tags_uri = "/api/tags.json.gz"sv;
 static constexpr std::string_view traits_uri = "/api/traits.json.gz"sv;
 //Code to parse the tag/trait dumps and create sql tables for them
@@ -254,6 +255,8 @@ int main(){
     return 1;
   }
   atexit(free_vndb_ssl_ctx);
+  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
+
   sqlite3_wrapper db(default_db_file);
   if(!db){
     fprintf(stderr, "Error opening sqlite database.\n");

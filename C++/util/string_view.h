@@ -189,8 +189,8 @@ struct string_view {
     return other.compare(this->to_std_string_view());
   }
   constexpr int compare(const char *other) const {
-    size_t len = strlen(other);
-    int cmp_result = strncmp(data(), other, std::min(size(), len));
+    size_t len = __builtin_strlen(other);
+    int cmp_result = constexpr_strncmp(data(), other, std::min(size(), len));
     return (cmp_result ? cmp_result : three_way_compare(size(), len));
   }
   

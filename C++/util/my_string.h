@@ -53,8 +53,11 @@ struct string {
     : string(other.data(), other.size()) {}
   //Move constructor, sets other to the empty string.
   constexpr string(string&& other) noexcept {
-    //use memcpy to avoid having to check the size
-    memcpy(this, &other, other.sz);
+    //memcpy not allowed in constexpr
+    for(int i = 0; i < small_string_size; i++){
+      buf[i] = other.buf[i];
+    }
+    sz = other.sz;
     other.buf[0] = '\0';
   }
   //strings are immutable, the copy assigment/move operators are

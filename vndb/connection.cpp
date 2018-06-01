@@ -55,9 +55,9 @@ static SSL_CTX* init_ssl_ctx(){
   return nullptr;
 }
 bool init_vndb_ssl_ctx(){
-  DEBUG_PRINTF("Initializing SSL context.\n");
+  vndb_log->print(util::log_level::info,"Initializing SSL context.\n");
   vndb_ctx = init_ssl_ctx();
-  DEBUG_PRINTF("SSL context = %p.\n", vndb_ctx);
+  vndb_log->printf(util::log_level::info,"SSL context = %p.\n", vndb_ctx);
   return vndb_ctx;
 }
 void free_vndb_ssl_ctx(){
@@ -133,7 +133,7 @@ ssize_t BIO_wrapper::read_n(char *buf, size_t len){
 //is more than half full it is resized before reading data, the length
 //of the buffer is increased by the number of bytes read and the
 //result of the read call is returned..
-static ssize_t buf_read(BIO_wrapper &bio, char *& buf, 
+static ssize_t buf_read(BIO_wrapper &bio, char *& buf,
                         size_t& buflen, size_t& bufsz){
   if((bufsz - buflen) < (bufsz / 2)){
     buf = (char*)realloc(buf, bufsz*2);
@@ -213,9 +213,9 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
   buf.reserve(1024);
   //Due to how I've written things I can't read until a delmiter unless
   //its at the end of the message, so I make a head request to get the
-  //header length (and content length) so I can skip over it 
+  //header length (and content length) so I can skip over it
   int nbytes = snprintf(buf.data(), buf.capacity(),
-                        "HEAD %s HTTP/1.1\r\nHost: %s\r\n\r\n", 
+                        "HEAD %s HTTP/1.1\r\nHost: %s\r\n\r\n",
                         uri.data(), hostname.data());
   DEBUG_PRINTF("Sending http HEAD request:\n%.*s\n", nbytes, buf.data());
   if(bio.write(std::string_view(buf.data(), nbytes)) < 0){
@@ -239,7 +239,7 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
         return status_code;
       }
     }
-    fprintf(stderr, "Error malformed http status line %.*s.\n", 
+    fprintf(stderr, "Error malformed http status line %.*s.\n",
             (int)buf.size(), buf.data());
     return -1;
   }
@@ -249,7 +249,7 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
     fprintf(stderr, "Error could not find Content-Length in header.\n");
     return -1;
   }
-  int content_length = strtol(length_offset + length_field.size(), 
+  int content_length = strtol(length_offset + length_field.size(),
                               &length_offset, 0);
   if(content_length == 0){
     fprintf(stderr, "Error parsing content length, or content length was 0.\n");
@@ -258,7 +258,7 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
   buf.clear();
   buf.reserve(content_length + 1);//leave space for null terminator, because why not.
   nbytes = snprintf(buf.data(), buf.capacity(),
-                    "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n", 
+                    "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n",
                     uri.data(), hostname.data());
   DEBUG_PRINTF("Sending http GET request:\n%.*s\n", nbytes, buf.data());
   if(bio.write(std::string_view(buf.data(), nbytes)) <= 0){
@@ -292,14 +292,14 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
   char tmp_buf[tmp_buf_sz];//Stack allocated buffer for the header.
   int tmp_buf_len = 0;
   int nbytes = snprintf(tmp_buf, tmp_buf_sz,
-                        "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n", 
+                        "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n",
                         uri.data(), hostname.data());
 //  DEBUG_PRINTF("Sending http GET request:\n%s\n", tmp_buf);
   if(bio.write(std::string_view(tmp_buf, nbytes)) < 0){
     return -1;
   }
 //  DEBUG_PRINTF("Reading response.\n");
-  //This should be enough to read the whole header, without reading 
+  //This should be enough to read the whole header, without reading
   //too much actual content.
   nbytes = bio.read(tmp_buf, 512);
   if(nbytes <= 0){ return (nbytes ? -1 : nbytes); }
@@ -324,7 +324,7 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
     if(nbytes <= 0){  return (nbytes ? -1 : nbytes); }
     tmp_buf_len += nbytes;
     tmp_buf[tmp_buf_len] = '\0';
-    header_end = strstr(tmp_buf, header_delim.data());    
+    header_end = strstr(tmp_buf, header_delim.data());
   }
   //Figure out content length and copy any content we already read from
   //tmp_buf into buf.
@@ -335,7 +335,7 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
     fprintf(stderr, "Error could not find Content-Length in header.\n");
     return -1;
   }
-  int content_length = strtol(length_offset + length_field.size(), 
+  int content_length = strtol(length_offset + length_field.size(),
                               &length_offset, 0);
   if(content_length == 0){
     fprintf(stderr, "Error parsing content length, or content length was 0.\n");
@@ -345,9 +345,9 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
   buf.reserve(content_length);
   int content_read = tmp_buf_len - header_length;
   memcpy(buf.data(), tmp_buf + header_length, content_read);
-  
+
   nbytes = bio.read_n(buf.data() + content_read, content_length - content_read);
-  if(nbytes <= 0){  return (nbytes ? -1 : nbytes); }  
+  if(nbytes <= 0){  return (nbytes ? -1 : nbytes); }
   assert((nbytes + content_read) == content_length);
   buf.set_length(content_length);
   return 0;
@@ -371,6 +371,8 @@ bool vndb_connection::login(){
   } else {
     this->buf.append("}\x4", constexpr_strlen("}\x4"));
   }
+  vndb_log->printf(util::log_level::debug, "Sending login command %s.\n",
+                   this->buf.c_str());
   if(this->write_buf() <= 0){
     //bio method will print the errors
     return false;
@@ -420,15 +422,15 @@ int vndb_connection::read(){
 json vndb_connection::get_error(){
   util::string_view response = this->buf.to_string_view();
   assert(has_prefix(response, "error"));
-  DEBUG_PRINTF("Recieved error %s\n", response.data());
-
   json ret = json::parse(response.substr(constexpr_strlen("error")));
-  if(ret["type"].get_ref<std::string>() == "throttled"){
+  if(ret["id"].get_ref<std::string>() == "throttled"){
+    DEBUG_PRINTF("Recieved throttled error.\n");
     this->throttled = true;
     //If wait on throttle is true than we don't consider it an error,
     //otherwise we do, since it will cause an early return.
     this->error = !this->wait_on_throttle;
   } else {
+    DEBUG_PRINTF("Recieved error %s\n", response.data());
     this->error = true;
   }
   return ret;
@@ -450,6 +452,8 @@ static bool wait_if_throttled(vndb_connection* conn){
   if(!duration_offset) { return false; }
   double duration = strtod(duration_offset + 1, nullptr);
   if(duration == 0.0) { return false; }
+  vndb_log->printf(util::log_level::debug, "Throttled, waiting for %d seconds.\n",
+                   duration);
   util::sleep(duration);
   conn->error = false;
   return true;
@@ -461,17 +465,22 @@ json vndb_connection::send_get_command_once(int page_no,
                                             util::string_view sort_by){
   static const std::string_view options =
     R"( {"sort" : "%s", "results" : 25, "page" : %d})"sv;
-
   this->buf.append_formatted(options.data(), sort_by.data(), page_no);
+
+  vndb_log->printf(util::log_level::debug, "Sending get command %s\n",
+                   this->buf.c_str());
+
 //  DEBUG_PRINTF("Sending command %s\n", this->buf.c_str());
   this->buf.append(this->EOT);
   int nbytes_written = this->write_buf();
   if(nbytes_written <= 0){//assume this means we couldn't connect to the server
+    vndb_log->printf(util::log_level::warn, "Couldn't send get command to server.\n");
     this->logged_in = false;
     return json_null;
   }
   int nbytes_read = this->read();
   if(nbytes_read <= 0){//Shouldn't happen very often.
+    vndb_log->printf(util::log_level::warn, "Couldn't get response from server.\n");
     this->logged_in = false;
     return json_null;
   }
@@ -479,7 +488,7 @@ json vndb_connection::send_get_command_once(int page_no,
   util::string_view response = this->buf.to_string_view();
   if(is_error_response(response)){
     //We can't retry the command if we get a throttled response, We could
-    //save the command after we send it, but that would defeat the 
+    //save the command after we send it, but that would defeat the
     //purpose of this function in the first place.
     return this->get_error();
   }
@@ -501,7 +510,7 @@ int vndb_connection::send_get_command(std::vector<json>& results,
   bool more = true;
   while(more){
     //Should proably reuse this storage.
-    json result = this->send_get_command_once(page_no++, sort_by); 
+    json result = this->send_get_command_once(page_no++, sort_by);
     if(this->error){
       //Store the error in case the calling function wants more details.
       results.push_back(result);
@@ -539,7 +548,7 @@ int vndb_connection::send_get_command(get_callback& callback,
   bool more = true;
   while(more){
     //Should proably reuse this storage.
-    json result = this->send_get_command_once(page_no++, sort_by); 
+    json result = this->send_get_command_once(page_no++, sort_by);
     if(this->error){
       return -1;
     }
@@ -581,8 +590,8 @@ bool vndb_connection::send_set_command(){
     this->error = true;
     return false;
   }
-}  
-int vndb_connection::get(vndb::object_type what, int start, int stop, 
+}
+int vndb_connection::get(vndb::object_type what, int start, int stop,
                          std::vector<json>& vec){
   this->buf.clear();
   std::string_view command_base = this->get_get_command_base(what);
@@ -591,7 +600,7 @@ int vndb_connection::get(vndb::object_type what, int start, int stop,
   vec.reserve(stop - start);
   return this->send_get_command(vec);
 }
-int vndb_connection::get(vndb::object_type what, int start, int stop, 
+int vndb_connection::get(vndb::object_type what, int start, int stop,
                          get_callback& callback){
   this->buf.clear();
   std::string_view command_base = this->get_get_command_base(what);
@@ -604,12 +613,13 @@ int vndb_connection::get_all(vndb::object_type what,
   this->buf.clear();
   std::string_view command_base = this->get_get_command_base(what);
   buf.append(command_base);
-  buf.append("(id >= 0)");
+  buf.append("(id >= 1)");
   return this->send_get_command(callback);
 }
 json vndb_connection::dbstats(){
   this->buf.clear();
   this->buf.append("dbstats\x4", constexpr_strlen("dbstats\x4"));
+  vndb_log->printf(util::log_level::debug, "Sending dbstats command.\n");
   this->write_buf();
   this->read();
   util::string_view response = this->buf.to_string_view();
@@ -623,6 +633,8 @@ json vndb_connection::dbstats(){
     this->error = true;
     return json_null;
   }
+  vndb_log->printf(util::log_level::debug, "Got dbstats result %.*s.\n",
+                   (int)response.size(), response.data());
   return json::parse(response.substr(constexpr_strlen("dbstats")));
 }
 bool vndb_connection::set_vote(int vn_id, int value){
@@ -666,7 +678,7 @@ bool vndb_connection::set_wishlist(int vn_id, int priority){
     return false;
   }
 }
-  
+
 bool vndb_connection::remove_from_wishlist(int vn_id){
   this->buf.clear();
   this->buf.append_formatted("set wishlist %d", vn_id);
