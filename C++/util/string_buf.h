@@ -290,8 +290,10 @@ struct string_buf {
   char* data() {
     return buf.data();
   }
+  // Add a null terminator, but not really.
   void null_terminate(){
     buf.push_back('\0');
+    buf.pop_back();
   }
   void clear(){
     buf.clear();
@@ -312,11 +314,11 @@ struct string_buf {
   }
   std::string_view std_string_view(){
     null_terminate();
-    return std::string_view(buf.data(), buf.size()-1);
+    return std::string_view(buf.data(), buf.size());
   }
   string_view to_string_view(){
     null_terminate();
-    return string_view(buf.data(), buf.size()-1);
+    return string_view(buf.data(), buf.size());
   }
   const char* c_str(){
     return to_string_view().data();
@@ -331,7 +333,7 @@ struct string_buf {
   //allocations and leaves the string_buf empty.
   string_view move_to_string_view(){
     null_terminate();
-    util::string_view ret{buf.data(), buf.size()-1, string_view::flag_both};
+    util::string_view ret{buf.data(), buf.size(), string_view::flag_both};
     (void)buf.take_memory();
     return ret;
   }

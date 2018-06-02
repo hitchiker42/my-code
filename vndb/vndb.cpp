@@ -132,7 +132,9 @@ bool test_insert_vns(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
   db.print_errmsg("Recieved sqlite error");
   return false;
 }
-bool download_all(const char *database_filename){
+bool download_all(const char *database_filename, int vn_start = 1,
+                  int release_start = 1, int producer_start = 1, int character_start = 1,
+                  int staff_start = 1){
   vndb_main vndb(database_filename);
   //compile sql, connect to servert & get dbstats (for progress bars).
   if(!vndb.db){
@@ -155,16 +157,26 @@ bool download_all(const char *database_filename){
     fprintf(stderr, "Failed to run dbstats command.\n");
     return false;
   }
-  printf("Downloading VNs\n");
-  if(!vndb.download_and_insert_all(vndb::object_type::VN)){ return false; }
-  printf("Downloading Releases\n");
-  if(!vndb.download_and_insert_all(vndb::object_type::release)){ return false; }
-  printf("Downloading Producers\n");
-  if(!vndb.download_and_insert_all(vndb::object_type::producer)){ return false; }
-  printf("Downloading Characters\n");
-  if(!vndb.download_and_insert_all(vndb::object_type::character)){ return false; }
-  printf("Downloading Staff\n");
-  if(!vndb.download_and_insert_all(vndb::object_type::staff)){ return false; }
+  if(vn_start > 0){
+    printf("Downloading VNs\n");
+    if(vndb.download_and_insert_all(vndb::object_type::VN,vn_start) <= 0){ return false; }
+  }
+  if(release_start > 0){
+    printf("Downloading Releases\n");
+    if(vndb.download_and_insert_all(vndb::object_type::release,release_start) <= 0){ return false; }
+  }
+  if(producer_start > 0){
+    printf("Downloading Producers\n");
+    if(vndb.download_and_insert_all(vndb::object_type::producer,producer_start)<= 0){ return false; }
+  }
+  if(character_start > 0){
+    printf("Downloading Characters\n");
+    if(vndb.download_and_insert_all(vndb::object_type::character,character_start) <= 0){ return false; }
+  }
+  if(staff_start > 0){
+    printf("Downloading Staff\n");
+    if(vndb.download_and_insert_all(vndb::object_type::staff,staff_start) <= 0){ return false; }
+  }
   return true;
 }
 int run_connection_test(){
@@ -200,13 +212,13 @@ int run_insertion_test(){
   return !test_insert_vns(db, stmt, "conn_test.out");
 }
 int main(int argc, char* argv[]){
+  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
   if(!init_vndb_ssl_ctx()){
     fprintf(stderr, "Error, failed to initialize ssl context\n");
     return -1;
   }
   atexit(free_vndb_ssl_ctx);
-  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
-  return download_all(default_db_file);
+  return download_all(default_db_file, -1, -1,-1,-1);
 /*
   if(argc > 1){
     if(argv[1][0] == 'c'){

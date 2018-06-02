@@ -57,7 +57,12 @@ int sqlite_insert_vn(const json &vn, sqlite3_stmt_wrapper& stmt){
   //bind the current date/time, I may remove this.
   stmt.bind(idx++, time(NULL));
 //  DEBUG_PRINTF("Executing sql: %s\n", sqlite3_expanded_sql(stmt.unwrap()));
-  return stmt.exec();
+  int ret = stmt.exec(false);
+  if(ret != SQLITE_OK){
+    DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
+  }
+  stmt.reset();
+  return ret;
 }
 //insert a release into the database.
 int sqlite_insert_release(const json &release,

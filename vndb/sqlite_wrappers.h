@@ -56,6 +56,9 @@ struct sqlite3_stmt_wrapper {
   sqlite3_stmt* unwrap(){
     return stmt;
   }
+  std::string get_sql(){
+    return sqlite3_expanded_sql(stmt);
+  }
   //This is convient but doesn't offer a way to tell between an error
   //and successful terminaton.
   bool step(){

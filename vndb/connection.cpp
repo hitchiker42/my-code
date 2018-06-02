@@ -456,6 +456,7 @@ static bool wait_if_throttled(vndb_connection* conn){
                    duration);
   util::sleep(duration);
   conn->error = false;
+  conn->throttled = false;
   return true;
 }
 static bool is_error_response(util::string_view response){
@@ -470,7 +471,7 @@ json vndb_connection::send_get_command_once(int page_no,
   vndb_log->printf(util::log_level::debug, "Sending get command %s\n",
                    this->buf.c_str());
 
-//  DEBUG_PRINTF("Sending command %s\n", this->buf.c_str());
+  //  DEBUG_PRINTF("Sending command %s\n", this->buf.c_str());
   this->buf.append(this->EOT);
   int nbytes_written = this->write_buf();
   if(nbytes_written <= 0){//assume this means we couldn't connect to the server
@@ -487,6 +488,8 @@ json vndb_connection::send_get_command_once(int page_no,
   //maybe not the most elegant way to do this but it should work.
   util::string_view response = this->buf.to_string_view();
   if(is_error_response(response)){
+    vndb_log->printf(util::log_level::debug, "Got error response %.*s.\n",
+                     (int)response.size(), response.data());
     //We can't retry the command if we get a throttled response, We could
     //save the command after we send it, but that would defeat the
     //purpose of this function in the first place.
@@ -512,6 +515,7 @@ int vndb_connection::send_get_command(std::vector<json>& results,
     //Should proably reuse this storage.
     json result = this->send_get_command_once(page_no++, sort_by);
     if(this->error){
+      vndb_log->printf(util::log_level::warn, "Got error response.\n");
       //Store the error in case the calling function wants more details.
       results.push_back(result);
       return -1;
@@ -529,6 +533,7 @@ int vndb_connection::send_get_command(std::vector<json>& results,
       //we could avoid incrementing the page number until later and
       //then remove this.
       page_no--;
+      this->throttled = false;
       continue;
     }
     //definately not the fastest way to do this
@@ -550,6 +555,7 @@ int vndb_connection::send_get_command(get_callback& callback,
     //Should proably reuse this storage.
     json result = this->send_get_command_once(page_no++, sort_by);
     if(this->error){
+      vndb_log->printf(util::log_level::warn, "Got error response.\n");
       return -1;
     }
     this->buf.clear();
@@ -565,11 +571,14 @@ int vndb_connection::send_get_command(get_callback& callback,
       //we could avoid incrementing the page number until later and
       //then remove this.
       page_no--;
+      this->throttled = false;
       continue;
     }
     std::vector<json>& items = result["items"].get_ref<std::vector<json>>();
     int err = callback(items);
     if(err != 0){
+      DEBUG_PRINTF("Callback returned error %d.\n", err);
+      vndb_log->printf(util::log_level::warn, "Got error from callback %d.\n", err);
       return err;
     }
     count += items.size();
@@ -609,17 +618,26 @@ int vndb_connection::get(vndb::object_type what, int start, int stop,
   return this->send_get_command(callback);
 }
 int vndb_connection::get_all(vndb::object_type what,
-                             get_callback& callback){
+                             get_callback& callback, int start){
   this->buf.clear();
   std::string_view command_base = this->get_get_command_base(what);
   buf.append(command_base);
-  buf.append("(id >= 1)");
-  return this->send_get_command(callback);
+  //Not sure if it's documented but theres a limit of 999 for the page field
+  //so if we have more than 25000 items we need to use muliple commands
+  buf.append_formatted("(id >= %d and id <= %d)", start, start + 24999);
+  int cnt = this->send_get_command(callback);
+  int total = cnt;
+  while(cnt > 20000){
+    buf.append_formatted("(id >= %d and id <= %d)", start + total, start + total + 24999);
+    cnt = this->send_get_command(callback);
+    total += cnt;
+  }
+  return total;
 }
 json vndb_connection::dbstats(){
   this->buf.clear();
   this->buf.append("dbstats\x4", constexpr_strlen("dbstats\x4"));
-  vndb_log->printf(util::log_level::debug, "Sending dbstats command.\n");
+  vndb_log->printf(util::log_level::debug, "Sending dbstats command: %s.\n", this->buf.c_str());
   this->write_buf();
   this->read();
   util::string_view response = this->buf.to_string_view();

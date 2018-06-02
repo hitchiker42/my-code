@@ -195,7 +195,7 @@ struct vndb_connection {
   }
   int get(vndb::object_type what, int start, int stop,
           get_callback& callback);
-  int get_all(vndb::object_type what, get_callback& callback);
+  int get_all(vndb::object_type what, get_callback& callback, int start = 1);
   //Get a number of vns from the server starting at a given id
   //and ending at either a given id, or id+25 (which is the max
   //number of vns we can get per response.
@@ -237,3 +237,7 @@ struct vndb_connection {
   bool set_vnlist(int vn_id, std::string_view note, int status = 0);
   bool remove_from_vnlist(int vn_id);
 };
+
+/* Local Variables: */
+/* mode: C++ */
+/* End: */

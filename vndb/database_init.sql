@@ -25,7 +25,7 @@ anime json, --json array of objects
 relations json, --json array of objects
 tags json, --json array of arrays
 popularity real not null check(popularity between 0 and 100),
-rating real not null check(rating between 1 and 10),
+rating real not null check(rating between 1 and 10 or rating is 0.0),
 votecount integer not null,
 screens json, -- json array of objects
 -- may change to array of ints

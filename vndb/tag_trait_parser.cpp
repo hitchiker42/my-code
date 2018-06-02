@@ -250,12 +250,13 @@ int insert_traits(sqlite3_wrapper& db){
   return traits.size();
 }    
 int main(){
+  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
   if(!init_vndb_ssl_ctx()){
     fprintf(stderr, "Error initializing ssl context.\n");
     return 1;
   }
   atexit(free_vndb_ssl_ctx);
-  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
+
 
   sqlite3_wrapper db(default_db_file);
   if(!db){

@@ -39,11 +39,11 @@ static constexpr std::string_view sql_insert_producer =
   R"EOF(insert or replace into producers values (
         @id, @name, @original, @type, @language,
         @links, @aliases, @description, @relations);)EOF"sv;
-static constexpr std::string_view sql_insert_character =
+static constexpr std::string_view sql_insert_staff =
   R"EOF(insert or replace into staff values (
         @id, @name, @original, @gender, @language, @links,
         @description, @aliases, @main_ailas, @vns, @voiced);)EOF"sv;
-static constexpr std::string_view sql_insert_staff =
+static constexpr std::string_view sql_insert_character =
   R"EOF(insert or replace into characters values (
         @id, @name, @original, @gender, @aliases,
         @description, @image, @traits, @vns, @voiced);)EOF"sv;

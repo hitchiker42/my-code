@@ -29,6 +29,7 @@ bool init_vndb_ssl_ctx();
 void free_vndb_ssl_ctx();
 
 //This needs to be defined and initialized in whatever file has main.
+//It should be initialized before anything else.
 extern std::unique_ptr<util::logger> vndb_log;
 static constexpr const char* default_log_file = "vndb.log";
 
@@ -138,7 +139,7 @@ struct vndb_main {
       return false;
     } else {
       db_stats = conn.dbstats();
-      return !db_stats.is_null();
+      return !conn.error;
     }
   }
   //Two names for the same function.
@@ -210,7 +211,10 @@ struct vndb_main {
     auto callback = [&ins_stmt, &db, pb, what](std::vector<json>& items) mutable -> int {
       if(db.begin_transaction() != SQLITE_OK){ return -1; }
       for(auto &&item : items){
-        if(sqlite_insert_object(what, item, ins_stmt) != SQLITE_OK){
+        int err = sqlite_insert_object(what, item, ins_stmt);
+        if(err != SQLITE_OK){
+          db.print_errmsg("Error in callback.");
+          fprintf(stderr, "Sql command was %s.\n", ins_stmt.get_sql().data());
           db.rollback_transaction();
           return -1;
         }
@@ -230,16 +234,16 @@ struct vndb_main {
   }
   
   int download_and_insert(vndb::object_type what, int start, int stop){
-    progress_bar pb(db_stats_count(what), 
+    progress_bar pb(db_stats_count(what) - start, 
                     vndb::object_type_names[to_underlying(what)].data());
     auto callback = gen_insert_callback(what, &pb);
     return conn.get(what, start, stop, callback);
   }
-  int download_and_insert_all(vndb::object_type what){
+  int download_and_insert_all(vndb::object_type what, int start = 1){
     progress_bar pb(db_stats_count(what), 
                     vndb::object_type_names[to_underlying(what)].data());
     auto callback = gen_insert_callback(what, &pb);
-    return conn.get_all(what, callback);
+    return conn.get_all(what, callback, start);
   }
   int get_max_id(table_type what){
     static constexpr int bufsz = 256;

@@ -4,3 +4,4 @@ tag_trait_parser
 # database files
 *.db
 TAGS
+*.log
