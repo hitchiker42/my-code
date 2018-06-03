@@ -112,28 +112,6 @@ int sqlite_insert_producer(const json& producer,
   stmt.reset();
   return ret;
 }
-int sqlite_insert_staff(const json& staff,
-                        sqlite3_stmt_wrapper& stmt){
-  int idx = 1;
-  stmt.bind(idx++, staff["id"].get<int>());
-  stmt.bind(idx++, staff["name"].get<std::string_view>());
-  stmt.bind(idx++, staff["original"].get_ptr<json::string_t>());
-  stmt.bind(idx++, staff["language"].get_ptr<json::string_t>());
-  stmt.bind(idx++, staff["gender"].get_ptr<json::string_t>());
-  stmt.bind(idx++,
-            parse_delimted_string(staff["aliases"].get_ptr<json::string_t>(), '\n'));
-  stmt.bind(idx++, staff["description"].get_ptr<json::string_t>());
-  stmt.bind(idx++, staff["image"].get_ptr<json::string_t>());
-  stmt.bind(idx++, staff["traits"]);
-  stmt.bind(idx++, staff["vns"]);
-  stmt.bind(idx++, staff["voiced"]);
-  int ret = stmt.exec(false);
-  if(ret != SQLITE_OK){
-    DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
-  }
-  stmt.reset();
-  return ret;
-}
 int sqlite_insert_character(const json& chara,
                            sqlite3_stmt_wrapper& stmt){
   int idx = 1;
@@ -155,6 +133,28 @@ int sqlite_insert_character(const json& chara,
   stmt.reset();
   return ret;
 }
+int sqlite_insert_staff(const json& staff,
+                        sqlite3_stmt_wrapper& stmt){
+  int idx = 1;
+  stmt.bind(idx++, staff["id"].get<int>());
+  stmt.bind(idx++, staff["name"].get<std::string_view>());
+  stmt.bind(idx++, staff["original"].get_ptr<json::string_t>());
+  stmt.bind(idx++, staff["gender"].get_ptr<json::string_t>());
+  stmt.bind(idx++, staff["language"].get<std::string_view>());
+  stmt.bind(idx++, staff["links"]);
+  stmt.bind(idx++, staff["description"].get_ptr<json::string_t>());
+  stmt.bind(idx++, staff["aliases"]);
+  stmt.bind(idx++, staff["main_alias"].get<int>());
+  stmt.bind(idx++, staff["vns"]);
+  stmt.bind(idx++, staff["voiced"]);
+  int ret = stmt.exec(false);
+  if(ret != SQLITE_OK){
+    DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
+  }
+  stmt.reset();
+  return ret;
+}
+
 // Add relations between each VN and producer from release.
 // Since the relations table use foreign keys it is an error
 // to try and add a relation for a non-existant VN/producer.

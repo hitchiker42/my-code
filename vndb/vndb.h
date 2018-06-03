@@ -135,9 +135,14 @@ struct vndb_main {
     : db(db_filename), conn(username, passwd, true, connect) {}
   bool init_insert_stmts();
   bool init_get_id_stmts();
+  bool build_vn_tags();
+  bool build_character_traits();
+  //uses the releases table
   bool build_vn_producer_relations();
-  bool build_vn_character_actor_relations();
-  bool build_vn_staff_relations();
+  //builds vn_character_actor_relations, vn_staff_relations and staff_aliases.
+  bool build_staff_derived_tables();
+  bool build_vn_images();
+  bool build_character_images();
   bool init_db_stats(){
     if(!conn.ensure_logged_in()){
       return false;

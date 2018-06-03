@@ -1,6 +1,54 @@
 #ifndef __VNDB_H__
 #error "Don't include sqlite_wrappers.h directly use vndb.h"
 #endif
+//simple string using memory allocated with sqlite_malloc, used pretty
+//much exclusively to wrap the return value of sqlite3_expanded_sql.
+struct sqlite_string {
+  typedef const char* pointer;
+  typedef const char& reference;
+  typedef char value_type;
+  typedef size_t size_type;
+  typedef ptrdiff_t difference_type;
+  typedef pointer iterator;
+  char *str;
+  size_t len;
+  sqlite_string(char *str, bool copy = false)
+    : str{copy ? sqlite_strdup(str) : str}, len{strlen(str)} {}
+  sqlite_string(char *str, size_t len, bool copy = false)
+    : str{copy ? sqlite_strdup(str, len)  : str}, len{len} {}
+  ~sqlite_string(){
+    sqlite3_free(str);
+  }
+  operator std::string_view(){
+    return std::string_view(str, len);
+  }
+  const char* c_str() const {
+    return str;
+  }
+  const char* data() const {
+    return str;
+  }
+  size_t size() const {
+    return len;
+  }
+  char operator[](size_type idx) const {
+    return str[idx];
+  }
+  iterator begin() const {
+    return iterator(str);
+  }
+  iterator end() const {
+    return iterator(str+len);
+  }
+  static char* sqlite_strdup(const char *str, size_t len = -1){
+    if(len == (size_t)-1){
+      len = strlen(str);
+    }
+    char *ret = (char*)sqlite3_malloc(len+1);
+    memcpy(ret, str, len + 1);
+    return ret;
+  }
+};
 //being written it C sqlite uses cpp defines for constants, which
 //makes sense, but in C++ we have the benifit enums being compile
 //time constants, so use that.
@@ -56,16 +104,22 @@ struct sqlite3_stmt_wrapper {
   sqlite3_stmt* unwrap(){
     return stmt;
   }
-  std::string get_sql(){
+  //Returns sql stmt with currently bound parameters expanded
+  sqlite_string get_sql(){
     return sqlite3_expanded_sql(stmt);
+  }
+  //Returns the string used to initialize the stmt, i.e without expanding
+  //any parameters.
+  std::string_view get_sql_template(){
+    return sqlite3_sql(stmt);
   }
   //This is convient but doesn't offer a way to tell between an error
   //and successful terminaton.
-  bool step(){
+/*  bool step(){
     int res = sqlite3_step(stmt);
     return res == SQLITE_ROW;
-  }
-  bool step_explicit(){
+  }*/
+  int step(){
     return sqlite3_step(stmt);
   }
   //returns SQLITE_OK (0) if there were no errors in step, and nonzero

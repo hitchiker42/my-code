@@ -52,6 +52,215 @@ bool vndb_main::init_get_id_stmts(){
   }
   return true;
 }
+bool vndb_main::build_vn_tags(){
+  sqlite3_wrapper &db = this->db;
+  auto stmt = db.prepare_stmt("select id, tags from VNs;");
+  if(!stmt){
+    db.print_errmsg("Failed to compile sql");
+  }
+  auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_tags);
+  db.begin_transaction();
+  int res;
+  while((res = stmt.step()) == SQLITE_ROW){
+    int id = stmt.get_column<int>(0);
+    json tags = stmt.get_column<json>(1);
+    int err = sqlite_insert_vn_tags(id, tags, ins_stmt);
+    if(err != SQLITE_OK){
+      db.print_errmsg("Failed to insert into vn_tags");
+      vndb_log->printf(util::log_level::warn,
+                       "Failed to insert tags for vn %d, tags were %s\n",
+                       id, tags.dump().c_str());
+      db.rollback_transaction();
+      return false;
+    }
+  }
+  if(res != SQLITE_DONE){
+      db.print_errmsg("Failure running 'select id,tags from VNs;'");
+      db.rollback_transaction();
+      return false;
+  }
+  return (db.commit_transaction() == SQLITE_OK);
+}  
+bool vndb_main::build_character_traits(){
+  sqlite3_wrapper &db = this->db;
+  auto stmt = db.prepare_stmt("select id, traits from characters;");
+  if(!stmt){
+    db.print_errmsg("Failed to compile sql");
+  }
+  auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::character_traits);
+  db.begin_transaction();
+  int res;
+  while((res = stmt.step()) == SQLITE_ROW){
+    int id = stmt.get_column<int>(0);
+    json traits = stmt.get_column<json>(1);
+    int err = sqlite_insert_character_traits(id, traits, ins_stmt);
+    if(err != SQLITE_OK){
+      db.print_errmsg("Failed to insert into character_traits");
+      vndb_log->printf(util::log_level::warn,
+                       "Failed to insert tags for character %d, traits were %s\n",
+                       id, traits.dump().c_str());
+      db.rollback_transaction();
+      return false;
+    }
+  }
+  if(res != SQLITE_DONE){
+      db.print_errmsg("Failure running 'select id,traits from characters;'");
+      db.rollback_transaction();
+      return false;
+  }
+  return (db.commit_transaction() == SQLITE_OK);
+}
+//uses the releases table
+bool vndb_main::build_vn_producer_relations(){
+  sqlite3_wrapper &db = this->db;
+  auto stmt = db.prepare_stmt("select id, vn, producers from releases;");
+  if(!stmt){
+    db.print_errmsg("Failed to compile sql");
+  }
+  auto &ins_stmt = 
+    this->get_insert_stmt(vndb_main::table_type::vn_producer_relations);
+  db.begin_transaction();
+  int res;
+  while((res = stmt.step()) == SQLITE_ROW){
+    int id = stmt.get_column<int>(0);
+    json vns = stmt.get_column<json>(1);
+    json producers = stmt.get_column<json>(2);
+    int err = sqlite_insert_vn_producer_relations(id, vns, producers, ins_stmt);
+    if(err != SQLITE_OK){
+      db.print_errmsg("Failed to insert into vn_producer_relations");
+      vndb_log->printf(util::log_level::warn,
+                       "Failed to insert relation for release %d,"
+                       "vns = %s, producers = %s.\n",
+                       id, vns.dump().c_str(), producers.dump().c_str());
+      db.rollback_transaction();
+      return false;
+    }
+  }
+  if(res != SQLITE_DONE){
+      db.print_errmsg("failure running 'select id, vn, producers from releases;'");
+      db.rollback_transaction();
+      return false;
+  }
+  return (db.commit_transaction() == SQLITE_OK);
+}
+//builds vn_character_actor_relations, vn_staff_relations and staff_aliases.
+bool vndb_main::build_staff_derived_tables(){
+  sqlite3_wrapper &db = this->db;
+  auto stmt = db.prepare_stmt("select id, aliases, vns, voiced from staff;");
+  if(!stmt){
+    db.print_errmsg("Failed to compile sql");
+  }
+  auto &vca_ins_stmt = 
+    this->get_insert_stmt(vndb_main::table_type::vn_character_actor_relations);
+  auto &vs_ins_stmt = 
+    this->get_insert_stmt(vndb_main::table_type::vn_staff_relations);
+  auto &sa_ins_stmt = 
+    this->get_insert_stmt(vndb_main::table_type::staff_aliases);
+  db.begin_transaction();
+  int res;
+  while((res = stmt.step()) == SQLITE_ROW){
+    int id = stmt.get_column<int>(0);
+    json aliases = stmt.get_column<json>(1);
+    json vns = stmt.get_column<json>(2);
+    json voiced = stmt.get_column<json>(3);
+    int err = sqlite_insert_vn_character_actor_relations(id, voiced, vca_ins_stmt);
+    if(err != SQLITE_OK){
+      db.print_errmsg("Failed to insert into vn_character_actor_relations");
+      vndb_log->printf(util::log_level::warn,
+                       "Failed to insert into vn_character_actor_relations for "
+                       "staff = %d, voiced = %s\n",
+                       id, voiced.dump().c_str());
+      db.rollback_transaction();
+      return false;
+    }
+    err = sqlite_insert_vn_staff_relations(id, vns, vs_ins_stmt);
+    if(err != SQLITE_OK){
+      db.print_errmsg("Failed to insert into vn_staff_relations");
+      vndb_log->printf(util::log_level::warn,
+                       "Failed to insert into vn_staff_relations for "
+                       "staff = %d, vn = %s\n",
+                       id, vns.dump().c_str());
+      db.rollback_transaction();
+      return false;
+    }
+    err = sqlite_insert_staff_aliases(id, aliases, sa_ins_stmt);
+    if(err != SQLITE_OK){
+      db.print_errmsg("Failed to insert into staff_aliases");
+      vndb_log->printf(util::log_level::warn,
+                       "Failed to insert into staff_aliases for "
+                       "staff = %d, aliases = %s\n",
+                       id, aliases.dump().c_str());
+      db.rollback_transaction();
+      return false;
+    }
+  }
+  if(res != SQLITE_DONE){
+      db.print_errmsg("Failure running 'select id, aliases, vns, voiced from staff;'");
+      db.rollback_transaction();
+      return false;
+  }
+  return (db.commit_transaction() == SQLITE_OK); 
+}
+static bool build_image_table(sqlite3_wrapper &db,
+                              sqlite3_stmt_wrapper &stmt,
+                              sqlite3_stmt_wrapper &ins_stmt,
+                              const char *name){
+  http_connection conn("s.vndb.org", "443");
+  db.begin_transaction();
+  int res;
+  util::svector<char> buf;
+  while((res = stmt.step()) == SQLITE_ROW){
+    int id = stmt.get_column<int>(0);
+    std::string_view uri = stmt.get_column<std::string_view>(1);
+    int err = conn.http_get(uri, buf);
+    if(!err){
+      fprintf(stderr, "Error downloding https://s.vndb.org%s.\n", uri.data());
+      db.rollback_transaction();
+      return false;
+    }
+    ins_stmt.bind(1, id);
+    ins_stmt.bind(2, (void*)buf.data(), buf.size());
+    err = ins_stmt.exec();
+    if(err != SQLITE_OK){
+      fprintf(stderr, "Error inserting %s image.\n", name);
+      db.rollback_transaction();
+      return false;
+    }
+  }
+  if(res != SQLITE_DONE){
+    fprintf(stderr, "Failure running '%s' : %s(%d).",
+            stmt.get_sql_template().data(), db.errmsg(), db.errcode());
+    db.rollback_transaction();
+    return false;
+  }
+  return (db.commit_transaction() == SQLITE_OK); 
+}  
+/*
+  The links for vn images should be of the form:
+  https://s.vndb.org/cv/.+
+  and for character images:
+  https://s.vndb.org/ch/.+
+*/
+bool vndb_main::build_vn_images(){  
+  sqlite3_wrapper &db = this->db;
+  //substr(image,19) cuts the leading "https://s.vndb.org" from the link
+  auto stmt = db.prepare_stmt("select id, substr(image, 19) from VNs");
+  if(!stmt){
+    db.print_errmsg("Failed to compile sql");
+  }
+  auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
+  return build_image_table(db, stmt, ins_stmt, "VNs");
+}  
+bool vndb_main::build_character_images(){
+  sqlite3_wrapper &db = this->db;
+  //substr(image,19) cuts the leading "https://s.vndb.org" from the link
+  auto stmt = db.prepare_stmt("select id, substr(image, 19) from characters");
+  if(!stmt){
+    db.print_errmsg("Failed to compile sql");
+  }
+  auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
+  return build_image_table(db, stmt, ins_stmt, "characters");
+}  
 bool download_all(const char *database_filename, int vn_start = 1,
                   int release_start = 1, int producer_start = 1, int character_start = 1,
                   int staff_start = 1){
@@ -118,10 +327,10 @@ int main(int argc, char* argv[]){
     start_indexes.push_back(1);
   }
   //Temporary, skips VNs, releases and producers.
-  start_indexes[0] = start_indexes[1] = start_indexes[2] = -1;
-  start_indexes[3] = 71140;
-  return download_all(default_db_file, start_indexes[0], start_indexes[1],
-                      start_indexes[2], start_indexes[3], start_indexes[4]);
+  start_indexes[0] = start_indexes[1] = start_indexes[2] = start_indexes[3] = -1;
+  bool success = download_all(default_db_file, start_indexes[0], start_indexes[1],
+                              start_indexes[2], start_indexes[3], start_indexes[4]);
+  return (success ? EXIT_SUCCESS : EXIT_FAILURE);
 /*
   if(argc > 1){
     if(argv[1][0] == 'c'){
