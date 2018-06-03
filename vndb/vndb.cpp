@@ -119,7 +119,7 @@ int main(int argc, char* argv[]){
   }
   //Temporary, skips VNs, releases and producers.
   start_indexes[0] = start_indexes[1] = start_indexes[2] = -1;
-  start_indexes[3] = 49860;
+  start_indexes[3] = 71140;
   return download_all(default_db_file, start_indexes[0], start_indexes[1],
                       start_indexes[2], start_indexes[3], start_indexes[4]);
 /*

@@ -640,6 +640,8 @@ int vndb_connection::get_all(vndb::object_type what,
                        "Recieved error from send_get_command.\n");
       return -1;
     }
+    buf.clear();
+    buf.append(this->get_get_command_base(what));
     buf.append_formatted("(id >= %d and id <= %d)", 
                          start + total, start + total + 24999);
     cnt = this->send_get_command(callback);
