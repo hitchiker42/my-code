@@ -32,6 +32,7 @@ void free_vndb_ssl_ctx();
 //It should be initialized before anything else.
 extern std::unique_ptr<util::logger> vndb_log;
 static constexpr const char* default_log_file = "vndb.log";
+static constexpr const char* default_log_file_bkup = "vndb.log.bkup";
 
 using string_buf = util::string_buf;
 
@@ -134,6 +135,9 @@ struct vndb_main {
     : db(db_filename), conn(username, passwd, true, connect) {}
   bool init_insert_stmts();
   bool init_get_id_stmts();
+  bool build_vn_producer_relations();
+  bool build_vn_character_actor_relations();
+  bool build_vn_staff_relations();
   bool init_db_stats(){
     if(!conn.ensure_logged_in()){
       return false;

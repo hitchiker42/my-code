@@ -60,7 +60,7 @@ static constexpr std::string_view sql_insert_vn_producer_relation =
   R"EOF(insert or replace into vn_producer_relations values (
         @vn_id, @producer_id, @release_id);)EOF"sv;
 static constexpr std::string_view sql_insert_vn_tag =
-  R"EOF(insert or replace into vn_tags (@vn_id, @tag_id);)EOF"sv;
+  R"EOF(insert or replace into vn_tags (@vn_id, @tag_id, @score);)EOF"sv;
 static constexpr std::string_view sql_insert_character_trait =
   R"EOF(insert or replace into character_traits (
         @character_id, @trait_id);)EOF"sv;

@@ -267,6 +267,17 @@ int main(){
     fprintf(stderr, "Error initializing database.\n");
     return 1;
   }
-  //return insert_tags(db);
-  return insert_traits(db);
+  
+  int err = insert_tags(db);
+  if(err <= 0){
+    fprintf(stderr, "Error inserting tags.\n");
+    //Make sure to return non-zero on error.
+    return err-1;
+  }
+  err = insert_traits(db);
+  if(err <= 0){
+    fprintf(stderr, "Error inserting traits.\n");
+    return err-1;
+  }
+  return 0;
 }

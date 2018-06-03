@@ -84,32 +84,12 @@ int sqlite_insert_release(const json &release,
   stmt.bind(idx++, release["animation"]);
   stmt.bind(idx++, release["vn"]);
   stmt.bind(idx++, release["producers"]);
-  return stmt.exec();
-}
-// Add relations between each VN and producer from release.
-// Since the relations table use foreign keys it is an error
-// to try and add a relation for a non-existant VN/producer.
-int sqlite_insert_relations(const json& release,
-                            sqlite3_stmt_wrapper& stmt){
-  const json& vns = release["vn"];
-  const json& producers = release["producers"];
-  //I'm pretty sure vns can't be empty, but it doesn't really matter.
-  if(vns.empty() || producers.empty()){
-    return SQLITE_OK;
+  int ret = stmt.exec(false);
+  if(ret != SQLITE_OK){
+    DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
   }
-  //order of columns is vn, producer, release.
-  stmt.bind(3, release["id"].get<int>());
-  for(auto &&vn : vns){
-    stmt.bind(1, vn["id"].get<int>());
-    for(auto &&producer : producers){
-      stmt.bind(2, producer["id"].get<int>());
-      int err = stmt.exec(false);//Don't reset the bindings
-      if(err != SQLITE_OK){
-        return err;
-      }
-    }
-  }
-  return SQLITE_OK;
+  stmt.reset();
+  return ret;
 }
 int sqlite_insert_producer(const json& producer,
                            sqlite3_stmt_wrapper& stmt){
@@ -125,7 +105,12 @@ int sqlite_insert_producer(const json& producer,
   stmt.bind(idx++, producer["description"].get_ptr<json::string_t>());
   //This gives the relationship between this producer and other producers not vns.
   stmt.bind(idx++, producer["relations"].get_ptr<json::string_t>());
-  return stmt.exec();
+  int ret = stmt.exec(false);
+  if(ret != SQLITE_OK){
+    DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
+  }
+  stmt.reset();
+  return ret;
 }
 int sqlite_insert_staff(const json& staff,
                         sqlite3_stmt_wrapper& stmt){
@@ -142,7 +127,12 @@ int sqlite_insert_staff(const json& staff,
   stmt.bind(idx++, staff["traits"]);
   stmt.bind(idx++, staff["vns"]);
   stmt.bind(idx++, staff["voiced"]);
-  return stmt.exec();
+  int ret = stmt.exec(false);
+  if(ret != SQLITE_OK){
+    DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
+  }
+  stmt.reset();
+  return ret;
 }
 int sqlite_insert_character(const json& chara,
                            sqlite3_stmt_wrapper& stmt){
@@ -158,79 +148,155 @@ int sqlite_insert_character(const json& chara,
   stmt.bind(idx++, chara["traits"]);
   stmt.bind(idx++, chara["vns"]);
   stmt.bind(idx++, chara["voiced"]);
-  return stmt.exec();
+  int ret = stmt.exec(false);
+  if(ret != SQLITE_OK){
+    DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
+  }
+  stmt.reset();
+  return ret;
 }
-int sqlite_insert_vn_tags(int vn_id, json vn_tags,
-                          sqlite3_wrapper &db);
-int sqlite_insert_vn_tags(json vn,
-                          sqlite3_wrapper &db){
-  return sqlite_insert_vn_tags(vn["id"].get<int>(), vn["tags"], db);
+// Add relations between each VN and producer from release.
+// Since the relations table use foreign keys it is an error
+// to try and add a relation for a non-existant VN/producer.
+int sqlite_insert_vn_producer_relations(const json& release,
+                                        sqlite3_stmt_wrapper& stmt){
+  return sqlite_insert_vn_producer_relations(release["id"].get<int>(),
+                                             release["vn"], release["producers"],
+                                             stmt);
 }
-int sqlite_insert_vn_tags(int vn_id, json vn_tags,
-                          sqlite3_wrapper &db){
+int sqlite_insert_vn_producer_relations(int release_id,
+                                        const json& vns,
+                                        const json& producers,
+                                        sqlite3_stmt_wrapper& stmt){
+  //I'm pretty sure vns can't be empty, but it doesn't really matter.
+  if(vns.empty() || producers.empty()){
+    return SQLITE_OK;
+  }
+  //order of columns is vn, producer, release.
+  stmt.bind(3, release_id);
+  for(auto &&vn : vns){
+    stmt.bind(1, vn["id"].get<int>());
+    for(auto &&producer : producers){
+      stmt.bind(2, producer["id"].get<int>());
+      int err = stmt.exec(false);//Don't reset the bindings
+      if(err != SQLITE_OK){
+        return err;
+      }
+    }
+  }
+  return SQLITE_OK;
+}
+int sqlite_insert_vn_tags(const json& vn,
+                          sqlite3_stmt_wrapper &stmt){
+  return sqlite_insert_vn_tags(vn["id"].get<int>(), vn["tags"], stmt);
+}
+int sqlite_insert_vn_tags(int vn_id, const json& vn_tags,
+                          sqlite3_stmt_wrapper &stmt){
   if(vn_tags.empty()){
     return SQLITE_OK;
   }
-  auto stmt = db.prepare_stmt(sql_insert_vn_tag);
-  if(!stmt){
-    return db.err();
-  }
   stmt.bind(1, vn_id);
-  int err = db.begin_transaction();
-  if(err != SQLITE_OK){ return err; }
+  //tags is an array of [id, score, spoiler_level]
   for(auto &&tag : vn_tags){
-    int tag_id = tag[0];
-    stmt.bind(2, tag_id);
-    if((err = stmt.exec(false)) != SQLITE_OK){
-      db.rollback_transaction();
+    stmt.bind(2, tag[0].get<int>());
+    stmt.bind(3, tag[0].get<double>());
+    int err = stmt.exec(false);
+    if(err != SQLITE_OK){
       return err;
     }
   }
-  return db.commit_transaction();
+  return SQLITE_OK;
 }
-//It's probably more useful to get a VN as json rather than a C++ object
-json sqlite_get_VN(sqlite3_stmt_wrapper &stmt){
-  json ret;
-  int idx = 1;
-  //We don't need to deal with NULL for most values since the api returns
-  //empty arrays / objects instead of NULL, so only scalar values can be NULL.
-  ret.emplace("id", stmt.get_column<int>(idx++));
-  ret.emplace("title", stmt.get_column<const char*>(idx++));
-  ret.emplace("original", stmt.get_column<const char*>(idx++));
-  ret.emplace("date", stmt.get_column<const char*>(idx++));
-  ret.emplace("languages", stmt.get_column<json>(idx++));
-  ret.emplace("orig_lang", stmt.get_column<json>(idx++));
-  ret.emplace("platforms", stmt.get_column<json>(idx++));
-  ret.emplace("aliases", stmt.get_column<json>(idx++));
-  ret.emplace("length", stmt.get_column<int>(idx++));
-  ret.emplace("description", stmt.get_column<const char*>(idx++));
-  ret.emplace("links", stmt.get_column<json>(idx++));
-  ret.emplace("image_link", stmt.get_column<const char*>(idx++));
-  ret.emplace("image_nsfw", stmt.get_column<int>(idx++));
-  ret.emplace("anime", stmt.get_column<json>(idx++));
-  ret.emplace("relations", stmt.get_column<json>(idx++));
-  ret.emplace("tags", stmt.get_column<json>(idx++));
-  ret.emplace("popularity", stmt.get_column<int>(idx++));
-  ret.emplace("rating", stmt.get_column<int>(idx++));
-  ret.emplace("votecount", stmt.get_column<int>(idx++));
-  ret.emplace("screens", stmt.get_column<json>(idx++));
-  ret.emplace("staff", stmt.get_column<json>(idx++));
-  ret.emplace("relases", stmt.get_column<json>(idx++));
-  ret.emplace("producers", stmt.get_column<json>(idx++));
-  ret.emplace("characters", stmt.get_column<json>(idx++));
-  //ret.emplace("list_info", stmt.get_column<json>(idx++));
-  return ret;
+int sqlite_insert_character_traits(const json& character,
+                                   sqlite3_stmt_wrapper &stmt){
+  return sqlite_insert_character_traits(character["id"].get<int>(),
+                                        character["traits"], stmt);
 }
-/*
-int sqlite_insert_producer(json producer, sqlite3_stmt_wrapper& stmt){
-  int idx = 0;
-  stmt.bind(idx++, producer["id"].get<int>());
-  stmt.bind(idx++, producer["name"].get<json::string_view_t>());
-  stmt.bind(idx++, producer["original"].get<json::string_view_t>());
-  stmt.bind(idx++, producer["original"].get<json::string_view_t>());
+int sqlite_insert_character_traits(int character_id,
+                                   const json& traits, 
+                                   sqlite3_stmt_wrapper &stmt){
+  if(traits.empty()){
+    return SQLITE_OK;
+  }
+  stmt.bind(1, character_id);
+  //traits is an array of [id, spoliler_level]
+  for(auto &&trait : traits){
+    stmt.bind(2, trait[0].get<int>());
+    int err = stmt.exec(false);
+    if(err != SQLITE_OK){
+      return err;
+    }
+  }
+  return SQLITE_OK;
 }
-*/
+int sqlite_insert_vn_character_actor_relations(const json& actor,
+                                               sqlite3_stmt_wrapper &stmt){
+ return sqlite_insert_vn_character_actor_relations(actor["id"].get<int>(),
+                                                   actor["voiced"], stmt);
+}
+int sqlite_insert_vn_character_actor_relations(int actor_id,
+                                               const json& voiced,
+                                               sqlite3_stmt_wrapper &stmt){
+  if(voiced.empty()){
+    return SQLITE_OK;
+  }
+  stmt.bind(3, actor_id);
+  //voiced is array of {vn_id(id), alias_id(aid), character_id(cid), note(note)}
+  for(auto &&voice : voiced){//now thats a weird variable name
+    stmt.bind(1, voice["id"].get<int>());
+    stmt.bind(2, voice["cid"].get<int>());
+    int err = stmt.exec(false);
+    if(err != SQLITE_OK){
+      return err;
+    }
+  }
+  return SQLITE_OK;
+}
 
+int sqlite_insert_vn_staff_relations(const json& staff,
+                                     sqlite3_stmt_wrapper &stmt){
+ return sqlite_insert_vn_staff_relations(staff["id"].get<int>(),
+                                         staff["vns"], stmt);
+}
+int sqlite_insert_vn_staff_relations(int staff_id,
+                                     const json& vn_info,
+                                     sqlite3_stmt_wrapper &stmt){
+  if(vn_info.empty()){
+    return SQLITE_OK;
+  }
+  stmt.bind(2, staff_id);
+  //vn_info is an array of {vn_id(id), alias_id(aid),
+  //                        role(role), note(note)}
+  for(auto &&vn : vn_info){
+    stmt.bind(1, vn["id"].get<int>());
+    int err = stmt.exec(false);
+    if(err != SQLITE_OK){
+      return err;
+    }
+  }
+  return SQLITE_OK;
+}
+int sqlite_insert_staff_aliases(const json& staff,
+                                sqlite3_stmt_wrapper &stmt){
+  return sqlite_insert_staff_aliases(staff["id"].get<int>(),
+                                     staff["aliases"], stmt);
+}
+int sqlite_insert_staff_aliases(int staff_id,
+                                const json& aliases,
+                                sqlite3_stmt_wrapper &stmt){
+  //aliases should never be empty since everyone has at least one
+  //otherwise you would'nt exist.
+  stmt.bind(1, staff_id);
+  //aliases is an array of [alias id, name(romanji), name(original)]
+  for(auto &&alias : aliases){
+    stmt.bind(2, alias[0].get<int>());
+    int err = stmt.exec(false);
+    if(err != SQLITE_OK){
+      return err;
+    }
+  }
+  return SQLITE_OK;
+}
 std::vector<std::string_view>&
 sqlite3_stmt_wrapper::get_row_text(std::vector<std::string_view>& row,
                                    const char *nullstr){
@@ -479,4 +545,39 @@ struct json_path {
     return follow(&val);
   }
 };
+/*
+//It's probably more useful to get a VN as json rather than a C++ object
+json sqlite_get_VN(sqlite3_stmt_wrapper &stmt){
+  json ret;
+  int idx = 1;
+  //We don't need to deal with NULL for most values since the api returns
+  //empty arrays / objects instead of NULL, so only scalar values can be NULL.
+  ret.emplace("id", stmt.get_column<int>(idx++));
+  ret.emplace("title", stmt.get_column<const char*>(idx++));
+  ret.emplace("original", stmt.get_column<const char*>(idx++));
+  ret.emplace("date", stmt.get_column<const char*>(idx++));
+  ret.emplace("languages", stmt.get_column<json>(idx++));
+  ret.emplace("orig_lang", stmt.get_column<json>(idx++));
+  ret.emplace("platforms", stmt.get_column<json>(idx++));
+  ret.emplace("aliases", stmt.get_column<json>(idx++));
+  ret.emplace("length", stmt.get_column<int>(idx++));
+  ret.emplace("description", stmt.get_column<const char*>(idx++));
+  ret.emplace("links", stmt.get_column<json>(idx++));
+  ret.emplace("image_link", stmt.get_column<const char*>(idx++));
+  ret.emplace("image_nsfw", stmt.get_column<int>(idx++));
+  ret.emplace("anime", stmt.get_column<json>(idx++));
+  ret.emplace("relations", stmt.get_column<json>(idx++));
+  ret.emplace("tags", stmt.get_column<json>(idx++));
+  ret.emplace("popularity", stmt.get_column<int>(idx++));
+  ret.emplace("rating", stmt.get_column<int>(idx++));
+  ret.emplace("votecount", stmt.get_column<int>(idx++));
+  ret.emplace("screens", stmt.get_column<json>(idx++));
+  ret.emplace("staff", stmt.get_column<json>(idx++));
+  ret.emplace("relases", stmt.get_column<json>(idx++));
+  ret.emplace("producers", stmt.get_column<json>(idx++));
+  ret.emplace("characters", stmt.get_column<json>(idx++));
+  //ret.emplace("list_info", stmt.get_column<json>(idx++));
+  return ret;
+}
+*/
 #endif

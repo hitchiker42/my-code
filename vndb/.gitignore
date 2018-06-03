@@ -4,4 +4,6 @@ tag_trait_parser
 # database files
 *.db
 TAGS
+# logs and backups
 *.log
+*.bkup

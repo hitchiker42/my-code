@@ -88,7 +88,7 @@ create table if not exists characters (
 id integer primary key not null,
 name text not null,
 original text,
-gender text check (gender isnull or gender in ('m','f','u')),
+gender text check (gender isnull or gender in ('m','f','b')),
 -- bloodt text check (bloodt isnull or bloodt in('a','b','ab','o'))
 -- birthday
 aliases json,
@@ -197,6 +197,8 @@ create index if not exists vca_relations_actor_idx
        on vn_character_actor_relations (actor);
 
 -- Relations between VNs and staff (excluding voice actors)
+-- There is also an alias id and role associated with each relation
+-- that you can get by parsing the vns field of the 'staff'.
 create table if not exists vn_staff_relations (
 vn integer not null references VNs (id),
 staff integer not null references staff (id)
@@ -223,9 +225,11 @@ create index if not exists staff_aliases_alias_idx on staff_aliases (alias_id);
 create table if not exists vn_tags (
 vn integer not null references VNs (id),
 tag integer not null references tags (id),
+score real not null check (score between 0.0 and 3.0),
 primary key (vn, tag)
 );
 --index both vns and tags since lookup on both is likely.
+-- I'm not sure about score.
 create index if not exists vn_tags_vn_idx on vn_tags (vn);
 create index if not exists vn_tags_tag_idx on vn_tags (tag);
 

@@ -1,4 +1,4 @@
-DEBUGFLAGS= -DDEBUG -fsanitize=address
+DEBUGFLAGS= -DDEBUG # -fsanitize=address # Asan is great, but it breaks under gdb
 CPPFLAGS=-I$(PWD)/../C++/util -Wall -Wextra \
 -Wno-unused-function -Wmissing-braces
 CXXFLAGS=-std=gnu++17 -g -Og $(DEBUGFLAGS)  -fno-rtti -fno-exceptions
@@ -9,7 +9,9 @@ LDFLAGS=-lssl -lcrypto -lsqlite3 -lpcre -lz
 
 SOURCES=$(wildcard *.cpp) $(wildcard *.h) $(wildcard *.c) json.hpp
 
-.PHONY: clean
+PROGRAM_FILES=vndb_cpp tag_trait_parser
+
+.PHONY: all clean
 
 all: vndb_cpp tag_trait_parser
 
@@ -36,6 +38,6 @@ tag_trait_parser: connection.o sqlite.o tag_trait_parser.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
-	rm -f vndb_cpp *.o
+	rm -f *.o $(PROGRAM_FILES)
 TAGS: $(SOURCES)
 	ctags -eR *

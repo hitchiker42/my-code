@@ -220,12 +220,17 @@ struct sqlite3_stmt_wrapper {
   int bind(int idx, const std::string& s){
     return sqlite3_bind_text(stmt, idx, s.data(), s.size(), SQLITE_TRANSIENT);
   }
+  int bind(int idx, const char* c_str){
+    return sqlite3_bind_text(stmt, idx, c_str, strlen(c_str), SQLITE_TRANSIENT);
+  }
   int bind_null(int idx){
     return sqlite3_bind_null(stmt, idx);
   }
   //bind a potentially null pointer, if ptr == nullptr, the index is bound
-  //to NULL, otherwise it is bound to *ptr
-  template<typename T>
+  //to NULL, otherwise it is bound to *ptr. Excludes char*s since they
+  //bind to strings.
+  template<typename T,
+           std::enable_if_t<!std::is_same_v<std::remove_cv_t<T>, char*>, int> = 0>
   int bind(int idx, const T* ptr){
     if(ptr){
       return bind(idx, *ptr);
@@ -238,6 +243,12 @@ struct sqlite3_stmt_wrapper {
   int bind(int idx, const char* str, int len,
            void(*destroy)(void*)){
     return sqlite3_bind_text(stmt, idx, str, len, destroy);
+  }
+  //Bind a blob, there's no way to do this without explicitly giving
+  //a length, 
+  int bind(int idx, const void* blob, int len,
+           void(*destroy)(void*) = SQLITE_TRANSIENT){
+    return sqlite3_bind_blob(stmt, idx, blob, len, destroy);
   }
   //bind json by converting it into a string.
   int bind(int idx, const json &j){
@@ -312,7 +323,7 @@ struct sqlite3_wrapper {
   sqlite3 *db;
   //Set to the result of the last sqlite function
   int db_err = SQLITE_OK;
-  
+
   bool in_transaction = false;
   sqlite3_wrapper(std::string_view filename,
                   int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE){
@@ -321,7 +332,7 @@ struct sqlite3_wrapper {
   sqlite3_wrapper(sqlite3_wrapper &&other)
     : db{other.db}, db_err{other.db_err}, in_transaction{other.in_transaction} {
       other.db = nullptr;
-  }    
+  }
   ~sqlite3_wrapper(){
     sqlite3_close(db);
   }
@@ -430,6 +441,41 @@ int sqlite_insert_character(const json& chara,
                            sqlite3_stmt_wrapper& stmt);
 int sqlite_insert_staff(const json& staff,
                         sqlite3_stmt_wrapper& stmt);
+//All of the following may execute stmt more than once so they should
+//be called within an explicit transaction.
+//Most of these have two versions one which takes a json object as returned
+//by the vndb get command and one which takes more specific arguments, the
+//actual functions are the ones with more specific arguments, the others
+//are just for convenience.
+int sqlite_insert_vn_producer_relations(const json& release,
+                                        sqlite3_stmt_wrapper& stmt);
+int sqlite_insert_vn_producer_relations(int release_id,
+                                        const json& vns, const json& producers,
+                                        sqlite3_stmt_wrapper& stmt);
+int sqlite_insert_vn_tags(int vn_id, const json& vn_tags,
+                          sqlite3_stmt_wrapper &stmt);
+int sqlite_insert_vn_tags(const json &vn,
+                          sqlite3_stmt_wrapper &stmt);
+int sqlite_insert_character_traits(const json& character,
+                                   sqlite3_stmt_wrapper &stmt);
+int sqlite_insert_character_traits(int character_id,
+                                   const json& traits,
+                                   sqlite3_stmt_wrapper &stmt);
+int sqlite_insert_vn_character_actor_relations(const json& actor,
+                                               sqlite3_stmt_wrapper &stmt);
+int sqlite_insert_vn_character_actor_relations(int actor_id,
+                                               const json& voiced,
+                                               sqlite3_stmt_wrapper &stmt);
+int sqlite_insert_vn_staff_relations(const json& staff,
+                                     sqlite3_stmt_wrapper &stmt);
+int sqlite_insert_vn_staff_relations(int staff_id,
+                                     const json& vn_info,
+                                     sqlite3_stmt_wrapper &stmt);
+int sqlite_insert_staff_aliases(const json& staff,
+                                sqlite3_stmt_wrapper &stmt);
+int sqlite_insert_staff_aliases(int staff_id,
+                                const json& aliases,
+                                sqlite3_stmt_wrapper &stmt);
 //template<vndb::object_type what>
 inline int sqlite_insert_object(vndb::object_type what, const json& obj, sqlite3_stmt_wrapper& stmt){
   vndb_log->printf(util::log_level::debug, "Inserting %s, id = %d.\n",

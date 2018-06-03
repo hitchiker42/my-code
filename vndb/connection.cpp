@@ -431,6 +431,7 @@ json vndb_connection::get_error(){
     this->error = !this->wait_on_throttle;
   } else {
     DEBUG_PRINTF("Recieved error %s\n", response.data());
+    vndb_log->printf(util::log_level::warn, "Recieved error %s\n", response.data());
     this->error = true;
   }
   return ret;
@@ -577,6 +578,9 @@ int vndb_connection::send_get_command(get_callback& callback,
     std::vector<json>& items = result["items"].get_ref<std::vector<json>>();
     int err = callback(items);
     if(err != 0){
+      //err ought to be < 0, but even if it isn't we still return it, so
+      //set error to true so the caller can identify an error.
+      this->error = true;
       DEBUG_PRINTF("Callback returned error %d.\n", err);
       vndb_log->printf(util::log_level::warn, "Got error from callback %d.\n", err);
       return err;
@@ -627,8 +631,17 @@ int vndb_connection::get_all(vndb::object_type what,
   buf.append_formatted("(id >= %d and id <= %d)", start, start + 24999);
   int cnt = this->send_get_command(callback);
   int total = cnt;
-  while(cnt > 20000){
-    buf.append_formatted("(id >= %d and id <= %d)", start + total, start + total + 24999);
+  vndb_log->printf(util::log_level::debug, 
+                   "Downloaded %d objects (using ids < 25000), "
+                   "moving to next 25000 ids.", cnt);
+  while(cnt > 0){
+    if(this->error){
+      vndb_log->printf(util::log_level::warn,
+                       "Recieved error from send_get_command.\n");
+      return -1;
+    }
+    buf.append_formatted("(id >= %d and id <= %d)", 
+                         start + total, start + total + 24999);
     cnt = this->send_get_command(callback);
     total += cnt;
   }

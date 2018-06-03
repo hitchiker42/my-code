@@ -52,6 +52,145 @@ bool vndb_main::init_get_id_stmts(){
   }
   return true;
 }
+bool download_all(const char *database_filename, int vn_start = 1,
+                  int release_start = 1, int producer_start = 1, int character_start = 1,
+                  int staff_start = 1){
+  vndb_main vndb(database_filename);
+  //compile sql, connect to servert & get dbstats (for progress bars).
+  if(!vndb.db){
+    fprintf(stderr, "Failed to open database file %s.\n", database_filename);
+    return false;
+  }
+  if(!vndb.init_db()){
+    fprintf(stderr, "Failed to run database_init.sql.\n");
+    return false;
+  }
+  if(!vndb.init_insert_stmts()){
+    fprintf(stderr, "Failed to compile sql insert statements.\n");
+    return false;
+  }
+  if(!vndb.connect()){
+    fprintf(stderr, "Failed to connect to vndb server.\n");
+    return false;
+  }
+  if(!vndb.init_db_stats()){
+    fprintf(stderr, "Failed to run dbstats command.\n");
+    return false;
+  }
+  if(vn_start > 0){
+    printf("Downloading VNs\n");
+    if(vndb.download_and_insert_all(vndb::object_type::VN,vn_start) <= 0){ return false; }
+  }
+  if(release_start > 0){
+    printf("Downloading Releases\n");
+    if(vndb.download_and_insert_all(vndb::object_type::release,release_start) <= 0){ return false; }
+  }
+  if(producer_start > 0){
+    printf("Downloading Producers\n");
+    if(vndb.download_and_insert_all(vndb::object_type::producer,producer_start)<= 0){ return false; }
+  }
+  if(character_start > 0){
+    printf("Downloading Characters\n");
+    if(vndb.download_and_insert_all(vndb::object_type::character,character_start) <= 0){ return false; }
+  }
+  if(staff_start > 0){
+    printf("Downloading Staff\n");
+    if(vndb.download_and_insert_all(vndb::object_type::staff,staff_start) <= 0){ return false; }
+  }
+  return true;
+}
+int main(int argc, char* argv[]){
+  //Keep the old log file, I may extend this to keep the last N log files.
+  rename(default_log_file, default_log_file_bkup);
+  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
+  if(!init_vndb_ssl_ctx()){
+    fprintf(stderr, "Error, failed to initialize ssl context\n");
+    return -1;
+  }
+  atexit(free_vndb_ssl_ctx);
+  util::array<int, vndb_main::num_base_tables> start_indexes(1);
+  if(argc > 1){
+    for(int i = 1; i < argc; i++){
+      start_indexes.push_back(strtol(argv[i], nullptr, 10));
+    }
+  }
+  while(start_indexes.capacity() > 0){
+    start_indexes.push_back(1);
+  }
+  //Temporary, skips VNs, releases and producers.
+  start_indexes[0] = start_indexes[1] = start_indexes[2] = -1;
+  start_indexes[3] = 49860;
+  return download_all(default_db_file, start_indexes[0], start_indexes[1],
+                      start_indexes[2], start_indexes[3], start_indexes[4]);
+/*
+  if(argc > 1){
+    if(argv[1][0] == 'c'){
+      return run_connection_test();
+    } else {
+      return run_insertion_test();
+    }
+  }
+  return run_insertion_test();
+*/
+}
+#if 0
+int main(int argc, char* argv[]){
+
+  /*
+    Simple interactive loop, read until we encounter a semicolon, it's not
+    the most elegent solution but it allows multi-line commands without
+    having to actually parse the input.
+
+    Input takes the form of: <command> <arguments>*
+    where the commands are:
+    help; | print help message
+    sql stmt; | execute sql statement, bind result to some global variable
+    set variable value; | set the value of variable to the result value
+    print value; | print the result of evaluating value to stdout
+    write value filename; | print value to the file 'filename'
+    select ...; | shorthand for sql select ...
+
+    TODO: need commands to modify vnlist/wishlist, which will
+      require an active vndb connection.
+
+    variables are fairly simple, the only operations you can perform
+    on a variable are to print it or access a part of it.
+
+    The main types are the different structures in the vndb namespace.
+    You can also have arrays of these structures. Individual fields
+    of structs can be accessed as well as elements of arrays.
+
+    Variables are simply a means of saving the results of sql queries
+    and accessing them using a more simple syntax, everything can be
+    done using sql if you want.
+  */
+  using_history();
+  string_buf buf;
+  char *lineptr, *endptr;
+  while(lineptr = readline("> ")){
+    if(!(endptr = strchr(lineptr, ';'))){
+      buf.append(lineptr).append('\n');
+      free(lineptr);
+      continue;
+    } else {
+      //make sure there's no actual text after the semicolon
+      while(*(++endptr) != '\0'){
+        if(!isspace(*endptr)){
+          //print some error
+        }
+      }
+      //Check if the semicolon is the only thing on the line and just
+      //append it to the last line in that case.
+
+      //grab the memory allocated by the buffer so we can store in the history.
+      util::string_view sv = buf.move_to_string_view();
+      //Unset the owned flag of sv so it doesn't get freed.
+      add_history(str.data());
+
+      //Exectute whatever command was in sv & print the results or whatever.
+    }
+  }
+}
 
 //Get 100 VNs from server and write into outfile
 bool test_connection(const char *outfile, int start = 1){
@@ -132,53 +271,6 @@ bool test_insert_vns(sqlite3_wrapper &db, sqlite3_stmt_wrapper& stmt,
   db.print_errmsg("Recieved sqlite error");
   return false;
 }
-bool download_all(const char *database_filename, int vn_start = 1,
-                  int release_start = 1, int producer_start = 1, int character_start = 1,
-                  int staff_start = 1){
-  vndb_main vndb(database_filename);
-  //compile sql, connect to servert & get dbstats (for progress bars).
-  if(!vndb.db){
-    fprintf(stderr, "Failed to open database file %s.\n", database_filename);
-    return false;
-  }
-  if(!vndb.init_db()){
-    fprintf(stderr, "Failed to run database_init.sql.\n");
-    return false;
-  }
-  if(!vndb.init_insert_stmts()){
-    fprintf(stderr, "Failed to compile sql insert statements.\n");
-    return false;
-  }
-  if(!vndb.connect()){
-    fprintf(stderr, "Failed to connect to vndb server.\n");
-    return false;
-  }
-  if(!vndb.init_db_stats()){
-    fprintf(stderr, "Failed to run dbstats command.\n");
-    return false;
-  }
-  if(vn_start > 0){
-    printf("Downloading VNs\n");
-    if(vndb.download_and_insert_all(vndb::object_type::VN,vn_start) <= 0){ return false; }
-  }
-  if(release_start > 0){
-    printf("Downloading Releases\n");
-    if(vndb.download_and_insert_all(vndb::object_type::release,release_start) <= 0){ return false; }
-  }
-  if(producer_start > 0){
-    printf("Downloading Producers\n");
-    if(vndb.download_and_insert_all(vndb::object_type::producer,producer_start)<= 0){ return false; }
-  }
-  if(character_start > 0){
-    printf("Downloading Characters\n");
-    if(vndb.download_and_insert_all(vndb::object_type::character,character_start) <= 0){ return false; }
-  }
-  if(staff_start > 0){
-    printf("Downloading Staff\n");
-    if(vndb.download_and_insert_all(vndb::object_type::staff,staff_start) <= 0){ return false; }
-  }
-  return true;
-}
 int run_connection_test(){
   //TODO: add argument parsing
   const char *outfile = "conn_test.out";
@@ -211,82 +303,4 @@ int run_insertion_test(){
   //negate return value since 0 is success for the shell.
   return !test_insert_vns(db, stmt, "conn_test.out");
 }
-int main(int argc, char* argv[]){
-  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
-  if(!init_vndb_ssl_ctx()){
-    fprintf(stderr, "Error, failed to initialize ssl context\n");
-    return -1;
-  }
-  atexit(free_vndb_ssl_ctx);
-  return download_all(default_db_file, -1, -1,-1,-1);
-/*
-  if(argc > 1){
-    if(argv[1][0] == 'c'){
-      return run_connection_test();
-    } else {
-      return run_insertion_test();
-    }
-  }
-  return run_insertion_test();
-*/
-}
-#if 0
-int main(int argc, char* argv[]){
-
-  /*
-    Simple interactive loop, read until we encounter a semicolon, it's not
-    the most elegent solution but it allows multi-line commands without
-    having to actually parse the input.
-
-    Input takes the form of: <command> <arguments>*
-    where the commands are:
-    help; | print help message
-    sql stmt; | execute sql statement, bind result to some global variable
-    set variable value; | set the value of variable to the result value
-    print value; | print the result of evaluating value to stdout
-    write value filename; | print value to the file 'filename'
-    select ...; | shorthand for sql select ...
-
-    TODO: need commands to modify vnlist/wishlist, which will
-      require an active vndb connection.
-
-    variables are fairly simple, the only operations you can perform
-    on a variable are to print it or access a part of it.
-
-    The main types are the different structures in the vndb namespace.
-    You can also have arrays of these structures. Individual fields
-    of structs can be accessed as well as elements of arrays.
-
-    Variables are simply a means of saving the results of sql queries
-    and accessing them using a more simple syntax, everything can be
-    done using sql if you want.
-  */
-  using_history();
-  string_buf buf;
-  char *lineptr, *endptr;
-  while(lineptr = readline("> ")){
-    if(!(endptr = strchr(lineptr, ';'))){
-      buf.append(lineptr).append('\n');
-      free(lineptr);
-      continue;
-    } else {
-      //make sure there's no actual text after the semicolon
-      while(*(++endptr) != '\0'){
-        if(!isspace(*endptr)){
-          //print some error
-        }
-      }
-      //Check if the semicolon is the only thing on the line and just
-      //append it to the last line in that case.
-
-      //grab the memory allocated by the buffer so we can store in the history.
-      util::string_view sv = buf.move_to_string_view();
-      //Unset the owned flag of sv so it doesn't get freed.
-      add_history(str.data());
-
-      //Exectute whatever command was in sv & print the results or whatever.
-    }
-  }
-}
-
 #endif
