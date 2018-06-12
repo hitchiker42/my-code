@@ -57,11 +57,11 @@ int sqlite_insert_vn(const json &vn, sqlite3_stmt_wrapper& stmt){
   //bind the current date/time, I may remove this.
   stmt.bind(idx++, time(NULL));
 //  DEBUG_PRINTF("Executing sql: %s\n", sqlite3_expanded_sql(stmt.unwrap()));
-  int ret = stmt.exec(false);
+  int ret = stmt.exec();
   if(ret != SQLITE_OK){
     DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
   }
-  stmt.reset();
+  stmt.reset_bindings();
   return ret;
 }
 //insert a release into the database.
@@ -84,11 +84,11 @@ int sqlite_insert_release(const json &release,
   stmt.bind(idx++, release["animation"]);
   stmt.bind(idx++, release["vn"]);
   stmt.bind(idx++, release["producers"]);
-  int ret = stmt.exec(false);
+  int ret = stmt.exec();
   if(ret != SQLITE_OK){
     DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
   }
-  stmt.reset();
+  stmt.reset_bindings();
   return ret;
 }
 int sqlite_insert_producer(const json& producer,
@@ -105,11 +105,11 @@ int sqlite_insert_producer(const json& producer,
   stmt.bind(idx++, producer["description"].get_ptr<json::string_t>());
   //This gives the relationship between this producer and other producers not vns.
   stmt.bind(idx++, producer["relations"].get_ptr<json::string_t>());
-  int ret = stmt.exec(false);
+  int ret = stmt.exec();
   if(ret != SQLITE_OK){
     DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
   }
-  stmt.reset();
+  stmt.reset_bindings();
   return ret;
 }
 int sqlite_insert_character(const json& chara,
@@ -126,11 +126,11 @@ int sqlite_insert_character(const json& chara,
   stmt.bind(idx++, chara["traits"]);
   stmt.bind(idx++, chara["vns"]);
   stmt.bind(idx++, chara["voiced"]);
-  int ret = stmt.exec(false);
+  int ret = stmt.exec();
   if(ret != SQLITE_OK){
     DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
   }
-  stmt.reset();
+  stmt.reset_bindings();
   return ret;
 }
 int sqlite_insert_staff(const json& staff,
@@ -147,11 +147,11 @@ int sqlite_insert_staff(const json& staff,
   stmt.bind(idx++, staff["main_alias"].get<int>());
   stmt.bind(idx++, staff["vns"]);
   stmt.bind(idx++, staff["voiced"]);
-  int ret = stmt.exec(false);
+  int ret = stmt.exec();
   if(ret != SQLITE_OK){
     DEBUG_PRINTF("Error executing SQL %s.\n", stmt.get_sql().c_str());
   }
-  stmt.reset();
+  stmt.reset_bindings();
   return ret;
 }
 
@@ -178,55 +178,13 @@ int sqlite_insert_vn_producer_relations(int release_id,
     stmt.bind(1, vn["id"].get<int>());
     for(auto &&producer : producers){
       stmt.bind(2, producer["id"].get<int>());
-      int err = stmt.exec(false);//Don't reset the bindings
+      int err = stmt.exec();
       if(err != SQLITE_OK){
         return err;
       }
     }
   }
-  return SQLITE_OK;
-}
-int sqlite_insert_vn_tags(const json& vn,
-                          sqlite3_stmt_wrapper &stmt){
-  return sqlite_insert_vn_tags(vn["id"].get<int>(), vn["tags"], stmt);
-}
-int sqlite_insert_vn_tags(int vn_id, const json& vn_tags,
-                          sqlite3_stmt_wrapper &stmt){
-  if(vn_tags.empty()){
-    return SQLITE_OK;
-  }
-  stmt.bind(1, vn_id);
-  //tags is an array of [id, score, spoiler_level]
-  for(auto &&tag : vn_tags){
-    stmt.bind(2, tag[0].get<int>());
-    stmt.bind(3, tag[0].get<double>());
-    int err = stmt.exec(false);
-    if(err != SQLITE_OK){
-      return err;
-    }
-  }
-  return SQLITE_OK;
-}
-int sqlite_insert_character_traits(const json& character,
-                                   sqlite3_stmt_wrapper &stmt){
-  return sqlite_insert_character_traits(character["id"].get<int>(),
-                                        character["traits"], stmt);
-}
-int sqlite_insert_character_traits(int character_id,
-                                   const json& traits, 
-                                   sqlite3_stmt_wrapper &stmt){
-  if(traits.empty()){
-    return SQLITE_OK;
-  }
-  stmt.bind(1, character_id);
-  //traits is an array of [id, spoliler_level]
-  for(auto &&trait : traits){
-    stmt.bind(2, trait[0].get<int>());
-    int err = stmt.exec(false);
-    if(err != SQLITE_OK){
-      return err;
-    }
-  }
+  stmt.reset_bindings();
   return SQLITE_OK;
 }
 int sqlite_insert_vn_character_actor_relations(const json& actor,
@@ -245,11 +203,12 @@ int sqlite_insert_vn_character_actor_relations(int actor_id,
   for(auto &&voice : voiced){//now thats a weird variable name
     stmt.bind(1, voice["id"].get<int>());
     stmt.bind(2, voice["cid"].get<int>());
-    int err = stmt.exec(false);
+    int err = stmt.exec();
     if(err != SQLITE_OK){
       return err;
     }
   }
+  stmt.reset_bindings();
   return SQLITE_OK;
 }
 
@@ -269,11 +228,12 @@ int sqlite_insert_vn_staff_relations(int staff_id,
   //                        role(role), note(note)}
   for(auto &&vn : vn_info){
     stmt.bind(1, vn["id"].get<int>());
-    int err = stmt.exec(false);
+    int err = stmt.exec();
     if(err != SQLITE_OK){
       return err;
     }
   }
+  stmt.reset_bindings();
   return SQLITE_OK;
 }
 int sqlite_insert_staff_aliases(const json& staff,
@@ -290,11 +250,13 @@ int sqlite_insert_staff_aliases(int staff_id,
   //aliases is an array of [alias id, name(romanji), name(original)]
   for(auto &&alias : aliases){
     stmt.bind(2, alias[0].get<int>());
-    int err = stmt.exec(false);
+    stmt.bind(3, alias[1].get<std::string_view>());
+    int err = stmt.exec();
     if(err != SQLITE_OK){
       return err;
     }
   }
+  stmt.reset_bindings();
   return SQLITE_OK;
 }
 std::vector<std::string_view>&
@@ -353,12 +315,16 @@ json sqlite3_stmt_wrapper::get_row_json(){
       case sqlite3_type::null:
         obj.emplace(name, json_null);
         break;
-      //I know this will never come up in this application,
-      //if this were possible I'd probably encode the input in base64,
+
+      //For blobs (currently the only blobs I use are for image storage) we just
+      //store a string indicating this is a blob and its size.
       case sqlite3_type::blob:{
-        fprintf(stderr, "Error found unexpectd blob type in sql table %s\n",
-                sqlite3_column_table_name(this->stmt, i));
-        return json_null;        /*
+        char buf[128];
+        snprintf(buf, 128, "#<%d byte blob>", sqlite3_column_bytes(this->stmt, i));
+        obj.emplace(name, json(std::string(buf)));
+        break;
+      }
+        /*
         //Convert into
         json::array_t arr;
         size_t blob_size = this->get_column_bytes(i);
@@ -374,13 +340,13 @@ json sqlite3_stmt_wrapper::get_row_json(){
           arr.emplace_back(*((uintptr_t*)buf));
         }
         obj.emplace(name, arr);
-        */
       }
+        */
       //We need to determine if the column is meant to be json or just a string.
       //sqlite doesn't have a json type, but the sqlite3_column_decltype function
       //Lets us get the type the column was declared to have as a string, so
       //we can use that to see if a column is supposed to be json. This is just
-      //an optimization, if we can't get the declared type we just try to parse 
+      //an optimization, if we can't get the declared type we just try to parse
       //the string as json and insert it as a string if we fail.
       case sqlite3_type::text: {
         std::string_view col_text = this->get_column<std::string_view>(i);

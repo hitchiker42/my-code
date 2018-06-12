@@ -1,6 +1,7 @@
 #ifndef __MY_STRING_H__
 #define __MY_STRING_H__
 namespace util {
+//TODO: make this allocator aware;
 //Immutable string which owns its own memory.
 struct string {
   typedef const char* pointer;

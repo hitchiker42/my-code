@@ -36,13 +36,14 @@ struct progress_bar {
     : title{title}, title_size{strlen(title)}, end{end} {//, start_time{float_time()} {
       get_term_info(this);
       buf = (char*)malloc(termwidth + 1);
-  }      
-  ~progress_bar(){    
+  }
+  ~progress_bar(){
     finish();
     free(buf);
   }
   void update(double amt){
     current += amt;
+    display();
   }
   void display(){
     display_progress_bar(this);
@@ -67,6 +68,14 @@ struct progress_bar {
     if(new_title == nullptr){ return; }
     title = new_title;
     title_size = strlen(title);
+  }
+  progress_bar& operator++(){
+    update(1.0);
+    return *this;
+  }
+  progress_bar& operator+=(double amt){
+    update(amt);
+    return *this;
   }
 };
 static_assert(std::is_standard_layout_v<progress_bar>);

@@ -11,13 +11,13 @@ SOURCES=$(wildcard *.cpp) $(wildcard *.h) $(wildcard *.c) json.hpp
 
 PROGRAM_FILES=vndb_cpp tag_trait_parser
 
-.PHONY: all clean
+.PHONY: all clean tags
 
 all: vndb_cpp tag_trait_parser
 
 vndb.o : vndb.cpp vndb.h json.hpp sql.h sqlite_wrappers.h connection.h
 connection.o : connection.cpp vndb.h json.hpp connection.h sqlite_wrappers.h
-sqlite.o : sqlite.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
+sqlite_wrappers.o : sqlite_wrappers.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
 sqlite_ext.o: sqlite_ext.c
 tag_trait_parser.o: tag_trait_parser.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
 # the .o file doesn't actually depend on the .h file, but it
@@ -31,13 +31,14 @@ progress_bar.o: progress_bar.c progress_bar.h
 %.S:%.cpp
 	$(CXX) $(CXXFLAGS_NDEBUG) $(CPPFLAGS) -S $< -o- | c++filt > $@
 
-vndb_cpp: vndb.o connection.o sqlite.o progress_bar.o # sqlite_ext.o
+vndb_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o # sqlite_ext.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
-tag_trait_parser: connection.o sqlite.o tag_trait_parser.o
+tag_trait_parser: connection.o sqlite_wrappers.o tag_trait_parser.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
-	rm -f *.o $(PROGRAM_FILES)
+	rm -f *.eo $(PROGRAM_FILES)
+tags: TAGS
 TAGS: $(SOURCES)
 	ctags -eR *

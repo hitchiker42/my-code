@@ -11,6 +11,7 @@
 //#include "fmt/time.h"
 //#include "fmt/printf.h"
 #endif
+#include "macros.h"
 namespace util {
 //Names borrowed from linux printk levels
 enum class log_level {
@@ -106,8 +107,7 @@ struct logger {
       ensure_newline(fmt);
     }
   }
-  template<typename T,
-           typename ... Ts,
+  template<typename T, typename ... Ts,
            std::enable_if_t<std::is_enum_v<T>, int> = 0>
   void printf(T level, const char *fmt, const Ts&... args){
     return this->printf(to_underlying(level), fmt, args...);
@@ -116,20 +116,45 @@ struct logger {
   template<typename ... Ts>
   void format(int level, std::string_view fmt, const Ts&... args){
     if(level <= log_level_max){
-      fmt::print(out, fmt, std::forward<Ts>(args)...);
+      fmt::print(out, fmt, args...);
       ensure_newline(fmt);
     }
   }
-  template<  template<typename T,
-                      typename ... Ts,
-                      std::enable_if_t<std::is_enum_v<T>, int> = 0>
+  template<typename T,
+           typename ... Ts,
+           std::enable_if_t<std::is_enum_v<T>, int> = 0>
   void format(T level, std::string_view fmt, const Ts&... args){
-    return format(to_underlying(level), fmt, std::forward<Ts>(args)...);
+    return format(to_underlying(level), fmt, args...);
+  }
+#else
+  template<typename ... Ts>
+  void format(int level, std::string_view fmt, const Ts&... args){
+    this->printf(level, fmt.data(), args...);
+  }
+  template<typename T, typename ... Ts,
+           std::enable_if_t<std::is_enum_v<T>, int> = 0>
+  void format(T level, std::string_view fmt, const Ts&... args){
+    return format(to_underlying(level), fmt, args...);
   }
 #endif
+#define gen_log_wrapper(level)                                  \
+  template<typename ... Ts>                         \
+  void CAT(log_, level)(const char *fmt, const Ts& ... args){   \
+    return this->format(util::log_level::level, fmt, args...);        \
+  }
+//  gen_log_wrapper(emergency);
+//  gen_log_wrapper(critical);
+//  gen_log_wrapper(error);
+//  gen_log_wrapper(warning);
+  gen_log_wrapper(warn);
+//  gen_log_wrapper(notice);
+//  gen_log_wrapper(info);
+  gen_log_wrapper(debug);
+//  gen_log_wrapper(all);
 };
+#undef gen_log_wrapper
 }
-#include "macros.h"
+
 //Only works with a string literal as str.
 #define LOG_HERE(logger, level, str, ...)                               \
   if constexpr(std::is_pointer_v<decltype(logger)>){                    \

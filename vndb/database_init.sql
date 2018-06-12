@@ -143,7 +143,7 @@ create index if not exists traits_full_name_idx on traits(full_name);
 
 -- Info about above tables, the max_id fields are given to make it
 -- easy to update the database with new info from the server
-create table if not exists db_stats (
+create table if not exists db_info (
 num_vns integer not null,
 max_vn_id integer not null,
 num_releases integer not null,       
@@ -154,9 +154,15 @@ num_characters integer not null,
 max_character_id integer not null,
 num_staff integer not null,
 max_staff_id integer not null,
+num_tags integer not null,
+max_tag_id integer not null,
+num_traits integer not null,
+max_trait_id integer not null,
 -- Limit table to only one row
 row_limiter integer not null primary key check (row_limiter = 1)
 );
+-- Make sure db_info has a row, since we modify it using update statements.
+insert or ignore into db_info values (0,0,0,0,0,0,0,0,0,0,0,0,0,0,1);
 -- Derived tables
 -- vndb uses postgres sql, which has array types, and has many fields
 -- that are arrays. We store these as json arrays / objects, but also

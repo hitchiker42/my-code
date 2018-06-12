@@ -41,8 +41,6 @@
 /*
   CPP Funtimes
 */
-
-
 #define CAT(a,b) PRIMITIVE_CAT(a, b)
 #define PRIMITIVE_CAT(a,b) a ## b
 #define CAT2(a,b) PRIMITIVE_CAT2(a,b)

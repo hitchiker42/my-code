@@ -535,19 +535,69 @@ unordered_multimap_equal_range_count(std::unordered_multimap<K,V> &ht, const K& 
 */
 template <typename T>
 struct malloc_allocator {
-  typedef T* pointer;
-  typedef const T* const_pointer;
-  typedef void* void_pointer;
-  typedef const void* const_void_pointer;
-  typedef T value_type;
-  typedef size_t size_type;
-  typedef ptrdiff_t difference_type;
-  typedef std::true_type is_always_equal;
+  using pointer = T*;
+  using const_pointer = const T*;
+  using void_pointer = void*;
+  using const_void_pointer =const void* ;
+  using value_type = T;
+  using size_type = size_t;
+  using difference_type = ptrdiff_t;
+  //introduced in C++17
+  using is_always_equal = std::true_type;
   static pointer allocate(size_type n){
     return (pointer)malloc(n * sizeof(value_type));
   }
   static void deallocate(pointer ptr, size_type n){
     free(ptr);
+  }
+  static pointer reallocate(pointer ptr, size_type n,
+                            [[maybe_unused]] size_type old_length = -1,
+                            [[maybe_unused]] size_type old_size = -1){
+    return realloc(ptr, n*sizeof(value_type));
+  }
+  //does nothing
+  template<class... Args>
+  static void construct(Args&&... args){
+    return;
+  }
+  //also does nothing
+  template<class... Args>
+  static void destroy(Args&&... args){
+    return;
+  }
+};
+/*
+  An allocator using calloc, same as the above malloc_allocator but
+  zeros all allocated memory.
+*/
+template <typename T>
+struct calloc_allocator {
+  using pointer = T*;
+  using const_pointer = const T*;
+  using void_pointer = void*;
+  using const_void_pointer =const void* ;
+  using value_type = T;
+  using size_type = size_t;
+  using difference_type = ptrdiff_t;
+  //introduced in C++17
+  using is_always_equal = std::true_type;
+  static pointer allocate(size_type n){
+    return (pointer)calloc(n,sizeof(value_type));
+  }
+  static void deallocate(pointer ptr, size_type n){
+    free(ptr);
+  }
+  //Newly allocated memory will not be zeroed, if old_length 
+  //is not explicitly given.
+  static pointer reallocate(pointer ptr, size_type n,
+                            [[maybe_unused]] size_type old_length = -1,
+                            [[maybe_unused]] size_type old_size = -1){
+    pointer ret =  realloc(ptr, n*sizeof(value_type));
+    if(old_length != (size_type)-1){
+      memset(ret + (old_length * sizeof(value_type)), '\0',
+             (n * sizeof(value_type)) - (old_length * sizeof(value_type)));
+    }
+    return ret;
   }
   //does nothing
   template<class... Args>

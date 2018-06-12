@@ -123,32 +123,133 @@ struct vndb_main {
   sqlite3_wrapper db;
   vndb_connection conn;  
   //result of the dbstats command from the server, used for progress bars
-  json db_stats;
+  json db_stats = json_null;
+  //information about local database.
+  json db_info = json_null;
+  //Booleans to indicate we've already initialized something.
+  //Could use a bitfield but I really don't need to worry about space that much.
+  //Could alsa make these atomic.
+  bool get_by_id_stmts_initialized = false;
+  bool insert_stmts_initialized = false;
+  bool db_initialized = false;
   //These are not automatically initialized, you need to explicitly initialize
   //them, this is to avoid the overhead of creating prepared statments you
   //may never use.
   std::array<sqlite3_stmt_wrapper, num_base_tables> get_by_id_stmts = {{}};
   std::array<sqlite3_stmt_wrapper, num_tables_total> insert_stmts = {{}};
+  //Open the databas in db_filename and create a connection with the given
+  //username and password, but don't actually connect yet.
   vndb_main(std::string_view db_filename,
             std::string_view username = "", std::string_view passwd = "", 
             bool connect = false)
-    : db(db_filename), conn(username, passwd, true, connect) {}
+    : db(db_filename), conn(username, passwd, true, connect) {
+    if(!db){
+      fprintf(stderr, "Failed to open database file %s.\n", 
+              db_filename.data());
+    }
+  }
   bool init_insert_stmts();
   bool init_get_id_stmts();
+  bool init_all(bool do_connect = false, bool get_dbstats = false){
+    if(!init_db()){
+      return false;
+    } 
+    if(!init_insert_stmts()){
+      fprintf(stderr, "Failed to compile sql insert statements.\n");
+      return false;
+    }
+    if(!init_get_id_stmts()){
+      fprintf(stderr, "Failed to compile sql get_by_id statements.\n");
+      return false;
+    }
+    if(!init_db_info()){
+      fprintf(stderr, "Failed to initialize db_info.\n");
+      return false;
+    }
+    if(do_connect){
+      if(!connect()){
+        fprintf(stderr, "Failed to connect to vndb server.\n");
+        return false;
+      }
+      if(get_dbstats){
+        if(!init_db_stats()){
+          fprintf(stderr, "Failed to run dbstats command.\n");
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+  //I'd like to replace this with a bitset I've written but this should work for now.
+  using bitvector = std::vector<bool>;
+  bitvector build_missing_ids_bitvector(sqlite3_stmt_wrapper& stmt, 
+                                        int size);
   bool build_vn_tags();
   bool build_character_traits();
   //uses the releases table
   bool build_vn_producer_relations();
   //builds vn_character_actor_relations, vn_staff_relations and staff_aliases.
   bool build_staff_derived_tables();
+  //convience function to run the previous 4 functions in one call.
+  //returns 0 on success and 1-4 if it fails indicating which function
+  //it was that faild.
+  int build_derived_tables();
   bool build_vn_images();
   bool build_character_images();
   bool init_db_stats(){
+    if(!db_stats.is_null()){
+      return true;
+    }
     if(!conn.ensure_logged_in()){
       return false;
     } else {
       db_stats = conn.dbstats();
       return !conn.error;
+    }
+  }
+  bool init_db_info(){
+    if(!db_info.is_null()){
+      return true;
+    }
+    auto stmt = db.prepare_stmt("select * from db_info;");
+    if(stmt.step() != SQLITE_ROW){
+      return false;
+    }
+    json tmp = stmt.get_row_json();
+    if(stmt.step() != SQLITE_DONE){
+      return false;
+    }
+    if(tmp.is_null()){
+      return false;
+    }
+    db_info = std::move(tmp);
+    return true;
+  }
+  std::pair<int,int> get_table_info(table_type what){
+    switch(what){
+      case table_type::VNs:
+        return {db_info["num_vns"].get<int>(), 
+          db_info["max_vn_id"].get<int>()};
+      case table_type::releases:
+        return {db_info["num_releases"].get<int>(), 
+          db_info["max_release_id"].get<int>()};
+      case table_type::producers:
+        return {db_info["num_producers"].get<int>(), 
+          db_info["max_producer_id"].get<int>()};
+      case table_type::characters:
+        return {db_info["num_characters"].get<int>(), 
+          db_info["max_character_id"].get<int>()};
+      case table_type::staff:
+        return {db_info["num_staff"].get<int>(), 
+          db_info["max_staff_id"].get<int>()};
+      case table_type::tags:
+        return {db_info["num_tags"].get<int>(), 
+          db_info["max_tag_id"].get<int>()};
+      case table_type::traits:
+        return {db_info["num_traits"].get<int>(), 
+          db_info["max_trait_id"].get<int>()};
+      default:
+        assert(false);
     }
   }
   //Two names for the same function.
@@ -159,6 +260,14 @@ struct vndb_main {
     return conn.login();
   }
   bool init_db(){
+    if(db_initialized){
+      return true;
+    }
+    //If the database couldn't be opened the constructor should've issued
+    //a message already so just return false.
+    if(!db){
+      return false;
+    }
     int err = db.exec_file(db_init_file);
     if(err != SQLITE_OK){
       if(err != SQLITE_CANTOPEN){
@@ -166,6 +275,7 @@ struct vndb_main {
       }
       return false;
     }
+    db_initialized = true;
     return true;
   }
   //function to access db_stats via table type, since the names of the tables
@@ -248,11 +358,63 @@ struct vndb_main {
     auto callback = gen_insert_callback(what, &pb);
     return conn.get(what, start, stop, callback);
   }
+  //If start == -1 then do an update.
   int download_and_insert_all(vndb::object_type what, int start = 1){
-    progress_bar pb(db_stats_count(what), 
-                    vndb::object_type_names[to_underlying(what)].data());
-    auto callback = gen_insert_callback(what, &pb);
-    return conn.get_all(what, callback, start);
+    //Ugly code duplication, but the only way I see avoiding it is using some form
+    //of new, which is even more ugly.
+    if(start > 0){
+      progress_bar pb(db_stats_count(what) - start,
+                      vndb::object_type_names[to_underlying(what)].data());
+      auto callback = gen_insert_callback(what, &pb);
+      return conn.get_all(what, callback, start);
+    } else {
+      auto [count, max_id] = get_table_info(table_type(to_underlying(what)));
+      progress_bar pb(db_stats_count(what) - count,
+                      vndb::object_type_names[to_underlying(what)].data());
+      auto callback = gen_insert_callback(what, &pb);
+      return conn.get_all(what, callback, max_id);
+    } 
+  }
+  //Downloads all objects that have been added to the online database since
+  //the local database was last updated.
+  bool update_all(){
+    return download_all(-1,-1,-1,-1,-1);
+  }
+  //Passing -1 as start will cause an update for that object type
+  bool download_all(int vn_start = 1, int release_start = 1,
+                    int producer_start = 1, int character_start = 1,
+                    int staff_start = 1){
+    if(vn_start > 0){
+      //printf("Downloading VNs\n");
+      if(download_and_insert_all(vndb::object_type::VN, vn_start) <= 0){
+        return false; 
+      }
+    }
+    if(release_start > 0){
+      //printf("Downloading Releases\n");
+      if(download_and_insert_all(vndb::object_type::release,release_start) <= 0){
+        return false; 
+      }
+    }
+    if(producer_start > 0){
+      //printf("Downloading Producers\n");
+      if(download_and_insert_all(vndb::object_type::producer,producer_start) <= 0){
+        return false; 
+      }
+    }
+    if(character_start > 0){
+      //printf("Downloading Characters\n");
+      if(download_and_insert_all(vndb::object_type::character,character_start) <= 0){
+        return false; 
+      }
+    }
+    if(staff_start > 0){
+      printf("Downloading Staff\n");
+      if(download_and_insert_all(vndb::object_type::staff, staff_start) <= 0){
+        return false; 
+      }
+    }
+    return true;
   }
   int get_max_id(table_type what){
     static constexpr int bufsz = 256;

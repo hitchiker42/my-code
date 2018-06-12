@@ -59,6 +59,8 @@ enum class sqlite3_type {
   blob = SQLITE_BLOB,
   null = SQLITE_NULL
 };
+struct sqlite3_wrapper; //forward declaration of database wrapper
+
 struct sqlite3_stmt_wrapper {
   sqlite3_stmt* stmt = nullptr;
   sqlite3_stmt_wrapper() = default;
@@ -122,15 +124,20 @@ struct sqlite3_stmt_wrapper {
   int step(){
     return sqlite3_step(stmt);
   }
+  //Important: This needs to be called after each complete executition of
+  //the statement.
+
   //returns SQLITE_OK (0) if there were no errors in step, and nonzero
   //if the last step caused an error. So you need to check the return
   //value of this to test for error.
   int reset(){
-    int ret = sqlite3_reset(stmt);
-    //Not sure what happens when you call this after an error
-    //but I doubt it'll do anything that bad.
-    sqlite3_clear_bindings(stmt);
-    return ret;
+    return sqlite3_reset(stmt);
+  }
+  //There's no real need to ever reset the bindings, but doing so can help 
+  //to point out errors, and potentially release resources if the stmt
+  //outlives the paramters.
+  int reset_bindings(){
+    return sqlite3_clear_bindings(stmt);
   }
   //there's no need to call this since the destructor will do it for you,
   //but it can be called manualy to check for errors.
@@ -142,41 +149,31 @@ struct sqlite3_stmt_wrapper {
     return ret;
   }
   //Run this statement to completion for side effects only
-  int exec(bool should_reset = true){
+  int exec(){
     int err;
     while((err = sqlite3_step(stmt)) == SQLITE_ROW); //execute the sql
-    if(should_reset){
-      return reset();
-    } else {
-      return (err == SQLITE_DONE ? SQLITE_OK : err);
-    }
+    //reset will return the appropiate error code if sqlite_step failed;
+    return reset();
   }
   //Convience function to execute a complete statement, the callback
   //is given '*this' as its argument. returns SQLITE_OK on success,
   //or an error code if there was an error, returns SQLITE_ABORT if
   //the callback returns a non-zero value, like sqlite3_exec does.
-  int exec(std::function<int(sqlite3_stmt_wrapper&)> &f,
-           bool should_reset = true){
+  int exec(std::function<int(sqlite3_stmt_wrapper&)> &f){
     int err;
     while((err = sqlite3_step(stmt)) == SQLITE_ROW){
       err = f(*this);
       if(err != 0){ return SQLITE_ABORT; }
     }
-    //Don't just return err, since on success it will be SQLITE_DONE,
-    //which is non-zero, and we want to return 0 on success.
-    if(should_reset){
-      return reset();
-    } else {
-      return (err == SQLITE_DONE ? SQLITE_OK : err);
-    }
+    //reset will return the appropiate error code if sqlite_step failed;
+    return reset();
   }
   //Convience function to execute a complete statement, follows
   //the api of the builtin sqlite3_exec, with the char**s replaced
   //with vectors of std::string_views, the views need to be copied
   //if you want to save the text.
   int exec(std::function<int(int, std::vector<std::string_view>&,
-                             std::vector<std::string_view>&)> &f,
-           bool should_reset = true){
+                             std::vector<std::string_view>&)> &f){
     int err;
     std::vector<std::string_view> row_text, row_names;
     while((err = sqlite3_step(stmt)) == SQLITE_ROW){
@@ -185,15 +182,11 @@ struct sqlite3_stmt_wrapper {
       err = f(get_ncolumns(), row_text, row_names);
       if(err != 0){ return SQLITE_ABORT; }
     }
-    if(should_reset){
-      return reset();
-    } else {
-      return (err == SQLITE_DONE ? SQLITE_OK : err);
-    }
+    //reset will return the appropiate error code if sqlite_step failed;
+    return reset();
   }
   //Same as above but without the column names.
-  int exec(std::function<int(int, std::vector<std::string_view>&)> &f,
-           bool should_reset = true){
+  int exec(std::function<int(int, std::vector<std::string_view>&)> &f){
     int err;
     std::vector<std::string_view> row_text;
     while((err = sqlite3_step(stmt)) == SQLITE_ROW){
@@ -201,12 +194,32 @@ struct sqlite3_stmt_wrapper {
       err = f(get_ncolumns(), row_text);
       if(err != 0){ return SQLITE_ABORT; }
     }
-    if(should_reset){
-      return reset();
+    //reset will return the appropiate error code if sqlite_step failed;
+    return reset();
+  }
+  //Run this statement and collect the results (as json objects) into
+  //a json array.
+  json exec_json(int *err_ptr = nullptr){
+    std::vector<json> rows;
+    int err;
+    if(!err_ptr){ err_ptr = &err; }
+    while((err = sqlite3_step(stmt)) == SQLITE_ROW){
+      json row = get_row_json();
+      //This should never happen.
+      if(row.is_null()){
+        return SQLITE_ABORT;
+      }
+      rows.emplace_back(row);
+    }
+    *err_ptr = reset();
+    if(*err_ptr != SQLITE_OK){
+      return json_null;
     } else {
-      return (err == SQLITE_DONE ? SQLITE_OK : err);
+      return rows;
     }
   }
+    
+
   //base template for getting columns, specializations are below.
   template<typename T>
   T get_column(int idx);
@@ -223,6 +236,7 @@ struct sqlite3_stmt_wrapper {
   int get_ncolumns(){
     return sqlite3_data_count(stmt);
   }
+  sqlite3_wrapper get_db();
   std::string_view column_name(int i){
     return sqlite3_column_name(stmt, i);
   }
@@ -299,7 +313,7 @@ struct sqlite3_stmt_wrapper {
     return sqlite3_bind_text(stmt, idx, str, len, destroy);
   }
   //Bind a blob, there's no way to do this without explicitly giving
-  //a length, 
+  //a length,
   int bind(int idx, const void* blob, int len,
            void(*destroy)(void*) = SQLITE_TRANSIENT){
     return sqlite3_bind_blob(stmt, idx, blob, len, destroy);
@@ -377,7 +391,9 @@ struct sqlite3_wrapper {
   sqlite3 *db;
   //Set to the result of the last sqlite function
   int db_err = SQLITE_OK;
-
+  //if is_view is true we don't call sqlite3_close in the destructor, this
+  //is mostly used for pointers returned from sqlite3_stmt_wrapper::get_db.
+  bool is_view = false;
   bool in_transaction = false;
   sqlite3_wrapper(std::string_view filename,
                   int flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE){
@@ -387,8 +403,15 @@ struct sqlite3_wrapper {
     : db{other.db}, db_err{other.db_err}, in_transaction{other.in_transaction} {
       other.db = nullptr;
   }
+  //If given a raw database pointer assume we don't take ownership, and so
+  //shouldn't destroy the db connectin when we go out of scope.
+  sqlite3_wrapper(sqlite3 *db_ptr)
+    : db{db_ptr}, is_view{true} {}
+
   ~sqlite3_wrapper(){
-    sqlite3_close(db);
+    if(!is_view){
+      sqlite3_close(db);
+    }
   }
   //Conversion to bool to check for error in constructor
   operator bool(){
@@ -423,6 +446,12 @@ struct sqlite3_wrapper {
               sqlite3_extended_errcode(db));
     }
   }
+  template<typename T, typename ... Ts>
+  void print_errmsg(const char *fmt, const T& arg, const Ts&... args){
+    fprintf(stderr, fmt, arg, args...);
+    fprintf(stderr, "%s(%d)\n", sqlite3_errmsg(db),
+            sqlite3_extended_errcode(db));
+  }
   //errstr gets string version of this->err
   const char* errstr(){
     return sqlite3_errstr(db_err);
@@ -430,6 +459,9 @@ struct sqlite3_wrapper {
   //get the string version of the given error code.
   static const char* errstr(int errno){
     return sqlite3_errstr(errno);
+  }
+  const char *filename(const char *name = "main"){
+    return sqlite3_db_filename(db, name);
   }
   //evaluate the sql in 'sql', the sql is executed for side effects only.
   int exec(const char *sql){
@@ -470,8 +502,7 @@ struct sqlite3_wrapper {
   }
   sqlite3_stmt_wrapper prepare_stmt(const char* sql, int len = -1,
                                     const char** tail = nullptr){
-    sqlite3_stmt *stmt;
-    db_err = sqlite3_prepare(db, sql, len, &stmt, tail);
+    sqlite3_stmt *stmt = prepare_stmt_ptr(sql, len, tail);
     return sqlite3_stmt_wrapper(stmt);
   }
   sqlite3_stmt* prepare_stmt_ptr(const std::string_view& sv){
@@ -481,6 +512,7 @@ struct sqlite3_wrapper {
   sqlite3_stmt* prepare_stmt_ptr(const char* sql, int len = -1,
                                  const char** tail = nullptr){
     sqlite3_stmt *stmt;
+//    vndb_log->log_debug("Compiling sql '%s'.\n", sql);
     db_err = sqlite3_prepare(db, sql, len, &stmt, tail);
     return stmt;
   }
@@ -506,15 +538,6 @@ int sqlite_insert_vn_producer_relations(const json& release,
 int sqlite_insert_vn_producer_relations(int release_id,
                                         const json& vns, const json& producers,
                                         sqlite3_stmt_wrapper& stmt);
-int sqlite_insert_vn_tags(int vn_id, const json& vn_tags,
-                          sqlite3_stmt_wrapper &stmt);
-int sqlite_insert_vn_tags(const json &vn,
-                          sqlite3_stmt_wrapper &stmt);
-int sqlite_insert_character_traits(const json& character,
-                                   sqlite3_stmt_wrapper &stmt);
-int sqlite_insert_character_traits(int character_id,
-                                   const json& traits,
-                                   sqlite3_stmt_wrapper &stmt);
 int sqlite_insert_vn_character_actor_relations(const json& actor,
                                                sqlite3_stmt_wrapper &stmt);
 int sqlite_insert_vn_character_actor_relations(int actor_id,
@@ -548,4 +571,7 @@ inline int sqlite_insert_object(vndb::object_type what, const json& obj, sqlite3
   } else {
     assert(false);
   }
+}
+inline sqlite3_wrapper sqlite3_stmt_wrapper::get_db(){
+  return sqlite3_wrapper(sqlite3_db_handle(this->stmt));
 }

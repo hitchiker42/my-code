@@ -329,6 +329,38 @@ const std::string format_ordinal_number (long number) {
   }
 }
 #endif
+//wrapper to give strtod the same signature as strto[u]l
+static double strtod_wrapper(const char *s, const char **sp, 
+                             int [[maybe_unused]]){
+  return strtod(s,sp);
+}
+#include <cstdlib> //to get strtoX into namespace std::
+namespace util {
+//It's much cleaner to use a macro than a template here.
+#define strtoX(T, from_str, str, endptr, base)          \
+  errno = 0;                                            \
+  const char *tmp;                                      \
+  if(!endptr){ endptr = &tmp; }                         \
+  T val = from_str(str, endptr, base);                  \
+  if(errno != 0 || (*endptr == str)){                   \
+    return std::optional<T>(std::nullopt_t);            \
+  } else {                                              \
+    return std::optional<T>(std::in_place_t, val);      \
+  }
+
+std::optional<long> strtol(const char *str,
+                           const char** endptr = nullptr, int base = 0){
+  strotX(long, strtol, str, endptr, base);
+}
+std::optional<unsigned long> strtoul(const char *str,
+                                     const char** endptr = nullptr, 
+                                     int base = 0){
+  strotX(unsigned long, strtoul, str, endptr, base);
+}
+std::optional<double> strtod(const char *str,
+                             const char** endptr = nullptr, int base = 0){
+  strotX(double, strtod_wrapper, str, endptr, base);
+}
 bool strtol_checked(long *value, const char *str,
                     const char** endptr = nullptr, int base = 0){
   errno = 0;
@@ -408,9 +440,12 @@ size_t memcspn(const uint8_t *buf, size_t len,
   return memcspn_table(buf, len, bytes);
 }
 }
+} //namespace util.
 #if 0
 static thread_local char to_chars_static_buf[64];
-
+static constexpr char *nibble_strings[16] =
+  {"0000","0001","0010","0011","0100","0101","0111","1000",
+   "0111","1000","1001","1010","1011","1100","1101","1111"};
 char* binary_int_to_string(uint64_t x, int bitdepth, char *buf){
   int i;
   char *ret = buf;
@@ -444,9 +479,7 @@ static int max_length_per_base[35] =
   {64, 41, 32, 28, 25, 23, 22, 21, 20, 19, 18, 18,
    17, 17, 16, 16, 16, 16, 15, 15, 15, 15, 14, 14,
    14, 14 ,14, 14, 14, 13, 13, 13, 13, 13, 13};
-static const char *nibble_strings[16] =
-  {"0000","0001","0010","0011","0100","0101","0111","1000",
-   "0111","1000","1001","1010","1011","1100","1101","1111"};
+
 char* int_to_string(char *start, char *end,
                     unsigned long value, int base){
   if(value == 0){

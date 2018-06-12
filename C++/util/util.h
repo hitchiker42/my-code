@@ -112,7 +112,7 @@ template<typename T,
 constexpr int lg2(T x){
   return (std::max(sizeof(T),sizeof(int))*CHAR_BIT) - (clz(x) + 1);
 }
-//Functions and classes in namespace util.
+
 template <typename T>
 int compare(const T& lhs, const T& rhs){
   return three_way_compare(lhs, rhs);
@@ -142,7 +142,8 @@ struct unordered_map : std::unordered_map<K,V,Hash,KeyEq,Allocator> {
     }
   }
 };
-}
+
+} // namespace util
 //Functions to make working with tagged pointers eaiser,
 //test if ptr is a tagged pointer, by default checks any of the bits
 //that would be 0 for a word aligned pointer (i.e last 2 bits for
@@ -150,11 +151,11 @@ struct unordered_map : std::unordered_map<K,V,Hash,KeyEq,Allocator> {
 //These could be constexpr, except that you can't use reinterpret cast
 //in constexpr functions.
 inline /*constexpr*/ bool test_ptr_tag(const void *ptr, 
-                            const int bit = 
-                            (sizeof(uintptr_t) == 8 ? 0x7 : 0x3)){
+                                       const int bit = 
+                                       (sizeof(uintptr_t) == 8 ? 0x7 : 0x3)){
   return (((uintptr_t)ptr) & bit);
 }
-//Needs to be a template sistatic nce a paramater of type void*&
+//Needs to be a template since a paramater of type void*&
 //will only accept actual void*'s
 //could change these into macros to eliminate the templates.
 template<typename T>
@@ -271,6 +272,7 @@ struct bitset_32 {
 /*
   In case you need a custom hash function.
 */
+namespace util {
 /*
   templatized version.
   template<typename T> static constexpr T fnv_prime;
@@ -319,20 +321,15 @@ template<>
 inline uint64_t fnv_hash(const char* const& key){
   return fnv_hash(key, strlen(key));
 }
-//
-/*
-  These functions all behave in the same way, they set errno to 0,
-  call the underlying function, set *value to its result, and if
-  an error occured, or no number was found,  they return true,
-  otherwise they return false.
-  Not too complicated, but it saves having to mess with errno.
-*/
-bool strtol_checked(long *value, const char *str,
-                    const char** endptr = nullptr, int base = 0);
-bool strtoul_checked(long *value, const char *str,
-                    const char** endptr = nullptr, int base = 0);
-bool strtod_checked(double *value, const char *str,
-                    const char** endptr = nullptr, int base = 0);
+//Wrappers around strtoX which return a std::optional value, internally
+//they use errno to check the result.
+std::optional<long> strtol(const char *str,
+                           const char** endptr = nullptr, int base = 0);
+std::optional<unsigned long> strtoul(const char *str,
+                                     const char** endptr = nullptr, 
+                                     int base = 0);
+std::optional<double> strtod(const char *str,
+                             const char** endptr = nullptr, int base = 0);
 extern "C" {
 size_t memspn(const uint8_t *buf, size_t len,
               const uint8_t *accept, size_t len2);
@@ -343,6 +340,7 @@ size_t memspn_table(const uint8_t *buf, size_t len,
 size_t memcspn_table(const uint8_t *buf, size_t len,
                      const uint8_t reject[256]);
 }
+} // Namespace util
 #if (defined NEED_TIMER) || (defined NEED_TIMERS)
 #include "time_util.h"
 #endif

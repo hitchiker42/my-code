@@ -57,29 +57,49 @@ static constexpr std::string_view sql_insert_tag =
         @category, @aliases, @parents);)EOF"sv;
 //Insert statements for the derived tables (relations between tables)
 static constexpr std::string_view sql_insert_vn_producer_relation =
-  R"EOF(insert or replace into vn_producer_relations values (
+  R"EOF(insert or ignore into vn_producer_relations values (
         @vn_id, @producer_id, @release_id);)EOF"sv;
 static constexpr std::string_view sql_insert_vn_tag =
-  R"EOF(insert or replace into vn_tags (@vn_id, @tag_id, @score);)EOF"sv;
+  R"EOF(insert or replace into vn_tags values (@vn_id, @tag_id, @score);)EOF"sv;
 static constexpr std::string_view sql_insert_character_trait =
-  R"EOF(insert or replace into character_traits (
+  R"EOF(insert or ignore into character_traits values (
         @character_id, @trait_id);)EOF"sv;
 static constexpr std::string_view sql_insert_vn_character_actor_relation =
-  R"EOF(insert or replace into vn_character_actor_relations (
+  R"EOF(insert or ignore into vn_character_actor_relations values (
         @vn_id, @character_id, @actor_id);)EOF"sv;
 static constexpr std::string_view sql_insert_vn_staff_relation =
-  R"EOF(insert or replace into vn_staff_relations (
+  R"EOF(insert or ignore into vn_staff_relations values (
         @vn_id, @staff_id);)EOF"sv;
 static constexpr std::string_view sql_insert_staff_alias =
-  R"EOF(insert or replace into staff_aliases (
-        @staff_id, @alias_id);)EOF"sv;
+  R"EOF(insert or replace into staff_aliases values (
+        @staff_id, @alias_id, @alias_name);)EOF"sv;
 static constexpr std::string_view sql_insert_vn_image =
-  R"EOF(insert or replace into vn_images (
+  R"EOF(insert or replace into vn_images values (
         @vn_id, @image_blob);)EOF"sv;
 static constexpr std::string_view sql_insert_character_image =
-  R"EOF(insert or replace into character_images (
+  R"EOF(insert or replace into character_images values (
         @character_id, @image_blob);)EOF"sv;
-  
+/*
+  These queries find ids missing from a table, the basic idea is to
+  create a table of integers 1 - max_id using the with recursive clause
+  then do a left outer join on the table of interest on the id 
+  (an outer join includes all rows even if the column to join on in null in
+   one of the tables) then omit any rows where the id is non null.
+*/
+static constexpr std::string_view sql_find_missing_tags =
+  R"EOF(with recursive
+         seq(x) as (values(1) union all select x+1 from seq 
+           where x < (select max_tag_id from db_info))
+        select seq.x
+          from seq left outer join tags on seq.x = tags.id
+          where tags.id is null)EOF"sv;
+static constexpr std::string_view sql_find_missing_traits =
+  R"EOF(with recursive
+         seq(x) as (values(1) union all select x+1 from seq 
+           where x < (select max_trait_id from db_info))
+        select seq.x
+          from seq left outer join traits on seq.x = traits.id
+          where traits.id is null)EOF"sv;
 #endif /* __SQL_H__ */
 
 /* Local Variables: */
