@@ -88,6 +88,9 @@ static SSL_CTX_wrapper vndb_ctx;
 #include "connection.h"
 //wrappers for sqlite statements and database connections
 #include "sqlite_wrappers.h"
+//functions to download and parse tags and traits.
+int download_and_insert_tags(sqlite3_wrapper& db);
+int download_and_insert_traits(sqlite3_wrapper& db);
 
 //structure holding the main program context.
 struct vndb_main {
@@ -120,6 +123,7 @@ struct vndb_main {
       "vn_producer_relations", "vn_character_actor_relations", "vn_staff_relations",
       "vn_tags", "character_traits", "vn_images", "character_images"
     }};
+  static std::unordered_map<std::string_view, table_type> table_name_map;
   sqlite3_wrapper db;
   vndb_connection conn;  
   //result of the dbstats command from the server, used for progress bars
@@ -166,6 +170,10 @@ struct vndb_main {
       fprintf(stderr, "Failed to initialize db_info.\n");
       return false;
     }
+    if(!init_table_name_map()){
+      fprintf(stderr, "Failed to initialize table_name_map.\n");
+      return false;
+    }
     if(do_connect){
       if(!connect()){
         fprintf(stderr, "Failed to connect to vndb server.\n");
@@ -196,6 +204,16 @@ struct vndb_main {
   int build_derived_tables();
   bool build_vn_images();
   bool build_character_images();
+  bool init_table_name_map(){
+    if(!table_name_map.empty()){
+      return true;
+    } else {
+      for(int i = 0; i < num_tables_total; i++){
+        table_name_map.try_emplace(table_names[i], table_type(i));
+      }
+      return true;
+    }
+  }
   bool init_db_stats(){
     if(!db_stats.is_null()){
       return true;

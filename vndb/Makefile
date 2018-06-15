@@ -38,7 +38,7 @@ tag_trait_parser: connection.o sqlite_wrappers.o tag_trait_parser.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:
-	rm -f *.eo $(PROGRAM_FILES)
+	rm -f *.o $(PROGRAM_FILES)
 tags: TAGS
 TAGS: $(SOURCES)
 	ctags -eR *

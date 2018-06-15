@@ -141,7 +141,7 @@ int decompress(const util::svector<char>& in, util::svector<char>& out){
 }
 //return number of tags entered, which should be either all or none,
 //but I suppose it's possible to get an error midway.
-int insert_tags(sqlite3_wrapper& db){
+int download_and_insert_tags(sqlite3_wrapper& db){
   int err = -1;
   DEBUG_PRINTF("Compiling insert statement.\n");
   sqlite3_stmt_wrapper ins_stmt = db.prepare_stmt(sql_insert_tag);
@@ -194,7 +194,7 @@ int insert_tags(sqlite3_wrapper& db){
   DEBUG_PRINTF("Succeeded in inserting tags\n"); 
   return tags.size();
 }    
-int insert_traits(sqlite3_wrapper& db){
+int download_and_insert_traits(sqlite3_wrapper& db){
   int err = -1;
   DEBUG_PRINTF("Compiling insert statement.\n");
   sqlite3_stmt_wrapper ins_stmt = db.prepare_stmt(sql_insert_trait);
@@ -268,13 +268,13 @@ int main(){
     return 1;
   }
   
-  int err = insert_tags(db);
+  int err = download_and_insert_tags(db);
   if(err <= 0){
     fprintf(stderr, "Error inserting tags.\n");
     //Make sure to return non-zero on error.
     return err-1;
   }
-  err = insert_traits(db);
+  err = download_and_insert_traits(db);
   if(err <= 0){
     fprintf(stderr, "Error inserting traits.\n");
     return err-1;

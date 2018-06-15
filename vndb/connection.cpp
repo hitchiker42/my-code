@@ -15,7 +15,7 @@ SSL_CTX* vndb_ctx = nullptr;
 static const char *login_prefix =
   R"(login {"protocol":1, "client":"vndb-cpp", "clientver":0.1)";
 
-//Not that complicated but makeing this a function makes it much
+//Not that complicated but making this a function makes it much
 //clearer what's going on
 bool has_prefix(util::string_view sv, util::string_view prefix){
   return !strncmp(sv.data(), prefix.data(), prefix.size());

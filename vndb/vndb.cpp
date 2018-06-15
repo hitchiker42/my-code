@@ -1,6 +1,7 @@
 #include "vndb.h"
 #include "sql.h"
 std::unique_ptr<util::logger> vndb_log;
+std::unordered_map<std::string_view, vndb_main::table_type> vndb_main::table_name_map;
 
 bool vndb_main::init_insert_stmts(){
   static constexpr std::array<std::string_view, this->num_tables_total> sql = {{

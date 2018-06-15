@@ -20,6 +20,25 @@ static constexpr std::string_view sql_select_tag_by_id =
   "select * from tags where id = @id;"sv;
 static constexpr std::string_view sql_select_trait_by_id =
   "select * from traits where id = @id;"sv;
+/*
+  Select statements using derived tables
+*/
+static constexpr std::string_view sql_select_vn_by_tag_name = 
+  R"EOF(select * from VNs
+        where id in
+          (select distinct vn from vn_tags
+           where tag = (select id from tags where name like @name));)EOF"sv;
+static constexpr std::string_view sql_select_vn_by_producer_name = 
+  R"EOF(select * from VNs
+        where id in
+          (select distinct vn from vn_producer_relations
+           where producer = (select id from producers 
+                             where name like @name));)EOF"sv;
+static constexpr std::string_view sql_select_character_by_trait_name = 
+  R"EOF(select * from characters
+        where id in
+          (select distinct character from character_traits
+           where trait = (select id from tags where name like @name));)EOF"sv;
 // Insert statements for the base tables (the actual information)
 static constexpr std::string_view sql_insert_vn =
   R"EOF(insert or replace into VNs values (

@@ -179,8 +179,9 @@ vn integer not null references VNs (id),
 producer integer not null references producers (id),
 release_id integer not null references releases (id),
 primary key (vn, producer, release_id)
-);
+) without rowid;
 --index vns and producers, no need to index releases
+--we may be able to remove this index, since we added without rowid.
 create index if not exists vp_relations_vn_idx
        on vn_producer_relations (vn);
 create index if not exists vp_relations_producer_idx
@@ -194,7 +195,7 @@ actor integer not null references staff (id),
 -- Technically this isn't unique, you could have someone creditied
 -- twice for the same character in one vn under two different aliases.
 primary key (vn, character, actor)
-);
+) without rowid;
 create index if not exists vca_relations_vn_idx
        on vn_character_actor_relations (vn);
 create index if not exists vca_relations_character_idx
@@ -207,8 +208,9 @@ create index if not exists vca_relations_actor_idx
 -- that you can get by parsing the vns field of the 'staff'.
 create table if not exists vn_staff_relations (
 vn integer not null references VNs (id),
-staff integer not null references staff (id)
-);
+staff integer not null references staff (id),
+primary key (vn, staff)
+) without rowid;
 create index if not exists vs_relations_vn_idx
        on vn_staff_relations (vn);
 create index if not exists vs_relations_staff_idx
@@ -233,7 +235,7 @@ vn integer not null references VNs (id),
 tag integer not null references tags (id),
 score real not null check (score between 0.0 and 3.0),
 primary key (vn, tag)
-);
+) without rowid;
 --index both vns and tags since lookup on both is likely.
 -- I'm not sure about score.
 create index if not exists vn_tags_vn_idx on vn_tags (vn);
@@ -244,7 +246,7 @@ create table if not exists character_traits (
 character integer not null references characters (id),
 trait integer not null references traits (id),
 primary key (character, trait)
-);
+) without rowid;
 create index if not exists character_traits_character_idx
        on character_traits (character);
 create index if not exists character_traits_trait_idx
