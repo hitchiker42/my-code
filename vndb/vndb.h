@@ -21,6 +21,7 @@ static_assert(SQLITE_OK == 0);
 #include "string_buf.h"
 #include "filesystem.h"
 #include "progress_bar.h"
+#include "image.h"
 #include "json.hpp"
 #include "logger.h"
 
@@ -60,7 +61,7 @@ enum class object_type {
   staff
 };
 constexpr int num_object_types = to_underlying(object_type::staff)+1;
-static constexpr std::array<std::string_view, num_object_types> 
+static constexpr std::array<std::string_view, num_object_types>
 object_type_names = {{"VNs", "Releases", "Producers", "Characters", "Staff"}};
 }
 /*
@@ -94,7 +95,7 @@ int download_and_insert_traits(sqlite3_wrapper& db);
 
 //structure holding the main program context.
 struct vndb_main {
-  enum class table_type {
+  enum class table_type : int8_t {
     //Base tables, hold the actual information in the database
     VNs,
     releases,
@@ -111,21 +112,30 @@ struct vndb_main {
     staff_aliases,
     vn_tags,
     character_traits,
-    //Auxiliary tables, for now just tables to hold image data.
+    //Auxiliary tables image data & vn/wishlist
+    //TODO: Maybe move these to before derived tables.
+    vnlist,
+    wishlist,
     vn_images,
     character_images,
     num_tables_total = character_images + 1
   };
   static constexpr int num_base_tables = static_cast<int>(table_type::num_base_tables);
   static constexpr int num_tables_total = static_cast<int>(table_type::num_tables_total);
-  static constexpr std::array<const char *,num_tables_total> table_names = {{
-      "VNs","releases", "producers", "characters", "staff", "tags", "traits",
-      "vn_producer_relations", "vn_character_actor_relations", "vn_staff_relations",
-      "vn_tags", "character_traits", "vn_images", "character_images"
+  static constexpr std::array<std::string_view,num_tables_total> table_names = {{
+      "VNs"sv,"releases"sv, "producers"sv, "characters"sv, "staff"sv, 
+      "tags"sv, "traits"sv,"vn_producer_relations"sv, 
+      "vn_character_actor_relations"sv, "vn_staff_relations"sv, "vn_tags"sv,
+      "character_traits"sv, "vnlist"sv, "wishlist"sv,
+      "vn_images"sv, "character_images"sv      
     }};
   static std::unordered_map<std::string_view, table_type> table_name_map;
+  bool is_derived_table(table_type tt){
+    auto ttv = util::to_underlying(tt);
+    return (ttv >= num_base_tables && ttv < util::to_underlying(table_type::vn_images));
+  }
   sqlite3_wrapper db;
-  vndb_connection conn;  
+  vndb_connection conn;
   //result of the dbstats command from the server, used for progress bars
   json db_stats = json_null;
   //information about local database.
@@ -144,20 +154,22 @@ struct vndb_main {
   //Open the databas in db_filename and create a connection with the given
   //username and password, but don't actually connect yet.
   vndb_main(std::string_view db_filename,
-            std::string_view username = "", std::string_view passwd = "", 
+            std::string_view username = "", std::string_view passwd = "",
             bool connect = false)
     : db(db_filename), conn(username, passwd, true, connect) {
     if(!db){
-      fprintf(stderr, "Failed to open database file %s.\n", 
+      fprintf(stderr, "Failed to open database file %s.\n",
               db_filename.data());
     }
   }
   bool init_insert_stmts();
   bool init_get_id_stmts();
-  bool init_all(bool do_connect = false, bool get_dbstats = false){
+  //get_dbstats defaults to true, but it's only meaningful if
+  //do_connect is also true.
+  bool init_all(bool do_connect = false, bool get_dbstats = true){
     if(!init_db()){
       return false;
-    } 
+    }
     if(!init_insert_stmts()){
       fprintf(stderr, "Failed to compile sql insert statements.\n");
       return false;
@@ -190,7 +202,7 @@ struct vndb_main {
   }
   //I'd like to replace this with a bitset I've written but this should work for now.
   using bitvector = std::vector<bool>;
-  bitvector build_missing_ids_bitvector(sqlite3_stmt_wrapper& stmt, 
+  bitvector build_missing_ids_bitvector(sqlite3_stmt_wrapper& stmt,
                                         int size);
   bool build_vn_tags();
   bool build_character_traits();
@@ -246,25 +258,25 @@ struct vndb_main {
   std::pair<int,int> get_table_info(table_type what){
     switch(what){
       case table_type::VNs:
-        return {db_info["num_vns"].get<int>(), 
+        return {db_info["num_vns"].get<int>(),
           db_info["max_vn_id"].get<int>()};
       case table_type::releases:
-        return {db_info["num_releases"].get<int>(), 
+        return {db_info["num_releases"].get<int>(),
           db_info["max_release_id"].get<int>()};
       case table_type::producers:
-        return {db_info["num_producers"].get<int>(), 
+        return {db_info["num_producers"].get<int>(),
           db_info["max_producer_id"].get<int>()};
       case table_type::characters:
-        return {db_info["num_characters"].get<int>(), 
+        return {db_info["num_characters"].get<int>(),
           db_info["max_character_id"].get<int>()};
       case table_type::staff:
-        return {db_info["num_staff"].get<int>(), 
+        return {db_info["num_staff"].get<int>(),
           db_info["max_staff_id"].get<int>()};
       case table_type::tags:
-        return {db_info["num_tags"].get<int>(), 
+        return {db_info["num_tags"].get<int>(),
           db_info["max_tag_id"].get<int>()};
       case table_type::traits:
-        return {db_info["num_traits"].get<int>(), 
+        return {db_info["num_traits"].get<int>(),
           db_info["max_trait_id"].get<int>()};
       default:
         assert(false);
@@ -306,7 +318,7 @@ struct vndb_main {
     switch(what){
       case table_type::VNs: return db_stats["vn"].get<int>();
       case table_type::characters: return db_stats["chars"].get<int>();
-      default: return db_stats[table_names[to_underlying(what)]].get<int>();
+      default: return db_stats[table_names[to_underlying(what)].data()].get<int>();
     }
   }
   json get_by_id(int id, table_type what){
@@ -365,71 +377,72 @@ struct vndb_main {
     return callback;
   }
   std::function<int(std::vector<json>&)> gen_insert_callback(table_type what,
-                                                            progress_bar *pb){
+                                                             progress_bar *pb){
     assert(to_underlying(what) <= num_base_tables);
     return gen_insert_callback(vndb::object_type(to_underlying(what)),pb);
   }
-  
+
   int download_and_insert(vndb::object_type what, int start, int stop){
-    progress_bar pb(db_stats_count(what) - start, 
+    progress_bar pb(db_stats_count(what) - start,
                     vndb::object_type_names[to_underlying(what)].data());
     auto callback = gen_insert_callback(what, &pb);
     return conn.get(what, start, stop, callback);
   }
-  //If start == -1 then do an update.
+  //If start == -1 then do an update. If start == 0 ignore it.
   int download_and_insert_all(vndb::object_type what, int start = 1){
-    //Ugly code duplication, but the only way I see avoiding it is using some form
-    //of new, which is even more ugly.
+    //Ugly code duplication (due to the progress bar), but the only way I
+    //see avoiding it is using some form of new, which is even more ugly.
     if(start > 0){
       progress_bar pb(db_stats_count(what) - start,
                       vndb::object_type_names[to_underlying(what)].data());
       auto callback = gen_insert_callback(what, &pb);
       return conn.get_all(what, callback, start);
-    } else {
+    } else if(start < 0) {
       auto [count, max_id] = get_table_info(table_type(to_underlying(what)));
       progress_bar pb(db_stats_count(what) - count,
                       vndb::object_type_names[to_underlying(what)].data());
       auto callback = gen_insert_callback(what, &pb);
       return conn.get_all(what, callback, max_id);
-    } 
+    }
   }
   //Downloads all objects that have been added to the online database since
   //the local database was last updated.
   bool update_all(){
     return download_all(-1,-1,-1,-1,-1);
   }
-  //Passing -1 as start will cause an update for that object type
+  //Passing -1 as start will cause an update for that object type, passing
+  //0 for start will skip that object type.
   bool download_all(int vn_start = 1, int release_start = 1,
                     int producer_start = 1, int character_start = 1,
                     int staff_start = 1){
-    if(vn_start > 0){
+    if(vn_start != 0){
       //printf("Downloading VNs\n");
       if(download_and_insert_all(vndb::object_type::VN, vn_start) <= 0){
-        return false; 
+        return false;
       }
     }
-    if(release_start > 0){
+    if(release_start != 0){
       //printf("Downloading Releases\n");
       if(download_and_insert_all(vndb::object_type::release,release_start) <= 0){
-        return false; 
+        return false;
       }
     }
-    if(producer_start > 0){
+    if(producer_start != 0){
       //printf("Downloading Producers\n");
       if(download_and_insert_all(vndb::object_type::producer,producer_start) <= 0){
-        return false; 
+        return false;
       }
     }
-    if(character_start > 0){
+    if(character_start != 0){
       //printf("Downloading Characters\n");
       if(download_and_insert_all(vndb::object_type::character,character_start) <= 0){
-        return false; 
+        return false;
       }
     }
-    if(staff_start > 0){
-      printf("Downloading Staff\n");
+    if(staff_start != 0){
+      //printf("Downloading Staff\n");
       if(download_and_insert_all(vndb::object_type::staff, staff_start) <= 0){
-        return false; 
+        return false;
       }
     }
     return true;
@@ -437,7 +450,8 @@ struct vndb_main {
   int get_max_id(table_type what){
     static constexpr int bufsz = 256;
     char buf[bufsz];
-    snprintf(buf, bufsz, "select max(id) from %s;", table_names[to_underlying(what)]);
+    snprintf(buf, bufsz, "select max(id) from %s;", 
+             table_names[to_underlying(what)].data());
     auto stmt = db.prepare_stmt(buf);
     if(!stmt){
       return -1;
@@ -455,15 +469,15 @@ struct vndb_main {
   }
 };
 //Ensure that the values of vndb_main::table_type and vndb::object_type line up.
-static_assert(to_underlying(vndb::object_type::VN) == 
+static_assert(to_underlying(vndb::object_type::VN) ==
               to_underlying(vndb_main::table_type::VNs));
-static_assert(to_underlying(vndb::object_type::release) == 
+static_assert(to_underlying(vndb::object_type::release) ==
               to_underlying(vndb_main::table_type::releases));
-static_assert(to_underlying(vndb::object_type::producer) == 
+static_assert(to_underlying(vndb::object_type::producer) ==
               to_underlying(vndb_main::table_type::producers));
-static_assert(to_underlying(vndb::object_type::character) == 
+static_assert(to_underlying(vndb::object_type::character) ==
               to_underlying(vndb_main::table_type::characters));
-static_assert(to_underlying(vndb::object_type::staff) == 
+static_assert(to_underlying(vndb::object_type::staff) ==
               to_underlying(vndb_main::table_type::staff));
 
 namespace vndb {

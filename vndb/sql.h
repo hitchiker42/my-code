@@ -92,6 +92,18 @@ static constexpr std::string_view sql_insert_vn_staff_relation =
 static constexpr std::string_view sql_insert_staff_alias =
   R"EOF(insert or replace into staff_aliases values (
         @staff_id, @alias_id, @alias_name);)EOF"sv;
+static constexpr std::string_view sql_insert_vnlist_entry =
+  R"EOF(insert or replace into vnlist (vn, status, added, notes) 
+          values (@vn_id, @status, @added, @notes);)EOF"sv;
+//This is an update rather than an insert since we store votes as
+//a part of the vnlist table.
+static constexpr std::string_view sql_insert_votelist_entry =
+  R"EOF(update vnlist set
+         vote = @vote, vote_added = @added
+         where vn_id = @vn_id);)EOF"sv;
+static constexpr std::string_view sql_insert_wishlist_entry =
+  R"EOF(insert or replace into wishlist(vn, priority, added) 
+          values (@vn_id, @priority, @added);)EOF"sv;
 static constexpr std::string_view sql_insert_vn_image =
   R"EOF(insert or replace into vn_images values (
         @vn_id, @image_blob);)EOF"sv;

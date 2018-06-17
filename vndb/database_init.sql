@@ -34,8 +34,8 @@ staff json, -- json array of objects
 releases json default '[]', -- json array of ints (mabybe make into an object?)
 producers json default '[]', -- ""
 characters json default '[]', -- ""
-vnlist_id integer default -1, -- references vnlist (id)
-wishlist_id integer default -1, -- references wishlist(id)
+vnlist_id integer, -- references vnlist (id)
+wishlist_id integer, -- references wishlist(id)
 last_cached numeric default current_timestamp, -- timestamp of last access
 times_accessed integer default 0
 );
@@ -164,13 +164,7 @@ row_limiter integer not null primary key check (row_limiter = 1)
 -- Make sure db_info has a row, since we modify it using update statements.
 insert or ignore into db_info values (0,0,0,0,0,0,0,0,0,0,0,0,0,0,1);
 -- Derived tables
--- vndb uses postgres sql, which has array types, and has many fields
--- that are arrays. We store these as json arrays / objects, but also
--- have several derived tables for faster/eaiser queries.
-
--- I've attempted to keep these tables as small as possible, more
--- complex relations can be checked using the json stored in the
--- main tables.
+-- Store relations between tables, most are without rowid tables. 
 
 -- Table which relates vns, producers and releases
 -- release is a keyword, so add _id as a suffix. (or just quote it)
@@ -251,6 +245,30 @@ create index if not exists character_traits_character_idx
        on character_traits (character);
 create index if not exists character_traits_trait_idx
        on character_traits (trait);
+-- Tables for wishlist / vnlist
+create table if not exists vnlist (
+vn integer primary key not null references VNs (id),
+status integer check (status between 0 and 4),
+added integer, -- unix timestamp
+notes text, 
+-- Information from votelist, votes on vns not on the vnlist aren't stored.
+vote real,
+vote_added integer, --unix timestamp
+-- Info exclusive to the local database.
+path text, -- where this vn is located
+-- If the VN doesn't work for some reason (text hooking, needs a crack, 
+-- locale issues, etc) this will be non null and explain the reason.
+not_playable text,
+);
+-- Indexes go here.
+
+create table if not exists wishlist (
+vn integer primary key not null references VNs(id),
+priority integer check (priority between 0 and 3),
+added integer, --unix timestamp
+-- exclusive to local database
+notes text
+)
 
 -- Tables to hold images for characters and vns, these store
 -- the raw jpeg image as a blob.
@@ -262,27 +280,6 @@ create table if not exists character_images (
 character integer primary key not null references characters (id),
 image blob
 );
-
-/*
--- Tables for wishlist / vnlist
-create table if not exists vnlist (
-vn integer primary key not null references VNs (id),
-status integer check (status between 0 and 4),
-added integer, -- unix timestamp
-notes text, -- almost always, if not always, null,
--- Information from votelist
-vote real,
-vote_added integer,
--- personal info
-path text, -- where this vn is located
--- If the VN doesn't work for some reason (text hooking, needs a crack, 
--- locale issues, etc) this will be non null and explain the reason.
-not_playable text,
-);
--- Indexes go here.
-
-create table if not exists wishlist
-*/
 -- Local Variables:
 -- sql-product: sqlite
 -- End:

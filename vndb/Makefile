@@ -5,21 +5,25 @@ CXXFLAGS=-std=gnu++17 -g -Og $(DEBUGFLAGS)  -fno-rtti -fno-exceptions
 CXXFLAGS_NDEBUG=-std=gnu++17 -O2 -DNDEBUG -fno-rtti -fno-exceptions
 CFLAGS=-std=gnu11 -g -Og -lm $(DEBUGFLAGS)
 
-LDFLAGS=-lssl -lcrypto -lsqlite3 -lpcre -lz
+LDFLAGS=-lssl -lcrypto -lsqlite3 -lpcre -lz -ljpeg
 
 SOURCES=$(wildcard *.cpp) $(wildcard *.h) $(wildcard *.c) json.hpp
 
-PROGRAM_FILES=vndb_cpp tag_trait_parser
+PROGRAM_FILES=vndb_cpp vndb_cpp_old tag_trait_parser
 
 .PHONY: all clean tags
 
-all: vndb_cpp tag_trait_parser
+all: vndb_cpp
 
+# C++ files
+main.o: main.cpp vndb.h json.hpp sql.h sqlite_wrappers.h connection.h image.h
 vndb.o : vndb.cpp vndb.h json.hpp sql.h sqlite_wrappers.h connection.h
 connection.o : connection.cpp vndb.h json.hpp connection.h sqlite_wrappers.h
 sqlite_wrappers.o : sqlite_wrappers.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
-sqlite_ext.o: sqlite_ext.c
 tag_trait_parser.o: tag_trait_parser.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
+# C files
+sqlite_ext.o: sqlite_ext.c
+image.o: image.c image.h
 # the .o file doesn't actually depend on the .h file, but it
 # makes more sense to put the dependency here rather than vndb_cpp.
 progress_bar.o: progress_bar.c progress_bar.h
@@ -31,7 +35,9 @@ progress_bar.o: progress_bar.c progress_bar.h
 %.S:%.cpp
 	$(CXX) $(CXXFLAGS_NDEBUG) $(CPPFLAGS) -S $< -o- | c++filt > $@
 
-vndb_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o # sqlite_ext.o
+vndb_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o main.o image.o tag_trait_parser.o
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
+vndb_cpp_old: vndb.o connection.o sqlite_wrappers.o progress_bar.o # sqlite_ext.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
 tag_trait_parser: connection.o sqlite_wrappers.o tag_trait_parser.o

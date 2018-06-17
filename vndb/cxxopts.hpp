@@ -28,11 +28,9 @@ THE SOFTWARE.
 #include <cstring>
 #include <cctype>
 #include <exception>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <regex>
-#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -63,9 +61,8 @@ inline String toLocalString(std::string s) {
   return icu::UnicodeString::fromUTF8(std::move(s));
 }
 
-class UnicodeStringIterator
-    : public std::iterator<std::forward_iterator_tag, int32_t> {
-public:
+struct UnicodeStringIterator
+    : std::iterator<std::forward_iterator_tag, int32_t> {
   UnicodeStringIterator(const icu::UnicodeString* string, int32_t pos)
       : s(string), i(pos) {}
 
@@ -87,8 +84,6 @@ public:
   UnicodeStringIterator operator+(int32_t v) {
     return UnicodeStringIterator(s, i + v);
   }
-
-private:
   const icu::UnicodeString* s;
   int32_t i;
 };
@@ -175,14 +170,14 @@ namespace {
 #ifdef _WIN32
 const std::string LQUOTE("\'");
 const std::string RQUOTE("\'");
+#define strncasecmp _strncasecmp
 #else
 const std::string LQUOTE("‘");
 const std::string RQUOTE("’");
 #endif
 }
 
-class Value : public std::enable_shared_from_this<Value> {
-public:
+struct Value : std::enable_shared_from_this<Value> {
   virtual ~Value() = default;
 
   virtual std::shared_ptr<Value> clone() const = 0;
@@ -208,63 +203,53 @@ public:
   virtual bool is_boolean() const = 0;
 };
 
-class OptionException : public std::exception {
-public:
+struct OptionException : std::exception {
   OptionException(const std::string& message) : m_message(message) {}
 
   virtual const char* what() const noexcept { return m_message.c_str(); }
 
-private:
   std::string m_message;
 };
 
-class OptionSpecException : public OptionException {
-public:
+struct OptionSpecException : OptionException {
   OptionSpecException(const std::string& message) : OptionException(message) {}
 };
 
-class OptionParseException : public OptionException {
-public:
+struct OptionParseException : OptionException {
   OptionParseException(const std::string& message) : OptionException(message) {}
 };
 
-class option_exists_error : public OptionSpecException {
-public:
+struct option_exists_error : OptionSpecException {
   option_exists_error(const std::string& option)
       : OptionSpecException(u8"Option " + LQUOTE + option + RQUOTE +
                             u8" already exists") {}
 };
 
-class invalid_option_format_error : public OptionSpecException {
-public:
+struct invalid_option_format_error : OptionSpecException {
   invalid_option_format_error(const std::string& format)
       : OptionSpecException(u8"Invalid option format " + LQUOTE + format +
                             RQUOTE) {}
 };
 
-class option_not_exists_exception : public OptionParseException {
-public:
+struct option_not_exists_exception : OptionParseException {
   option_not_exists_exception(const std::string& option)
       : OptionParseException(u8"Option " + LQUOTE + option + RQUOTE +
                              u8" does not exist") {}
 };
 
-class missing_argument_exception : public OptionParseException {
-public:
+struct missing_argument_exception : OptionParseException {
   missing_argument_exception(const std::string& option)
       : OptionParseException(u8"Option " + LQUOTE + option + RQUOTE +
                              u8" is missing an argument") {}
 };
 
-class option_requires_argument_exception : public OptionParseException {
-public:
+struct option_requires_argument_exception : OptionParseException {
   option_requires_argument_exception(const std::string& option)
       : OptionParseException(u8"Option " + LQUOTE + option + RQUOTE +
                              u8" requires an argument") {}
 };
 
-class option_not_has_argument_exception : public OptionParseException {
-public:
+struct option_not_has_argument_exception : OptionParseException {
   option_not_has_argument_exception(const std::string& option,
                                     const std::string& arg)
       : OptionParseException(u8"Option " + LQUOTE + option + RQUOTE +
@@ -272,22 +257,19 @@ public:
                              LQUOTE + arg + RQUOTE + " given") {}
 };
 
-class option_not_present_exception : public OptionParseException {
-public:
+struct option_not_present_exception : OptionParseException {
   option_not_present_exception(const std::string& option)
       : OptionParseException(u8"Option " + LQUOTE + option + RQUOTE +
                              u8" not present") {}
 };
 
-class argument_incorrect_type : public OptionParseException {
-public:
+struct argument_incorrect_type : OptionParseException {
   argument_incorrect_type(const std::string& arg)
       : OptionParseException(u8"Argument " + LQUOTE + arg + RQUOTE +
                              u8" failed to parse") {}
 };
 
-class option_required_exception : public OptionParseException {
-public:
+struct option_required_exception : OptionParseException {
   option_required_exception(const std::string& option)
       : OptionParseException(u8"Option " + LQUOTE + option + RQUOTE +
                              u8" is required but not present") {}
@@ -341,69 +323,28 @@ T checked_negate(T&&, const std::string& text, std::false_type) {
   throw argument_incorrect_type(text);
 }
 
-template <typename T> void integer_parser(const std::string& text, T& value) {
-  std::smatch match;
-  std::regex_match(text, match, integer_pattern);
-
-  if (match.length() == 0) {
-    throw argument_incorrect_type(text);
+template <typename T> bool integer_parser(const std::string& text, T& value) {
+  errno = 0;
+  value = 0;//ensure value is set to 0 on error, for consistancy.
+  unsigned long long val = strtoull(text.c_str(), nullptr, 0);    
+  if(errno != 0){
+    return false;
   }
-
-  if (match.length(4) > 0) {
-    value = 0;
-    return;
-  }
-
-  using US = typename std::make_unsigned<T>::type;
-
-  constexpr auto umax = std::numeric_limits<US>::max();
-  constexpr bool is_signed = std::numeric_limits<T>::is_signed;
-  const bool negative = match.length(1) > 0;
-  const uint8_t base = match.length(2) > 0 ? 16 : 10;
-
-  auto value_match = match[3];
-
-  US result = 0;
-
-  for (auto iter = value_match.first; iter != value_match.second; ++iter) {
-    US digit = 0;
-
-    if (*iter >= '0' && *iter <= '9') {
-      digit = *iter - '0';
-    } else if (base == 16 && *iter >= 'a' && *iter <= 'f') {
-      digit = *iter - 'a' + 10;
-    } else if (base == 16 && *iter >= 'A' && *iter <= 'F') {
-      digit = *iter - 'A' + 10;
-    } else {
-      throw argument_incorrect_type(text);
+  //Check that the value in in range of the given type.
+  if(std::is_signed_v<T>){
+    long long sval = static_cast<long long>(val);
+    if(sval > std::numeric_limits<T>::max() ||
+       sval < std::numeric_limits<T>::min() ||
+       //unlikely but possible
+       val > std::numeric_limits<long long>::max()){
+      return false;
     }
-
-    if (umax - digit < result * base) {
-      throw argument_incorrect_type(text);
-    }
-
-    result = result * base + digit;
+  } else if (val > std::numeric_limits<T>::max()){
+    return false;
   }
-
-  detail::check_signed_range<T>(negative, result, text);
-
-  if (negative) {
-    value = checked_negate<T>(result, text,
-                              std::integral_constant<bool, is_signed>());
-  } else {
-    value = result;
-  }
+  value = static_cast<T>(val);
+  return true;
 }
-
-template <typename T>
-void stringstream_parser(const std::string& text, T& value) {
-  std::stringstream in(text);
-  in >> value;
-  if (!in) {
-    throw argument_incorrect_type(text);
-  }
-}
-
 inline void parse_value(const std::string& text, uint8_t& value) {
   integer_parser(text, value);
 }
@@ -435,34 +376,29 @@ inline void parse_value(const std::string& text, uint64_t& value) {
 inline void parse_value(const std::string& text, int64_t& value) {
   integer_parser(text, value);
 }
-
-inline void parse_value(const std::string& text, bool& value) {
-  std::smatch result;
-  std::regex_match(text, result, truthy_pattern);
-
-  if (!result.empty()) {
-    value = true;
-    return;
-  }
-
-  std::regex_match(text, result, falsy_pattern);
-  if (!result.empty()) {
+//Returns true if text was parsed successfully, it does not return
+//the value that was parsed.
+inline bool parse_value(const std::string& text, bool& value) {
+  if(text.empty()){
     value = false;
-    return;
+    return true;
   }
-
-  throw argument_incorrect_type(text);
+  if(text.size() > 5){
+    return false;
+  }
+  if(strncasecmp(text.c_str(), "true", text.size()) == 0){
+    value = true;
+    return true;
+  }
+  if(strncasecmp(text.c_str(), "false", text.size()) == 0){
+    value = false;
+    return true;
+  }
+  return false;
 }
 
 inline void parse_value(const std::string& text, std::string& value) {
   value = text;
-}
-
-// The fallback parser. It uses the stringstream parser to parse all types
-// that have not been overloaded explicitly.  It has to be placed in the
-// source code before all other more specialized templates.
-template <typename T> void parse_value(const std::string& text, T& value) {
-  stringstream_parser(text, value);
 }
 
 template <typename T>
@@ -489,10 +425,9 @@ template <typename T> struct type_is_container<std::vector<T>> {
   static constexpr bool value = true;
 };
 
-template <typename T> class abstract_value : public Value {
+template <typename T> struct abstract_value : Value {
   using Self = abstract_value<T>;
 
-public:
   abstract_value() : m_result(std::make_shared<T>()), m_store(m_result.get()) {}
 
   abstract_value(T* t) : m_store(t) {}
@@ -549,7 +484,6 @@ public:
     }
   }
 
-protected:
   std::shared_ptr<T> m_result;
   T* m_store;
 
@@ -560,8 +494,7 @@ protected:
   std::string m_implicit_value;
 };
 
-template <typename T> class standard_value : public abstract_value<T> {
-public:
+template <typename T> struct standard_value : abstract_value<T> {
   using abstract_value<T>::abstract_value;
 
   std::shared_ptr<Value> clone() const {
@@ -569,8 +502,7 @@ public:
   }
 };
 
-template <> class standard_value<bool> : public abstract_value<bool> {
-public:
+template <> struct standard_value<bool> : abstract_value<bool> {
   ~standard_value() = default;
 
   standard_value() { set_default_and_implicit(); }
@@ -581,7 +513,6 @@ public:
     return std::make_shared<standard_value<bool>>(*this);
   }
 
-private:
   void set_default_and_implicit() {
     m_default = true;
     m_default_value = "false";
@@ -599,10 +530,9 @@ template <typename T> std::shared_ptr<Value> value(T& t) {
   return std::make_shared<values::standard_value<T>>(&t);
 }
 
-class OptionAdder;
+struct OptionAdder;
 
-class OptionDetails {
-public:
+struct OptionDetails {
   OptionDetails(const std::string& short_, const std::string& long_,
                 const String& desc, std::shared_ptr<const Value> val)
       : m_short(short_), m_long(long_), m_desc(desc), m_value(val), m_count(0) {
@@ -625,7 +555,6 @@ public:
 
   const std::string& long_name() const { return m_long; }
 
-private:
   std::string m_short;
   std::string m_long;
   String m_desc;
@@ -652,8 +581,7 @@ struct HelpGroupDetails {
   std::vector<HelpOptionDetails> options;
 };
 
-class OptionValue {
-public:
+struct OptionValue {
   void parse(std::shared_ptr<const OptionDetails> details,
              const std::string& text) {
     ensure_value(details);
@@ -676,7 +604,6 @@ public:
 #endif
   }
 
-private:
   void ensure_value(std::shared_ptr<const OptionDetails> details) {
     if (m_value == nullptr) {
       m_value = details->make_storage();
@@ -687,8 +614,7 @@ private:
   size_t m_count = 0;
 };
 
-class KeyValue {
-public:
+struct KeyValue {
   KeyValue(std::string key_, std::string value_)
       : m_key(std::move(key_)), m_value(std::move(value_)) {}
 
@@ -702,13 +628,11 @@ public:
     return result;
   }
 
-private:
   std::string m_key;
   std::string m_value;
 };
 
-class ParseResult {
-public:
+struct ParseResult {
   ParseResult(
       const std::unordered_map<std::string, std::shared_ptr<OptionDetails>>&,
       std::vector<std::string>, bool allow_unrecognised, int&, char**&);
@@ -738,7 +662,6 @@ public:
 
   const std::vector<KeyValue>& arguments() const { return m_sequential; }
 
-private:
   OptionValue& get_option(std::shared_ptr<OptionDetails>);
 
   void parse(int& argc, char**& argv);
@@ -768,8 +691,7 @@ private:
   std::vector<KeyValue> m_sequential;
 };
 
-class Options {
-public:
+struct Options {
   Options(std::string program, std::string help_string = "")
       : m_program(std::move(program)),
         m_help_string(toLocalString(std::move(help_string))),
@@ -818,7 +740,6 @@ public:
 
   const HelpGroupDetails& group_help(const std::string& group) const;
 
-private:
   void add_one_option(const std::string& option,
                       std::shared_ptr<OptionDetails> details);
 
@@ -845,8 +766,7 @@ private:
   std::map<std::string, HelpGroupDetails> m_help;
 };
 
-class OptionAdder {
-public:
+struct OptionAdder {
   OptionAdder(Options& options, std::string group)
       : m_options(options), m_group(std::move(group)) {}
 
@@ -855,7 +775,6 @@ public:
              std::shared_ptr<const Value> value = ::cxxopts::value<bool>(),
              std::string arg_help = "");
 
-private:
   Options& m_options;
   std::string m_group;
 };
