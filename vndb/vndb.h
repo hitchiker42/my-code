@@ -115,6 +115,9 @@ struct vndb_main {
     //Auxiliary tables image data & vn/wishlist
     //TODO: Maybe move these to before derived tables.
     vnlist,
+    //not actually a table but part of the vnlist table, however since
+    //it's stored seperately on the server we need to have a seperate insert statement.
+    votelist,
     wishlist,
     vn_images,
     character_images,
@@ -126,7 +129,7 @@ struct vndb_main {
       "VNs"sv,"releases"sv, "producers"sv, "characters"sv, "staff"sv, 
       "tags"sv, "traits"sv,"vn_producer_relations"sv, 
       "vn_character_actor_relations"sv, "vn_staff_relations"sv, "vn_tags"sv,
-      "character_traits"sv, "vnlist"sv, "wishlist"sv,
+      "character_traits"sv, "vnlist"sv, "votelist"sv, "wishlist"sv, 
       "vn_images"sv, "character_images"sv      
     }};
   static std::unordered_map<std::string_view, table_type> table_name_map;
@@ -216,6 +219,8 @@ struct vndb_main {
   int build_derived_tables();
   bool build_vn_images();
   bool build_character_images();
+  bool update_vn_images();
+  bool update_character_images();
   bool init_table_name_map(){
     if(!table_name_map.empty()){
       return true;
@@ -283,11 +288,18 @@ struct vndb_main {
     }
   }
   //Two names for the same function.
-  bool connect(){
-    return conn.login();
+  bool connect(bool get_dbstats = false){
+    if(!conn.ensure_logged_in()){
+      return false;
+    }
+    if(get_dbstats){
+      return init_db_stats();
+    } else {
+      return true;
+    }    
   }
-  bool login(){
-    return conn.login();
+  bool login(bool get_dbstats = false){
+    return connect(get_dbstats);
   }
   bool init_db(){
     if(db_initialized){
@@ -314,6 +326,11 @@ struct vndb_main {
     return db_stats_count(table_type(to_underlying(what)));
   }
   int db_stats_count(table_type what){
+    if(db_stats.is_null()){
+      vndb_log->log_warn("Warning accessing dbstats without "
+                         "having called init_db_stats.\n");
+      return -1;
+    }
     assert(to_underlying(what) < num_base_tables);
     switch(what){
       case table_type::VNs: return db_stats["vn"].get<int>();
@@ -403,6 +420,9 @@ struct vndb_main {
                       vndb::object_type_names[to_underlying(what)].data());
       auto callback = gen_insert_callback(what, &pb);
       return conn.get_all(what, callback, max_id);
+    } else {
+      //This is a lie, but a 0 return is usually interpreted as an error.
+      return 1;
     }
   }
   //Downloads all objects that have been added to the online database since
@@ -415,6 +435,7 @@ struct vndb_main {
   bool download_all(int vn_start = 1, int release_start = 1,
                     int producer_start = 1, int character_start = 1,
                     int staff_start = 1){
+    connect(true);//make sure we're logged in & have dbstats info.
     if(vn_start != 0){
       //printf("Downloading VNs\n");
       if(download_and_insert_all(vndb::object_type::VN, vn_start) <= 0){

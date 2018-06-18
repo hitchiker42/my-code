@@ -1,7 +1,7 @@
 #include "vndb.h"
 #include "sql.h"
 #include <zlib.h>
-std::unique_ptr<util::logger> vndb_log;
+//std::unique_ptr<util::logger> vndb_log;
 static constexpr std::string_view tags_uri = "/api/tags.json.gz"sv;
 static constexpr std::string_view traits_uri = "/api/traits.json.gz"sv;
 //Code to parse the tag/trait dumps and create sql tables for them
@@ -249,6 +249,7 @@ int download_and_insert_traits(sqlite3_wrapper& db){
   DEBUG_PRINTF("Succeeded in inserting traits\n"); 
   return traits.size();
 }    
+#ifdef TAG_TRAIT_MAIN
 int main(){
   vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
   if(!init_vndb_ssl_ctx()){
@@ -281,3 +282,4 @@ int main(){
   }
   return 0;
 }
+#endif

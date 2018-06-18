@@ -496,24 +496,29 @@ struct sqlite3_wrapper {
   int toggle_read_only(bool toggle){
     return (toggle ? set_read_only() : clear_read_only());
   }
-  sqlite3_stmt_wrapper prepare_stmt(const std::string_view& sv){
-
-    return prepare_stmt(sv.data(), sv.size(), nullptr);
+  sqlite3_stmt_wrapper prepare_stmt(const std::string_view& sv, 
+                                    bool persistant = false){
+    return prepare_stmt(sv.data(), sv.size(), nullptr, persistant);
   }
   sqlite3_stmt_wrapper prepare_stmt(const char* sql, int len = -1,
-                                    const char** tail = nullptr){
-    sqlite3_stmt *stmt = prepare_stmt_ptr(sql, len, tail);
+                                    const char** tail = nullptr,
+                                    bool persistant = false){
+    sqlite3_stmt *stmt = prepare_stmt_ptr(sql, len, tail, persistant);
     return sqlite3_stmt_wrapper(stmt);
   }
-  sqlite3_stmt* prepare_stmt_ptr(const std::string_view& sv){
+  sqlite3_stmt* prepare_stmt_ptr(const std::string_view& sv,
+                                 bool persistant = false){
 
-    return prepare_stmt_ptr(sv.data(), sv.size(), nullptr);
+    return prepare_stmt_ptr(sv.data(), sv.size(), nullptr, persistant);
   }
   sqlite3_stmt* prepare_stmt_ptr(const char* sql, int len = -1,
-                                 const char** tail = nullptr){
+                                 const char** tail = nullptr,
+                                 bool persistant = false){
     sqlite3_stmt *stmt;
 //    vndb_log->log_debug("Compiling sql '%s'.\n", sql);
-    db_err = sqlite3_prepare(db, sql, len, &stmt, tail);
+    db_err = sqlite3_prepare_v3(db, sql, len, 
+                                (persistant ? SQLITE_PREPARE_PERSISTENT : 0),
+                                &stmt, tail);
     return stmt;
   }
 };

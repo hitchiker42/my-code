@@ -4,14 +4,16 @@
 extern "C" {
 #endif
 #include <stdio.h>
-#include <jpeglib.h>
+#include <stdlib.h>
 #include <setjmp.h>
 #include <stdint.h>
+#include <jpeglib.h>
+
 struct decompressed_image {
   uint8_t *img;
   uint32_t width;
   uint32_t height;
-  int num_componentns;
+  int num_components;
   J_COLOR_SPACE color_space;
 };
 int decompress_jpeg(uint8_t *src, size_t src_sz,

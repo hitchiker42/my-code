@@ -1,6 +1,16 @@
 #include "vndb.h"
 #include "sql.h"
-std::unique_ptr<util::logger> vndb_log;
+#include <chrono>
+//Even though we include this we don't need to link with pthreads since
+//we don't actually use any thread functions.
+#include <thread>
+namespace util {
+static void sleep(double seconds){
+  std::chrono::duration<double> dur(seconds);
+  std::this_thread::sleep_for(dur);
+}
+}
+//std::unique_ptr<util::logger> vndb_log;
 std::unordered_map<std::string_view, vndb_main::table_type> vndb_main::table_name_map;
 
 bool vndb_main::init_insert_stmts(){
@@ -10,29 +20,28 @@ bool vndb_main::init_insert_stmts(){
       sql_insert_vn_producer_relation, sql_insert_vn_character_actor_relation,
       sql_insert_vn_staff_relation, sql_insert_staff_alias,
       sql_insert_vn_tag, sql_insert_character_trait,
-      sql_insert_vn_image, sql_insert_character_image
-    }};
-  using table_type = vndb_main::table_type;
-  static constexpr std::array<table_type, this->num_tables_total> types = {{
-      table_type::VNs, table_type::releases, table_type::producers,
-      table_type::characters, table_type::staff,
-      table_type::tags, table_type::traits,
-      table_type::vn_producer_relations, table_type::vn_character_actor_relations,
-      table_type::vn_staff_relations,table_type::staff_aliases,
-      table_type::vn_tags, table_type::character_traits,
-      table_type::vn_images, table_type::character_images
+      sql_insert_vnlist_entry, sql_insert_votelist_entry,
+      sql_insert_wishlist_entry, sql_insert_vn_image, sql_insert_character_image
     }};
   if(this->insert_stmts_initialized){
     return true;
   }
   for(int i = 0; i < this->num_tables_total; i ++){
-    sqlite3_stmt *ptr = this->db.prepare_stmt_ptr(sql[i]);
+    //prepare statement with a hint that we'll be keeping the statement object
+    //around for a while.
+    sqlite3_stmt *ptr = this->db.prepare_stmt_ptr(sql[i], true);
     if(!ptr){
-      this->db.print_errmsg("Failed to compile statement");
-      fprintf(stderr, "%s\n", sql[i].data());
-      return false;
+      if(this->db.errcode() == SQLITE_OK){
+        fprintf(stderr, "Missing sql insert statement for table %s.\n",
+                this->table_names[i].data());
+        return false;
+      } else {
+        this->db.print_errmsg("Failed to compile statement");
+        fprintf(stderr, "%s\n", sql[i].data());
+        return false;
+      }
     }
-    this->insert_stmts[to_underlying(types[i])].stmt = ptr;
+    this->insert_stmts[i].stmt = ptr;
   }
   this->insert_stmts_initialized = true;
   return true;
@@ -55,7 +64,7 @@ bool vndb_main::init_get_id_stmts(){
     return true;
   }
   for(int i = 0; i < this->num_base_tables; i ++){
-    sqlite3_stmt *ptr = this->db.prepare_stmt_ptr(sql[i]);
+    sqlite3_stmt *ptr = this->db.prepare_stmt_ptr(sql[i], true);
     if(!ptr){
       return false;
     }
@@ -314,17 +323,37 @@ bool vndb_main::build_staff_derived_tables(){
 static bool build_image_table(sqlite3_wrapper &db,
                               sqlite3_stmt_wrapper &stmt,
                               sqlite3_stmt_wrapper &ins_stmt,
-                              const char *name){
+                              progress_bar *pb){
   http_connection conn("s.vndb.org", "443");
   db.begin_transaction();
   int res, cnt = 0;
   util::svector<char> buf;
+  pb->display();
   while((res = stmt.step()) == SQLITE_ROW){
     int id = stmt.get_column<int>(0);
     std::string_view uri = stmt.get_column<std::string_view>(1);
     int err = conn.http_get(uri, buf);
-    if(!err){
-      fprintf(stderr, "Error downloding https://s.vndb.org%s.\n", uri.data());
+    //If we can't read from the bio, wait a bit and retry.
+    if(err == -1){      
+      vndb_log->log_debug("Error reading from bio, waiting then retrying.");
+      int wait = 15;
+      while(err == -1){
+        wait *= 2;
+        vndb_log->log_debug("Waiting %d seconds.\n", wait);
+        util::sleep(wait);
+        vndb_log->log_debug("Trying to reconnect.\n", wait);
+        if(!conn.reconnect()){
+          fprintf(stderr,"Couldn't reconnect.\n");
+          return false;          
+        }
+        vndb_log->log_debug("Reconnected.\n");
+        err = conn.http_get(uri, buf);
+        vndb_log->log_debug("Retried request got %d response.\n", err);
+      }
+    }
+    if(err != 0){
+      fprintf(stderr, "Error downloding https://s.vndb.org%s.\nGot response %d.\n",
+              uri.data(), err);
       db.rollback_transaction();
       return false;
     }
@@ -332,16 +361,17 @@ static bool build_image_table(sqlite3_wrapper &db,
     ins_stmt.bind(2, (void*)buf.data(), buf.size());
     err = ins_stmt.exec();
     if(err != SQLITE_OK){
-      fprintf(stderr, "Error inserting %s image.\n", name);
+      fprintf(stderr, "Error inserting %s.\n", pb->title);
       db.rollback_transaction();
       return false;
     }
-    //Every 128 images commit the transaction, in case we get a connection
-    //error or something.
+    //Every 128 images commit the transaction & reset the connection.
     if((++cnt & 0x7f) == 0){
       db.commit_transaction();
+      conn.reconnect();
       db.begin_transaction();
     }
+    pb->update(1);
   }
   if(res != SQLITE_DONE){
     fprintf(stderr, "Failure running '%s' : %s(%d).",
@@ -379,23 +409,82 @@ int vndb_main::build_derived_tables(){
 bool vndb_main::build_vn_images(){
   sqlite3_wrapper &db = this->db;
   //substr(image,19) cuts the leading "https://s.vndb.org" from the link
-  auto stmt = db.prepare_stmt("select id, substr(image, 19) from VNs");
+  auto stmt = db.prepare_stmt(
+    "select id, substr(image, 19) from VNs where image is not null");
   if(!stmt){
     db.print_errmsg("Failed to compile sql");
   }
   auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
-  return build_image_table(db, stmt, ins_stmt, "VNs");
+
+  progress_bar pb(db_info["num_vns"].get<int>(), "VN images");
+  return build_image_table(db, stmt, ins_stmt, &pb);
 }
 bool vndb_main::build_character_images(){
   sqlite3_wrapper &db = this->db;
   //substr(image,19) cuts the leading "https://s.vndb.org" from the link
-  auto stmt = db.prepare_stmt("select id, substr(image, 19) from characters");
+  auto stmt = db.prepare_stmt(
+    "select id, substr(image, 19) from characters where image is not null");
   if(!stmt){
     db.print_errmsg("Failed to compile sql");
   }
   auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
-  return build_image_table(db, stmt, ins_stmt, "characters");
+  progress_bar pb(db_info["num_characters"].get<int>(), "VN images");
+  return build_image_table(db, stmt, ins_stmt, &pb);
 }
+static int get_image_count(sqlite3_wrapper &db, const char *what){
+  char buf[256];
+  snprintf(buf, 256, "select count(*) from %s_images where image is not null;", what);
+  auto stmt = db.prepare_stmt(buf);
+  if(!stmt){
+    db.print_errmsg("Failed to compile sql");
+    return -1;
+  }
+  if(stmt.step() != SQLITE_ROW){
+    db.print_errmsg("Error executing sql"); 
+    return -1;
+  }
+  int count = stmt.get_column<int>(1);
+  if(stmt.step() != SQLITE_DONE){
+    vndb_log->log_warn("Too many rows returned when querying image count.\n");
+  }
+  return count;
+}  
+bool vndb_main::update_vn_images(){
+  sqlite3_wrapper &db = this->db;
+  int img_count = get_image_count(db, "vn");
+  if(img_count < 0){ return false; }
+  //substr(image,19) cuts the leading "https://s.vndb.org" from the link
+  auto stmt = db.prepare_stmt(
+    R"(select id, substr(image, 19) from VNs
+         where image is not null and
+               not exists (select vn from vn_images 
+                            where vn = VNs.id and image is not null);)");
+  if(!stmt){
+    db.print_errmsg("Failed to compile sql");
+  }
+  auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
+
+  progress_bar pb(db_info["num_vns"].get<int>() - img_count, "VN images");
+  return build_image_table(db, stmt, ins_stmt, &pb);
+}
+bool vndb_main::update_character_images(){
+  sqlite3_wrapper &db = this->db;
+  int img_count = get_image_count(db, "character");
+  if(img_count < 0){ return false; }  
+  //substr(image,19) cuts the leading "https://s.vndb.org" from the link
+  auto stmt = db.prepare_stmt(
+    R"(select id, substr(image, 19) from characters
+         where image is not null and
+               not exists (select character from character_images 
+                            where character = characters.id and image is not null);)");
+  if(!stmt){
+    db.print_errmsg("Failed to compile sql");
+  }
+  auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
+  progress_bar pb(db_info["num_characters"].get<int>() - img_count, "character images");
+  return build_image_table(db, stmt, ins_stmt, &pb);
+}
+#ifdef VNDB_CPP_MAIN
 int main(int argc, char* argv[]){
   //Keep the old log file, I may extend this to keep the last N log files.
   rename(default_log_file, default_log_file_bkup);
@@ -455,6 +544,7 @@ int main(int argc, char* argv[]){
   return run_insertion_test();
 */
 }
+#endif
 #if 0
 int main(int argc, char* argv[]){
 

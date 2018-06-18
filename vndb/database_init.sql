@@ -258,7 +258,7 @@ vote_added integer, --unix timestamp
 path text, -- where this vn is located
 -- If the VN doesn't work for some reason (text hooking, needs a crack, 
 -- locale issues, etc) this will be non null and explain the reason.
-not_playable text,
+not_playable text
 );
 -- Indexes go here.
 
@@ -268,7 +268,7 @@ priority integer check (priority between 0 and 3),
 added integer, --unix timestamp
 -- exclusive to local database
 notes text
-)
+);
 
 -- Tables to hold images for characters and vns, these store
 -- the raw jpeg image as a blob.

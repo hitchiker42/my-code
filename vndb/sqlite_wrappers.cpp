@@ -113,7 +113,7 @@ int sqlite_insert_producer(const json& producer,
   return ret;
 }
 int sqlite_insert_character(const json& chara,
-                           sqlite3_stmt_wrapper& stmt){
+                            sqlite3_stmt_wrapper& stmt){
   int idx = 1;
   stmt.bind(idx++, chara["id"].get<int>());
   stmt.bind(idx++, chara["name"].get<std::string_view>());

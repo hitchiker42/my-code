@@ -14,7 +14,7 @@ static void my_output_message(j_common_ptr cinfo){
     return;
   }
   char buf[JMSG_LENGTH_MAX];
-  err->format_message(cinfo, buf);
+  err->err_mgr.format_message(cinfo, buf);
   fputs(buf, err->outfile);
 }
 //Just in case the version of libjpeg used doesn't provide jpeg_mem_src
@@ -92,21 +92,23 @@ int decompress_jpeg(uint8_t *src, size_t src_sz,
 
   if(setjmp(jerr.dest) != 0){
     int ret = jerr.err_mgr.msg_code;
-    jpeg_destroy_decompress(cinfo);
+    jpeg_destroy_decompress(&cinfo);
     free(dst->img);//may be null but that's fine
     dst->img = NULL;
     return ret;
   }
 
   jpeg_create_decompress(&cinfo);
-  jpeg_read_header(&cinfo);
+  jpeg_mem_src(&cinfo, src, src_sz);
+  jpeg_read_header(&cinfo, TRUE);
   //Code taken from SDL_IMG
   if(cinfo.num_components == 4) {
     /* Set 32-bit Raw output */
     cinfo.out_color_space = JCS_CMYK;
     cinfo.quantize_colors = FALSE; //FALSE is defined by jpeglib.h
     jpeg_calc_output_dimensions(&cinfo);
-    out->img = malloc(cinfo.output_width * cinfo.output_height * 4);
+    dst->img = malloc(cinfo.output_width * cinfo.output_height * 4);
+
   } else if(cinfo.num_components > 1){
     /* Set 24-bit RGB output */
     cinfo.out_color_space = JCS_RGB;
@@ -118,24 +120,24 @@ int decompress_jpeg(uint8_t *src, size_t src_sz,
     cinfo.do_fancy_upsampling = FALSE;
 #endif
     jpeg_calc_output_dimensions(&cinfo);
-    out->img = malloc(cinfo.output_width * cinfo.output_height * 3);
+    dst->img = malloc(cinfo.output_width * cinfo.output_height * 3);
   } else {
     cinfo.out_color_space = JCS_GRAYSCALE;
-    cinfo.quantize_colors = false;
+    cinfo.quantize_colors = FALSE;
     jpeg_calc_output_dimensions(&cinfo);
-    out->img = malloc(cinfo.output_width * cinfo.output_height);
+    dst->img = malloc(cinfo.output_width * cinfo.output_height);
   }
-  out->width = cinfo.output_width;
-  out->height = cinfo.output_height;
-  out->num_components = cinfo.num_components;
-  out->color_space = cinfo.out_color_space;
+  dst->width = cinfo.output_width;
+  dst->height = cinfo.output_height;
+  dst->num_components = cinfo.num_components;
+  dst->color_space = cinfo.out_color_space;
 
   jpeg_start_decompress(&cinfo);
 
   JSAMPROW rowptr[1];
   while(cinfo.output_scanline < cinfo.output_height){
-    rowptr[0] = (JSAMPROW)out->img +
-      (cinfo.output_scanline * cinfo.output_width * out->num_components);
+    rowptr[0] = (JSAMPROW)dst->img +
+      (cinfo.output_scanline * cinfo.output_width * dst->num_components);
     jpeg_read_scanlines(&cinfo, rowptr, 1);
   }
   jpeg_finish_decompress(&cinfo);

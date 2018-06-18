@@ -60,6 +60,23 @@ struct http_connection {
         init();
       }
     }
+  bool full_reset(){
+    std::string hostname(std::move(this->hostname));
+    std::string port(std::move(this->port));
+    this->~http_connection();
+    new (this) http_connection(hostname, port, false);
+    return bio.connect();
+  }
+  void reset(){
+    bio.reset();
+  }
+  bool connect(){
+    return bio.connect();
+  }
+  bool reconnect(){
+    bio.reset();
+    return bio.connect();
+  }
   void init(){
     if(bio){
       err = !bio.connect();
@@ -71,6 +88,7 @@ struct http_connection {
   //return 0 for a 200 response, a negitive number if there was an error in
   //the underlying connection and return the http response code otherwise.
   int http_get(std::string_view uri, util::svector<char>& buf);
+  
   //indicates if there was an error in the constructor.
   operator bool(){
     return err == 0;
@@ -196,27 +214,31 @@ struct vndb_connection {
   int get(vndb::object_type what, int start, int stop,
           get_callback& callback);
   int get_all(vndb::object_type what, get_callback& callback, int start = 1);
-  //Get a number of vns from the server starting at a given id
-  //and ending at either a given id, or id+25 (which is the max
-  //number of vns we can get per response.
-  int get_vns(int start, int stop, std::vector<json>& vec){
-   return get(vndb::object_type::VN, start, stop, vec);
-  }
-  int get_vns(int start, std::vector<json>& vec){
-    return get_vns(start, start + 25, vec);
-  }
-  //You need to check this->error after calling this, since on error
-  //the error response is stored in the vector.
-  std::vector<json> get_vns(int start, int count = 25){
-    std::vector<json> ret;
-    (void)get_vns(start, start + count, ret);
-    return ret;
-  }
+  // //Get a number of vns from the server starting at a given id
+  // //and ending at either a given id, or id+25 (which is the max
+  // //number of vns we can get per response.
+  // int get_vns(int start, int stop, std::vector<json>& vec){
+  //  return get(vndb::object_type::VN, start, stop, vec);
+  // }
+  // int get_vns(int start, std::vector<json>& vec){
+  //   return get_vns(start, start + 25, vec);
+  // }
+  // //You need to check this->error after calling this, since on error
+  // //the error response is stored in the vector.
+  // std::vector<json> get_vns(int start, int count = 25){
+  //   std::vector<json> ret;
+  //   (void)get_vns(start, start + count, ret);
+  //   return ret;
+  // }
   json dbstats();
   //TODO: change these so they get 100 results at a time, since
   //thats allowed.
   json get_vnlist(std::vector<json>& vec){
     buf.append("get vnlist (uid = 0)");
+    return send_get_command(vec);
+  }
+  json get_votelist(std::vector<json>& vec){
+    buf.append("get votelist (uid = 0)");
     return send_get_command(vec);
   }
   json get_wishlist(std::vector<json>& vec){
@@ -232,9 +254,7 @@ struct vndb_connection {
   bool set_wishlist(int vn_id, int priority);
   bool remove_from_wishlist(int vn_id);
   //status 0=Unknown, 1=playing, 2=finished, 3=stalled, 4=dropped.
-  bool set_vnlist(int vn_id, int status = 0);
-  //I've never set a note on my vnlist, so I doubt I'll use this
-  bool set_vnlist(int vn_id, std::string_view note, int status = 0);
+  bool set_vnlist(int vn_id, int status = 0,  std::string_view notes = ""sv);
   bool remove_from_vnlist(int vn_id);
 };
 

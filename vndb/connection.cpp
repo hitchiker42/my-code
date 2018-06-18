@@ -4,7 +4,7 @@
 //we don't actually use any thread functions.
 #include <thread>
 namespace util {
-void sleep(double seconds){
+static void sleep(double seconds){
   std::chrono::duration<double> dur(seconds);
   std::this_thread::sleep_for(dur);
 }
@@ -24,13 +24,16 @@ bool has_prefix(util::string_view sv, util::string_view prefix){
 
 template<typename ... Ts>
 void print_ssl_errors(FILE* out, const char *fmt, Ts&&... Args){
-  fprintf(out, fmt, std::forward<Ts>(Args)...);
+  vndb_log->log_warn("Latest SSL error = %d.\n", ERR_peek_last_error());
   ERR_print_errors_fp(out);
+  fprintf(out, fmt, std::forward<Ts>(Args)...);
 }
 template<typename ... Ts>
 void print_ssl_errors(const char *fmt, Ts&&... Args){
-  fprintf(stderr, fmt, std::forward<Ts>(Args)...);
+  vndb_log->log_warn("Latest SSL error = %d.\n", ERR_peek_last_error());
   ERR_print_errors_fp(stderr);
+  fprintf(stderr, fmt, std::forward<Ts>(Args)...);
+
 }
 //bool SSL_CTX_wrapper::init(){
 static SSL_CTX* init_ssl_ctx(){
@@ -218,6 +221,9 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
                         "HEAD %s HTTP/1.1\r\nHost: %s\r\n\r\n",
                         uri.data(), hostname.data());
   DEBUG_PRINTF("Sending http HEAD request:\n%.*s\n", nbytes, buf.data());
+
+  //This might not be super efficent but it should prevent the connection
+  //from being dropped.
   if(bio.write(std::string_view(buf.data(), nbytes)) < 0){
     return -1;
   }
@@ -294,7 +300,7 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
   int nbytes = snprintf(tmp_buf, tmp_buf_sz,
                         "GET %s HTTP/1.1\r\nHost: %s\r\n\r\n",
                         uri.data(), hostname.data());
-//  DEBUG_PRINTF("Sending http GET request:\n%s\n", tmp_buf);
+  vndb_log->log_debug("Sending http GET request:\n%s\n", tmp_buf);
   if(bio.write(std::string_view(tmp_buf, nbytes)) < 0){
     return -1;
   }
@@ -302,7 +308,7 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
   //This should be enough to read the whole header, without reading
   //too much actual content.
   nbytes = bio.read(tmp_buf, 512);
-  if(nbytes <= 0){ return (nbytes ? -1 : nbytes); }
+  if(nbytes <= 0){ return (nbytes ? nbytes : -1); }
   tmp_buf_len = nbytes;
   tmp_buf[tmp_buf_len] = '\0';
   //Check for a 200 OK response, return response code if we get something else.
@@ -329,7 +335,7 @@ int http_connection::http_get(std::string_view uri, util::svector<char>& buf){
   //Figure out content length and copy any content we already read from
   //tmp_buf into buf.
   int header_length = (header_end - tmp_buf) + header_delim.size();
-//  DEBUG_PRINTF("Response header:\n%.*s\n", header_length, tmp_buf);
+  vndb_log->log_debug("Response header:\n%.*s\n", header_length, tmp_buf);
   char *length_offset = strstr(tmp_buf, length_field.data());
   if(!length_offset){
     fprintf(stderr, "Error could not find Content-Length in header.\n");
@@ -725,10 +731,12 @@ bool vndb_connection::remove_from_wishlist(int vn_id){
   }
 }
 //status 0=Unknown, 1=playing, 2=finished, 3=stalled, 4=dropped.
-bool vndb_connection::set_vnlist(int vn_id, int status){
+bool vndb_connection::set_vnlist(int vn_id, int status,
+                                 std::string_view notes){
   assert(status >= 0 && status <= 4);
   this->buf.clear();
-  this->buf.append_formatted("set vnlist %d {\"status\": %d}", vn_id, status);
+  this->buf.append_formatted("set vnlist %d {\"status\": %d, \"notes\" : \"%s\"}",
+                             vn_id, status, notes.data());
   if(this->send_set_command()){
     return true;
   } else if(wait_if_throttled(this)){
@@ -737,11 +745,6 @@ bool vndb_connection::set_vnlist(int vn_id, int status){
   } else {
     return false;
   }
-}
-//I've never set a note on my vnlist, so I doubt I'll use this, currenly
-//I just ignore the note paramater.
-bool vndb_connection::set_vnlist(int vn_id, std::string_view note, int status){
-  return this->set_vnlist(vn_id, status);
 }
 bool vndb_connection::remove_from_vnlist(int vn_id){
   this->buf.clear();
