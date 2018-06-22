@@ -26,12 +26,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE  OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-#ifndef NLOHMANN_JSON_HPP
-#define NLOHMANN_JSON_HPP
+#ifndef JSON_NS_JSON_HPP
+#define JSON_NS_JSON_HPP
 
-#define NLOHMANN_JSON_VERSION_MAJOR 3
-#define NLOHMANN_JSON_VERSION_MINOR 1
-#define NLOHMANN_JSON_VERSION_PATCH 2
+#define JSON_NS_JSON_VERSION_MAJOR 3
+#define JSON_NS_JSON_VERSION_MINOR 1
+#define JSON_NS_JSON_VERSION_PATCH 2
 
 #include <algorithm>
 #include <array>
@@ -61,18 +61,18 @@ SOFTWARE.
 #include <valarray>
 #include <vector>
 
-//<nlohmann/json_fwd.hpp>
-#ifndef NLOHMANN_JSON_FWD_HPP
-#define NLOHMANN_JSON_FWD_HPP
+//<json_ns/json_fwd.hpp>
+#ifndef JSON_NS_JSON_FWD_HPP
+#define JSON_NS_JSON_FWD_HPP
 
 
 
 /*!
 @brief namespace for Niels Lohmann
-@see https://github.com/nlohmann
+@see https://github.com/json_ns
 @since version 1.0.0
 */
-namespace nlohmann
+namespace json_ns
 {
 /*!
 @brief default JSONSerializer template argument
@@ -84,17 +84,7 @@ for serialization.
 template<typename = void, typename = void>
 struct adl_serializer;
 
-template<template<typename U, typename V, typename... Args> class ObjectType =
-         std::map,
-         template<typename U, typename... Args> class ArrayType = std::vector,
-         class StringType = std::string, class BooleanType = bool,
-         class NumberIntegerType = std::int64_t,
-         class NumberUnsignedType = std::uint64_t,
-         class NumberFloatType = double,
-         template<typename U> class AllocatorType = std::allocator,
-         template<typename T, typename SFINAE = void> class JSONSerializer =
-         adl_serializer>
-class basic_json;
+struct basic_json;
 
 /*!
 @brief JSON Pointer
@@ -118,12 +108,11 @@ uses the standard template types.
 
 @since version 1.0.0
 */
-using json = basic_json<>;
 }
 
 #endif
 
-//<nlohmann/detail/macro_scope.hpp>
+//<json_ns/detail/macro_scope.hpp>
 
 
 // This file contains all internal macro definitions
@@ -132,11 +121,11 @@ using json = basic_json<>;
 // exclude unsupported compilers
 #if defined(__clang__)
     #if (__clang_major__ * 10000 + __clang_minor__ * 100 + __clang_patchlevel__) < 30400
-        #error "unsupported Clang version - see https://github.com/nlohmann/json#supported-compilers"
+        #error "unsupported Clang version - see https://github.com/json_ns/json#supported-compilers"
     #endif
 #elif defined(__GNUC__) && !(defined(__ICC) || defined(__INTEL_COMPILER))
     #if (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__) < 40900
-        #error "unsupported GCC version - see https://github.com/nlohmann/json#supported-compilers"
+        #error "unsupported GCC version - see https://github.com/json_ns/json#supported-compilers"
     #endif
 #endif
 
@@ -203,22 +192,6 @@ using json = basic_json<>;
     #define JSON_HAS_CPP_14
 #endif
 
-// Ugly macros to avoid uglier copy-paste when specializing basic_json. They
-// may be removed in the future once the class is split.
-
-#define NLOHMANN_BASIC_JSON_TPL_DECLARATION                                \
-    template<template<typename, typename, typename...> class ObjectType,   \
-             template<typename, typename...> class ArrayType,              \
-             class StringType, class BooleanType, class NumberIntegerType, \
-             class NumberUnsignedType, class NumberFloatType,              \
-             template<typename> class AllocatorType,                       \
-             template<typename, typename = void> class JSONSerializer>
-
-#define NLOHMANN_BASIC_JSON_TPL                                            \
-    basic_json<ObjectType, ArrayType, StringType, BooleanType,             \
-    NumberIntegerType, NumberUnsignedType, NumberFloatType,                \
-    AllocatorType, JSONSerializer>
-
 /*!
 @brief Helper to determine whether there's a key_type for T.
 
@@ -229,7 +202,7 @@ contains a `mapped_type`, whereas `std::vector` fails the test.
 @sa http://stackoverflow.com/a/7728728/266378
 @since version 1.0.0, overworked in version 2.0.6
 */
-#define NLOHMANN_JSON_HAS_HELPER(type)                                        \
+#define JSON_NS_JSON_HAS_HELPER(type)                                        \
     template<typename T> struct has_##type {                                  \
     private:                                                                  \
         template<typename U, typename = typename U::type>                     \
@@ -240,10 +213,10 @@ contains a `mapped_type`, whereas `std::vector` fails the test.
                 std::is_integral<decltype(detect(std::declval<T>()))>::value; \
     }
 
-// <nlohmann/detail/meta.hpp>
+// <json_ns/detail/meta.hpp>
 
 
-namespace nlohmann
+namespace json_ns
 {
 /*!
 @brief detail namespace with internal helper functions
@@ -259,29 +232,8 @@ namespace detail
 // helpers //
 /////////////
 
-template<typename> struct is_basic_json : std::false_type {};
-
-NLOHMANN_BASIC_JSON_TPL_DECLARATION
-struct is_basic_json<NLOHMANN_BASIC_JSON_TPL> : std::true_type {};
-
-// alias templates to reduce boilerplate
-template<bool B, typename T = void>
-using enable_if_t = typename std::enable_if<B, T>::type;
-
 template<typename T>
 using uncvref_t = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
-// implementation of C++14 index_sequence and affiliates
-// source: https://stackoverflow.com/a/32223343
-template<std::size_t... Ints>
-struct index_sequence
-{
-    using type = index_sequence;
-    using value_type = std::size_t;
-    static constexpr std::size_t size() noexcept
-    {
-        return sizeof...(Ints);
-    }
-};
 
 template<class Sequence1, class Sequence2>
 struct merge_and_renumber;
@@ -337,10 +289,10 @@ struct is_complete_type : std::false_type {};
 template <typename T>
 struct is_complete_type<T, decltype(void(sizeof(T)))> : std::true_type {};
 
-NLOHMANN_JSON_HAS_HELPER(mapped_type);
-NLOHMANN_JSON_HAS_HELPER(key_type);
-NLOHMANN_JSON_HAS_HELPER(value_type);
-NLOHMANN_JSON_HAS_HELPER(iterator);
+JSON_NS_JSON_HAS_HELPER(mapped_type);
+JSON_NS_JSON_HAS_HELPER(key_type);
+JSON_NS_JSON_HAS_HELPER(value_type);
+JSON_NS_JSON_HAS_HELPER(iterator);
 
 template<bool B, class RealType, class CompatibleObjectType>
 struct is_compatible_object_type_impl : std::false_type {};
@@ -489,12 +441,12 @@ constexpr T static_const<T>::value;
 }
 }
 
-// <nlohmann/detail/exceptions.hpp>
+// <json_ns/detail/exceptions.hpp>
 
 
 
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -819,9 +771,9 @@ class other_error : public exception
 }
 }
 
-// <nlohmann/detail/value_t.hpp>
+// <json_ns/detail/value_t.hpp>
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -891,11 +843,11 @@ inline bool operator<(const value_t lhs, const value_t rhs) noexcept
 }
 }
 
-// <nlohmann/detail/conversions/from_json.hpp>
+// <json_ns/detail/conversions/from_json.hpp>
 
 
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -1210,11 +1162,11 @@ constexpr const auto& from_json = detail::static_const<detail::from_json_fn>::va
 }
 }
 
-// <nlohmann/detail/conversions/to_json.hpp>
+// <json_ns/detail/conversions/to_json.hpp>
 
 
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -1547,12 +1499,12 @@ constexpr const auto& to_json = detail::static_const<detail::to_json_fn>::value;
 }
 }
 
-// <nlohmann/detail/input/input_adapters.hpp>
+// <json_ns/detail/input/input_adapters.hpp>
 
 
 
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -1826,11 +1778,11 @@ class input_adapter
 }
 }
 
-// <nlohmann/detail/input/lexer.hpp>
+// <json_ns/detail/input/lexer.hpp>
 
 
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -3093,7 +3045,7 @@ scan_number_done:
 }
 }
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -3721,9 +3673,9 @@ class parser
 }
 }
 
-// <nlohmann/detail/iterators/primitive_iterator.hpp>
+// <json_ns/detail/iterators/primitive_iterator.hpp>
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -3839,9 +3791,9 @@ class primitive_iterator_t
 }
 }
 
-// <nlohmann/detail/iterators/internal_iterator.hpp>
+// <json_ns/detail/iterators/internal_iterator.hpp>
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -3849,7 +3801,7 @@ namespace detail
 @brief an iterator value
 
 @note This structure could easily be a union, but MSVC currently does not allow
-unions members with complex constructors, see https://github.com/nlohmann/json/pull/105.
+unions members with complex constructors, see https://github.com/json_ns/json/pull/105.
 */
 template<typename BasicJsonType> struct internal_iterator
 {
@@ -3863,9 +3815,9 @@ template<typename BasicJsonType> struct internal_iterator
 }
 }
 
-//  <nlohmann/detail/iterators/iter_impl.hpp>
+//  <json_ns/detail/iterators/iter_impl.hpp>
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -3890,7 +3842,7 @@ This class implements a both iterators (iterator and const_iterator) for the
   incremented and decremented).
 
 @since version 1.0.0, simplified in version 2.0.9, change to bidirectional
-       iterators in version 3.0.0 (see https://github.com/nlohmann/json/issues/593)
+       iterators in version 3.0.0 (see https://github.com/json_ns/json/issues/593)
 */
 template<typename BasicJsonType>
 class iter_impl
@@ -4467,9 +4419,9 @@ class iter_impl
 }
 }
 
-// <nlohmann/detail/iterators/iteration_proxy.hpp>
+// <json_ns/detail/iterators/iteration_proxy.hpp>
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -4561,8 +4513,8 @@ template<typename IteratorType> class iteration_proxy
 }
 }
 
-// <nlohmann/detail/iterators/json_reverse_iterator.hpp>
-namespace nlohmann
+// <json_ns/detail/iterators/json_reverse_iterator.hpp>
+namespace json_ns
 {
 namespace detail
 {
@@ -4676,8 +4628,8 @@ class json_reverse_iterator : public std::reverse_iterator<Base>
 }
 }
 
-// <nlohmann/detail/output/output_adapters.hpp>
-namespace nlohmann
+// <json_ns/detail/output/output_adapters.hpp>
+namespace json_ns
 {
 namespace detail
 {
@@ -4827,10 +4779,10 @@ class output_adapter
 }
 }
 
-// <nlohmann/detail/input/binary_reader.hpp>
+// <json_ns/detail/input/binary_reader.hpp>
 
 #if USE_BINARY_FORMATS
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -6183,10 +6135,10 @@ class binary_reader
 }
 }
 #endif //USE_BINARY_FORMATS
-// <nlohmann/detail/output/binary_writer.hpp>
+// <json_ns/detail/output/binary_writer.hpp>
 
 #if USE_BINARY_FORMATS
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -7125,9 +7077,9 @@ class binary_writer
 }
 }
 #endif //USE_BINARY_FORMATS
-// <nlohmann/detail/output/serializer.hpp>
+// <json_ns/detail/output/serializer.hpp>
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -8213,9 +8165,9 @@ char* to_chars(char* first, char* last, FloatType value)
 }
 
 } // namespace detail
-} // namespace nlohmann
+} // namespace json_ns
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -8863,7 +8815,7 @@ class serializer
     void dump_float(number_float_t x, std::true_type /*is_ieee_single_or_double*/)
     {
         char* begin = number_buffer.data();
-        char* end = ::nlohmann::detail::to_chars(begin, begin + number_buffer.size(), x);
+        char* end = ::json_ns::detail::to_chars(begin, begin + number_buffer.size(), x);
 
         o->write_characters(begin, static_cast<size_t>(end - begin));
     }
@@ -8995,9 +8947,9 @@ class serializer
 }
 }
 
-// <nlohmann/detail/json_ref.hpp>
+// <json_ns/detail/json_ref.hpp>
 
-namespace nlohmann
+namespace json_ns
 {
 namespace detail
 {
@@ -9056,15 +9008,15 @@ class json_ref
 }
 }
 
-// <nlohmann/detail/json_pointer.hpp>
+// <json_ns/detail/json_pointer.hpp>
 
-namespace nlohmann
+namespace json_ns
 {
 template<typename BasicJsonType>
 class json_pointer
 {
     // allow basic_json to access private members
-    NLOHMANN_BASIC_JSON_TPL_DECLARATION
+    JSON_NS_BASIC_JSON_TPL_DECLARATION
     friend class basic_json;
 
   public:
@@ -9744,9 +9696,9 @@ class json_pointer
 };
 }
 
-// <nlohmann/adl_serializer.hpp>
+// <json_ns/adl_serializer.hpp>
 
-namespace nlohmann
+namespace json_ns
 {
 template<typename, typename>
 struct adl_serializer
@@ -9762,9 +9714,9 @@ struct adl_serializer
     */
     template<typename BasicJsonType, typename ValueType>
     static void from_json(BasicJsonType&& j, ValueType& val) noexcept(
-        noexcept(::nlohmann::from_json(std::forward<BasicJsonType>(j), val)))
+        noexcept(::json_ns::from_json(std::forward<BasicJsonType>(j), val)))
     {
-        ::nlohmann::from_json(std::forward<BasicJsonType>(j), val);
+        ::json_ns::from_json(std::forward<BasicJsonType>(j), val);
     }
 
     /*!
@@ -9778,9 +9730,9 @@ struct adl_serializer
     */
     template<typename BasicJsonType, typename ValueType>
     static void to_json(BasicJsonType& j, ValueType&& val) noexcept(
-        noexcept(::nlohmann::to_json(j, std::forward<ValueType>(val))))
+        noexcept(::json_ns::to_json(j, std::forward<ValueType>(val))))
     {
-        ::nlohmann::to_json(j, std::forward<ValueType>(val));
+        ::json_ns::to_json(j, std::forward<ValueType>(val));
     }
 };
 }
@@ -9788,10 +9740,10 @@ struct adl_serializer
 
 /*!
 @brief namespace for Niels Lohmann
-@see https://github.com/nlohmann
+@see https://github.com/json_ns
 @since version 1.0.0
 */
-namespace nlohmann
+namespace json_ns
 {
 
 /*!
@@ -9875,52 +9827,52 @@ Format](http://rfc7159.net/rfc7159)
 
 @nosubgrouping
 */
-NLOHMANN_BASIC_JSON_TPL_DECLARATION
+JSON_NS_BASIC_JSON_TPL_DECLARATION
 class basic_json
 {
   private:
     template<detail::value_t> friend struct detail::external_constructor;
-    friend ::nlohmann::json_pointer<basic_json>;
-    friend ::nlohmann::detail::parser<basic_json>;
-    friend ::nlohmann::detail::serializer<basic_json>;
+    friend ::json_ns::json_pointer<basic_json>;
+    friend ::json_ns::detail::parser<basic_json>;
+    friend ::json_ns::detail::serializer<basic_json>;
     template<typename BasicJsonType>
-    friend class ::nlohmann::detail::iter_impl;
+    friend class ::json_ns::detail::iter_impl;
 #if USE_BINARY_FORMATS
     template<typename BasicJsonType, typename CharType>
-    friend class ::nlohmann::detail::binary_writer;
+    friend class ::json_ns::detail::binary_writer;
     template<typename BasicJsonType>
-    friend class ::nlohmann::detail::binary_reader;
+    friend class ::json_ns::detail::binary_reader;
 #endif
 
     /// workaround type for MSVC
-    using basic_json_t = NLOHMANN_BASIC_JSON_TPL;
+    using basic_json_t = JSON_NS_BASIC_JSON_TPL;
 
     // convenience aliases for types residing in namespace detail;
-    using lexer = ::nlohmann::detail::lexer<basic_json>;
-    using parser = ::nlohmann::detail::parser<basic_json>;
+    using lexer = ::json_ns::detail::lexer<basic_json>;
+    using parser = ::json_ns::detail::parser<basic_json>;
 
-    using primitive_iterator_t = ::nlohmann::detail::primitive_iterator_t;
+    using primitive_iterator_t = ::json_ns::detail::primitive_iterator_t;
     template<typename BasicJsonType>
-    using internal_iterator = ::nlohmann::detail::internal_iterator<BasicJsonType>;
+    using internal_iterator = ::json_ns::detail::internal_iterator<BasicJsonType>;
     template<typename BasicJsonType>
-    using iter_impl = ::nlohmann::detail::iter_impl<BasicJsonType>;
+    using iter_impl = ::json_ns::detail::iter_impl<BasicJsonType>;
     template<typename Iterator>
-    using iteration_proxy = ::nlohmann::detail::iteration_proxy<Iterator>;
-    template<typename Base> using json_reverse_iterator = ::nlohmann::detail::json_reverse_iterator<Base>;
+    using iteration_proxy = ::json_ns::detail::iteration_proxy<Iterator>;
+    template<typename Base> using json_reverse_iterator = ::json_ns::detail::json_reverse_iterator<Base>;
 
     template<typename CharType>
-    using output_adapter_t = ::nlohmann::detail::output_adapter_t<CharType>;
+    using output_adapter_t = ::json_ns::detail::output_adapter_t<CharType>;
 #if USE_BINARY_FORMATS
-    using binary_reader = ::nlohmann::detail::binary_reader<basic_json>;
-    template<typename CharType> using binary_writer = ::nlohmann::detail::binary_writer<basic_json, CharType>;
+    using binary_reader = ::json_ns::detail::binary_reader<basic_json>;
+    template<typename CharType> using binary_writer = ::json_ns::detail::binary_writer<basic_json, CharType>;
 #endif
 
-    using serializer = ::nlohmann::detail::serializer<basic_json>;
+    using serializer = ::json_ns::detail::serializer<basic_json>;
 
   public:
     using value_t = detail::value_t;
-    /// @copydoc nlohmann::json_pointer
-    using json_pointer = ::nlohmann::json_pointer<basic_json>;
+    /// @copydoc json_ns::json_pointer
+    using json_pointer = ::json_ns::json_pointer<basic_json>;
     template<typename T, typename SFINAE>
     using json_serializer = JSONSerializer<T, SFINAE>;
     /// helper type for initializer lists of basic_json values
@@ -10032,14 +9984,14 @@ class basic_json
 
         result["copyright"] = "(C) 2013-2017 Niels Lohmann";
         result["name"] = "JSON for Modern C++";
-        result["url"] = "https://github.com/nlohmann/json";
+        result["url"] = "https://github.com/json_ns/json";
         result["version"]["string"] =
-            std::to_string(NLOHMANN_JSON_VERSION_MAJOR) + "." +
-            std::to_string(NLOHMANN_JSON_VERSION_MINOR) + "." +
-            std::to_string(NLOHMANN_JSON_VERSION_PATCH);
-        result["version"]["major"] = NLOHMANN_JSON_VERSION_MAJOR;
-        result["version"]["minor"] = NLOHMANN_JSON_VERSION_MINOR;
-        result["version"]["patch"] = NLOHMANN_JSON_VERSION_PATCH;
+            std::to_string(JSON_NS_JSON_VERSION_MAJOR) + "." +
+            std::to_string(JSON_NS_JSON_VERSION_MINOR) + "." +
+            std::to_string(JSON_NS_JSON_VERSION_PATCH);
+        result["version"]["major"] = JSON_NS_JSON_VERSION_MAJOR;
+        result["version"]["minor"] = JSON_NS_JSON_VERSION_MINOR;
+        result["version"]["patch"] = JSON_NS_JSON_VERSION_PATCH;
 
 #ifdef _WIN32
         result["platform"] = "win32";
@@ -14569,7 +14521,7 @@ class basic_json
     @note This function is required to resolve an ambiguous overload error,
           because pairs like `{"key", "value"}` can be both interpreted as
           `object_t::value_type` or `std::initializer_list<basic_json>`, see
-          https://github.com/nlohmann/json/issues/235 for more information.
+          https://github.com/json_ns/json/issues/235 for more information.
 
     @liveexample{The example shows how initializer lists are treated as
     objects when possible.,push_back__initializer_list}
@@ -17329,7 +17281,7 @@ class basic_json
 
     /// @}
 };
-} // namespace nlohmann
+} // namespace json_ns
 
 ///////////////////////
 // nonmember support //
@@ -17344,10 +17296,10 @@ namespace std
 @since version 1.0.0
 */
 template<>
-inline void swap(nlohmann::json& j1,
-                 nlohmann::json& j2) noexcept(
-                     is_nothrow_move_constructible<nlohmann::json>::value and
-                     is_nothrow_move_assignable<nlohmann::json>::value
+inline void swap(json_ns::json& j1,
+                 json_ns::json& j2) noexcept(
+                     is_nothrow_move_constructible<json_ns::json>::value and
+                     is_nothrow_move_assignable<json_ns::json>::value
                  )
 {
     j1.swap(j2);
@@ -17355,35 +17307,35 @@ inline void swap(nlohmann::json& j1,
 
 /// hash value for JSON objects
 template<>
-struct hash<nlohmann::json>
+struct hash<json_ns::json>
 {
     /*!
     @brief return a hash value for a JSON object
 
     @since version 1.0.0
     */
-    std::size_t operator()(const nlohmann::json& j) const
+    std::size_t operator()(const json_ns::json& j) const
     {
         // a naive hashing via the string representation
-        const auto& h = hash<nlohmann::json::string_t>();
+        const auto& h = hash<json_ns::json::string_t>();
         return h(j.dump());
     }
 };
 
 /// specialization for std::less<value_t>
 /// @note: do not remove the space after '<',
-///        see https://github.com/nlohmann/json/pull/679
+///        see https://github.com/json_ns/json/pull/679
 template<>
-struct less< ::nlohmann::detail::value_t>
+struct less< ::json_ns::detail::value_t>
 {
     /*!
     @brief compare two value_t enum values
     @since version 3.0.0
     */
-    bool operator()(nlohmann::detail::value_t lhs,
-                    nlohmann::detail::value_t rhs) const noexcept
+    bool operator()(json_ns::detail::value_t lhs,
+                    json_ns::detail::value_t rhs) const noexcept
     {
-        return nlohmann::detail::operator<(lhs, rhs);
+        return json_ns::detail::operator<(lhs, rhs);
     }
 };
 
@@ -17402,9 +17354,9 @@ if no parse error occurred.
 
 @since version 1.0.0
 */
-inline nlohmann::json operator "" _json(const char* s, std::size_t n)
+inline json_ns::json operator "" _json(const char* s, std::size_t n)
 {
-    return nlohmann::json::parse(s, s + n);
+    return json_ns::json::parse(s, s + n);
 }
 
 /*!
@@ -17420,12 +17372,12 @@ object if no parse error occurred.
 
 @since version 2.0.0
 */
-inline nlohmann::json::json_pointer operator "" _json_pointer(const char* s, std::size_t n)
+inline json_ns::json::json_pointer operator "" _json_pointer(const char* s, std::size_t n)
 {
-    return nlohmann::json::json_pointer(std::string(s, n));
+    return json_ns::json::json_pointer(std::string(s, n));
 }
 
-// <nlohmann/detail/macro_unscope.hpp>
+// <json_ns/detail/macro_unscope.hpp>
 
 
 // restore GCC/clang diagnostic settings
@@ -17445,9 +17397,9 @@ inline nlohmann::json::json_pointer operator "" _json_pointer(const char* s, std
 #undef JSON_DEPRECATED
 #undef JSON_HAS_CPP_14
 #undef JSON_HAS_CPP_17
-#undef NLOHMANN_BASIC_JSON_TPL_DECLARATION
-#undef NLOHMANN_BASIC_JSON_TPL
-#undef NLOHMANN_JSON_HAS_HELPER
+#undef JSON_NS_BASIC_JSON_TPL_DECLARATION
+#undef JSON_NS_BASIC_JSON_TPL
+#undef JSON_NS_JSON_HAS_HELPER
 
 
 #endif

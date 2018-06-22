@@ -92,27 +92,26 @@ static constexpr std::string_view sql_insert_vn_staff_relation =
 static constexpr std::string_view sql_insert_staff_alias =
   R"EOF(insert or replace into staff_aliases values (
         @staff_id, @alias_id, @alias_name);)EOF"sv;
-//Currently updating a vnlist entry will clobber any existing vote info,
-//so updating the vnlist and votelist must be done together.
-static constexpr std::string_view sql_insert_vnlist_entry =
-  R"EOF(insert or replace into vnlist (vn, status, added, notes) 
-          values (@vn_id, @status, @added, @notes);)EOF"sv;
-//This is an update rather than an insert since we store votes as
-//a part of the vnlist table.
-static constexpr std::string_view sql_insert_votelist_entry =
-  R"EOF(update vnlist set
-         vote = @vote, vote_added = @added
-         where vn = @vn_id;)EOF"sv;
+// //Currently updating a vnlist entry will clobber any existing vote info,
+// //so updating the vnlist and votelist must be done together.
+// static constexpr std::string_view sql_insert_vnlist_entry =
+//   R"EOF(insert or replace into vnlist (vn, status, added, notes) 
+//           values (@vn_id, @status, @added, @notes);)EOF"sv;
+// //This is an update rather than an insert since we store votes as
+// //a part of the vnlist table.
+// static constexpr std::string_view sql_insert_votelist_entry =
+//   R"EOF(update vnlist set
+//          vote = @vote, vote_added = @added
+//          where vn = @vn_id;)EOF"sv;
 /*
   Since the vnlist and votelist are stored in the same table
   we clobber the votelist info when we replace a vnlist entry, a solution
   to this is what sqlite calls an upsert, basically it just combines an 
   insert and an update.
-  However it's only available on sqlite versions releases after june 2018,
-  which is currenly way too recent to be usable, however I've left the
-  sql here to use later.
+  This is only available in very recent versions of sqlite, so we need
+  build sqlite ourselves
 */
-/*
+
 static constexpr std::string_view sql_insert_vnlist_entry =
   R"EOF(insert into vnlist (vn, status, added, notes) 
           values (@vn_id, @status, @added, @notes)
@@ -123,7 +122,7 @@ static constexpr std::string_view sql_insert_votelist_entry =
           values (@vn_id, @vote, @added)
         on conflict(vn) do update
         set vote = @vote, vote_added = @added;)EOF"sv;
-*/
+
 static constexpr std::string_view sql_insert_wishlist_entry =
   R"EOF(insert or replace into wishlist(vn, priority, added) 
           values (@vn_id, @priority, @added);)EOF"sv;
