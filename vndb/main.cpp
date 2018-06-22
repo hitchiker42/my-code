@@ -201,10 +201,10 @@ int get_command_type(std::string_view command){
   if(do_main_tables || do_vnlist || do_wishlist){
     vndb_log->log_debug("Logging into vndb server.\n");
     vndb.connect(true);//make sure we're connected and have dbstats info
+    vndb_log->log_debug("dbstats : '%s'.\n dbinfo : '%s'.\n",
+                        vndb.db_stats.dump().c_str(),
+                        vndb.db_info.dump().c_str());
   }
-  vndb_log->log_debug("dbstats : '%s'.\n dbinfo : '%s'.\n",
-                      vndb.db_stats.dump().c_str(),
-                      vndb.db_info.dump().c_str());
   vndb_log->log_debug("Begining to download data.\n"); 
   //TODO: add option to continue on error. 
   if(do_main_tables){
@@ -401,7 +401,7 @@ int main(int argc, char *argv[]){
     exit(EXIT_FAILURE);
   }
   atexit(free_vndb_ssl_ctx);
-
+  vndb_log->log_debug("Initializing vndb_main object.\n");
   vndb_main vndb(db_filename, username, password);
   if(!vndb.init_all(auto_connect)){
     exit(EXIT_FAILURE);

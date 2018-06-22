@@ -50,8 +50,11 @@ struct progress_bar {
   }
   //Display progress bar one last time and start a new line, its a bit
   //clunky but its fine for now.
-  void finish(){
+  void finish(bool fill = false){
     if(!finished){
+      if(fill){
+        current = end;
+      }
       char tmp = display_chars.endline;
       display_chars.endline = '\n';
       display_progress_bar(this);

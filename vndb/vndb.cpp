@@ -373,6 +373,7 @@ static bool build_image_table(sqlite3_wrapper &db,
     }
     pb->update(1);
   }
+  pb->finish(true);
   if(res != SQLITE_DONE){
     fprintf(stderr, "Failure running '%s' : %s(%d).",
             stmt.get_sql_template().data(), db.errmsg(), db.errcode());
@@ -443,7 +444,7 @@ static int get_image_count(sqlite3_wrapper &db, const char *what){
     db.print_errmsg("Error executing sql"); 
     return -1;
   }
-  int count = stmt.get_column<int>(1);
+  int count = stmt.get_column<int>(0);
   if(stmt.step() != SQLITE_DONE){
     vndb_log->log_warn("Too many rows returned when querying image count.\n");
   }
@@ -452,6 +453,8 @@ static int get_image_count(sqlite3_wrapper &db, const char *what){
 bool vndb_main::update_vn_images(){
   sqlite3_wrapper &db = this->db;
   int img_count = get_image_count(db, "vn");
+  vndb_log->log_debug("Downloading images currently have %d / %d.\n",
+                      img_count, db_info["num_vns"].get<int>());
   if(img_count < 0){ return false; }
   //substr(image,19) cuts the leading "https://s.vndb.org" from the link
   auto stmt = db.prepare_stmt(
