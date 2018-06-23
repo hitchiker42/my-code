@@ -31,6 +31,9 @@ struct string_view {
   using size_type = uint32_t;
   using difference_type = ptrdiff_t;
   using iterator =  pointer;
+  using const_iterator = iterator;
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  using const_reverse_iterator = reverse_iterator;
 
   const char* ptr;
     //We could store the flag bits in the top 2 bits of the size, this
@@ -172,6 +175,18 @@ struct string_view {
   constexpr iterator end() const {
     return iterator(ptr+sz);
   }
+  constexpr reverse_iterator rbegin() const {
+    return reverse_iterator(end());
+  }
+  constexpr reverse_iterator rend() const {
+    return reverse_iterator(begin());
+  }
+  constexpr reference front() const {
+    return *begin();
+  }
+  constexpr reference back() const {
+    return *rbegin();
+  }
   //behaves the same as std::string_view::compare
   constexpr int compare(const string_view &other) const {
     size_type len = std::min(sz, other.sz);
@@ -237,6 +252,13 @@ struct string_view {
   string_view substr_copy(size_type start, size_type stop) const {
     return string_view(ptr + start, stop - start, true);
   }
+  //Need to use std::string_view to make this constexpr
+  constexpr size_type find_first_of(const std::string_view v, size_type pos = 0) const {
+    return memcspn(ptr + pos, sz - pos, v.data(), v.size());
+  }
+  constexpr size_type find_first_of_not(const std::string_view v, size_type pos = 0) const {
+    return memrspn(ptr + pos, sz - pos, v.data(), v.size());
+  }  
 };
 //Copying the std libraries naming hierarchy.
 namespace literals {

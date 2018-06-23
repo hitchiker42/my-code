@@ -1,6 +1,29 @@
 #include "util_extra.h"
 #include <assert.h>
-#include <list>
+void test_text_functions(){
+  util::string_view test("  one two    three\nfour\nfive    \n");
+  auto left = util::ltrim(test);
+  auto right = util::rtrim(test);
+  auto both = util::trim(test);
+  auto split = util::split(test);
+  printf("Unmodified : \"%.*s\".\n"
+         "Left trimmed : \"%.*s\".\n"
+         "Right trimmed : \"%.*s\".\n"
+         "Trimmed : \"%.*s\".\n",
+         test.size(), test.data(),
+         left.size(), left.data(),
+         right.size(), right.data(),
+         split.size(), split.data());
+  printf("Split :");
+  for(auto &&s : split){
+    printf(" \"%.*s\"", s.size(), s.data());
+  }
+}
+int main(){
+  test_text_functions();
+  return 0;
+}
+#if 0
 template<typename T>
 void print_int_container(const T& C){
   for(auto&& x : C){
@@ -32,3 +55,4 @@ void test_mapping_functions(){
 int main(){
   test_mapping_functions();
 }
+#endif

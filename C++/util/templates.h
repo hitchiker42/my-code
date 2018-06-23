@@ -4,10 +4,8 @@
 //Macros, most notably  macros for defining templates to test for the existance
 //of a member function/variable.
 #include "macros.h"
-#if 0
 namespace util {
 namespace templates {
-#endif
 
 /*
   convience typedefs for iterator traits (avoids having to add 'typename')
@@ -176,11 +174,6 @@ T find_or_default(const Container<T>& container, const T& val,
   } else {
     return (*it);
   }
-}
-template< class ForwardIt1, class ForwardIt2 >
-ForwardIt1 find_first_of_not(ForwardIt1 first, ForwardIt1 last,
-                             ForwardIt2 s_first, ForwardIt2 s_last){
-  return find_first_of(first, last, s_first, s_last, std::not_equal_to<>());
 }
 //Version which takes a container
 template<class T, class U = typename T::value_type>
@@ -1189,14 +1182,12 @@ template <class D = void, class... Types>
 constexpr details::return_type<D, Types...> make_array(Types&&... t) {
   return {std::forward<Types>(t)... };
 }
-#if 0
-}// namespace templates
-  using namespace util::templates;
+}
+using namespace util::templates;
 }//namespace util
 //originally all the above functions were in the global namespace,
 //and I'm fine with them staying there, it's just useful to have them
 //in a namespace as well. In generally 'using namespace XXX' is not a good idea.
 using namespace util::templates;
-#endif
 
 #endif /* __TEMPLATES_H__ */

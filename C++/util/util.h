@@ -150,8 +150,8 @@ struct unordered_map : std::unordered_map<K,V,Hash,KeyEq,Allocator> {
 //a 32bit machine and last 3 for a 64 bit machine).
 //These could be constexpr, except that you can't use reinterpret cast
 //in constexpr functions.
-inline /*constexpr*/ bool test_ptr_tag(const void *ptr, 
-                                       const int bit = 
+inline /*constexpr*/ bool test_ptr_tag(const void *ptr,
+                                       const int bit =
                                        (sizeof(uintptr_t) == 8 ? 0x7 : 0x3)){
   return (((uintptr_t)ptr) & bit);
 }
@@ -213,6 +213,15 @@ static inline bool is_nonempty_string(const char *s){
 static inline bool is_empty_string(const char *s){
   return (!s || !s[0]);
 }
+static inline bool is_prefix_of(const std::string_view prefix, 
+                                const std::string_view sv){
+  if(prefix.size() > sv.size()){ return false; }
+  return strncmp(prefix.data(), sv.data(), prefix.size()) == 0;
+}
+static inline bool has_prefix(const std::string_view sv,
+                              const std::string_view prefix){
+  return is_prefix_of(prefix, sv);
+}
 //constexpr versions of C functions
 static constexpr size_t constexpr_strlen(const char *s, size_t len = 0){
   return *s ? constexpr_strlen(s+1,len+1) : len;
@@ -237,7 +246,7 @@ static inline void* mempcpy(void *dest, const void* src, size_t n){
 static inline char* stpcpy(char *dest, const char *src){
   size_t len = strlen(src);
   return (char*)mempcpy(dest, src, len);
-} 
+}
 #endif
 
 //Convert a number into a string stored in a static buffer. This is
@@ -316,7 +325,7 @@ uint64_t fnv_hash(const T& key){
   }
   return hash;
 }
-    
+
 template<>
 inline uint64_t fnv_hash(const char* const& key){
   return fnv_hash(key, strlen(key));
@@ -326,20 +335,109 @@ inline uint64_t fnv_hash(const char* const& key){
 std::optional<long> strtol(const char *str,
                            const char** endptr = nullptr, int base = 0);
 std::optional<unsigned long> strtoul(const char *str,
-                                     const char** endptr = nullptr, 
+                                     const char** endptr = nullptr,
                                      int base = 0);
 std::optional<double> strtod(const char *str,
                              const char** endptr = nullptr, int base = 0);
-extern "C" {
-size_t memspn(const uint8_t *buf, size_t len,
-              const uint8_t *accept, size_t len2);
-size_t memcspn(const uint8_t *buf, size_t len,
-               const uint8_t *reject, size_t len2);
-size_t memspn_table(const uint8_t *buf, size_t len,
-                    const uint8_t accept[256]);
-size_t memcspn_table(const uint8_t *buf, size_t len,
-                     const uint8_t reject[256]);
+//extern "C" {
+/*inline constexpr size_t memspn_table(const uint8_t *str, size_t len,
+                                     const uint8_t accept[256]){
+  unsigned int i=0;
+  //this is for speed, but I'm not sure how much it's worth it
+  while(i+4 <= len){
+    if(!accept[str[i]]){return i;}
+    if(!accept[str[i+1]]){return i+1;}
+    if(!accept[str[i+2]]){return i+2;}
+    if(!accept[str[i+3]]){return i+3;}
+    i+=4;
+  }
+  switch(len-i){
+    case 3: if(!accept[str[i]]){return i;} i++;
+    case 2: if(!accept[str[i]]){return i;} i++;
+    case 1: if(!accept[str[i]]){return i;}
+  }
+  return len;
 }
+inline constexpr size_t memcspn_table(const uint8_t *str, size_t len,
+                                      const uint8_t reject[256]){
+  unsigned int i=0;
+  while(i+4 <= len){
+    if(reject[str[i]]){return i;}
+    if(reject[str[i+1]]){return i+1;}
+    if(reject[str[i+2]]){return i+2;}
+    if(reject[str[i+3]]){return i+3;}
+    i+=4;
+  }
+  switch(len-i){
+    case 3: if(reject[str[i]]){return i;} i++;
+    case 2: if(reject[str[i]]){return i;} i++;
+    case 1: if(reject[str[i]]){return i;}
+  }
+  return len;
+}*/
+inline constexpr size_t memspn_table(const void *str, size_t len,
+                                     const uint8_t accept[256]){
+  size_t i = 0;
+  while(i < len && accept[((uint8_t*)str)[i]]){
+    i++;
+  }
+  return i;
+}
+inline constexpr size_t memcspn_table(const void *str, size_t len,
+                                      const uint8_t reject[256]){
+  size_t i = 0;
+  while(i < len && !reject[((uint8_t*)str)[i]]){
+    i++;
+  }
+  return i;
+}
+inline constexpr size_t memrspn_table(const void *str, size_t len,
+                                      const uint8_t accept[256]){
+  ssize_t i = len-1;
+  while(i >= 0 && accept[((uint8_t*)str)[i]]){
+    i--;
+  }
+  return i;
+}
+inline constexpr size_t memrcspn_table(const void *str, size_t len,
+                                       const uint8_t reject[256]){
+  ssize_t i = len-1;
+  while(i >= 0 && !reject[((uint8_t*)str)[i]]){
+    i--;
+  }
+  return i;
+}
+//Needs to be a macro since it deals with stack allocated memory.
+#define build_span_table(table, bytes, len)                     \
+  for(unsigned int i = 0; i < len; i++){                        \
+    table[((uint8_t*)bytes)[i]] = 1;                            \
+  }
+inline constexpr size_t memspn(const void *buf, size_t len,
+                               const void *accept, size_t len2){
+  uint8_t bytes[256] = {0};
+  build_span_table(bytes, accept, len2);
+  return memspn_table(buf, len, bytes);
+}
+inline constexpr size_t memcspn(const void *buf, size_t len,
+                                const void *reject, size_t len2){
+  uint8_t bytes[256] = {0};
+  build_span_table(bytes, reject, len2);
+  return memcspn_table(buf, len, bytes);
+}
+inline constexpr size_t memrspn(const void *buf, size_t len,
+                                const void *accept, size_t len2){
+  uint8_t bytes[256] = {0};
+  build_span_table(bytes, accept, len2);
+  return memrspn_table(buf, len, bytes);
+}
+inline constexpr size_t memrcspn(const void *buf, size_t len,
+                                 const void *reject, size_t len2){
+  uint8_t bytes[256] = {0};
+  build_span_table(bytes, reject, len2);
+  return memrcspn_table(buf, len, bytes);
+}
+#undef build_span_table
+//} //extern "C"
 } // Namespace util
 #if (defined NEED_TIMER) || (defined NEED_TIMERS)
 #include "time_util.h"

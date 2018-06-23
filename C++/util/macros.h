@@ -207,6 +207,16 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
 #define DEBUG_PRINTF(...)
 #endif
 
+//portable version of gcc's builtin_unreachable
+#if (defined __GNUC__)
+#define unreachable() __builtin_unreachable()
+#elif (defined _MSC_VER)
+//MVSC has assume, which is like assert but used by the compiler.
+#define unreachable() __assume(0)
+#else
+//Will only work when debugging is enabled but it's better than nothing.
+#define unreachable() assert(false);
+#endif
 /*
   Super tricky way to test if something is a string literal.
 

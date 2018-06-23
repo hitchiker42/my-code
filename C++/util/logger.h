@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <string_view>
 #include <type_traits>
 #if (defined USE_FMT)
@@ -14,17 +15,22 @@
 #include "macros.h"
 namespace util {
 //Names borrowed from linux printk levels
-enum class log_level {
-  emergency = 0,
-  critical = 1,
-  error = 2,
-  warning = 3,
-  warn = 3,
-  notice = 4,
-  info = 5,
-  debug = 6,
-  all = 7
+enum class log_level : int8_t {
+  disabled = 0,
+  emergency = 1,
+  critical = 2,
+  error = 3,
+  warning = 4,
+  warn = 4,
+  notice = 5,
+  info = 6,
+  debug = 7,
+  all = 8
 };
+static constexpr std::array<std::string_view, 9> log_level_names = {{
+    "disabled", "emergency", "critical", "error", "warn",
+    "notice", "info", "debug", "all"
+}};
 //Core logger struct, uses integer log levels & logs to a single FILE*,
 //provides support for using an enumeration for log levels via templated wrappers,
 //the above log_level enum is provided as a convenient default.

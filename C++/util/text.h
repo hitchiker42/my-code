@@ -2,22 +2,58 @@
 #define __TEXT_H__
 #include "util.h"
 #include "string_view.h"
-#inlcude "string_buf.h"
+#include "string_buf.h"
 #include "my_string.h"
 namespace util {
-static inline string_view ltrim(const string_view& str,
-                                const string_view& filter = " \n\t\v\f\r"_sv){
-  return find_first_of_not(str.begin(), std.end(),
-                           filter.begin(), filter.end());
+using namespace util::literals::string_literals;
+static constexpr const char* whitespace_cstr = " \n\t\v\f\r";
+static const string_view whitespace_sv = " \n\t\v\f\r"_sv;
+//Functions using string_views, these are generally much cleaner
+//and eaiser to write than functions using c strings.
+static inline string_view ltrim(const string_view sv,
+                                const string_view filter = whitespace_sv){
+  size_t start = sv.find_first_of_not(filter);
+  return sv.substr(start, sv.size() - start);
 }
+static inline string_view rtrim(const string_view sv, 
+                                const string_view filter = whitespace_sv){
+  auto it = util::find_first_of_not(sv.rbegin(), sv.rend(),
+                                    filter.begin(), filter.end());
+  auto len = std::distance(sv.begin(), it.base()); 
+  return sv.substr(0, len);
+}
+static inline string_view trim(const string_view sv, 
+                               const string_view filter = whitespace_sv){
+  auto l = util::find_first_of_not(sv.begin(), sv.end(),
+                                   filter.begin(), filter.end());
+  auto r = util::find_first_of_not(sv.rbegin(), sv.rend(),
+                                    filter.begin(), filter.end());  
+  return sv.substr(std::distance(sv.begin(), l), 
+                   std::distance(sv.begin(), r.base()));
+}
+static inline svector<string_view> split(const string_view sv,
+                                         const string_view filter = whitespace_sv){
+  svector<string_view> ret;
+  auto l = util::find_first_of_not(sv.begin(), sv.end(),
+                                   filter.begin(), filter.end());
+  while(l != sv.end()){
+    auto r = std::find_first_of(l, sv.end(), filter.begin(), filter.end());    
+    size_t len = r-l;
+    ret.emplace_back(l, len);
+    l = util::find_first_of_not(r, sv.end(),
+                                filter.begin(), filter.end());
+  }
+  return ret;
+}
+//Functions using c strings, ultimately these should be faster.
 static inline const char* ltrim(const char *str,
-                                const char *filter = " \n\t\v\f\r"){
+                                const char *filter = whitespace_cstr){
   return str + strspn(str, filter);
 }
 //returns length of trimmed string
 static inline size_t rtrim(const char *str, size_t size_1,
                            const char *filter, size_t size_2){
-  size_t idx;
+  ssize_t idx;
   uint8_t table[256] = {0};
   for(idx = 0; idx < size_2; ++idx){
     table[(uint8_t)filter[idx]] = 1;
@@ -30,21 +66,17 @@ static inline size_t rtrim(const char *str, size_t size_1,
   }
   return idx;
 }
-static inline size_t rtrim(const char *str, const char *filter = " \n\t\v\f\r"){
-  //No confident library function here.
-  return rtrim(str, strlen(str), filter, strlen(filter));
-}
 static inline void trim(const char *str, size_t size_1,
                         const char *filter, size_t size_2,
                         const char **start, size_t *end){
   //Use the same table for both rtrim and ltrim.
-  size_t idx;
+  ssize_t idx;
   uint8_t table[256] = {0};
   for(idx = 0; idx < size_2; ++idx){
     table[(uint8_t)filter[idx]] = 1;
   }
-  uint8_t *s = (uint8_t)str;
-  size_t idx1 = 0, idx2 = size_1 - 1;
+  uint8_t *s = (uint8_t*)str;
+  ssize_t idx1 = 0, idx2 = size_1 - 1;
   while(idx1 < size_1 && table[s[idx1]]){
     ++idx1;
   }
@@ -59,21 +91,9 @@ static inline void trim(const char *str, const char *filter,
                         const char **start, size_t *end){
   return trim(str, strlen(str), filter, strlen(filter), start, end);
 }
-static inline std::string_view trim(const char *str, size_t size_1,
-                                    const char *filter = " \n\t\v\r\f",
-                                    size_t size_2 = sizeof("\n\t\v\r\f")-1){
-  const char *start = NULL;
-  size_t end = 0;
-  trim(str, size_1, filter, size_2, &start, &end);
-  size_t len = end - (start - str);
-  return std::string_view(start, len);
-}
-static inline std::string_view trim(const char *str, 
-                                    const char* filter = " \n\t\v\r"){
-  return trim(str, strlen(str), filter, strlen(filter));
-}
 static inline std::vector<std::string_view> split(const char *str, size_t size_1,
                                                   const char *filter, size_t size_2){
+  ssize_t idx;
   uint8_t table[256] = {0};
   for(idx = 0; idx < size_2; ++idx){
     table[(uint8_t)filter[idx]] = 1;
