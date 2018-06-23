@@ -250,7 +250,7 @@ struct vndb_main {
     if(stmt.step() != SQLITE_ROW){
       return false;
     }
-    json tmp = stmt.get_row_json();
+    json tmp = stmt.get_row_json(true);
     if(stmt.step() != SQLITE_DONE){
       return false;
     }
@@ -343,7 +343,7 @@ struct vndb_main {
     stmt.bind(1, id);
     json ret = json_null;
     if(stmt.step()){
-      ret = stmt.get_row_json();
+      ret = stmt.get_row_json_obj();
       if(stmt.step()){
         fprintf(stderr, "Error multiple rows returned from select by id statement.");
         ret = json_null;

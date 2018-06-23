@@ -325,7 +325,7 @@ int main(int argc, char *argv[]){
     finished parsing options, so we know what the log level should be.
   */
   const char *username = "", *password = "";
-  const char *log_level_name = "info", *db_filename = default_db_file;
+  const char *log_level_name = "debug", *db_filename = default_db_file;
   bool log_to_stderr = false, no_derived_tables = false, auto_connect = false;
   opterr = 0; //prevent getopt from printing its own error messages.
   int c, options_idx = 0;

@@ -197,28 +197,13 @@ struct sqlite3_stmt_wrapper {
     //reset will return the appropiate error code if sqlite_step failed;
     return reset();
   }
-  //Run this statement and collect the results (as json objects) into
-  //a json array.
-  json exec_json(int *err_ptr = nullptr){
-    std::vector<json> rows;
-    int err;
-    if(!err_ptr){ err_ptr = &err; }
-    while((err = sqlite3_step(stmt)) == SQLITE_ROW){
-      json row = get_row_json();
-      //This should never happen.
-      if(row.is_null()){
-        return SQLITE_ABORT;
-      }
-      rows.emplace_back(row);
-    }
-    *err_ptr = reset();
-    if(*err_ptr != SQLITE_OK){
-      return json_null;
-    } else {
-      return rows;
-    }
-  }
-    
+  //Run this statement and collect the results into a json array.
+  //if the number of colmuns in the result is 1 a simple 1-dimensional
+  //array is always returned. Otherwise an 2-D array is returned
+  //if as_objects is fals and a 1-D array of objects if it is true.
+  //if err_ptr is not null it is set to SQLITE_OK on success
+  //and the relevent error code if there was an error.
+  json exec_json(bool as_objects = false, int *err_ptr = nullptr);
 
   //base template for getting columns, specializations are below.
   template<typename T>
@@ -232,8 +217,12 @@ struct sqlite3_stmt_wrapper {
   size_t get_column_bytes(int idx){
     return sqlite3_column_bytes(stmt, idx);
   }
-  //Get the number of columns in the current row.
+  //Get the number of columns in the result set.
   int get_ncolumns(){
+    return sqlite3_column_count(stmt);
+  }
+  //get the number of columns in the current row (or 0 if finished executing).
+  int get_current_ncolumns(){
     return sqlite3_data_count(stmt);
   }
   sqlite3_wrapper get_db();
@@ -267,7 +256,11 @@ struct sqlite3_stmt_wrapper {
     }
     return row;
   }
-  json get_row_json();
+  json get_row_json_obj();
+  json get_row_json_arr();
+  json get_row_json(bool as_object = true){
+    return (as_object ? get_row_json_obj() : get_row_json_arr());
+  }
   //Single overloaded function to replace the sqlite_bind_type functions.
   int bind(int idx, double val){
     return sqlite3_bind_double(stmt, idx, val);

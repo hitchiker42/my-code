@@ -282,89 +282,107 @@ sqlite3_stmt_wrapper::get_row_text(std::vector<std::string_view>& row,
   }
   return row;
 }
-//Given a string that may or may not represent a json array/object
-//return a json value that is either the value obtained by parsing
-//the string if it is valid json or just the string itself if it isn't.
-static json parse_possible_json(std::string_view text){
-  //Only arrays and objects are stored as json, so if it
-  //can't be one of those it must just be a string.
-  if(text[0] != '[' && text[0] != '{'){
-    json(text);
-  }
-  json_parser p(text);
-  json j;
-  bool is_json = p.try_parse(j);
-  if(is_json){
-    return j;
+
+//We need to determine if the column is meant to be json or just a string.
+//sqlite doesn't have a json type, but the sqlite3_column_decltype function
+//Lets us get the type the column was declared to have as a string, so
+//we can use that to see if a column is supposed to be json. This is just
+//an optimization, if we can't get the declared type we just try to parse
+//the string as json and insert it as a string if we fail.
+static json get_text_column_as_json(sqlite3_stmt_wrapper *stmt, int idx){
+  std::string_view col_text = stmt->get_column<std::string_view>(idx);
+  const char *col_type_name = sqlite3_column_decltype(stmt->stmt, idx);
+  if(col_type_name){
+    if(sqlite3_stricmp(col_type_name, "json") == 0){
+      return json::parse(col_text);
+    } else {
+      return json(col_text);
+    }
   } else {
-    return json(text);
+    //Only arrays and objects are stored as json, so if it
+    //can't be one of those it must just be a string.
+    if(col_text[0] != '[' && col_text[0] != '{'){
+      json(text);
+    }
+    json_parser p(col_text);
+    json j;
+    bool is_json = p.try_parse(j);
+    if(is_json){
+      return j;
+    } else {
+      return json(col_text);
+    }
   }
 }
-json sqlite3_stmt_wrapper::get_row_json(){
+static json get_blob_column_as_json(sqlite3_stmt_wrapper *stmt, int idx){
+  //For blobs (currently the only blobs I use are for image storage) we just
+  //store a string indicating this is a blob and its size. An alternative
+  //would be base64 encoding or extending the json type to support binary data.
+  char buf[128];
+  snprintf(buf, 128, "#<%d byte blob>", sqlite3_column_bytes(stmt->stmt, idx));
+  return json(std::string_view(buf));
+}
+//This is different from get_column<json>, get_column<json> assumes the
+//column holds valid json and parses it, This converts the column from
+//whatever type it is into json.
+static json get_column_json(sqlite3_stmt_wrapper *stmt, int idx){
+  switch(stmt->column_type(idx)){
+    case sqlite3_type::integer:
+      return json(stmt->get_column<int>(idx));
+    case sqlite3_type::floating:
+      return json(stmt->get_column<double>(idx));
+    case sqlite3_type::null:
+      return json_null;
+    case sqlite3_type::blob:
+      return get_blob_column_as_json(stmt, idx);
+    case sqlite3_type::text:
+      return get_text_column_as_json(stmt, idx);
+  }
+  unreachable();
+}
+json sqlite3_stmt_wrapper::get_row_json_obj(){
   int ncols = this->get_ncolumns();
   json::object_t obj;
   for(int i = 0; i < ncols; i++){
     auto name = this->column_name(i);
-    switch(this->column_type(i)){
-      case(sqlite3_type::integer):
-        obj.emplace(name, json(this->get_column<int>(i)));
-        break;
-      case sqlite3_type::floating:
-        obj.emplace(name, json(this->get_column<double>(i)));
-        break;
-      case sqlite3_type::null:
-        obj.emplace(name, json_null);
-        break;
-
-      //For blobs (currently the only blobs I use are for image storage) we just
-      //store a string indicating this is a blob and its size.
-      case sqlite3_type::blob:{
-        char buf[128];
-        snprintf(buf, 128, "#<%d byte blob>", sqlite3_column_bytes(this->stmt, i));
-        obj.emplace(name, json(std::string(buf)));
-        break;
-      }
-        /*
-        //Convert into
-        json::array_t arr;
-        size_t blob_size = this->get_column_bytes(i);
-        uintptr_t* blob = (uintptr_t*)get_column<void*>(i);
-        for(size_t j = 0; j < (blob_size/8); j++){
-           arr.emplace_back(blob[j]);
-        }
-        j *= 8;
-        uint8_t buf[sizeof(uinptr_t)] = {0};
-        if(j < blob_size){
-          uint8_t* tail = ((uint8_t*)blob) + j;
-          memcpy(buf, tail, blob_size - j);
-          arr.emplace_back(*((uintptr_t*)buf));
-        }
-        obj.emplace(name, arr);
-      }
-        */
-      //We need to determine if the column is meant to be json or just a string.
-      //sqlite doesn't have a json type, but the sqlite3_column_decltype function
-      //Lets us get the type the column was declared to have as a string, so
-      //we can use that to see if a column is supposed to be json. This is just
-      //an optimization, if we can't get the declared type we just try to parse
-      //the string as json and insert it as a string if we fail.
-      case sqlite3_type::text: {
-        std::string_view col_text = this->get_column<std::string_view>(i);
-        const char *col_type_name = sqlite3_column_decltype(this->stmt, i);
-        if(col_type_name){
-          if(sqlite3_stricmp(col_type_name, "json") == 0){
-            obj.emplace(name, json::parse(col_text));
-          } else {
-            obj.emplace(name, col_text);
-          }
-        } else {
-          obj.emplace(name, parse_possible_json(col_text));
-        }
-        break;
-      }
-    }
+    obj.emplace(name, get_column_json(this, i));
   }
   return json(std::move(obj));
+}
+json sqlite3_stmt_wrapper::get_row_json_arr(){
+  int ncols = this->get_ncolumns();
+  json::array_t arr;
+  arr.reserve(ncols);
+  for(int i = 0; i < ncols; i++){
+    arr.emplace_back(get_column_json(this, i));
+  }
+  return json(std::move(arr));
+}
+json sqlite3_stmt_wrapper::exec_json(bool as_objects, int *err_ptr){
+  std::vector<json> ret;
+  int err;
+  if(!err_ptr){ err_ptr = &err; }
+  //I'm not 100% sure if it's safe to call this here, but as far
+  //as I can tell it should be.
+  int ncols = this->get_ncolumns();
+  while((err = sqlite3_step(this->stmt)) == SQLITE_ROW){
+    if(ncols == 1){ //flatten array if there's only one column
+      ret.emplace_back(get_column_json(this, 0));
+    } else {
+      json row = get_row_json(as_objects);
+      //This should never happen.
+      if(row.is_null()){
+        return SQLITE_ABORT;
+      }
+      ret.emplace_back(row);
+    }
+  }
+  *err_ptr = reset();
+  if(*err_ptr != SQLITE_OK){
+    return json_null;
+  } else {
+    return ret;
+  }
 }
 
 #if 0

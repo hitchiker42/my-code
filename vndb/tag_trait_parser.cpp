@@ -23,7 +23,7 @@ static void create_trait_name_acc(const json& traits,
     create_trait_name_acc(traits, traits[trait["parents"][0].get<int>()], name);
   }
   name.push_back(seperator);
-  name.append(trait["name"]);
+  name.append(trait["name"].get<std::string_view>());
 }
 //Construct a unique name for trait, of the form /root[/child]*
 std::string create_trait_name(const json& traits, int idx){

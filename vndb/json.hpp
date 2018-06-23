@@ -906,7 +906,7 @@ template<typename BasicJsonType, typename ArithmeticType,
                      int> = 0>
 void get_arithmetic_value(const BasicJsonType& j, ArithmeticType& val)
 {
-    switch (static_cast<value_t>(j))
+    switch (j.m_type)
     {
         case value_t::number_unsigned:
         {
@@ -1121,7 +1121,7 @@ template<typename BasicJsonType, typename ArithmeticType,
              int> = 0>
 void from_json(const BasicJsonType& j, ArithmeticType& val)
 {
-    switch (static_cast<value_t>(j))
+    switch (j.m_type)
     {
         case value_t::number_unsigned:
         {
@@ -12066,10 +12066,10 @@ class basic_json
 
     @since version 1.0.0
     */
-    constexpr operator value_t() const noexcept
-    {
-        return m_type;
-    }
+//    constexpr operator value_t() const noexcept
+//    {
+//        return m_type;
+//    }
 
     /// @}
 
@@ -12563,6 +12563,7 @@ class basic_json
 
     @since version 1.0.0
     */
+/*
     template <typename ValueType, 
               typename std::enable_if<
                 !std::is_pointer<ValueType>::value &&
@@ -12582,7 +12583,7 @@ class basic_json
         // delegate the call to get<>() const
         return get<ValueType>();
     }
-
+*/
   //Take the json value and set the current object to null, super unsafe.
   std::pair<void*, value_t> take(){
     std::pair<void*,value_t> ret = {reinterpret_cast<void*>(m_value), m_type};

@@ -234,17 +234,47 @@ struct vndb_connection {
   //TODO: change these so they get 100 results at a time, since
   //thats allowed.
   json get_vnlist(std::vector<json>& vec){
+    buf.clear();
     buf.append("get vnlist (uid = 0)");
     return send_get_command(vec);
   }
   json get_votelist(std::vector<json>& vec){
+    buf.clear();
     buf.append("get votelist (uid = 0)");
     return send_get_command(vec);
   }
   json get_wishlist(std::vector<json>& vec){
+    buf.clear();
     buf.append("get wishlist (uid = 0)");
     return send_get_command(vec);
   }
+  int get_current_user_id(){
+    buf.clear();
+    buf.append("get user (id = 0)");
+    return do_get_user();
+  }
+  int get_user_id(std::string_view name){
+    buf.clear();
+    buf.append("get user (username = ").append(name).append(')');
+    return do_get_user();
+  }
+  //send the get user command currently in the buffer, return
+  //0 if no user was found, the user id if one user was found
+  //and -1 if multiple users were found, I may add a function
+  //to search for multiple users later.
+  int do_get_user(){
+    const json tmp = send_get_command_once(1, "id");
+    int cnt = tmp["num"].get<int>();
+    if(cnt == 0){
+      return 0;//0 is an invalid user
+    } else if(cnt == 1){
+      return tmp["items"][0]["id"].get<int>();
+    } else {
+      return -1;
+    }
+  }
+
+    
   //Functions to add/remove/modify votes / entries on user lists.
   //value is a score on [10,100]
   bool send_set_command();
