@@ -1,7 +1,7 @@
 #include "gui.h"
-int my_sdl_event_type = -1;
+int jpeg_event_type = -1;
 int my_event_filter(void *data, SDL_Event *event){
-  if(event->type == SDL_QUIT || event->type == SDL_USER_EVENT){
+  if(event->type == SDL_QUIT || event->type == jpeg_event_type){
     return 1;
   } else {
     return 0;
@@ -26,7 +26,7 @@ sdl_context* init_sdl_context(SDL_Semaphore *sem){
   if(!SDL_WasInit(SDL_INIT_VIDEO)){
     SDL_Init(SDL_INIT_VIDEO);
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
-    my_sdl_event_type = SDL_RegisterEvents(1);
+    jpeg_event_type = SDL_RegisterEvents(1);
   }
   //Get the current resolution to use as the texture size.
   SDL_DisplayMode dm;
@@ -117,6 +117,7 @@ int render_jpeg(sdl_context *ctx){
   uint8_t *jpeg = ctx->evt.user.data1;
   size_t jpeg_sz = (uintptr_t)ctx->evt.user.data2;
   int err = decompress_jpeg(jpeg, jpeg_sz, &img);
+//  ctx->err = err;
   SDL_SemPost(ctx->sem);//Needs to be called even if we fail at decoding.
   if(err != 0){
     fprintf(stderr, "Error decoding jpeg.\n");
@@ -168,7 +169,7 @@ int active_event_loop(sdl_context *ctx){
       //just redraw the image.
       case SDL_WINDOWEVENT:
         if(evt->window.event == SDL_WINDOWEVENT_CLOSE){
-            return do_hide_window(ctx);
+          return do_hide_window(ctx);
         } else {
           render_texture(ctx);
         }
@@ -205,7 +206,7 @@ int sdl_main_loop(void *data){
     if(ctx->evt.type == SDL_QUIT){
       goto end;
     }
-    if(ctx->evt.type == SDL_USER_EVENT){
+    if(ctx->evt.type == jpeg_event_type){
       render_jpeg(ctx);
       //This may cause a crash I'm not sure, there doesn't appear to be
       //a documented way to remove an existing event filter.

@@ -278,7 +278,6 @@ struct svector {
   const_iterator end() const noexcept {
     return const_iterator(data() + len);
   }
-
   reverse_iterator rbegin() noexcept {
     return reverse_iterator(end());
   }

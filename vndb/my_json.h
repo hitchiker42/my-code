@@ -61,18 +61,11 @@ SOFTWARE.
 #include <valarray>
 #include <vector>
 
-//<json_ns/json_fwd.hpp>
-#ifndef JSON_NS_JSON_FWD_HPP
-#define JSON_NS_JSON_FWD_HPP
+//<my_json/json_fwd.hpp>
+#ifndef MY_JSON_JSON_FWD_HPP
+#define MY_JSON_JSON_FWD_HPP
 
-
-
-/*!
-@brief namespace for Niels Lohmann
-@see https://github.com/json_ns
-@since version 1.0.0
-*/
-namespace json_ns
+namespace my_json
 {
 /*!
 @brief default JSONSerializer template argument
@@ -87,15 +80,9 @@ struct adl_serializer;
 struct basic_json;
 
 /*!
-@brief JSON Pointer
-
 A JSON pointer defines a string syntax for identifying a specific value
 within a JSON document. It can be used with functions `at` and
 `operator[]`. Furthermore, JSON pointers are the base for JSON patches.
-
-@sa [RFC 6901](https://tools.ietf.org/html/rfc6901)
-
-@since version 2.0.0
 */
 template<typename BasicJsonType>
 class json_pointer;
@@ -111,21 +98,13 @@ uses the standard template types.
 }
 
 #endif
-
-//<json_ns/detail/macro_scope.hpp>
-
-
-// This file contains all internal macro definitions
-// You MUST include macro_unscope.hpp at the end of json.hpp to undef all of them
-
-// exclude unsupported compilers
 #if defined(__clang__)
     #if (__clang_major__ * 10000 + __clang_minor__ * 100 + __clang_patchlevel__) < 30400
-        #error "unsupported Clang version - see https://github.com/json_ns/json#supported-compilers"
+        #error "unsupported Clang version - see https://github.com/my_json/json#supported-compilers"
     #endif
 #elif defined(__GNUC__) && !(defined(__ICC) || defined(__INTEL_COMPILER))
     #if (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__) < 40900
-        #error "unsupported GCC version - see https://github.com/json_ns/json#supported-compilers"
+        #error "unsupported GCC version - see https://github.com/my_json/json#supported-compilers"
     #endif
 #endif
 
@@ -202,7 +181,7 @@ contains a `mapped_type`, whereas `std::vector` fails the test.
 @sa http://stackoverflow.com/a/7728728/266378
 @since version 1.0.0, overworked in version 2.0.6
 */
-#define JSON_NS_JSON_HAS_HELPER(type)                                        \
+#define MY_JSON_JSON_HAS_HELPER(type)                                        \
     template<typename T> struct has_##type {                                  \
     private:                                                                  \
         template<typename U, typename = typename U::type>                     \
@@ -213,10 +192,10 @@ contains a `mapped_type`, whereas `std::vector` fails the test.
                 std::is_integral<decltype(detect(std::declval<T>()))>::value; \
     }
 
-// <json_ns/detail/meta.hpp>
+// <my_json/detail/meta.hpp>
 
 
-namespace json_ns
+namespace my_json
 {
 /*!
 @brief detail namespace with internal helper functions
@@ -289,10 +268,10 @@ struct is_complete_type : std::false_type {};
 template <typename T>
 struct is_complete_type<T, decltype(void(sizeof(T)))> : std::true_type {};
 
-JSON_NS_JSON_HAS_HELPER(mapped_type);
-JSON_NS_JSON_HAS_HELPER(key_type);
-JSON_NS_JSON_HAS_HELPER(value_type);
-JSON_NS_JSON_HAS_HELPER(iterator);
+MY_JSON_JSON_HAS_HELPER(mapped_type);
+MY_JSON_JSON_HAS_HELPER(key_type);
+MY_JSON_JSON_HAS_HELPER(value_type);
+MY_JSON_JSON_HAS_HELPER(iterator);
 
 template<bool B, class RealType, class CompatibleObjectType>
 struct is_compatible_object_type_impl : std::false_type {};
@@ -441,57 +420,21 @@ constexpr T static_const<T>::value;
 }
 }
 
-// <json_ns/detail/exceptions.hpp>
+// <my_json/detail/exceptions.hpp>
 
 
 
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
-////////////////
-// exceptions //
-////////////////
-
-/*!
-@brief general exception of the @ref basic_json class
-
-This class is an extension of `std::exception` objects with a member @a id for
-exception ids. It is used as the base class for all exceptions thrown by the
-@ref basic_json class. This class can hence be used as "wildcard" to catch
-exceptions.
-
-Subclasses:
-- @ref parse_error for exceptions indicating a parse error
-- @ref invalid_iterator for exceptions indicating errors with iterators
-- @ref type_error for exceptions indicating executing a member function with
-                  a wrong type
-- @ref out_of_range for exceptions indicating access out of the defined range
-- @ref other_error for exceptions indicating other library errors
-
-@internal
-@note To have nothrow-copy-constructible exceptions, we internally use
-      `std::runtime_error` which can cope with arbitrary-length error messages.
-      Intermediate strings are built with static functions and then passed to
-      the actual constructor.
-@endinternal
-
-@liveexample{The following code shows how arbitrary library exceptions can be
-caught.,exception}
-
-@since version 3.0.0
-*/
 class exception : public std::exception
 {
   public:
-    /// returns the explanatory string
-    const char* what() const noexcept override
-    {
+    const char* what() const noexcept override{
         return m.what();
     }
-
-    /// the id of the exception
     const int id;
 
   protected:
@@ -506,50 +449,6 @@ class exception : public std::exception
     /// an exception object as storage for error messages
     std::runtime_error m;
 };
-
-/*!
-@brief exception indicating a parse error
-
-This exception is thrown by the library when a parse error occurs. Parse errors
-can occur during the deserialization of JSON text, CBOR, MessagePack, as well
-as when using JSON Patch.
-
-Member @a byte holds the byte index of the last read character in the input
-file.
-
-Exceptions have ids 1xx.
-
-name / id                      | example message | description
------------------------------- | --------------- | -------------------------
-json.exception.parse_error.101 | parse error at 2: unexpected end of input; expected string literal | This error indicates a syntax error while deserializing a JSON text. The error message describes that an unexpected token (character) was encountered, and the member @a byte indicates the error position.
-json.exception.parse_error.102 | parse error at 14: missing or wrong low surrogate | JSON uses the `\uxxxx` format to describe Unicode characters. Code points above above 0xFFFF are split into two `\uxxxx` entries ("surrogate pairs"). This error indicates that the surrogate pair is incomplete or contains an invalid code point.
-json.exception.parse_error.103 | parse error: code points above 0x10FFFF are invalid | Unicode supports code points up to 0x10FFFF. Code points above 0x10FFFF are invalid.
-json.exception.parse_error.104 | parse error: JSON patch must be an array of objects | [RFC 6902](https://tools.ietf.org/html/rfc6902) requires a JSON Patch document to be a JSON document that represents an array of objects.
-json.exception.parse_error.105 | parse error: operation must have string member 'op' | An operation of a JSON Patch document must contain exactly one "op" member, whose value indicates the operation to perform. Its value must be one of "add", "remove", "replace", "move", "copy", or "test"; other values are errors.
-json.exception.parse_error.106 | parse error: array index '01' must not begin with '0' | An array index in a JSON Pointer ([RFC 6901](https://tools.ietf.org/html/rfc6901)) may be `0` or any number without a leading `0`.
-json.exception.parse_error.107 | parse error: JSON pointer must be empty or begin with '/' - was: 'foo' | A JSON Pointer must be a Unicode string containing a sequence of zero or more reference tokens, each prefixed by a `/` character.
-json.exception.parse_error.108 | parse error: escape character '~' must be followed with '0' or '1' | In a JSON Pointer, only `~0` and `~1` are valid escape sequences.
-json.exception.parse_error.109 | parse error: array index 'one' is not a number | A JSON Pointer array index must be a number.
-json.exception.parse_error.110 | parse error at 1: cannot read 2 bytes from vector | When parsing CBOR or MessagePack, the byte vector ends before the complete value has been read.
-json.exception.parse_error.112 | parse error at 1: error reading CBOR; last byte: 0xF8 | Not all types of CBOR or MessagePack are supported. This exception occurs if an unsupported byte was read.
-json.exception.parse_error.113 | parse error at 2: expected a CBOR string; last byte: 0x98 | While parsing a map key, a value that is not a string has been read.
-
-@note For an input with n bytes, 1 is the index of the first character and n+1
-      is the index of the terminating null byte or the end of file. This also
-      holds true when reading a byte vector (CBOR or MessagePack).
-
-@liveexample{The following code shows how a `parse_error` exception can be
-caught.,parse_error}
-
-@sa @ref exception for the base class of the library exceptions
-@sa @ref invalid_iterator for exceptions indicating errors with iterators
-@sa @ref type_error for exceptions indicating executing a member function with
-                    a wrong type
-@sa @ref out_of_range for exceptions indicating access out of the defined range
-@sa @ref other_error for exceptions indicating other library errors
-
-@since version 3.0.0
-*/
 class parse_error : public exception
 {
   public:
@@ -584,44 +483,6 @@ class parse_error : public exception
     parse_error(int id_, std::size_t byte_, const char* what_arg)
         : exception(id_, what_arg), byte(byte_) {}
 };
-
-/*!
-@brief exception indicating errors with iterators
-
-This exception is thrown if iterators passed to a library function do not match
-the expected semantics.
-
-Exceptions have ids 2xx.
-
-name / id                           | example message | description
------------------------------------ | --------------- | -------------------------
-json.exception.invalid_iterator.201 | iterators are not compatible | The iterators passed to constructor @ref basic_json(InputIT first, InputIT last) are not compatible, meaning they do not belong to the same container. Therefore, the range (@a first, @a last) is invalid.
-json.exception.invalid_iterator.202 | iterator does not fit current value | In an erase or insert function, the passed iterator @a pos does not belong to the JSON value for which the function was called. It hence does not define a valid position for the deletion/insertion.
-json.exception.invalid_iterator.203 | iterators do not fit current value | Either iterator passed to function @ref erase(IteratorType first, IteratorType last) does not belong to the JSON value from which values shall be erased. It hence does not define a valid range to delete values from.
-json.exception.invalid_iterator.204 | iterators out of range | When an iterator range for a primitive type (number, boolean, or string) is passed to a constructor or an erase function, this range has to be exactly (@ref begin(), @ref end()), because this is the only way the single stored value is expressed. All other ranges are invalid.
-json.exception.invalid_iterator.205 | iterator out of range | When an iterator for a primitive type (number, boolean, or string) is passed to an erase function, the iterator has to be the @ref begin() iterator, because it is the only way to address the stored value. All other iterators are invalid.
-json.exception.invalid_iterator.206 | cannot construct with iterators from null | The iterators passed to constructor @ref basic_json(InputIT first, InputIT last) belong to a JSON null value and hence to not define a valid range.
-json.exception.invalid_iterator.207 | cannot use key() for non-object iterators | The key() member function can only be used on iterators belonging to a JSON object, because other types do not have a concept of a key.
-json.exception.invalid_iterator.208 | cannot use operator[] for object iterators | The operator[] to specify a concrete offset cannot be used on iterators belonging to a JSON object, because JSON objects are unordered.
-json.exception.invalid_iterator.209 | cannot use offsets with object iterators | The offset operators (+, -, +=, -=) cannot be used on iterators belonging to a JSON object, because JSON objects are unordered.
-json.exception.invalid_iterator.210 | iterators do not fit | The iterator range passed to the insert function are not compatible, meaning they do not belong to the same container. Therefore, the range (@a first, @a last) is invalid.
-json.exception.invalid_iterator.211 | passed iterators may not belong to container | The iterator range passed to the insert function must not be a subrange of the container to insert to.
-json.exception.invalid_iterator.212 | cannot compare iterators of different containers | When two iterators are compared, they must belong to the same container.
-json.exception.invalid_iterator.213 | cannot compare order of object iterators | The order of object iterators cannot be compared, because JSON objects are unordered.
-json.exception.invalid_iterator.214 | cannot get value | Cannot get value for iterator: Either the iterator belongs to a null value or it is an iterator to a primitive type (number, boolean, or string), but the iterator is different to @ref begin().
-
-@liveexample{The following code shows how an `invalid_iterator` exception can be
-caught.,invalid_iterator}
-
-@sa @ref exception for the base class of the library exceptions
-@sa @ref parse_error for exceptions indicating a parse error
-@sa @ref type_error for exceptions indicating executing a member function with
-                    a wrong type
-@sa @ref out_of_range for exceptions indicating access out of the defined range
-@sa @ref other_error for exceptions indicating other library errors
-
-@since version 3.0.0
-*/
 class invalid_iterator : public exception
 {
   public:
@@ -635,45 +496,6 @@ class invalid_iterator : public exception
     invalid_iterator(int id_, const char* what_arg)
         : exception(id_, what_arg) {}
 };
-
-/*!
-@brief exception indicating executing a member function with a wrong type
-
-This exception is thrown in case of a type error; that is, a library function is
-executed on a JSON value whose type does not match the expected semantics.
-
-Exceptions have ids 3xx.
-
-name / id                     | example message | description
------------------------------ | --------------- | -------------------------
-json.exception.type_error.301 | cannot create object from initializer list | To create an object from an initializer list, the initializer list must consist only of a list of pairs whose first element is a string. When this constraint is violated, an array is created instead.
-json.exception.type_error.302 | type must be object, but is array | During implicit or explicit value conversion, the JSON type must be compatible to the target type. For instance, a JSON string can only be converted into string types, but not into numbers or boolean types.
-json.exception.type_error.303 | incompatible ReferenceType for get_ref, actual type is object | To retrieve a reference to a value stored in a @ref basic_json object with @ref get_ref, the type of the reference must match the value type. For instance, for a JSON array, the @a ReferenceType must be @ref array_t&.
-json.exception.type_error.304 | cannot use at() with string | The @ref at() member functions can only be executed for certain JSON types.
-json.exception.type_error.305 | cannot use operator[] with string | The @ref operator[] member functions can only be executed for certain JSON types.
-json.exception.type_error.306 | cannot use value() with string | The @ref value() member functions can only be executed for certain JSON types.
-json.exception.type_error.307 | cannot use erase() with string | The @ref erase() member functions can only be executed for certain JSON types.
-json.exception.type_error.308 | cannot use push_back() with string | The @ref push_back() and @ref operator+= member functions can only be executed for certain JSON types.
-json.exception.type_error.309 | cannot use insert() with | The @ref insert() member functions can only be executed for certain JSON types.
-json.exception.type_error.310 | cannot use swap() with number | The @ref swap() member functions can only be executed for certain JSON types.
-json.exception.type_error.311 | cannot use emplace_back() with string | The @ref emplace_back() member function can only be executed for certain JSON types.
-json.exception.type_error.312 | cannot use update() with string | The @ref update() member functions can only be executed for certain JSON types.
-json.exception.type_error.313 | invalid value to unflatten | The @ref unflatten function converts an object whose keys are JSON Pointers back into an arbitrary nested JSON value. The JSON Pointers must not overlap, because then the resulting value would not be well defined.
-json.exception.type_error.314 | only objects can be unflattened | The @ref unflatten function only works for an object whose keys are JSON Pointers.
-json.exception.type_error.315 | values in object must be primitive | The @ref unflatten function only works for an object whose keys are JSON Pointers and whose values are primitive.
-json.exception.type_error.316 | invalid UTF-8 byte at index 10: 0x7E | The @ref dump function only works with UTF-8 encoded strings; that is, if you assign a `std::string` to a JSON value, make sure it is UTF-8 encoded. |
-
-@liveexample{The following code shows how a `type_error` exception can be
-caught.,type_error}
-
-@sa @ref exception for the base class of the library exceptions
-@sa @ref parse_error for exceptions indicating a parse error
-@sa @ref invalid_iterator for exceptions indicating errors with iterators
-@sa @ref out_of_range for exceptions indicating access out of the defined range
-@sa @ref other_error for exceptions indicating other library errors
-
-@since version 3.0.0
-*/
 class type_error : public exception
 {
   public:
@@ -771,9 +593,9 @@ class other_error : public exception
 }
 }
 
-// <json_ns/detail/value_t.hpp>
+// <my_json/detail/value_t.hpp>
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -843,11 +665,11 @@ inline bool operator<(const value_t lhs, const value_t rhs) noexcept
 }
 }
 
-// <json_ns/detail/conversions/from_json.hpp>
+// <my_json/detail/conversions/from_json.hpp>
 
 
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -1162,11 +984,11 @@ constexpr const auto& from_json = detail::static_const<detail::from_json_fn>::va
 }
 }
 
-// <json_ns/detail/conversions/to_json.hpp>
+// <my_json/detail/conversions/to_json.hpp>
 
 
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -1499,12 +1321,12 @@ constexpr const auto& to_json = detail::static_const<detail::to_json_fn>::value;
 }
 }
 
-// <json_ns/detail/input/input_adapters.hpp>
+// <my_json/detail/input/input_adapters.hpp>
 
 
 
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -1778,11 +1600,11 @@ class input_adapter
 }
 }
 
-// <json_ns/detail/input/lexer.hpp>
+// <my_json/detail/input/lexer.hpp>
 
 
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -3045,7 +2867,7 @@ scan_number_done:
 }
 }
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -3673,9 +3495,9 @@ class parser
 }
 }
 
-// <json_ns/detail/iterators/primitive_iterator.hpp>
+// <my_json/detail/iterators/primitive_iterator.hpp>
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -3791,9 +3613,9 @@ class primitive_iterator_t
 }
 }
 
-// <json_ns/detail/iterators/internal_iterator.hpp>
+// <my_json/detail/iterators/internal_iterator.hpp>
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -3801,7 +3623,7 @@ namespace detail
 @brief an iterator value
 
 @note This structure could easily be a union, but MSVC currently does not allow
-unions members with complex constructors, see https://github.com/json_ns/json/pull/105.
+unions members with complex constructors, see https://github.com/my_json/json/pull/105.
 */
 template<typename BasicJsonType> struct internal_iterator
 {
@@ -3815,9 +3637,9 @@ template<typename BasicJsonType> struct internal_iterator
 }
 }
 
-//  <json_ns/detail/iterators/iter_impl.hpp>
+//  <my_json/detail/iterators/iter_impl.hpp>
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -3842,7 +3664,7 @@ This class implements a both iterators (iterator and const_iterator) for the
   incremented and decremented).
 
 @since version 1.0.0, simplified in version 2.0.9, change to bidirectional
-       iterators in version 3.0.0 (see https://github.com/json_ns/json/issues/593)
+       iterators in version 3.0.0 (see https://github.com/my_json/json/issues/593)
 */
 template<typename BasicJsonType>
 class iter_impl
@@ -4419,9 +4241,9 @@ class iter_impl
 }
 }
 
-// <json_ns/detail/iterators/iteration_proxy.hpp>
+// <my_json/detail/iterators/iteration_proxy.hpp>
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -4513,8 +4335,8 @@ template<typename IteratorType> class iteration_proxy
 }
 }
 
-// <json_ns/detail/iterators/json_reverse_iterator.hpp>
-namespace json_ns
+// <my_json/detail/iterators/json_reverse_iterator.hpp>
+namespace my_json
 {
 namespace detail
 {
@@ -4628,8 +4450,8 @@ class json_reverse_iterator : public std::reverse_iterator<Base>
 }
 }
 
-// <json_ns/detail/output/output_adapters.hpp>
-namespace json_ns
+// <my_json/detail/output/output_adapters.hpp>
+namespace my_json
 {
 namespace detail
 {
@@ -4779,10 +4601,10 @@ class output_adapter
 }
 }
 
-// <json_ns/detail/input/binary_reader.hpp>
+// <my_json/detail/input/binary_reader.hpp>
 
 #if USE_BINARY_FORMATS
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -6135,10 +5957,10 @@ class binary_reader
 }
 }
 #endif //USE_BINARY_FORMATS
-// <json_ns/detail/output/binary_writer.hpp>
+// <my_json/detail/output/binary_writer.hpp>
 
 #if USE_BINARY_FORMATS
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -7077,9 +6899,9 @@ class binary_writer
 }
 }
 #endif //USE_BINARY_FORMATS
-// <json_ns/detail/output/serializer.hpp>
+// <my_json/detail/output/serializer.hpp>
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -8165,9 +7987,9 @@ char* to_chars(char* first, char* last, FloatType value)
 }
 
 } // namespace detail
-} // namespace json_ns
+} // namespace my_json
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -8815,7 +8637,7 @@ class serializer
     void dump_float(number_float_t x, std::true_type /*is_ieee_single_or_double*/)
     {
         char* begin = number_buffer.data();
-        char* end = ::json_ns::detail::to_chars(begin, begin + number_buffer.size(), x);
+        char* end = ::my_json::detail::to_chars(begin, begin + number_buffer.size(), x);
 
         o->write_characters(begin, static_cast<size_t>(end - begin));
     }
@@ -8947,9 +8769,9 @@ class serializer
 }
 }
 
-// <json_ns/detail/json_ref.hpp>
+// <my_json/detail/json_ref.hpp>
 
-namespace json_ns
+namespace my_json
 {
 namespace detail
 {
@@ -9008,15 +8830,15 @@ class json_ref
 }
 }
 
-// <json_ns/detail/json_pointer.hpp>
+// <my_json/detail/json_pointer.hpp>
 
-namespace json_ns
+namespace my_json
 {
 template<typename BasicJsonType>
 class json_pointer
 {
     // allow basic_json to access private members
-    JSON_NS_BASIC_JSON_TPL_DECLARATION
+    MY_JSON_BASIC_JSON_TPL_DECLARATION
     friend class basic_json;
 
   public:
@@ -9696,9 +9518,9 @@ class json_pointer
 };
 }
 
-// <json_ns/adl_serializer.hpp>
+// <my_json/adl_serializer.hpp>
 
-namespace json_ns
+namespace my_json
 {
 template<typename, typename>
 struct adl_serializer
@@ -9714,9 +9536,9 @@ struct adl_serializer
     */
     template<typename BasicJsonType, typename ValueType>
     static void from_json(BasicJsonType&& j, ValueType& val) noexcept(
-        noexcept(::json_ns::from_json(std::forward<BasicJsonType>(j), val)))
+        noexcept(::my_json::from_json(std::forward<BasicJsonType>(j), val)))
     {
-        ::json_ns::from_json(std::forward<BasicJsonType>(j), val);
+        ::my_json::from_json(std::forward<BasicJsonType>(j), val);
     }
 
     /*!
@@ -9730,9 +9552,9 @@ struct adl_serializer
     */
     template<typename BasicJsonType, typename ValueType>
     static void to_json(BasicJsonType& j, ValueType&& val) noexcept(
-        noexcept(::json_ns::to_json(j, std::forward<ValueType>(val))))
+        noexcept(::my_json::to_json(j, std::forward<ValueType>(val))))
     {
-        ::json_ns::to_json(j, std::forward<ValueType>(val));
+        ::my_json::to_json(j, std::forward<ValueType>(val));
     }
 };
 }
@@ -9740,10 +9562,10 @@ struct adl_serializer
 
 /*!
 @brief namespace for Niels Lohmann
-@see https://github.com/json_ns
+@see https://github.com/my_json
 @since version 1.0.0
 */
-namespace json_ns
+namespace my_json
 {
 
 /*!
@@ -9827,52 +9649,52 @@ Format](http://rfc7159.net/rfc7159)
 
 @nosubgrouping
 */
-JSON_NS_BASIC_JSON_TPL_DECLARATION
+MY_JSON_BASIC_JSON_TPL_DECLARATION
 class basic_json
 {
   private:
     template<detail::value_t> friend struct detail::external_constructor;
-    friend ::json_ns::json_pointer<basic_json>;
-    friend ::json_ns::detail::parser<basic_json>;
-    friend ::json_ns::detail::serializer<basic_json>;
+    friend ::my_json::json_pointer<basic_json>;
+    friend ::my_json::detail::parser<basic_json>;
+    friend ::my_json::detail::serializer<basic_json>;
     template<typename BasicJsonType>
-    friend class ::json_ns::detail::iter_impl;
+    friend class ::my_json::detail::iter_impl;
 #if USE_BINARY_FORMATS
     template<typename BasicJsonType, typename CharType>
-    friend class ::json_ns::detail::binary_writer;
+    friend class ::my_json::detail::binary_writer;
     template<typename BasicJsonType>
-    friend class ::json_ns::detail::binary_reader;
+    friend class ::my_json::detail::binary_reader;
 #endif
 
     /// workaround type for MSVC
-    using basic_json_t = JSON_NS_BASIC_JSON_TPL;
+    using basic_json_t = MY_JSON_BASIC_JSON_TPL;
 
     // convenience aliases for types residing in namespace detail;
-    using lexer = ::json_ns::detail::lexer<basic_json>;
-    using parser = ::json_ns::detail::parser<basic_json>;
+    using lexer = ::my_json::detail::lexer<basic_json>;
+    using parser = ::my_json::detail::parser<basic_json>;
 
-    using primitive_iterator_t = ::json_ns::detail::primitive_iterator_t;
+    using primitive_iterator_t = ::my_json::detail::primitive_iterator_t;
     template<typename BasicJsonType>
-    using internal_iterator = ::json_ns::detail::internal_iterator<BasicJsonType>;
+    using internal_iterator = ::my_json::detail::internal_iterator<BasicJsonType>;
     template<typename BasicJsonType>
-    using iter_impl = ::json_ns::detail::iter_impl<BasicJsonType>;
+    using iter_impl = ::my_json::detail::iter_impl<BasicJsonType>;
     template<typename Iterator>
-    using iteration_proxy = ::json_ns::detail::iteration_proxy<Iterator>;
-    template<typename Base> using json_reverse_iterator = ::json_ns::detail::json_reverse_iterator<Base>;
+    using iteration_proxy = ::my_json::detail::iteration_proxy<Iterator>;
+    template<typename Base> using json_reverse_iterator = ::my_json::detail::json_reverse_iterator<Base>;
 
     template<typename CharType>
-    using output_adapter_t = ::json_ns::detail::output_adapter_t<CharType>;
+    using output_adapter_t = ::my_json::detail::output_adapter_t<CharType>;
 #if USE_BINARY_FORMATS
-    using binary_reader = ::json_ns::detail::binary_reader<basic_json>;
-    template<typename CharType> using binary_writer = ::json_ns::detail::binary_writer<basic_json, CharType>;
+    using binary_reader = ::my_json::detail::binary_reader<basic_json>;
+    template<typename CharType> using binary_writer = ::my_json::detail::binary_writer<basic_json, CharType>;
 #endif
 
-    using serializer = ::json_ns::detail::serializer<basic_json>;
+    using serializer = ::my_json::detail::serializer<basic_json>;
 
   public:
     using value_t = detail::value_t;
-    /// @copydoc json_ns::json_pointer
-    using json_pointer = ::json_ns::json_pointer<basic_json>;
+    /// @copydoc my_json::json_pointer
+    using json_pointer = ::my_json::json_pointer<basic_json>;
     template<typename T, typename SFINAE>
     using json_serializer = JSONSerializer<T, SFINAE>;
     /// helper type for initializer lists of basic_json values
@@ -9984,14 +9806,14 @@ class basic_json
 
         result["copyright"] = "(C) 2013-2017 Niels Lohmann";
         result["name"] = "JSON for Modern C++";
-        result["url"] = "https://github.com/json_ns/json";
+        result["url"] = "https://github.com/my_json/json";
         result["version"]["string"] =
-            std::to_string(JSON_NS_JSON_VERSION_MAJOR) + "." +
-            std::to_string(JSON_NS_JSON_VERSION_MINOR) + "." +
-            std::to_string(JSON_NS_JSON_VERSION_PATCH);
-        result["version"]["major"] = JSON_NS_JSON_VERSION_MAJOR;
-        result["version"]["minor"] = JSON_NS_JSON_VERSION_MINOR;
-        result["version"]["patch"] = JSON_NS_JSON_VERSION_PATCH;
+            std::to_string(MY_JSON_JSON_VERSION_MAJOR) + "." +
+            std::to_string(MY_JSON_JSON_VERSION_MINOR) + "." +
+            std::to_string(MY_JSON_JSON_VERSION_PATCH);
+        result["version"]["major"] = MY_JSON_JSON_VERSION_MAJOR;
+        result["version"]["minor"] = MY_JSON_JSON_VERSION_MINOR;
+        result["version"]["patch"] = MY_JSON_JSON_VERSION_PATCH;
 
 #ifdef _WIN32
         result["platform"] = "win32";
@@ -14521,7 +14343,7 @@ class basic_json
     @note This function is required to resolve an ambiguous overload error,
           because pairs like `{"key", "value"}` can be both interpreted as
           `object_t::value_type` or `std::initializer_list<basic_json>`, see
-          https://github.com/json_ns/json/issues/235 for more information.
+          https://github.com/my_json/json/issues/235 for more information.
 
     @liveexample{The example shows how initializer lists are treated as
     objects when possible.,push_back__initializer_list}
@@ -17281,7 +17103,7 @@ class basic_json
 
     /// @}
 };
-} // namespace json_ns
+} // namespace my_json
 
 ///////////////////////
 // nonmember support //
@@ -17296,10 +17118,10 @@ namespace std
 @since version 1.0.0
 */
 template<>
-inline void swap(json_ns::json& j1,
-                 json_ns::json& j2) noexcept(
-                     is_nothrow_move_constructible<json_ns::json>::value and
-                     is_nothrow_move_assignable<json_ns::json>::value
+inline void swap(my_json::json& j1,
+                 my_json::json& j2) noexcept(
+                     is_nothrow_move_constructible<my_json::json>::value and
+                     is_nothrow_move_assignable<my_json::json>::value
                  )
 {
     j1.swap(j2);
@@ -17307,35 +17129,35 @@ inline void swap(json_ns::json& j1,
 
 /// hash value for JSON objects
 template<>
-struct hash<json_ns::json>
+struct hash<my_json::json>
 {
     /*!
     @brief return a hash value for a JSON object
 
     @since version 1.0.0
     */
-    std::size_t operator()(const json_ns::json& j) const
+    std::size_t operator()(const my_json::json& j) const
     {
         // a naive hashing via the string representation
-        const auto& h = hash<json_ns::json::string_t>();
+        const auto& h = hash<my_json::json::string_t>();
         return h(j.dump());
     }
 };
 
 /// specialization for std::less<value_t>
 /// @note: do not remove the space after '<',
-///        see https://github.com/json_ns/json/pull/679
+///        see https://github.com/my_json/json/pull/679
 template<>
-struct less< ::json_ns::detail::value_t>
+struct less< ::my_json::detail::value_t>
 {
     /*!
     @brief compare two value_t enum values
     @since version 3.0.0
     */
-    bool operator()(json_ns::detail::value_t lhs,
-                    json_ns::detail::value_t rhs) const noexcept
+    bool operator()(my_json::detail::value_t lhs,
+                    my_json::detail::value_t rhs) const noexcept
     {
-        return json_ns::detail::operator<(lhs, rhs);
+        return my_json::detail::operator<(lhs, rhs);
     }
 };
 
@@ -17354,9 +17176,9 @@ if no parse error occurred.
 
 @since version 1.0.0
 */
-inline json_ns::json operator "" _json(const char* s, std::size_t n)
+inline my_json::json operator "" _json(const char* s, std::size_t n)
 {
-    return json_ns::json::parse(s, s + n);
+    return my_json::json::parse(s, s + n);
 }
 
 /*!
@@ -17372,12 +17194,12 @@ object if no parse error occurred.
 
 @since version 2.0.0
 */
-inline json_ns::json::json_pointer operator "" _json_pointer(const char* s, std::size_t n)
+inline my_json::json::json_pointer operator "" _json_pointer(const char* s, std::size_t n)
 {
-    return json_ns::json::json_pointer(std::string(s, n));
+    return my_json::json::json_pointer(std::string(s, n));
 }
 
-// <json_ns/detail/macro_unscope.hpp>
+// <my_json/detail/macro_unscope.hpp>
 
 
 // restore GCC/clang diagnostic settings
@@ -17397,9 +17219,9 @@ inline json_ns::json::json_pointer operator "" _json_pointer(const char* s, std:
 #undef JSON_DEPRECATED
 #undef JSON_HAS_CPP_14
 #undef JSON_HAS_CPP_17
-#undef JSON_NS_BASIC_JSON_TPL_DECLARATION
-#undef JSON_NS_BASIC_JSON_TPL
-#undef JSON_NS_JSON_HAS_HELPER
+#undef MY_JSON_BASIC_JSON_TPL_DECLARATION
+#undef MY_JSON_BASIC_JSON_TPL
+#undef MY_JSON_JSON_HAS_HELPER
 
 
 #endif

@@ -16,14 +16,43 @@
 #include <sqlite3.h>
 //I assume SQLITE_OK == 0 at several points in my code, so make sure it is.
 static_assert(SQLITE_OK == 0);
+#if (defined __unix__)
+#include <unistd.h>
+#include <fcntl.h>
+#include <dirent.h>
+//TODO: Move these someplace that makes more sense.
+inline void set_close_on_exec(int fd){
+  fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | FD_CLOEXEC);
+}
+inline void set_close_on_exec_all(){
+  DIR* dirp = opendir("/proc/self/fd");
+  struct dirent *d;
+  while((d = readdir(dirp)) != nullptr){
+    int fd = strtol(d->d_name, NULL, 0);
+    set_close_on_exec(fd);
+  }
+  closedir(dirp);
+  return;
+}
+#elif (defined _WIN32)
+#include <windows.h>
+inline void set_close_on_exec(int fd){}
+inline void set_close_on_exec_all(){}
+#endif
+
 //local headers.
 #include "util.h"
 #include "string_buf.h"
 #include "filesystem.h"
 #include "progress_bar.h"
 #include "image.h"
-#include "json.hpp"
 #include "logger.h"
+
+#define JSON_THROW_USER(exception)                                      \
+  do { fprintf(stderr, "%s\n", exception.what()), abort(); } while(0)
+#include "json.hpp"
+#undef JSON_THROW_USER
+
 
 extern SSL_CTX* vndb_ctx;
 bool init_vndb_ssl_ctx();

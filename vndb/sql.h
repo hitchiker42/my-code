@@ -20,6 +20,10 @@ static constexpr std::string_view sql_select_tag_by_id =
   "select * from tags where id = @id;"sv;
 static constexpr std::string_view sql_select_trait_by_id =
   "select * from traits where id = @id;"sv;
+static constexpr std::string_view sql_select_vn_image_by_id =
+  "select image from vn_images where id = @id;"sv;
+static constexpr std::string_view sql_select_character_image_by_id =
+  "select image from character_images where id = @id;"sv;
 /*
   Select statements using derived tables
 */

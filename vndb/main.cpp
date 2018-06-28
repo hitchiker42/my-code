@@ -47,18 +47,23 @@ R"EOF(./vndb_cpp [options] [command [command_arguments]]
     start interactive mode.)EOF";
 //Unless I add a lot more commands a linear search (instead of a hash table/rbtree),
 //should be fine.
-static constexpr int num_commands = 5;
+static constexpr int num_commands = 6;
 static constexpr std::array<std::string_view, num_commands> command_names = {{
     "download"sv, "update"sv, "build-derived-tables"sv,
-    "re-build-derived-tables"sv, "evaluate"sv
+    "re-build-derived-tables"sv, "evaluate"sv, "interactive"sv
 }};
 enum class command_type {
   download = 0,
   update = 1,
   build = 2,
   rebuild = 3,
-  eval = 4
+  eval = 4,
+  interactive = 5
 };
+[[noreturn]] void print_help_and_exit(){
+  printf("%s\n", usage_message.data());
+  exit(EXIT_SUCCESS);
+}
 //if prefix is a prefix of one and only one of the strings in 'strs' return the
 //index of that string, if prefix is not a prefix of any of strs return -1,
 //and if prefix is a prefix of more than one of strs return -2.
@@ -288,7 +293,10 @@ int get_command_type(std::string_view command){
   exit(EXIT_SUCCESS);
 }
 [[noreturn]] void run_interactively(vndb_main &vndb){
-  fprintf(stderr, "Interactive mode not yet implemented.\n");
+  set_close_on_exec_all();
+  printf("Placeholder for interactive loop, pid = %d.\n"
+         "Press any key to quit.\n", getpid());
+  getchar();
   exit(EXIT_SUCCESS);
 }
 void ignore_signal(int sig){
@@ -320,6 +328,9 @@ int main(int argc, char *argv[]){
   sigemptyset(&ignore_act.sa_mask);
   ignore_act.sa_flags = SA_RESTART;
   sigaction(SIGPIPE, &ignore_act, &old_act);
+  //Set SIGCHLD to ignore so we don't need to reap any child processes
+  ignore_act.sa_handler = SIG_IGN;
+  sigaction(SIGCHLD, &ignore_act, &old_act);
   /*
     Avoid doing anything that might do logging untill we've
     finished parsing options, so we know what the log level should be.
@@ -359,8 +370,7 @@ int main(int argc, char *argv[]){
         break;
       }
       case 'h':
-        printf("%s\n", usage_message.data());
-        exit(EXIT_SUCCESS);
+        print_help_and_exit();
       //TODO: We need to test if the argument here is a valid log level, either
       //here or later.
       case 'l':
@@ -415,7 +425,7 @@ int main(int argc, char *argv[]){
   int cmd_type = get_command_type(argv[arg_idx]);
   if(cmd_type < 0){
     fprintf(stderr, "Unknown command type '%s'.\n", argv[arg_idx]);
-    exit(EXIT_FAILURE);
+    print_help_and_exit();
   }
   ++arg_idx;
   command_type cmd = (command_type)cmd_type;
@@ -426,6 +436,8 @@ int main(int argc, char *argv[]){
     //TODO: Actually parse the arguments to this command.
     vndb.build_derived_tables();
   } else if(cmd == command_type::eval){
+    print_help_and_exit();
+  } else if(cmd == command_type::interactive){
     run_interactively(vndb);
   } else {
     unreachable();

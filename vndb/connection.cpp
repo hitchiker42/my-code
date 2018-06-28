@@ -92,6 +92,12 @@ bool BIO_wrapper::connect(){
     print_ssl_errors("Error connecting to server\n");
     return false;
   }
+  int fd = BIO_get_fd(this->bio, nullptr);
+  if(fd == -1){
+    fprintf(stderr, "Bio not initialized.\n");
+  } else {
+    set_close_on_exec(fd);
+  }
   //  if(is_encrypted()){
   if(BIO_do_handshake(this->bio) <= 0){
     print_ssl_errors("Error establishing SSL connection.\n");

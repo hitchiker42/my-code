@@ -17,8 +17,8 @@ static inline string_view ltrim(const string_view sv,
 }
 static inline string_view rtrim(const string_view sv, 
                                 const string_view filter = whitespace_sv){
-  auto it = util::find_first_of_not(sv.rbegin(), sv.rend(),
-                                    filter.begin(), filter.end());
+  size_t len = sv.find_first_of_not(filter)
+                                       filter.begin(), filter.end());
   auto len = std::distance(sv.begin(), it.base()); 
   return sv.substr(0, len);
 }

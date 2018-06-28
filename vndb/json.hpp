@@ -12969,7 +12969,18 @@ class basic_json
 
         JSON_THROW(type_error::create(305, "cannot use operator[] with " + std::string(type_name())));
     }
-
+    const_pointer
+    find_or_null(const typename object_t::key_type& key) const {
+      if (JSON_LIKELY(is_object())){
+        auto it = m_value.object->find(key);
+        if(it == m_value.object->end()){
+          return nullptr;
+        } else {
+          return &(it->second);
+        }
+      }
+        JSON_THROW(type_error::create(305, "cannot use operator[] with " + std::string(type_name())));
+    }
     /*!
     @brief access specified object element
 
