@@ -86,7 +86,7 @@ json* eval_expr(vdb_main *vndb, std::string_view expr);//Need to write this.
 int is_unique_prefix(std::string_view prefix, std::string_view *strs, int nstrs);
 //Functions to proved generic access to readline type libraries, so that I'm not
 //tied to one particular library.
-void init_readline();
+void vndb_init_readline();
 char *vndb_readline(const char *prompt);
 void vndb_add_to_history(const char *str, bool copy = false);
 int set_var_to_sql(vndb_main *vndb, std::string_view var,
@@ -179,7 +179,8 @@ bool eval_expr(vdb_main *vndb, std::string_view expr, json *val_ptr){
       printf("Undefined variables %.*s.\n", var.size(), var.data());
       return false;
     }
-    
+  }
+}
   
     
 enum class command_type {
@@ -275,6 +276,10 @@ int do_command(vndb_main *vndb, std::string_view command){
       return 0;
     }
     case command_type::view:{
+      if(!sdl_running){
+        printf("SDL is not running so images can not be displayed.\n");
+        return -1;
+      }
       //This should be sql_select_vn_image_by_id, compiled.
       sqlite3_stmt_wrapper stmt;
       while(*cmd_end == ' '){
@@ -300,7 +305,7 @@ int do_command(vndb_main *vndb, std::string_view command){
         SDL_PushEvent(&evt);
         //The pointer to data is only valid until we call stmt.step/reset
         //so we need to wait for the other thread to be done with it.
-        SDL_SemWait(vndb->sdl_ctx->sem);
+        SDL_SemWait(vndb->sdl_sem);
         return 0        
       } else {
         printf("Error executing sql.\n");
@@ -310,36 +315,50 @@ int do_command(vndb_main *vndb, std::string_view command){
   }
 }
 
-
-int main(int argc, char* argv[]){
-
-
-  using_history();
-  string_buf buf;
-  char *lineptr, *endptr;
-  while(lineptr = readline("> ")){
-    if(!(endptr = strchr(lineptr, ';'))){
-      buf.append(lineptr).append(' ');//translate newlines to spaces
-      free(lineptr);
-      continue;
-    } else {
-      //make sure there's no actual text after the semicolon
-      while(*(++endptr) != '\0'){
-        if(!isspace(*endptr)){
-          //print some error
-        }
-      }
-      //Check if the semicolon is the only thing on the line and just
-      //append it to the last line in that case.
-
-      //grab the memory allocated by the buffer so we can store in the history.
-      util::string_view sv = buf.move_to_string_view();
-      //Unset the owned flag of sv so it doesn't get freed.
-      add_history(str.data());
-
-      //Exectute whatever command was in sv & print the results or whatever.
-    }
+[[noreturn]] void run_interactively(vndb_main &vndb){
+  util::string_buf buf;
+  char *lineptr = nullptr;
+  char *endptr = nullptr;
+  int err = 0;
+  vndb_init_readline();
+  if(!vndb.init_sdl()){
+    printf("Could not initialize SDL, will not be able to display images.\n");
   }
+  while(1){
+    char *prompt = "vndb >";
+    buf.clear();
+    lineptr = vndb_readline(prompt);
+    if(!lineptr){ goto end; }
+    if(!(endptr = strchr(lineptr, ';'))){
+      prompt = " ... >";
+      do {
+        buf.append(lineptr).append(' ');//translate newlines to spaces
+        free(lineptr);
+        lineptr = vndb_readline(prompt);
+        if(!lineptr){ goto end; }
+      } while(!(endptr = strchr(lineptr, ";")));
+    }
+    //append everything upto and including the semicolon.
+    buf.append(lineptr, (endptr - lineptr) + 1);
+    //make sure there's no actual text after the semicolon
+    while(*(++endptr) != '\0'){
+      if(!isspace(*endptr)){
+        printf("Unexpected text following ';' : \"%s\".\n", endptr);
+        goto next;
+      }
+    }
+    //grab the memory allocated by the buffer so we can store in the history.
+    util::string_view line = buf.move_to_string_view();
+    line.release_memory(); //we're transfering ownership to the history manager.
+    vndb_add_history(line.data());
+    //There isn't really anything to do with the return value of do_command...
+    err = do_command(vndb, line);
+  next:
+    free(lineptr);
+  }
+ end:
+  free(lineptr);
+  exit(abs(err));
 }
 /*
 struct json_path {

@@ -13,7 +13,8 @@
 #include <openssl/ssl.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
-#include <sqlite3.h>
+//Use local copy of sqlite3.h
+#include "sqlite3.h"
 //I assume SQLITE_OK == 0 at several points in my code, so make sure it is.
 static_assert(SQLITE_OK == 0);
 #if (defined __unix__)
@@ -57,6 +58,9 @@ inline void set_close_on_exec_all(){}
 extern SSL_CTX* vndb_ctx;
 bool init_vndb_ssl_ctx();
 void free_vndb_ssl_ctx();
+
+//from sqlite_ext.c, initializes sqlite extensions, specifically regexps
+int init_sqlite_ext(sqlite3 *db){
 
 //This needs to be defined and initialized in whatever file has main.
 //It should be initialized before anything else.

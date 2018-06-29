@@ -1,31 +1,31 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <sqlite3.h>
-#include <prce.h>
-/*
-  Simple regex function thats a bit more optimized that the most
-  basic verison. It caches the last regexp used so repeated
-  calls with the same pattern won't need to recompile it. 
-  If a sql statement has more than one regex call in it however
-  this will slow it down slightly, I think its worth the trade off.
-*/
+#include <assert.h>
+
+#include "sqlite3.h"
 typedef struct simple_cache simple_cache;
 struct simple_cache {
-  const char *pat;
+  char *pat;
   size_t patlen;
   size_t mem;
-  prce *regex;
+  pcre2_code *regex;
+  pcre2_match_data *mdata;
 };
 void destroy_simple_cache(void *ptr){
   simple_cache *cache = ptr;
   free(cache->pat);
-  pcre_free(cache->regex);
+  pcre2_code_free(cache->regex);
+  pcre2_match_data_free(cache->mdata);
+  free(cache);
 }
 //See if the pattern used in 'cache' is the same as pat, if not copy
 //pat into cache and free the old regexp.
 int check_simple_cache(simple_cache *cache, char *pat, size_t patlen){
   if((cache->patlen == patlen) && !strcmp(pat, cache->pat)){
+    //If we reuse a pattern once we're likely to do so multiple times
+    //so it's probably worth using jit compilation
+    prec2_jit_compile(cache->regex);
     return 1;
   }
   cache->patlen = patlen;
@@ -34,9 +34,14 @@ int check_simple_cache(simple_cache *cache, char *pat, size_t patlen){
     cache->mem = patlen + 1;
   }
   memcpy(cache->pat, pat, patlen+1);
-  pcre_free(cache->regex);
+  pcre2_code_free(cache->regex);
+  return 0;
 }
-
+int do_regex_match(char *pat, size_t patlen,
+                   char *text, size_t text_len,
+                   simple_cache *cache, sqlite3_context* context){  
+}
+#endif
 void sqlite_regexp_simple(sqlite3_context* context, int argc,
                           sqlite3_value** values) {
   int ret;
@@ -51,40 +56,42 @@ void sqlite_regexp_simple(sqlite3_context* context, int argc,
   size_t patlen = strlen(pat);
   size_t text_len = strlen(text);
   simple_cache *cache = sqlite3_user_data(context);
-
-  //Compile pattern if necessary.
+    //Compile pattern if necessary.
   if(!check_simple_cache(cache, pat, patlen)){
-    char *errptr;
-    int erroffset;
-    cache->regex = pcre_compile(pat, PCRE_UTF8, &errptr, &erroffset, NULL);
+    int errnum;
+    size_t erroffset;
+    cache->regex = pcre2_compile(pat, patlen, PCRE2_UTF8,
+                                 &errnum, &erroffset, NULL);
     if(!cache->regex){
       //make sure we don't get a cache hit for a wrong pattern.
       cache->patlen = 0;
       char buf[512];
       //Print error message in such a way that if anything gets truncated
       //it will be the pattern.
-      int nbytes = sprintf(buf, 4096,"error compiling regular expression, "
-                           "\"%s\" at offset %d of pattern %s.\n", 
-                           errptr, erroffset, pat);
+      int nbytes = snprintf(buf, 4096,"error compiling regular expression, "
+                            "\"%s\" at offset %d of pattern %s.\n", 
+                            errptr, erroffset, pat);
       sqlite3_result_error(context, buf, nbytes);
       return;      
     }
   }
-  //We have reason to to save the capture groups, but we need to give
-  //pcre space to store them in order to allow backreferences to work.
-  int ovector[18];
-  ret = pcre_exec(cache->regexp, NULL, text, text_len, 0, 0, ovector, 18);
-  //Check for error from pcre_exec
-  if(ret < -1){
+  int ret = pcre2_match(cache->regex, text, text_len, 0, 0, cache->mdata, NULL);
+  if(ret >= 0){
+    sqlite3_result_int(context, 1);
+  } else if(ret == NO_MATCH){
+    sqlite3_result_int(context, 0);
+  } else {
     char buf[64];
     int nbytes = snprintf(buf, 128, 
                           "Error in pcre_exec, error number %d.\n", ret);
     sqlite3_result_error(context, buf, nbytes);
   }
-  sqlite3_result_int(context, ret >= 0);
+  return;
 }
+//Non regexp code
 int init_sqlite_ext(sqlite3 *db){
-  simple_cache *cache = calloc(sizeof(simple_cache));
+  simple_cache *cache = calloc(sizeof(simple_cache), 1);
+  cache->mdata = pcre2_match_data_create(10, NULL);
   int ret = sqlite3_create_function_v2(db, "regexp", 2, 
                                        SQLITE_UTF8 | SQLITE_DETERMINISTIC,
                                        cache, sqlite_regexp_simple,
@@ -100,16 +107,16 @@ int init_sqlite_ext(sqlite3 *db){
 // in filename into it. Written using a simlar interface as most sqlite3 api
 // functions.
 int sqlite_open_db_in_memory(const char* filename, sqlite3 **db_ptr){
-  sqlite3 *file = nullptr;
+  sqlite3 *file = NULL;
   //insure calling sqlite3_close on *dp_ptr after an error will work.
-  *db_ptr = nullptr;
+  *db_ptr = NULL;
   int err = sqlite3_open_v2(filename, &file,
-                            SQLITE_OPEN_READWRITE, nullptr);
+                            SQLITE_OPEN_READWRITE, NULL);
   //This doesn't work in C++ since this jump skips the initialization
   //of mem & bkup.
   if(err != SQLITE_OK){ goto end; }
 
-  err = sqlite3_open_v2(":memory:", db_ptr, SQLITE_OPEN_READWRITE, nullptr);
+  err = sqlite3_open_v2(":memory:", db_ptr, SQLITE_OPEN_READWRITE, NULL);
   if(err != SQLITE_OK){ goto end; }
 
   sqlite3 *mem = *db_ptr;
