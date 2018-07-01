@@ -82,8 +82,8 @@ void open_url(const char *url){
 #endif
 
 
-json* eval_expr(vdb_main *vndb, std::string_view expr);//Need to write this.
-int is_unique_prefix(std::string_view prefix, std::string_view *strs, int nstrs);
+json* eval_expr(vdb_main *vndb, std::string_view expr);
+
 //Functions to proved generic access to readline type libraries, so that I'm not
 //tied to one particular library.
 void vndb_init_readline();
@@ -107,8 +107,8 @@ int set_var_to_sql(vndb_main *vndb, std::string_view var,
 //path is: \[number|name\]+
 // where number = [0-9]+ and name = [a-zA-z][[:alnum:]]+
 //I may extend this defination later, but this is the eaisest to parse.
-json* follow_json_path(const json &val, const char *path){
-  const json *current = &val;
+json* follow_json_path(const json *val, const char *path){
+  const json *current = val;
   const char *ptr = path;
   char c;
   //TODO: Need to check that index is in range / subobject exists and
@@ -121,13 +121,13 @@ json* follow_json_path(const json &val, const char *path){
     }
     if(c >= '0' && c <= '9'){
       int idx = strtol(ptr, &ptr, 10);
-      if(json->type() != json::value_t::array_t){
-        printf("Error expected json array but got a(n) %s.\n", json->type_name());
+      if(current->type() != json::value_t::array_t){
+        printf("Error expected json array but got a(n) %s.\n", current->type_name());
         return nullptr;
       }
-      if(idx > json->size()){
+      if(idx > current->size()){
         printf("Index %d out of range for array of size %lu.\n",
-               idx, json->size());
+               idx, current->size());
         return nullptr;
       }
       if(*ptr != ']'){
@@ -155,7 +155,7 @@ json* follow_json_path(const json &val, const char *path){
 }
 //expr is a string with a ';' as the final character. Currenly
 //the only supported expressions are numbers and variables.
-bool eval_expr(vdb_main *vndb, std::string_view expr, json *val_ptr){   
+bool eval_expr(vdb_main *vndb, std::string_view expr, json *val_ptr){
   char *ptr = expr.data();
   assert(expr.back() == ';');
   while(*ptr == ' '){ ++ptr; }  //skip space
@@ -179,10 +179,36 @@ bool eval_expr(vdb_main *vndb, std::string_view expr, json *val_ptr){
       printf("Undefined variables %.*s.\n", var.size(), var.data());
       return false;
     }
+    if(*ptr == '['){
+      val = follow_json_path();
+      if(!val){ return false; }
+    }
+    *val_ptr = *val;
+    return true;
+  } else {
+    printf("Unexpected character '%c' in expression '%.*s'.\n",
+           *ptr, expr.size(), expr.data());
+    return false;
   }
 }
-  
-    
+int do_sql_command(vndb_main *vndb, const char *sql){
+  //Variables in sql must begin with a '$' ala perl and bash, this
+  //makes it much eaiser to find them and avoids name conflicts.
+  //TODO: Decide if variables have to follow the same restrictions
+  //      as parameters for prepared statements or if they can
+  //      be part of the actual command.
+  char *var_start = nullptr;
+  if((var_start = strchr(sql, '$')) != nullptr){
+    //expand variables
+  }
+  int err = set_var_to_sql(vndb, "last", sql);
+  if(err != SQLITE_OK){
+    return err;
+  }
+  //print rows, We may print results differently depending on if there was
+  //one column in the result or more than one.
+  return SQLITE_OK;
+}
 enum class command_type {
   sql,
   select,
@@ -216,13 +242,7 @@ int do_command(vndb_main *vndb, std::string_view command){
     case command_type::sql:
     case command_type::select:{
       char *sql = (cmd_type == command_type::sql ? cmd_end : command.data());
-      int err = set_var_to_sql(vndb, "last", sql);
-      if(err != SQLITE_OK){
-        return err;
-      }
-      //print rows, We may print results differently depending on if there was
-      //one column in the result or more than one.
-      break;
+      return do_sql_command(vndb, sql);
     }
     //For print & set Make sure the value that eval_expr returns
     //is pointing to is still in scope.
@@ -248,7 +268,7 @@ int do_command(vndb_main *vndb, std::string_view command){
       } else {
         val.pprint(out);
         return 0;
-      }      
+      }
     }
     case command_type::print:{
       json val;
@@ -294,10 +314,10 @@ int do_command(vndb_main *vndb, std::string_view command){
       int res = stmt.step();
       if(res == SQLITE_DONE){
         printf("Could not find an image for vn %d.\n", id);
-        //Not sure what to return here, it's not really an error but 
+        //Not sure what to return here, it's not really an error but
         //it's not successful either.
         return 0;
-      } else if(res == SQLITE_ROW){       
+      } else if(res == SQLITE_ROW){
         void *data = stmt.get_column<void*>(0);
         size_t data_size = stmt.get_column_bytes(0);
         SDL_Event evt;
@@ -306,7 +326,7 @@ int do_command(vndb_main *vndb, std::string_view command){
         //The pointer to data is only valid until we call stmt.step/reset
         //so we need to wait for the other thread to be done with it.
         SDL_SemWait(vndb->sdl_sem);
-        return 0        
+        return 0
       } else {
         printf("Error executing sql.\n");
         return -1;

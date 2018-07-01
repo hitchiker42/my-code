@@ -8643,147 +8643,121 @@ class serializer
 
     @complexity Linear in the length of string @a s.
     */
-    void dump_escaped(const string_t& s, const bool ensure_ascii)
-    {
-        uint32_t codepoint;
-        uint8_t state = UTF8_ACCEPT;
-        std::size_t bytes = 0;  // number of bytes written to string_buffer
+  void dump_escaped(const string_t& s, const bool ensure_ascii){
+    uint32_t codepoint;
+    uint8_t state = UTF8_ACCEPT;
+    std::size_t bytes = 0;  // number of bytes written to string_buffer
 
-        for (std::size_t i = 0; i < s.size(); ++i)
-        {
-            const auto byte = static_cast<uint8_t>(s[i]);
+    for (std::size_t i = 0; i < s.size(); ++i){
+      const auto byte = static_cast<uint8_t>(s[i]);
 
-            switch (decode(state, codepoint, byte))
-            {
-                case UTF8_ACCEPT:  // decode found a new code point
-                {
-                    switch (codepoint)
-                    {
-                        case 0x08: // backspace
-                        {
-                            string_buffer[bytes++] = '\\';
-                            string_buffer[bytes++] = 'b';
-                            break;
-                        }
-
-                        case 0x09: // horizontal tab
-                        {
-                            string_buffer[bytes++] = '\\';
-                            string_buffer[bytes++] = 't';
-                            break;
-                        }
-
-                        case 0x0A: // newline
-                        {
-                            string_buffer[bytes++] = '\\';
-                            string_buffer[bytes++] = 'n';
-                            break;
-                        }
-
-                        case 0x0C: // formfeed
-                        {
-                            string_buffer[bytes++] = '\\';
-                            string_buffer[bytes++] = 'f';
-                            break;
-                        }
-
-                        case 0x0D: // carriage return
-                        {
-                            string_buffer[bytes++] = '\\';
-                            string_buffer[bytes++] = 'r';
-                            break;
-                        }
-
-                        case 0x22: // quotation mark
-                        {
-                            string_buffer[bytes++] = '\\';
-                            string_buffer[bytes++] = '\"';
-                            break;
-                        }
-
-                        case 0x5C: // reverse solidus
-                        {
-                            string_buffer[bytes++] = '\\';
-                            string_buffer[bytes++] = '\\';
-                            break;
-                        }
-
-                        default:
-                        {
-                            // escape control characters (0x00..0x1F) or, if
-                            // ensure_ascii parameter is used, non-ASCII characters
-                            if ((codepoint <= 0x1F) or (ensure_ascii and (codepoint >= 0x7F)))
-                            {
-                                if (codepoint <= 0xFFFF)
-                                {
-                                    std::snprintf(string_buffer.data() + bytes, 7, "\\u%04x",
-                                                  static_cast<uint16_t>(codepoint));
-                                    bytes += 6;
-                                }
-                                else
-                                {
-                                    std::snprintf(string_buffer.data() + bytes, 13, "\\u%04x\\u%04x",
-                                                  static_cast<uint16_t>(0xD7C0 + (codepoint >> 10)),
-                                                  static_cast<uint16_t>(0xDC00 + (codepoint & 0x3FF)));
-                                    bytes += 12;
-                                }
-                            }
-                            else
-                            {
-                                // copy byte to buffer (all previous bytes
-                                // been copied have in default case above)
-                                string_buffer[bytes++] = s[i];
-                            }
-                            break;
-                        }
-                    }
-
-                    // write buffer and reset index; there must be 13 bytes
-                    // left, as this is the maximal number of bytes to be
-                    // written ("\uxxxx\uxxxx\0") for one code point
-                    if (string_buffer.size() - bytes < 13)
-                    {
-                        o->write_characters(string_buffer.data(), bytes);
-                        bytes = 0;
-                    }
-                    break;
-                }
-
-                case UTF8_REJECT:  // decode found invalid UTF-8 byte
-                {
-                  char buf[8];
-                  snprintf(buf,8,"%02X", byte);
-                    JSON_THROW(type_error::create(316, "invalid UTF-8 byte at index " + std::to_string(i) + ": 0x" + std::string(buf)));
-                }
-
-                default:  // decode found yet incomplete multi-byte code point
-                {
-                    if (!ensure_ascii)
-                    {
-                        // code point will not be escaped - copy byte to buffer
-                        string_buffer[bytes++] = s[i];
-                    }
-                    break;
-                }
+      switch (decode(state, codepoint, byte)){
+        case UTF8_ACCEPT:{  // decode found a new code point
+          switch (codepoint){
+            case 0x08:{ // backspace
+              string_buffer[bytes++] = '\\';
+              string_buffer[bytes++] = 'b';
+              break;
             }
+
+            case 0x09:{ // horizontal tab
+              string_buffer[bytes++] = '\\';
+              string_buffer[bytes++] = 't';
+              break;
+            }
+
+            case 0x0A:{ // newline
+              string_buffer[bytes++] = '\\';
+              string_buffer[bytes++] = 'n';
+              break;
+            }
+
+            case 0x0C:{ // formfeed
+              string_buffer[bytes++] = '\\';
+              string_buffer[bytes++] = 'f';
+              break;
+            }
+
+            case 0x0D:{ // carriage return
+              string_buffer[bytes++] = '\\';
+              string_buffer[bytes++] = 'r';
+              break;
+            }
+
+            case 0x22:{ // quotation mark
+              string_buffer[bytes++] = '\\';
+              string_buffer[bytes++] = '\"';
+              break;
+            }
+
+            case 0x5C:{ // reverse solidus              
+              string_buffer[bytes++] = '\\';
+              string_buffer[bytes++] = '\\';
+              break;
+            }
+
+            default:
+              {
+                // escape control characters (0x00..0x1F) or, if
+                // ensure_ascii parameter is used, non-ASCII characters
+                if ((codepoint <= 0x1F) or (ensure_ascii and (codepoint >= 0x7F))) {
+                  if (codepoint <= 0xFFFF) {
+                    std::snprintf(string_buffer.data() + bytes, 7, "\\u%04x",
+                                  static_cast<uint16_t>(codepoint));
+                    bytes += 6;
+                  } else {
+                    std::snprintf(string_buffer.data() + bytes, 13, "\\u%04x\\u%04x",
+                                  static_cast<uint16_t>(0xD7C0 + (codepoint >> 10)),
+                                  static_cast<uint16_t>(0xDC00 + (codepoint & 0x3FF)));
+                    bytes += 12;
+                  }
+                } else {
+                  // copy byte to buffer (all previous bytes
+                  // been copied have in default case above)
+                  string_buffer[bytes++] = s[i];
+                }
+                break;
+              }
+          }
+
+          // write buffer and reset index; there must be 13 bytes
+          // left, as this is the maximal number of bytes to be
+          // written ("\uxxxx\uxxxx\0") for one code point
+          if (string_buffer.size() - bytes < 13){
+            o->write_characters(string_buffer.data(), bytes);
+            bytes = 0;
+          }
+          break;
         }
 
-        if (JSON_LIKELY(state == UTF8_ACCEPT))
-        {
-            // write buffer
-            if (bytes > 0)
-            {
-                o->write_characters(string_buffer.data(), bytes);
-            }
-        }
-        else
-        {
-            // we finish reading, but do not accept: string was incomplete
+        case UTF8_REJECT:{  // decode found invalid UTF-8 byte
           char buf[8];
-          snprintf(buf,8,"%02X", static_cast<uint8_t>(s.back()));
-            JSON_THROW(type_error::create(316, "incomplete UTF-8 string; last byte: 0x" + std::string(buf)));
+          snprintf(buf,8,"%02X", byte);
+          JSON_THROW(type_error::create(316, "invalid UTF-8 byte at index " + std::to_string(i) + ": 0x" + std::string(buf)));
         }
+
+        default:{  // decode found yet incomplete multi-byte code point
+          if (!ensure_ascii) {
+            // code point will not be escaped - copy byte to buffer
+            string_buffer[bytes++] = s[i];
+          }
+          break;
+        }
+      }
     }
+
+    if (JSON_LIKELY(state == UTF8_ACCEPT)) {
+        // write buffer
+      if (bytes > 0){
+        o->write_characters(string_buffer.data(), bytes);
+      }
+    } else {
+      // we finish reading, but do not accept: string was incomplete
+      char buf[8];
+      snprintf(buf,8,"%02X", static_cast<uint8_t>(s.back()));
+      JSON_THROW(type_error::create(316, "incomplete UTF-8 string; last byte: 0x" + std::string(buf)));
+    }
+  }
 
     /*!
     @brief dump an integer

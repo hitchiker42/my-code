@@ -1,15 +1,6 @@
 #include "vndb.h"
 #include "sql.h"
-#include <chrono>
-//Even though we include this we don't need to link with pthreads since
-//we don't actually use any thread functions.
-#include <thread>
-namespace util {
-static void sleep(double seconds){
-  std::chrono::duration<double> dur(seconds);
-  std::this_thread::sleep_for(dur);
-}
-}
+
 //std::unique_ptr<util::logger> vndb_log;
 std::unordered_map<std::string_view, vndb_main::table_type> vndb_main::table_name_map;
 
@@ -487,65 +478,3 @@ bool vndb_main::update_character_images(){
   progress_bar pb(db_info["num_characters"].get<int>() - img_count, "character images");
   return build_image_table(db, stmt, ins_stmt, &pb);
 }
-
-#ifdef VNDB_CPP_MAIN
-int main(int argc, char* argv[]){
-  //Keep the old log file, I may extend this to keep the last N log files.
-  rename(default_log_file, default_log_file_bkup);
-  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
-  if(!init_vndb_ssl_ctx()){
-    fprintf(stderr, "Error, failed to initialize ssl context\n");
-    return -1;
-  }
-  atexit(free_vndb_ssl_ctx);
-  vndb_main vndb(default_db_file);
-  // if(!vndb.init_all(true, true)){
-  //   return EXIT_FAILURE;
-  // }
-  // return (vndb.update_all() ? EXIT_SUCCESS : EXIT_FAILURE);
-
-  if(!vndb.init_all()){
-    return EXIT_FAILURE;
-  }
-  int err = vndb.build_derived_tables();
-  if(err != 0){
-    fprintf(stderr, "Failed to build derived tables error on function %d.\n", err);
-  }
-  return err;
- // return err;
-/*
-  if(!vndb.build_vn_producer_relations()){
-    fprintf(stderr, "Failed to build vn_producer_relations.\n");
-    return EXIT_FAILURE;
-  }
-  if(!vndb.build_staff_derived_tables()){
-    fprintf(stderr, "Failed to build staff derived tables.\n");
-    return EXIT_FAILURE;
-  }
-  util::array<int, vndb_main::num_base_tables> start_indexes(1);
-  if(argc > 1){
-    for(int i = 1; i < argc; i++){
-      start_indexes.push_back(strtol(argv[i], nullptr, 10));
-    }
-  }
-  while(start_indexes.capacity() > 0){
-    start_indexes.push_back(1);
-  }
-  //Temporary, skips VNs, releases and producers.
-  start_indexes[0] = start_indexes[1] = start_indexes[2] = start_indexes[3] = -1;
-  bool success = download_all(default_db_file, start_indexes[0], start_indexes[1],
-                              start_indexes[2], start_indexes[3], start_indexes[4]);
-  return (success ? EXIT_SUCCESS : EXIT_FAILURE);
-*/
-/*
-  if(argc > 1){
-    if(argv[1][0] == 'c'){
-      return run_connection_test();
-    } else {
-      return run_insertion_test();
-    }
-  }
-  return run_insertion_test();
-*/
-}
-#endif

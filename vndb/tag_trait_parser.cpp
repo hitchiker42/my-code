@@ -92,7 +92,7 @@ int decompress(const util::svector<char>& in, util::svector<char>& out){
     //But we're not likely to get here anyway.
     decompressed_size = in.size() * 2;
   }
-   
+
   out.reserve(decompressed_size);
 
   z_stream zlib_stream;
@@ -104,8 +104,8 @@ int decompress(const util::svector<char>& in, util::svector<char>& out){
   zlib_stream.next_in = in_ptr;
   zlib_stream.avail_in = in.size();
   zlib_stream.next_out = (unsigned char*)(out.data());
-  zlib_stream.avail_out = decompressed_size;  
-  //The 15+16 means use a window size of 2^15 and assume the stream is 
+  zlib_stream.avail_out = decompressed_size;
+  //The 15+16 means use a window size of 2^15 and assume the stream is
   //gzip encoded.
   int ret = inflateInit2(&zlib_stream, 15 + 16);
   if(ret != Z_OK){
@@ -131,7 +131,7 @@ int decompress(const util::svector<char>& in, util::svector<char>& out){
     ret = inflate(&zlib_stream, Z_SYNC_FLUSH);
   } while(ret == Z_OK);
   if(ret != Z_STREAM_END){ goto error; }
-  
+
   out.set_length(zlib_stream.total_out);
   return Z_OK;
  error:
@@ -191,9 +191,9 @@ int download_and_insert_tags(sqlite3_wrapper& db){
     }
   }
   db.commit_transaction();
-  DEBUG_PRINTF("Succeeded in inserting tags\n"); 
+  DEBUG_PRINTF("Succeeded in inserting tags\n");
   return tags.size();
-}    
+}
 int download_and_insert_traits(sqlite3_wrapper& db){
   int err = -1;
   DEBUG_PRINTF("Compiling insert statement.\n");
@@ -246,40 +246,6 @@ int download_and_insert_traits(sqlite3_wrapper& db){
     }
   }
   db.commit_transaction();
-  DEBUG_PRINTF("Succeeded in inserting traits\n"); 
+  DEBUG_PRINTF("Succeeded in inserting traits\n");
   return traits.size();
-}    
-#ifdef TAG_TRAIT_MAIN
-int main(){
-  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
-  if(!init_vndb_ssl_ctx()){
-    fprintf(stderr, "Error initializing ssl context.\n");
-    return 1;
-  }
-  atexit(free_vndb_ssl_ctx);
-
-
-  sqlite3_wrapper db(default_db_file);
-  if(!db){
-    fprintf(stderr, "Error opening sqlite database.\n");
-    return 1;
-  }
-  if(db.exec_file(db_init_file) != SQLITE_OK){
-    fprintf(stderr, "Error initializing database.\n");
-    return 1;
-  }
-  
-  int err = download_and_insert_tags(db);
-  if(err <= 0){
-    fprintf(stderr, "Error inserting tags.\n");
-    //Make sure to return non-zero on error.
-    return err-1;
-  }
-  err = download_and_insert_traits(db);
-  if(err <= 0){
-    fprintf(stderr, "Error inserting traits.\n");
-    return err-1;
-  }
-  return 0;
 }
-#endif

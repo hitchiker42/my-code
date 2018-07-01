@@ -64,24 +64,6 @@ enum class command_type {
   printf("%s\n", usage_message.data());
   exit(EXIT_SUCCESS);
 }
-//if prefix is a prefix of one and only one of the strings in 'strs' return the
-//index of that string, if prefix is not a prefix of any of strs return -1,
-//and if prefix is a prefix of more than one of strs return -2.
-int is_unique_prefix(std::string_view prefix, std::string_view *strs, int nstrs){
-  int idx = -1;
-  for(int i = 0; i < nstrs; i++){
-    if(is_prefix_of(prefix, strs[i])){
-      if(idx != -1){
-        vndb_log->log_debug("'%s' is a prefix of '%s' and '%s'.\n",
-                            prefix.data(), strs[idx].data(), strs[i].data());
-        return -2;
-      } else {
-        idx = i;
-      }
-    }
-  }
-  return idx;
-}
 int get_command_type(std::string_view command){
   for(int i = 0; i < num_commands; i++){
     if(command_names[i].size() < command.size()){ continue; }
@@ -292,6 +274,7 @@ int get_command_type(std::string_view command){
                       vndb.db_info.dump().c_str());
   exit(EXIT_SUCCESS);
 }
+
 [[noreturn]] void run_interactively(vndb_main &vndb){
   set_close_on_exec_all();
   printf("Placeholder for interactive loop, pid = %d.\n"

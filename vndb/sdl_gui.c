@@ -1,5 +1,6 @@
 #include "gui.h"
 int jpeg_event_type = -1;
+int sdl_running = 0;
 int my_event_filter(void *data, SDL_Event *event){
   if(event->type == SDL_QUIT || event->type == jpeg_event_type){
     return 1;
@@ -19,12 +20,14 @@ void destroy_sdl_context(sdl_context *ctx){
   //We deliberately don't destroy the semaphore, 
   //since it's `owned` by another thread.
   free(ctx);
+  sdl_running = 0;
 }
-sdl_context* init_sdl_context(SDL_Semaphore *sem){
+sdl_context* create_sdl_context(SDL_Semaphore *sem){
   sdl_context *ret = NULL;
   //one time initialization code.
   if(!SDL_WasInit(SDL_INIT_VIDEO)){
     SDL_Init(SDL_INIT_VIDEO);
+    atexit(SDL_Quit);
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
     jpeg_event_type = SDL_RegisterEvents(1);
   }
@@ -53,6 +56,7 @@ sdl_context* init_sdl_context(SDL_Semaphore *sem){
                                    SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING,
                                    dm->width, dm->height);
   if(!ret->texture){ goto error; }
+  sdl_running = 1;//make sure to set this only at the very end.
   return ret;
  error:
   destroy_sdl_context(ret);
@@ -188,13 +192,15 @@ int active_event_loop(sdl_context *ctx){
 }
 int sdl_main_loop(void *data){
   SDL_Semaphore *sem = data;
-  sdl_context *ctx = init_sdl_context(sem);
+  sdl_context *ctx = create_sdl_context(sem);  
   //The thread waiting on the semaphore uses a timed wait with a decently
   //long timeout, we use that timeout as an indication that we got an error
   //here, so it's important to not call sem_post if we fail.
   if(!ctx){
+    SDL_SemPost(ctx->sem);
     return -1;
   }
+
   SDL_SemPost(ctx->sem);
   //We don't care about mouse motion and ignoring it should
   //help avoid waking up the thread unnecessarily
@@ -219,6 +225,23 @@ int sdl_main_loop(void *data){
  end:
   destroy_sdl_context(ctx);
 }
+SDL_Semaphore* launch_sdl_thread(){
+  SDL_Thread *thrd;
+  SDL_Semaphore *sem = SDL_CreateSemaphore(0);
+  if(!sem){
+    return NULL;
+  }
+  thrd = SDL_CreateThread(sdl_main_loop, "sdl_thread", sem);
+  SDL_SemWait(sem);
+  if(!sdl_running){
+    SDL_DestroySemaphore(sem);
+    return NULL;
+  }
+  return sem;
+}
+  
+
+
 #if 0
 //Silly little test program to make sure I can do video stuff on a thread
 //than I create.

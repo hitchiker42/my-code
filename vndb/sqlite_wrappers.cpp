@@ -529,39 +529,4 @@ struct json_path {
     return follow(&val);
   }
 };
-/*
-//It's probably more useful to get a VN as json rather than a C++ object
-json sqlite_get_VN(sqlite3_stmt_wrapper &stmt){
-  json ret;
-  int idx = 1;
-  //We don't need to deal with NULL for most values since the api returns
-  //empty arrays / objects instead of NULL, so only scalar values can be NULL.
-  ret.emplace("id", stmt.get_column<int>(idx++));
-  ret.emplace("title", stmt.get_column<const char*>(idx++));
-  ret.emplace("original", stmt.get_column<const char*>(idx++));
-  ret.emplace("date", stmt.get_column<const char*>(idx++));
-  ret.emplace("languages", stmt.get_column<json>(idx++));
-  ret.emplace("orig_lang", stmt.get_column<json>(idx++));
-  ret.emplace("platforms", stmt.get_column<json>(idx++));
-  ret.emplace("aliases", stmt.get_column<json>(idx++));
-  ret.emplace("length", stmt.get_column<int>(idx++));
-  ret.emplace("description", stmt.get_column<const char*>(idx++));
-  ret.emplace("links", stmt.get_column<json>(idx++));
-  ret.emplace("image_link", stmt.get_column<const char*>(idx++));
-  ret.emplace("image_nsfw", stmt.get_column<int>(idx++));
-  ret.emplace("anime", stmt.get_column<json>(idx++));
-  ret.emplace("relations", stmt.get_column<json>(idx++));
-  ret.emplace("tags", stmt.get_column<json>(idx++));
-  ret.emplace("popularity", stmt.get_column<int>(idx++));
-  ret.emplace("rating", stmt.get_column<int>(idx++));
-  ret.emplace("votecount", stmt.get_column<int>(idx++));
-  ret.emplace("screens", stmt.get_column<json>(idx++));
-  ret.emplace("staff", stmt.get_column<json>(idx++));
-  ret.emplace("relases", stmt.get_column<json>(idx++));
-  ret.emplace("producers", stmt.get_column<json>(idx++));
-  ret.emplace("characters", stmt.get_column<json>(idx++));
-  //ret.emplace("list_info", stmt.get_column<json>(idx++));
-  return ret;
-}
-*/
 #endif

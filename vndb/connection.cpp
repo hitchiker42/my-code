@@ -1,14 +1,5 @@
 #include "vndb.h"
-#include <chrono>
-//Even though we include this we don't need to link with pthreads since
-//we don't actually use any thread functions.
-#include <thread>
-namespace util {
-static void sleep(double seconds){
-  std::chrono::duration<double> dur(seconds);
-  std::this_thread::sleep_for(dur);
-}
-}
+
 SSL_CTX* vndb_ctx = nullptr;
 //static const char *login_anon =
 //  R"(login {"protocol":1, "client":"vndb-cpp", "clientver":0.1})";

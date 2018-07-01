@@ -10,8 +10,13 @@ extern "C" {
 #include <vector>
 
 extern int jpeg_event_type;//needs to be set using SDL_RegisterEvents
+//indicates if the sdl thread is running, mostly used to check if
+//initialization was successful.
+extern int sdl_running;
 static const int default_window_width = 640;
 static const int default_window_height = 480;
+//This is internal to sdl_gui.c, comunication with the sdl thread is done
+//using a semaphore and the sdl event queue.
 struct sdl_context {
   SDL_Window *window;
   SDL_Renderer *renderer;
@@ -38,6 +43,9 @@ static inline void init_jpeg_user_event(SDL_event *evt, void *data, size_t sz){
   evt->user.data1 = data;
   evt->user.data2 = sz;
 }
+//void destroy_sdl_context(sdl_context *ctx);
+//sdl_context* create_sdl_context(SDL_Semaphore *sem);
+SDL_Semaphore* launch_sdl_thread();
 #ifdef __cplusplus
 }
 #endif

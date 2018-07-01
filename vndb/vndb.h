@@ -21,24 +21,13 @@ static_assert(SQLITE_OK == 0);
 #include <unistd.h>
 #include <fcntl.h>
 #include <dirent.h>
-//TODO: Move these someplace that makes more sense.
-inline void set_close_on_exec(int fd){
+//this is small enough to just define here.
+static inline void set_close_on_exec(int fd){
   fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | FD_CLOEXEC);
-}
-inline void set_close_on_exec_all(){
-  DIR* dirp = opendir("/proc/self/fd");
-  struct dirent *d;
-  while((d = readdir(dirp)) != nullptr){
-    int fd = strtol(d->d_name, NULL, 0);
-    set_close_on_exec(fd);
-  }
-  closedir(dirp);
-  return;
 }
 #elif (defined _WIN32)
 #include <windows.h>
-inline void set_close_on_exec(int fd){}
-inline void set_close_on_exec_all(){}
+static inline void set_close_on_exec(int fd){}
 #endif
 
 //local headers.
@@ -46,21 +35,38 @@ inline void set_close_on_exec_all(){}
 #include "string_buf.h"
 #include "filesystem.h"
 #include "progress_bar.h"
-#include "image.h"
 #include "logger.h"
+//These are C headers
+#include "image.h" //includes jpeglib.h
+#include "gui.h"  //includes SDL2/SDL.h
 
 #define JSON_THROW_USER(exception)                                      \
   do { fprintf(stderr, "%s\n", exception.what()), abort(); } while(0)
 #include "json.hpp"
 #undef JSON_THROW_USER
 
-
+//Forward declarations of functions for files that don't have a separate header.
 extern SSL_CTX* vndb_ctx;
 bool init_vndb_ssl_ctx();
 void free_vndb_ssl_ctx();
 
 //from sqlite_ext.c, initializes sqlite extensions, specifically regexps
-int init_sqlite_ext(sqlite3 *db){
+int init_sqlite_ext(sqlite3 *db);
+//from misc.cpp, various functions that don't fit anywhere else, I may
+//make a seperate header later.
+int is_unique_prefix(std::string_view prefix, std::string_view *strs, int nstrs);
+void set_close_on_exec_all();
+[[noreturn]] void run_interactively(vndb_main &vndb);
+
+//simple function to sleep for a floating point number of seconds.
+#include <chrono>
+#include <thread>
+namespace util {
+static inline void sleep(double seconds){
+  std::chrono::duration<double> dur(seconds);
+  std::this_thread::sleep_for(dur);
+}
+}
 
 //This needs to be defined and initialized in whatever file has main.
 //It should be initialized before anything else.
@@ -84,6 +90,7 @@ static constexpr const char* vndb_hostname = "api.vndb.org";
 static constexpr const char* default_db_file = "vn.db";
 //file of sql code used to initialize the database tables.
 static constexpr const char* db_init_file = "database_init.sql";
+//TODO: try and merge this with vndb_main::table_type somehow.
 namespace vndb {
 //Possible targets of the get command
 enum class object_type {
@@ -118,6 +125,9 @@ struct SSL_CTX_wrapper {
 }
 static SSL_CTX_wrapper vndb_ctx;
 */
+//These currently aren't standalone headers and also need to be included in the
+//correct order. I'd like to fix this at some point, but it's not a priority.
+
 //SSL wrappers and a struct dealing with the connecting to the vndb server.
 #include "connection.h"
 //wrappers for sqlite statements and database connections
@@ -159,11 +169,11 @@ struct vndb_main {
   static constexpr int num_base_tables = static_cast<int>(table_type::num_base_tables);
   static constexpr int num_tables_total = static_cast<int>(table_type::num_tables_total);
   static constexpr std::array<std::string_view,num_tables_total> table_names = {{
-      "VNs"sv,"releases"sv, "producers"sv, "characters"sv, "staff"sv, 
-      "tags"sv, "traits"sv,"vn_producer_relations"sv, 
+      "VNs"sv,"releases"sv, "producers"sv, "characters"sv, "staff"sv,
+      "tags"sv, "traits"sv,"vn_producer_relations"sv,
       "vn_character_actor_relations"sv, "vn_staff_relations"sv, "vn_tags"sv,
-      "character_traits"sv, "vnlist"sv, "votelist"sv, "wishlist"sv, 
-      "vn_images"sv, "character_images"sv      
+      "character_traits"sv, "vnlist"sv, "votelist"sv, "wishlist"sv,
+      "vn_images"sv, "character_images"sv
     }};
   static std::unordered_map<std::string_view, table_type> table_name_map;
   bool is_derived_table(table_type tt){
@@ -187,6 +197,13 @@ struct vndb_main {
   //may never use.
   std::array<sqlite3_stmt_wrapper, num_base_tables> get_by_id_stmts = {{}};
   std::array<sqlite3_stmt_wrapper, num_tables_total> insert_stmts = {{}};
+  //holds variables for the interactive front end. I may change the container
+  //type and/or the key type later, but I'm using std::string for now
+  //to avoid worring about possible dangling references (which I would
+  //if I used std::string_view).
+  std::unordered_map<std::string, json> symbol_table;
+  //Used for comunication with SDL which is used to display images.
+  SDL_Sempahore *sdl_sem = NULL;
   //Open the databas in db_filename and create a connection with the given
   //username and password, but don't actually connect yet.
   vndb_main(std::string_view db_filename,
@@ -198,8 +215,17 @@ struct vndb_main {
               db_filename.data());
     }
   }
+  vndb_main(const vndb_main& other) = delete;
+  //most members clean up after themeselves.
+  ~vndb_main(){
+    SDL_DestroySemaphore(sdl_sem);
+  }
   bool init_insert_stmts();
   bool init_get_id_stmts();
+  bool init_sdl(){
+    sdl_sem = launch_sdl_thread();
+    return (sdl_sem != nullptr);
+  }
   //get_dbstats defaults to true, but it's only meaningful if
   //do_connect is also true.
   bool init_all(bool do_connect = false, bool get_dbstats = true){
@@ -329,7 +355,7 @@ struct vndb_main {
       return init_db_stats();
     } else {
       return true;
-    }    
+    }
   }
   bool login(bool get_dbstats = false){
     return connect(get_dbstats);
@@ -504,7 +530,7 @@ struct vndb_main {
   int get_max_id(table_type what){
     static constexpr int bufsz = 256;
     char buf[bufsz];
-    snprintf(buf, bufsz, "select max(id) from %s;", 
+    snprintf(buf, bufsz, "select max(id) from %s;",
              table_names[to_underlying(what)].data());
     auto stmt = db.prepare_stmt(buf);
     if(!stmt){
@@ -533,130 +559,4 @@ static_assert(to_underlying(vndb::object_type::character) ==
               to_underlying(vndb_main::table_type::characters));
 static_assert(to_underlying(vndb::object_type::staff) ==
               to_underlying(vndb_main::table_type::staff));
-
-namespace vndb {
-using string = std::string;
-using date = string;
-template<typename T>
-using vector = std::vector<T>;
-/*enum class object_type {
-  VN,
-  release,
-  producer,
-  character,
-  staff,
-  tag,
-  trait
-};*/
-//Things stored here as json could be changed to use a more specific datatype
-struct VN {
-  VN() = default;
-  VN(json);
-  VN(sqlite3_stmt_wrapper&);
-  //Values obtained from vndb get vn command.
-  int id;
-  string title;
-  string original;// = "";
-  date released;
-  //Could probably get rid of these next 3
-  json languages;
-  json orig_lang;
-  json platforms;
-  string aliases;// = "";
-  int length;// = 0;
-  string description;// = "";
-  json links;//{json::value_t::object};//could probably remove.
-  string image;// = "";
-  bool image_nsfw;
-  json anime;//{json::value_t::array};//could probably remove.
-  json relations;//{json::value_t::array};
-  json tags;//{json::value_t::array};
-  int popularity;
-  int rating;
-  int votecount;
-  json screens;//{json::value_t::array};
-  json staff;//{json::value_t::array};
-  //Values from other vndb get commands.
-  //Stored in SQL table as json arrays.
-  vector<int> releases;
-  vector<int> producers;
-  vector<int> characters;
-  //User specific info
-  //null or array of ["wishlist"/"vnlist", priority/rating, date added]
-  json list_info;
-  //Extra info
-  date last_cached;
-  int times_accessed;// = 0;
-};
-//For my purposes releases aren't really that important, but
-//they are the only way to connect vns and producers using the vndb api.
-struct Release {
-  int id;
-  string title;
-  string original_title = "";
-  date released;
-  vector<int> vns;
-  vector<int> producers;
-};
-
-struct Producer {
-  int id;
-  string name;
-  string original = "";
-  string type; //amateur/profesional
-  //string language; //primary language
-  //json links; //link to homepage and/or wikipedia, or neither
-  vector<string> aliases; //maybe change to json
-  //string description.
-  json relations{json::value_t::object};//related producers
-};
-struct Character {
-  //There are lots of details that vndb stores we don't really care about
-  //like birthday, blood type and measurements
-  int id;
-  string name;
-  string original_name = "";
-  string gender; //enum of male, female, both;
-  vector<string> aliases;
-  string description;
-  string image_link;
-  json traits{json::value_t::object};
-  json vns{json::value_t::array};
-  json voice_actors{json::value_t::array};
-};
-struct Staff {
-  int id;
-  string name;
-  string original_name;
-  json aliases{json::value_t::array};
-  json vns{json::value_t::array};
-  json characters{json::value_t::array};
-};
-}
-/*
-struct Tag {
-  int id;
-  string name;
-  string description;
-  bool is_meta;
-  int vn_count;
-  string category;
-  //stored in sql table as json arrays.
-  vector<string> aliases;
-  vector<int> parents;
-};
-struct Trait {
-
-struct vndb_object {
-  object_type type;
-  union {
-    VN *vn;
-    Release *release;
-    Producer *producer;
-    Character *character;
-    Staff *staff;
-  };
-
-}
-*/
 #endif /* __VNDB_H__ */
