@@ -20,12 +20,12 @@ static const int default_window_height = 480;
 struct sdl_context {
   SDL_Window *window;
   SDL_Renderer *renderer;
-  SDL_texture *texture;
+  SDL_Texture *texture;
   //This is a bit of a hack to prevent SDL from generating SDL_Quit when
   //I close the main window.
   SDL_Window *hack; 
   //Semaphore for synchronization (Passed to the initialization function)
-  SDL_Semaphore *sem;
+  SDL_sem *sem;
   //store an event just to make it eaiser to break event
   //handling into seperate functions
   SDL_Event evt;
@@ -37,15 +37,15 @@ struct sdl_context {
   int img_width;
   int img_height;
 };
-static inline void init_jpeg_user_event(SDL_event *evt, void *data, size_t sz){
+static inline void init_jpeg_user_event(SDL_Event *evt, void *data, size_t sz){
   memset(evt, 0, sizeof(SDL_Event));
-  evt->type = my_sdl_event_type;
+  evt->type = jpeg_event_type;
   evt->user.data1 = data;
-  evt->user.data2 = sz;
+  evt->user.data2 = (void*)sz;
 }
 //void destroy_sdl_context(sdl_context *ctx);
 //sdl_context* create_sdl_context(SDL_Semaphore *sem);
-SDL_Semaphore* launch_sdl_thread();
+SDL_sem* launch_sdl_thread();
 #ifdef __cplusplus
 }
 #endif

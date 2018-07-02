@@ -1,3 +1,4 @@
+#include "vndb.h"
 /*
   Simple interactive loop, read until we encounter a semicolon, it's not
   the most elegent solution but it allows multi-line commands without
@@ -53,8 +54,8 @@ view image; | view the image using SDL
   argv[0] = bufptr;
   bufptr = stpcpy(bufptr, "xdg-open");
   argv[1] = ++bufptr;
-  if(!is_prefix("http", url)){
-    bufptr = mempcpy(buf, "https://", constexpr_strlen("https://"));
+  if(!is_prefix_of("http", url)){
+    bufptr = (char*)mempcpy(buf, "https://", constexpr_strlen("https://"));
   }
   strncpy(bufptr, url, 256 - (bufptr-buf));
   argv[2] = nullptr;
@@ -81,14 +82,25 @@ void open_url(const char *url){
 }
 #endif
 
-
-json* eval_expr(vdb_main *vndb, std::string_view expr);
-
+//val_ptr needs to point to an actual json value.
+bool eval_expr(vdb_main *vndb, std::string_view expr, json *val_ptr);
 //Functions to proved generic access to readline type libraries, so that I'm not
 //tied to one particular library.
 void vndb_init_readline();
 char *vndb_readline(const char *prompt);
 void vndb_add_to_history(const char *str, bool copy = false);
+int set_var_to_sql(vndb_main *vndb, std::string_view var,
+                   sqlite3_stmt& stmt, bool as_object = true){
+  int err;
+  json val = stmt.exec_json(as_object, &err);
+  if(err != SQLITE_OK){
+    fprintf(stderr, "Failed to execute sql.\n");
+    return err;
+  }
+  auto [it, inserted] = vndb->symbol_table.insert_or_assign(util::string_view(var, true),
+                                                            std::move(val));
+  return SQLITE_OK;
+}
 int set_var_to_sql(vndb_main *vndb, std::string_view var,
                    std::string_view sql, bool as_object = true){
   auto stmt = vndb->db.prepare_stmt(sql);
@@ -96,27 +108,24 @@ int set_var_to_sql(vndb_main *vndb, std::string_view var,
     fprintf(stderr, "Failed to compile sql.\n");
     return vndb->db.errcode();
   }
-  int err;
-  vndb->symbol_table[var] = stmt.exec_json(as_object, &err);
-  if(err != SQLITE_OK){
-    fprintf(stderr, "Failed to execute sql.\n");
-    return err;
-  }
-  return SQLITE_OK;
+  return set_var_to_sql(vndb, var, stmt, as_object);
 }
+
 //path is: \[number|name\]+
 // where number = [0-9]+ and name = [a-zA-z][[:alnum:]]+
 //I may extend this defination later, but this is the eaisest to parse.
-json* follow_json_path(const json *val, const char *path){
+json* follow_json_path(const json *val, std::string_view path){
   const json *current = val;
-  const char *ptr = path;
+  const char *ptr = path.data();
+  const char *end = &path.back();
   char c;
   //TODO: Need to check that index is in range / subobject exists and
   //print an error if not. This shouldn't crash the program if given a
   //path to a nonexistant object.
-  while((c = *ptr) != '\0'){
+  while(ptr < end){
+    c = *ptr;
     if(c != '['){
-      printf("Unexpected character %c in json path, expected '[' or '\\0'.\n", c);
+      printf("Unexpected character %c in json path, expected '[' or end of path.\n", c);
       return nullptr;
     }
     if(c >= '0' && c <= '9'){
@@ -153,6 +162,28 @@ json* follow_json_path(const json *val, const char *path){
   }
   return current;
 }
+bool expand_variable(vndb_main *vndb, std::string_view var, json *val_ptr){
+  //First find the name of the variable and make sure it exists.
+  int start = (var[0] == '$' ? 1 : 0);//ignore a '$' prefix.
+  int idx = start+1;
+  //could definately be optimized
+  while(idx < var.size() && isalnum(var[idx])){
+    ++idx;
+  }
+  auto var_base = var.substr(start, idx - start);
+  json *val = hash_find_or_null(vndb->symbol_table, );
+  if(!val){
+    printf("Undefined variable %.*s.\n", var_base.size(), var_base.data());
+    return false;
+  }
+  //now follow the path if one exists
+  if(idx < var.size()){
+    val = follow_json_path(val, var.substr(idx));
+      if(!val){ return false; }
+  }
+  *val_ptr = *val;
+  return true;
+}
 //expr is a string with a ';' as the final character. Currenly
 //the only supported expressions are numbers and variables.
 bool eval_expr(vdb_main *vndb, std::string_view expr, json *val_ptr){
@@ -172,41 +203,83 @@ bool eval_expr(vdb_main *vndb, std::string_view expr, json *val_ptr){
     }
   } else if(isalpha(*ptr)){
     char *var_start = ptr;
-    do { ++ptr; } while(isalnum(*ptr));
+    ptr = strpbrk(" ;");
     std::string_view var(var_start, ptr - var_start);
-    json *val = hash_find_or_null(vndb->symbol_table, var);
-    if(!val){
-      printf("Undefined variables %.*s.\n", var.size(), var.data());
-      return false;
-    }
-    if(*ptr == '['){
-      val = follow_json_path();
-      if(!val){ return false; }
-    }
-    *val_ptr = *val;
-    return true;
+    return expand_variable(vndb, var, val_ptr);
   } else {
     printf("Unexpected character '%c' in expression '%.*s'.\n",
            *ptr, expr.size(), expr.data());
     return false;
   }
 }
+//Look for the start of a variable, a dollar sign followed by
+//an alphanumeric character. We need this function since a dollar
+//sign can also be part of a regexp.
+char* find_var_start(const char *str){
+  char *var_start = strchr(str, '$');
+  if(!var_start){ return nullptr; }
+  return(isalnum(*(var_start + 1)) ? var_start : nullptr);
+}
 int do_sql_command(vndb_main *vndb, const char *sql){
   //Variables in sql must begin with a '$' ala perl and bash, this
   //makes it much eaiser to find them and avoids name conflicts.
-  //TODO: Decide if variables have to follow the same restrictions
-  //      as parameters for prepared statements or if they can
-  //      be part of the actual command.
   char *var_start = nullptr;
-  if((var_start = strchr(sql, '$')) != nullptr){
-    //expand variables
-  }
-  int err = set_var_to_sql(vndb, "last", sql);
-  if(err != SQLITE_OK){
-    return err;
+  if((var_start = find_var_start(sql)) != nullptr){
+    //Replace each instance of a variable with a paramater for a
+    //prepared statement, then bind the variables to those statements.
+    //This is the safest way to do this (i.e it prevents sql injection).
+    //I may also eventually allow doing actual text substution.
+    vndb->buf.clear();
+    char *prev_var_end = sql;
+    std::vector<std::string_view> vars;
+    do {
+      vndb->buf.append(prev_var_end, var_start - prev_var_end).append(" ? ");
+      prev_var_end = strpbrk(var_start, " ;");
+      vars.emplace_back(var_start, prev_var_end - var_start);
+      if(*prev_var_end == ';'){ break; }
+    } while((var_start = find_var_start(prev_var_end)));
+    vndb->buf.append(prev_var_end);//append rest of sql.
+    util::string_view sql_sv = vndb->buf.move_to_string_view();
+    auto stmt = vndb->db.prepare_stmt(sql_sv);
+    if(!stmt){
+      printf("failed to compile sql '%.*s'.\n", sql_sv.size(), sql_sv.data());
+      return vndb->db.errcode();
+    }
+    int idx = 1;
+    json val;
+    for(auto &&var : vars){
+      if(!expand_variable(vndb, var, &val)){
+        return -1;
+      }
+      stmt.bind(idx++, val);
+    }
+    int err = set_var_to_sql(vndb, "last", stmt);
+    if(err != SQLITE_OK){
+      return err;
+    }
+  } else { //no variables to expand
+    int err = set_var_to_sql(vndb, "last", sql);
+    if(err != SQLITE_OK){
+      return err;
+    }
   }
   //print rows, We may print results differently depending on if there was
   //one column in the result or more than one.
+  const json &last = vndb->symbol_table["last"];
+  //TODO: add some formatting options
+  if(last.is_array()){
+    last.write(stdout);
+  } else {
+    for(auto &&row : last){
+      auto it = row.begin();
+      it->second.write(stdout);
+      while(++it != row.end()){
+        printf(" | ");
+        it->second.write(stdout);
+      }
+      fputs('\n', stdout);
+    }
+  }
   return SQLITE_OK;
 }
 enum class command_type {
@@ -336,7 +409,7 @@ int do_command(vndb_main *vndb, std::string_view command){
 }
 
 [[noreturn]] void run_interactively(vndb_main &vndb){
-  util::string_buf buf;
+
   char *lineptr = nullptr;
   char *endptr = nullptr;
   int err = 0;
@@ -346,20 +419,20 @@ int do_command(vndb_main *vndb, std::string_view command){
   }
   while(1){
     char *prompt = "vndb >";
-    buf.clear();
+    vndb.buf.clear();
     lineptr = vndb_readline(prompt);
     if(!lineptr){ goto end; }
     if(!(endptr = strchr(lineptr, ';'))){
       prompt = " ... >";
       do {
-        buf.append(lineptr).append(' ');//translate newlines to spaces
+        vndb.buf.append(lineptr).append(' ');//translate newlines to spaces
         free(lineptr);
         lineptr = vndb_readline(prompt);
         if(!lineptr){ goto end; }
       } while(!(endptr = strchr(lineptr, ";")));
     }
     //append everything upto and including the semicolon.
-    buf.append(lineptr, (endptr - lineptr) + 1);
+    vndb.buf.append(lineptr, (endptr - lineptr) + 1);
     //make sure there's no actual text after the semicolon
     while(*(++endptr) != '\0'){
       if(!isspace(*endptr)){
@@ -368,7 +441,7 @@ int do_command(vndb_main *vndb, std::string_view command){
       }
     }
     //grab the memory allocated by the buffer so we can store in the history.
-    util::string_view line = buf.move_to_string_view();
+    util::string_view line = vndb.buf.move_to_string_view();
     line.release_memory(); //we're transfering ownership to the history manager.
     vndb_add_history(line.data());
     //There isn't really anything to do with the return value of do_command...

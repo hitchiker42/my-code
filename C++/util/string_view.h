@@ -114,11 +114,11 @@ struct string_view {
     : string_view(cstr, constexpr_strlen(cstr), copy, true) {}
   //Constructing a string_view from a std::string or
   //std::string_view must be done explicitly (why?)
-  explicit string_view(const std::string& str, bool copy = false) noexcept
+  string_view(const std::string& str, bool copy = false) noexcept
     : string_view(str.data(), (size_type)str.size(), copy, true) {}
   //when using a string_view we can only guarantee that we're null terminated
   //if we make a copy.
-  explicit constexpr string_view(const std::string_view& sv, bool copy = false) noexcept
+  constexpr string_view(const std::string_view& sv, bool copy = false) noexcept
     : string_view(sv.data(), (size_type)sv.size(), copy, copy) {}
 
   //Destructor frees memory if it is owned.

@@ -56,7 +56,7 @@ int init_sqlite_ext(sqlite3 *db);
 //make a seperate header later.
 int is_unique_prefix(std::string_view prefix, std::string_view *strs, int nstrs);
 void set_close_on_exec_all();
-[[noreturn]] void run_interactively(vndb_main &vndb);
+[[noreturn]] void run_interactively(struct vndb_main &vndb);
 
 //simple function to sleep for a floating point number of seconds.
 #include <chrono>
@@ -197,13 +197,15 @@ struct vndb_main {
   //may never use.
   std::array<sqlite3_stmt_wrapper, num_base_tables> get_by_id_stmts = {{}};
   std::array<sqlite3_stmt_wrapper, num_tables_total> insert_stmts = {{}};
-  //holds variables for the interactive front end. I may change the container
-  //type and/or the key type later, but I'm using std::string for now
-  //to avoid worring about possible dangling references (which I would
-  //if I used std::string_view).
-  std::unordered_map<std::string, json> symbol_table;
+  //holds variables for the interactive front end. The key type is util::string_view
+  //so it can own memory but also avoid having to allocate memory just for
+  //a look up (like you would for a std::string). This makes inserting elements
+  //a bit more complicated however.
+  std::unordered_map<util::string_view, json> symbol_table;
   //Used for comunication with SDL which is used to display images.
-  SDL_Sempahore *sdl_sem = NULL;
+  SDL_sem *sdl_sem = NULL;
+  //Used to store multiline input and to expand variables embedded in sql commands.
+  util::string_buf buf;
   //Open the databas in db_filename and create a connection with the given
   //username and password, but don't actually connect yet.
   vndb_main(std::string_view db_filename,
