@@ -1,5 +1,6 @@
 #include "gui.h"
-int jpeg_event_type = -1;
+#include "image.h"
+SDL_EventType jpeg_event_type = -1;
 int sdl_running = 0;
 int my_event_filter(void *data, SDL_Event *event){
   if(event->type == SDL_QUIT || event->type == jpeg_event_type){
@@ -11,19 +12,19 @@ int my_event_filter(void *data, SDL_Event *event){
 //don't capitalize SDL since that would be using the naming convention
 //of SDL itself, which would effectively be using their `namespace`.
 
-void destroy_sdl_context(sdl_context *ctx){
+void destroy_sdl_context(struct sdl_context *ctx){
   if(!ctx){ return; }
   SDL_DestroyWindow(ctx->hack);
   SDL_DestroyWindow(ctx->window);
-  SDL_DestroyRenderer(ctx->rendeder);
+  SDL_DestroyRenderer(ctx->renderer);
   SDL_DestroyTexture(ctx->texture);
   //We deliberately don't destroy the semaphore, 
   //since it's `owned` by another thread.
   free(ctx);
   sdl_running = 0;
 }
-sdl_context* create_sdl_context(SDL_Semaphore *sem){
-  sdl_context *ret = NULL;
+struct sdl_context* create_sdl_context(SDL_sem *sem){
+  struct sdl_context *ret = NULL;
   //one time initialization code.
   if(!SDL_WasInit(SDL_INIT_VIDEO)){
     SDL_Init(SDL_INIT_VIDEO);
@@ -37,7 +38,7 @@ sdl_context* create_sdl_context(SDL_Semaphore *sem){
     fprintf(stderr, "Failed to get display mode");
     goto error;
   }
-  ret = (sdl_context*)calloc(sizeof(sdl_context), 1);
+  ret = (struct sdl_context*)calloc(sizeof(struct sdl_context), 1);
   if(!ret){ goto error; }
   ret->hack = SDL_CreateWindow("hack",SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                0, 0, SDL_WINDOW_HIDDEN);
@@ -54,8 +55,9 @@ sdl_context* create_sdl_context(SDL_Semaphore *sem){
   //but we can't resize a texture (though we could just create another one).
   ret->texture = SDL_CreateTexture(ret->renderer,
                                    SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING,
-                                   dm->width, dm->height);
+                                   dm.w, dm.h);
   if(!ret->texture){ goto error; }
+  ret->sem = sem;
   sdl_running = 1;//make sure to set this only at the very end.
   return ret;
  error:
@@ -69,7 +71,7 @@ SDL_Rect create_dest_rect(SDL_Rect src, int width, int height){
   //limit to 8x, just to prevent issues with really small images
   //or really just as a sanity check to avoid an infinite loop.
   while((scale <= 8) &&
-        ((src.w * scale) < width)
+        ((src.w * scale) < width) &&
         ((src.h * scale) < height)){
     scale++;
   }
@@ -81,11 +83,11 @@ SDL_Rect create_dest_rect(SDL_Rect src, int width, int height){
   dst.y = height / 2 - dst.h / 2;
   return dst;
 }
-SDL_Rect create_src_rect(sdl_context *ctx){
+SDL_Rect create_src_rect(struct sdl_context *ctx){
   SDL_Rect ret;
   ret.x = ret.y = 0;
-  ret.width = ctx->img_width;
-  ret.height = ctx->img_height;
+  ret.w = ctx->img_width;
+  ret.h = ctx->img_height;
   return ret;
 }
 /*
@@ -93,8 +95,8 @@ SDL_Rect create_src_rect(sdl_context *ctx){
   I've already written the code to do things the fast way.
 */
 //Draw the image currently stored in ctx->texture to the screen.
-int render_texture(sdl_context *ctx){
-  SDL_RenderClear(ctx->rendeder);
+int render_texture(struct sdl_context *ctx){
+  SDL_RenderClear(ctx->renderer);
   SDL_Rect src_rect = create_src_rect(ctx);
   int width, height;
   if(SDL_GetRendererOutputSize(ctx->renderer, &width, &height) != 0){
@@ -111,7 +113,7 @@ int render_texture(sdl_context *ctx){
 }
 //Currently the jpeg is stored in the data fields of a user event, I'll
 //likely change this at some point.
-int render_jpeg(sdl_context *ctx){
+int render_jpeg(struct sdl_context *ctx){
   //Clear the screen first so that we can see if we fail to render the image.
   SDL_RenderClear(ctx->renderer);
 
@@ -141,20 +143,20 @@ int render_jpeg(sdl_context *ctx){
     return -1;
   }
   int row_bytes = img.width * img.num_components;
-  for(int i = 0; i < img.height; i++){
+  for(size_t i = 0; i < img.height; i++){
     memcpy(pixels + i*stride, img.img + (i * row_bytes), row_bytes);
   }
-  SDL_UnlockTexure(ctx->texture);
+  SDL_UnlockTexture(ctx->texture);
   return render_texture(ctx);
 }
 //This doesn't really need to be a seperate function, but making it one
 //make it easy to change from hiding to minimizing the window if I want.
-int do_hide_window(sdl_context *ctx){
+int do_hide_window(struct sdl_context *ctx){
   SDL_HideWindow(ctx->window);
   return 0;
 }
 //Called when requested to display an image, exitied when window closed.
-int active_event_loop(sdl_context *ctx){
+int active_event_loop(struct sdl_context *ctx){
   SDL_Event *evt = &ctx->evt;
   //We don't need to redraw on every frame so use WaitEvent rather than 
   //PollEvent to allow the thread to sleep if possible.
@@ -163,9 +165,10 @@ int active_event_loop(sdl_context *ctx){
       case SDL_QUIT:
         return 1;
       case SDL_KEYUP:
-        if(evt->keysym.sym == SDL_SCANCODE_ESCAPE){
+        if(evt->key.keysym.sym == SDL_SCANCODE_ESCAPE){
           return do_hide_window(ctx);
         }
+        break;
       case SDL_USEREVENT:
         render_jpeg(ctx);
         break;
@@ -179,7 +182,7 @@ int active_event_loop(sdl_context *ctx){
         }
         break;
       default:
-        //do nothing
+        ;//do nothing
     }
     if(ctx->evt.type == SDL_WINDOWEVENT){
     } else if(ctx->evt.type == SDL_USEREVENT){
@@ -191,8 +194,8 @@ int active_event_loop(sdl_context *ctx){
   return 1;
 }
 int sdl_main_loop(void *data){
-  SDL_Semaphore *sem = data;
-  sdl_context *ctx = create_sdl_context(sem);  
+  SDL_sem *sem = data;
+  struct sdl_context *ctx = create_sdl_context(sem);  
   //The thread waiting on the semaphore uses a timed wait with a decently
   //long timeout, we use that timeout as an indication that we got an error
   //here, so it's important to not call sem_post if we fail.
@@ -205,7 +208,7 @@ int sdl_main_loop(void *data){
   //We don't care about mouse motion and ignoring it should
   //help avoid waking up the thread unnecessarily
   SDL_EventState(SDL_MOUSEMOTION, SDL_DISABLE);
-  int quit = 0;
+  //  int quit = 0;
   while(1){
     SDL_SetEventFilter(my_event_filter, NULL);
     SDL_WaitEvent(&ctx->evt);
@@ -224,10 +227,11 @@ int sdl_main_loop(void *data){
   }
  end:
   destroy_sdl_context(ctx);
+  return 0;
 }
-SDL_Semaphore* launch_sdl_thread(){
+SDL_sem* launch_sdl_thread(){
   SDL_Thread *thrd;
-  SDL_Semaphore *sem = SDL_CreateSemaphore(0);
+  SDL_sem *sem = SDL_CreateSemaphore(0);
   if(!sem){
     return NULL;
   }

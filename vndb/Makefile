@@ -5,7 +5,7 @@ CXXFLAGS=-std=gnu++17 -g -Og $(DEBUGFLAGS)  -fno-rtti -fno-exceptions
 CXXFLAGS_NDEBUG=-std=gnu++17 -O2 -DNDEBUG -fno-rtti -fno-exceptions
 CFLAGS=-std=gnu11 -g -Og -lm $(DEBUGFLAGS)
 
-LDFLAGS=-lssl -lcrypto -lpcre2 -lz -ljpeg -ldl -lSDL2
+LDFLAGS=-lssl -lcrypto -lpcre2-8 -lz -ljpeg -ldl -lSDL2 -lreadline
 
 SOURCES=$(wildcard *.cpp) $(wildcard *.h) $(wildcard *.c) json.hpp
 
@@ -22,6 +22,7 @@ connection.o : connection.cpp vndb.h json.hpp connection.h sqlite_wrappers.h
 sqlite_wrappers.o : sqlite_wrappers.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
 tag_trait_parser.o: tag_trait_parser.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
 interaction.o: interaction.cpp vndb.h json.hpp gui.h
+misc.o: misc.cpp vndb.h
 # C files
 sqlite_ext.o: sqlite_ext.c
 image.o: image.c image.h
@@ -48,7 +49,7 @@ sqlite3.o: sqlite3.c
 	-DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_USE_ALLOCA=1 \
 	-DSQLITE_ENABLE_COLUMN_METADATA=1 -DSQLITE_ENABLE_STMTVTAB=1 -DHAVE_USLEEP=1
 
-vndb_cpp: vndb.o connection.o sqlite_wrappers.o interaction.o progress_bar.o main.o image.o tag_trait_parser.o sqlite3.o sdl_gui.o sqlite_ext.o
+vndb_cpp: vndb.o connection.o sqlite_wrappers.o interaction.o progress_bar.o main.o image.o tag_trait_parser.o sqlite3.o sdl_gui.o sqlite_ext.o misc.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
 clean:

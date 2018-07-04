@@ -343,7 +343,8 @@ struct string_buf {
   }
   //Append a copy of a string like type.
   template <typename T,            
-            std::enable_if_t<std::is_constructible_v<string_view, T>,
+            std::enable_if_t<std::is_constructible_v<string_view, T> &&
+                             !std::is_same_v<T,char*>,
                              int> = 0>
   string_buf& append(const T& str){
     return append_bytes(std::data(str), std::size(str));

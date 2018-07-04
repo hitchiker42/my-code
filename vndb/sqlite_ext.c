@@ -4,6 +4,8 @@
 #include <assert.h>
 
 #include "sqlite3.h"
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include "pcre2.h"
 typedef struct simple_cache simple_cache;
 struct simple_cache {
   char *pat;
@@ -25,7 +27,7 @@ int check_simple_cache(simple_cache *cache, char *pat, size_t patlen){
   if((cache->patlen == patlen) && !strcmp(pat, cache->pat)){
     //If we reuse a pattern once we're likely to do so multiple times
     //so it's probably worth using jit compilation
-    prec2_jit_compile(cache->regex);
+    pcre2_jit_compile(cache->regex, PCRE2_JIT_COMPLETE);
     return 1;
   }
   cache->patlen = patlen;
@@ -37,14 +39,8 @@ int check_simple_cache(simple_cache *cache, char *pat, size_t patlen){
   pcre2_code_free(cache->regex);
   return 0;
 }
-int do_regex_match(char *pat, size_t patlen,
-                   char *text, size_t text_len,
-                   simple_cache *cache, sqlite3_context* context){  
-}
-#endif
 void sqlite_regexp_simple(sqlite3_context* context, int argc,
                           sqlite3_value** values) {
-  int ret;
   char* pat = (char*)sqlite3_value_text(values[0]);
   char* text = (char*)sqlite3_value_text(values[1]);
 
@@ -60,29 +56,35 @@ void sqlite_regexp_simple(sqlite3_context* context, int argc,
   if(!check_simple_cache(cache, pat, patlen)){
     int errnum;
     size_t erroffset;
-    cache->regex = pcre2_compile(pat, patlen, PCRE2_UTF8,
+    cache->regex = pcre2_compile((PCRE2_SPTR8)pat, patlen, PCRE2_UTF,
                                  &errnum, &erroffset, NULL);
     if(!cache->regex){
       //make sure we don't get a cache hit for a wrong pattern.
       cache->patlen = 0;
-      char buf[512];
+      #define BUFSZ 512
+      char buf[BUFSZ];
       //Print error message in such a way that if anything gets truncated
       //it will be the pattern.
-      int nbytes = snprintf(buf, 4096,"error compiling regular expression, "
-                            "\"%s\" at offset %d of pattern %s.\n", 
-                            errptr, erroffset, pat);
+      int nbytes = snprintf(buf, BUFSZ, "error compiling regular expression, \"");
+      nbytes += pcre2_get_error_message(errnum, (PCRE2_UCHAR8*)(buf + nbytes),
+                                        BUFSZ-nbytes);
+      nbytes += snprintf(buf + nbytes, BUFSZ - nbytes,
+                         "\" at offset %lu of pattern %s.\n",
+                         erroffset, pat);
       sqlite3_result_error(context, buf, nbytes);
-      return;      
+      return;
+      #undef BUFSZ
     }
   }
-  int ret = pcre2_match(cache->regex, text, text_len, 0, 0, cache->mdata, NULL);
+  int ret = pcre2_match(cache->regex, (PCRE2_SPTR8)text,
+                        text_len, 0, 0, cache->mdata, NULL);
   if(ret >= 0){
     sqlite3_result_int(context, 1);
-  } else if(ret == NO_MATCH){
+  } else if(ret == PCRE2_ERROR_NOMATCH){
     sqlite3_result_int(context, 0);
   } else {
     char buf[64];
-    int nbytes = snprintf(buf, 128, 
+    int nbytes = snprintf(buf, 128,
                           "Error in pcre_exec, error number %d.\n", ret);
     sqlite3_result_error(context, buf, nbytes);
   }
@@ -92,7 +94,7 @@ void sqlite_regexp_simple(sqlite3_context* context, int argc,
 int init_sqlite_ext(sqlite3 *db){
   simple_cache *cache = calloc(sizeof(simple_cache), 1);
   cache->mdata = pcre2_match_data_create(10, NULL);
-  int ret = sqlite3_create_function_v2(db, "regexp", 2, 
+  int ret = sqlite3_create_function_v2(db, "regexp", 2,
                                        SQLITE_UTF8 | SQLITE_DETERMINISTIC,
                                        cache, sqlite_regexp_simple,
                                        NULL, NULL,

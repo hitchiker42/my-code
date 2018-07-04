@@ -79,9 +79,9 @@ int get_command_type(std::string_view command){
   This function is pretty badly written, I'm going to have to re-write it,
   but it should work.
 */
-[[noreturn]] void do_download_command(vndb_main& vndb, int argc,
-                                      char *argv[], int arg_idx, 
-                                      bool update, bool no_derived_tables){
+int do_download_command(vndb_main& vndb, int argc,
+                        char *argv[], int arg_idx, 
+                        bool update, bool no_derived_tables){
   static constexpr int num_meta_arguments = 3;
   static constexpr std::array<std::string_view, num_meta_arguments> meta_arguments =
     {{"tables"sv, "main_tables"sv, "images"sv}};
@@ -93,7 +93,7 @@ int get_command_type(std::string_view command){
 
   if(arg_idx == argc){
     fprintf(stderr, "Error no arguments given to download command.\n");
-    exit(EXIT_FAILURE);
+    return EXIT_FAILURE;
   }
   const char* command_name = (update ? "update" : "download");
   std::array<std::string_view, 
@@ -125,7 +125,7 @@ int get_command_type(std::string_view command){
         fprintf(stderr, "Ambigous argument to %s command '%s'.\n",
                 command_name, arg);
         //exit for now, we may just ignore the argument later.
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
       } else {
         //A special cases for vn/character_images, we want don't want these
         //to be included with the rest of the arguments since we want a prefix
@@ -139,7 +139,7 @@ int get_command_type(std::string_view command){
         } else {
           fprintf(stderr, "Unknown argument to %s command '%s'.\n",
                   command_name, arg);
-          exit(EXIT_FAILURE);
+          return EXIT_FAILURE;
         }
       }
     }
@@ -199,7 +199,7 @@ int get_command_type(std::string_view command){
     if(!vndb.download_all(start_indexes[0], start_indexes[1], start_indexes[2],
                           start_indexes[3], start_indexes[4])){
       fprintf(stderr, "Failed at downloading informaiton from vndb server.\n");
-      exit(EXIT_FAILURE);
+      return EXIT_FAILURE;
     }
     vndb_log->log_debug("Downloded data for main tables.\n");
   }
@@ -209,14 +209,14 @@ int get_command_type(std::string_view command){
   if(do_tags){
     vndb_log->log_debug("Downloading data for tags.\n");
     if(download_and_insert_tags(vndb.get_db()) < 0){
-      exit(EXIT_FAILURE);
+      return EXIT_FAILURE;
     }
     vndb_log->log_debug("Downloded data for tags.\n");
   }
   if(do_traits){
     vndb_log->log_debug("Downloading data for traits.\n");
     if(download_and_insert_traits(vndb.get_db()) < 0){
-      exit(EXIT_FAILURE);
+      return EXIT_FAILURE;
     }
     vndb_log->log_debug("Downloded data for traits.\n");
   }
@@ -235,7 +235,7 @@ int get_command_type(std::string_view command){
     bool success = (update ? vndb.update_vn_images() : vndb.build_vn_images());
     if(!success){
       fprintf(stderr, "Error downloading vn images.\n");
-      exit(EXIT_FAILURE);
+      return EXIT_FAILURE;
     }
     vndb_log->log_debug("Downloded vn images.\n");
   }
@@ -245,7 +245,7 @@ int get_command_type(std::string_view command){
                     vndb.build_character_images());
     if(!success){
       fprintf(stderr, "Error downloading character images.\n");
-      exit(EXIT_FAILURE);
+      return EXIT_FAILURE;
     }
     vndb_log->log_debug("Downloded character images.\n");
   }
@@ -266,15 +266,15 @@ int get_command_type(std::string_view command){
     }
     if(err){
       fprintf(stderr, "Error when building derived tables.\n");
-      exit(EXIT_FAILURE);
+      return EXIT_FAILURE;
     }
     vndb_log->log_debug("Re-built derived tables.\n");
   }
   vndb_log->log_debug("dbinfo : '%s'.\n",
                       vndb.db_info.dump().c_str());
-  exit(EXIT_SUCCESS);
+  return EXIT_SUCCESS;
 }
-
+/*
 [[noreturn]] void run_interactively(vndb_main &vndb){
   set_close_on_exec_all();
   printf("Placeholder for interactive loop, pid = %d.\n"
@@ -282,6 +282,7 @@ int get_command_type(std::string_view command){
   getchar();
   exit(EXIT_SUCCESS);
 }
+*/
 void ignore_signal(int sig){
   vndb_log->log_debug("Igoring signal %d.\n", sig);
   //fprintf(stderr, "Igoring signal %d.\n", sig);
@@ -401,9 +402,9 @@ int main(int argc, char *argv[]){
   }
   int arg_idx = optind;
   if(arg_idx == argc){
-    printf("%s\n", usage_message.data());
-    exit(EXIT_SUCCESS);
     run_interactively(vndb);
+    //printf("%s\n", usage_message.data());
+    // exit(EXIT_SUCCESS);
   }
   int cmd_type = get_command_type(argv[arg_idx]);
   if(cmd_type < 0){
@@ -413,8 +414,8 @@ int main(int argc, char *argv[]){
   ++arg_idx;
   command_type cmd = (command_type)cmd_type;
   if(cmd == command_type::update || cmd == command_type::download){
-    do_download_command(vndb, argc, argv, arg_idx,
-                        cmd == command_type::update, no_derived_tables);
+    return do_download_command(vndb, argc, argv, arg_idx,
+                               cmd == command_type::update, no_derived_tables);
   } else if(cmd == command_type::build || cmd == command_type::rebuild){
     //TODO: Actually parse the arguments to this command.
     vndb.build_derived_tables();

@@ -7,9 +7,8 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <vector>
 
-extern int jpeg_event_type;//needs to be set using SDL_RegisterEvents
+extern SDL_EventType jpeg_event_type;//needs to be set using SDL_RegisterEvents
 //indicates if the sdl thread is running, mostly used to check if
 //initialization was successful.
 extern int sdl_running;
@@ -37,10 +36,10 @@ struct sdl_context {
   int img_width;
   int img_height;
 };
-static inline void init_jpeg_user_event(SDL_Event *evt, void *data, size_t sz){
+static inline void init_jpeg_user_event(SDL_Event *evt, const void *data, size_t sz){
   memset(evt, 0, sizeof(SDL_Event));
   evt->type = jpeg_event_type;
-  evt->user.data1 = data;
+  evt->user.data1 = (void*)data;
   evt->user.data2 = (void*)sz;
 }
 //void destroy_sdl_context(sdl_context *ctx);

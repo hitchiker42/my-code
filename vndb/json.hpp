@@ -12943,8 +12943,12 @@ class basic_json
 
         JSON_THROW(type_error::create(305, "cannot use operator[] with " + std::string(type_name())));
     }
+  template<typename T,
+           std::enable_if_t<
+             std::is_invocable_v<std::less<>, T,
+                                 typename object_t::key_type>, int> = 0>
     const_pointer
-    find_or_null(const typename object_t::key_type& key) const {
+    find_or_null(const T& key) const {
       if (JSON_LIKELY(is_object())){
         auto it = m_value.object->find(key);
         if(it == m_value.object->end()){
@@ -12953,7 +12957,7 @@ class basic_json
           return &(it->second);
         }
       }
-        JSON_THROW(type_error::create(305, "cannot use operator[] with " + std::string(type_name())));
+      JSON_THROW(type_error::create(305, "cannot call find_or_null with " + std::string(type_name())));
     }
     /*!
     @brief access specified object element

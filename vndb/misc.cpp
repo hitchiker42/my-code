@@ -1,3 +1,4 @@
+#include "vndb.h"
 //if prefix is a prefix of one and only one of the strings in 'strs' return the
 //index of that string, if prefix is not a prefix of any of strs return -1,
 //and if prefix is a prefix of more than one of strs return -2.
@@ -7,7 +8,7 @@ int is_unique_prefix(std::string_view prefix, std::string_view *strs, int nstrs)
     if(is_prefix_of(prefix, strs[i])){
       if(idx != -1){
         vndb_log->log_debug("'%s' is a prefix of '%s' and '%s'.\n",
-                            prefix.data(), strs[idx].data(), strfs[i].data());
+                            prefix.data(), strs[idx].data(), strs[i].data());
         return -2;
       } else {
         idx = i;

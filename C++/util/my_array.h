@@ -27,6 +27,12 @@ constexpr void constexpr_va_init(T *ptr, U val, Us ... Args){
   *ptr++ = val;
   constexpr_va_init(ptr, Args...);
 }
+//used in a constructor argument list to indicate the remaining arguments
+//should be interpreted as an initializer list.
+struct va_init_t {
+  explicit va_init_t() = default;
+};
+inline constexpr util::va_init_t va_init_tag{};
 /*
   Static array with seperate size and length, an initalizer list constructor,
   and everything that std::array has.
@@ -70,6 +76,11 @@ struct array {
       *ptr++ = x;
     }
   }
+  //Constructor for use with template type deduction.
+  //If there's a way to do this with initilizer lists I don't know how.
+  template<typename ... Ts>
+  constexpr array(va_init_t, const Ts&& ...t)
+    : array{t...} {}
   /*
   template<typename ...Ts>
   explicit constexpr array(const Ts ... Args) : length(sizeof...(Ts)) {
@@ -255,8 +266,12 @@ struct array {
     length = len;
   }
 };
+//Template type deduction, I don't know if/how to get this to work with
+//initializer lists which is why we need the va_init_t tag and the
+//variadic template constructor.
 template<typename ... Ts>
-explicit array(const Ts ...) -> array<std::common_type_t<Ts...>, sizeof...(Ts)>;
+explicit array(va_init_t, const Ts&& ...t) ->
+  array<std::common_type_t<Ts...>, sizeof...(Ts)>;
 
 template <typename T, size_t N, size_t M = N>
 using array_2D = array<array<T,N>,M>;

@@ -140,6 +140,13 @@ struct string_view {
   constexpr bool is_null_terminated() const {
     return (flags & flag_null_terminated);
   }
+  //Releases ownership of memory, returns true if memory was actually
+  //owned and false if not.
+  bool release_memory(){
+    bool ret = owns_memory();
+    flags &= ~flag_owned;
+    return ret;
+  }
   //Creates a copy of the string view with the same flag bits,
   //meaning if this string_view owns its memory we allocate a new
   //copy of the memory so the new string_view also owns its own memory.
@@ -274,7 +281,7 @@ namespace std {
 //Specialization of std::hash such that a hash of a util::string_view 
 //is the same as a std::string/string_view with the same contents. 
 template<> struct hash<::util::string_view> {
-  size_t operator()(const ::util::string_view& arg){
+  size_t operator()(const ::util::string_view& arg) const noexcept {
     return std::hash<std::string_view>{}(arg.to_std_string_view());
   }
 };
