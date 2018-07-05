@@ -54,9 +54,13 @@ void free_vndb_ssl_ctx();
 int init_sqlite_ext(sqlite3 *db);
 //from misc.cpp, various functions that don't fit anywhere else, I may
 //make a seperate header later.
-int is_unique_prefix(std::string_view prefix, std::string_view *strs, int nstrs);
+int is_unique_prefix(std::string_view prefix,
+                     const std::string_view *strs, int nstrs);
 void set_close_on_exec_all();
+//from interactive.cpp, run_interactively basicially runs a repl and
+//do_command is basically eval.
 [[noreturn]] void run_interactively(struct vndb_main &vndb);
+int do_command(vndb_main *vndb, std::string_view command);
 
 //simple function to sleep for a floating point number of seconds.
 #include <chrono>
@@ -73,6 +77,7 @@ static inline void sleep(double seconds){
 extern std::unique_ptr<util::logger> vndb_log;
 static constexpr const char* default_log_file = "vndb.log";
 static constexpr const char* default_log_file_bkup = "vndb.log.bkup";
+extern const char *current_log_file;
 
 using string_buf = util::string_buf;
 

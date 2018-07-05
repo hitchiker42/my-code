@@ -302,7 +302,7 @@ static json get_text_column_as_json(sqlite3_stmt_wrapper *stmt, int idx){
     //Only arrays and objects are stored as json, so if it
     //can't be one of those it must just be a string.
     if(col_text[0] != '[' && col_text[0] != '{'){
-      json(text);
+      return json(text);
     }
     json_parser p(col_text);
     json j;
@@ -365,14 +365,7 @@ json sqlite3_stmt_wrapper::exec_json(bool as_objects, int *err_ptr){
   //I'm not 100% sure if it's safe to call this here, but as far
   //as I can tell it should be.
   int ncols = this->get_ncolumns();
-  vndb_log->log_debug("In exec_json: ncols = %d before starting stmt.\n", ncols);
-  bool logged = false;
   while((err = sqlite3_step(this->stmt)) == SQLITE_ROW){
-    if(!logged){
-      int ncols = this->get_ncolumns();
-      vndb_log->log_debug("In exec_json: ncols = %d after starting stmt.\n", ncols);
-      logged = true;
-    }
     if(ncols == 1){ //flatten array if there's only one column
       ret.emplace_back(get_column_json(this, 0));
     } else {

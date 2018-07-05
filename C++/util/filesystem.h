@@ -98,6 +98,12 @@ struct FILE_wrapper {
   void set_to_null(){
     f = nullptr;
   }
+  //combines unwrap and set_to_null.
+  FILE* release(){
+    FILE* ret = f;
+    f = nullptr;
+    return ret;
+  }
 #if (defined unix) || (defined __unix) || (defined __unix__)
   int native_handle(){
     return fileno(f);
@@ -186,6 +192,9 @@ struct FILE_wrapper {
     } else {
       return ftell(f);
     }
+  }
+  long seek(long offset, int whence){
+    return setpos(offset, whence);
   }
   //If relative is true then the position is set to getpos() + offset,
   //otherwise the position as set to offset if it is positive or zero and

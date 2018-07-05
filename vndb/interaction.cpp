@@ -5,14 +5,23 @@
   the most elegent solution but it allows multi-line commands without
   having to actually parse the input.
 
-  Input takes the form of: <command> <arguments>*
+  Input takes the form of: <command> <arguments>*;
   where the commands are:
-  help; | print help message
-  sql stmt; | execute sql statement, bind result to some global variable
-  set variable value; | set the value of variable to the result value
-  print value; | print the result of evaluating value to stdout
-  write filename value; | print value to the file 'filename'
-  select ...; | shorthand for sql select ...
+  help | print help message
+  sql stmt | execute sql statement, bind result to some global variable
+  set variable value | set the value of variable to the result value
+  print value | print the result of evaluating value to stdout
+  write filename value | print value to the file 'filename'
+  select ... | shorthand for sql select ...
+  
+  There are also some auxiliary commands which take the form
+  .command args* # note the lack of a semicolon
+  these are:
+  .help | print help message.
+  .vars | print a list of defined variables.
+  .log [n] | print the last n lines of the current log file, or
+             the entire file if n is not given. (currently
+             the whole file is always printed).
 
   TODO: need commands to modify vnlist/wishlist, which will
   require an active vndb connection.
@@ -37,16 +46,43 @@ v = vn
 */
 
 static constexpr std::string_view help_string =
-R"EOF(help; | print this help message
-sql stmt; | execute sql statement, bind result to the variable 'last'
-select select-stmt; | shorthand for sql select select-stmt
-set variable value; | set the value of 'variable' to the result value
-print value; | print the result of evaluating value to stdout
-write value filename; | print value to the file 'filename'
-view image; | view the image using SDL
-[open-]url | open the url in the default web browser
-[open-]vndb ([cprsuv]id | json object)
+R"EOF(Input takes the form of: <command> <arguments>*
+Commands are terminated with semicolons, not newlines.
+help                 | print this help message
+sql stmt             | execute sql statement, bind result to the variable 'last'
+select select-stmt   | shorthand for sql select select-stmt
+set variable value   | set the value of 'variable' to the result value
+print value          | print the result of evaluating value to stdout
+write value filename | print value to the file 'filename'
+view image           | view the image using SDL
+[open-]url url       | open the url in the default web browser
+[open-]vndb [cprsuv]id | open the vndb page for the object of the
+                         given type, with the given id. (FIXME bad description).
+
+There aro also several utility commands which begin with a '.'
+and are newline rather than semicolon terminated.
+.help | print help message.
+.vars | print a list of defined variables.
+.log [n] | print the last n lines of the current log file, or
+           the entire file if n is not given. (currently
+           the whole file is always printed).
 )EOF"sv;
+
+const char* skip_space(const char *str){
+  while(*str && *str == ' '){
+    ++str;
+  }
+  return str;
+}
+std::string_view skip_space(std::string_view sv){
+  size_t idx = 0;
+  while(idx < sv.size() &&
+        sv[idx] == ' '){
+    ++idx;
+  }
+  return sv.substr(idx);
+}
+  
 #ifdef __unix__
 [[noreturn]] void open_url_exec(const char *url){
   char buf[256];
@@ -265,7 +301,7 @@ int do_sql_command(vndb_main *vndb, const char *sql){
   //one column in the result or more than one.
   const json &last = vndb->symbol_table["last"];
   //TODO: add some formatting options
-  if(last.is_array()){
+  if(last.is_array() && !(last[0].is_object())){
     if(last.size() == 1){
       last[0].write(stdout);
     } else {
@@ -333,7 +369,7 @@ int do_command(vndb_main *vndb, std::string_view command){
     //Trying to commbine the write and print commands just results
     //in more code due to scoping issues inside of switch statements.
     case command_type::write:{
-      const char *filename_end = strchr(cmd_end, ' ');
+      const char *filename_end = strchr(skip_space(cmd_end), ' ');
       if(!filename_end){
         printf("Malformed write command.\n");
         return -1;
@@ -363,7 +399,7 @@ int do_command(vndb_main *vndb, std::string_view command){
       }
     }
     case command_type::set:{
-      const char *name_end = strchr(cmd_end, ' ');
+      const char *name_end = strchr(skip_space(cmd_end), ' ');
       if(!name_end){
         printf("Malformed set command.\n");
         return -1;
@@ -385,9 +421,7 @@ int do_command(vndb_main *vndb, std::string_view command){
       }
       //This should be sql_select_vn_image_by_id, compiled.
       sqlite3_stmt_wrapper stmt;
-      while(*cmd_end == ' '){
-        ++cmd_end;
-      }
+      cmd_end = skip_space(cmd_end);
       char *tmp;
       int id = strtol(cmd_end, &tmp, 10);
       if(cmd_end == tmp){
@@ -421,6 +455,48 @@ int do_command(vndb_main *vndb, std::string_view command){
     }
   }
 }
+enum class dot_command_type {
+  help,
+  vars,
+  log,
+};
+static constexpr util::array dot_command_names(util::va_init_tag,
+                                               "help"sv, "vars"sv, "log"sv);
+int do_dot_command(vndb_main *vndb, std::string_view command){
+  std::string_view cmd = skip_space(command);
+  assert(command[0] == '.');
+  int cmd_val = is_unique_prefix(cmd, dot_command_names.data(),
+                                 dot_command_names.size());
+  if(cmd_val < 0){
+    if(cmd_val == -1){
+      printf("Unknown dot command '%.*s.\n", (int)cmd.size(), cmd.data());
+    } else if(cmd_val == -2){
+      printf("Ambiguous dot command '%.*s.\n", (int)cmd.size(), cmd.data());
+    }
+    return cmd_val;
+  }
+  auto cmd_type = dot_command_type(cmd_val);
+  switch(cmd_type){
+    case dot_command_type::help:
+      printf("%s.\n", help_string.data());
+      return 0;
+    case dot_command_type::vars:{
+      for(auto &&[key, val] : vndb->symbol_table){
+        printf("%.*s\n", (int)key.size(),key.data());
+      }
+      return 0;
+    }
+    case dot_command_type::log:{
+      FILE_wrapper log_file(current_log_file, "r");
+      //a bit lazy and inefficent but it should work.
+      printf("%s\n", log_file.to_string().c_str());
+      return 0;
+    }      
+    default:
+      printf("Unknown dot command");
+      return -1;
+  }
+} 
 //Functions to proved generic access to readline type libraries, so that I'm not
 //tied to one particular library.
 #define HAVE_READLINE
@@ -434,6 +510,7 @@ int do_command(vndb_main *vndb, std::string_view command){
 #endif
 
 #if (defined HAVE_READLINE) || (defined HAVE_EDITLINE)
+static constexpr bool have_history = true;
 char *vndb_readline(const char *prompt){
   return readline(prompt);
 }
@@ -454,16 +531,26 @@ void vndb_limit_history(int cnt) {
   stifle_history(cnt);
 }
 #elif (defined USE_LINENOISE)
+#else
+static constexpr bool have_history = true;
 #endif
-
 [[noreturn]] void run_interactively(vndb_main &vndb){
   char *lineptr = nullptr;
   char *endptr = nullptr;
   int err = 0;
   util::string_view line;
-  //  static constexpr histfile_name_bufsz = 512;
-  //  char histfile_name[histfile_name_bufsz];
-  //  char *homedir = getenv("HOME");
+  static constexpr size_t histfile_name_bufsz = 512;
+  static constexpr const char *histfile_basename = ".vndb_cpp_history";
+  char histfile_name[histfile_name_bufsz];    
+  if(have_history){
+    char *homedir = getenv("HOME");
+    snprintf(histfile_name, histfile_name_bufsz,
+             "%s/.%s", homedir, histfile_basename);
+    vndb_read_history(histfile_name);
+    vndb_limit_history(2000);
+  }
+    
+  
   
   //SDL support temporally commented out.
   //  if(!vndb.init_sdl()){
@@ -477,6 +564,15 @@ void vndb_limit_history(int cnt) {
       fputc('\n', stdout);
       goto end;
     }
+    char c = *skip_space(lineptr);//first nonspace character
+    if(c == '.'){
+      if(do_dot_command(&vndb, lineptr) >= 0){
+        vndb_add_to_history(lineptr);
+        continue;
+      } else {
+        free(lineptr);
+      }
+    }    
     if(!(endptr = strchr(lineptr, ';'))){
       prompt = " ... >";
       do {
@@ -506,6 +602,7 @@ void vndb_limit_history(int cnt) {
   }
  end:
   free(lineptr);
+  write_history(histfile_name);
   exit(abs(err));
 }
 /*

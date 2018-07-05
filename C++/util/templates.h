@@ -152,6 +152,7 @@ ssize_t position(InputIt first, InputIt last, const T& value){
     if(*first == value){
       return cnt;
     }
+    ++cnt;
   }
   return -1;
 }
@@ -162,6 +163,7 @@ ssize_t position_if(InputIt first, InputIt last, UnaryPredicate p){
     if(p(*first)){
       return cnt;
     }
+    ++cnt;
   }
   return -1;
 }

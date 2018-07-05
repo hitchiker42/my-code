@@ -4,6 +4,8 @@
 #include <getopt.h>
 #include <signal.h>
 std::unique_ptr<util::logger> vndb_log;
+const char* current_log_file = default_log_file;
+//TODO: add option to set log file name
 static constexpr std::string_view usage_message =
 R"EOF(./vndb_cpp [options] [command [command_arguments]]
   Options:
@@ -380,7 +382,9 @@ int main(int argc, char *argv[]){
 
   int log_level = util::position(util::log_level_names, log_level_name);
   if(log_level == -1){
-    fprintf(stderr, "Unknown log level '%s'.\n", log_level_name);
+    fprintf(stderr, "Unknown log level '%s'.\n Defaulting to debug.\n",
+            log_level_name);
+    log_level = to_underlying(util::log_level::debug);
   }
   if(log_to_stderr){
     vndb_log = std::make_unique<util::logger>(stderr, log_level);
@@ -390,12 +394,15 @@ int main(int argc, char *argv[]){
     rename(default_log_file, default_log_file_bkup);
     vndb_log = std::make_unique<util::logger>(default_log_file, log_level);
   }
+  if(!vndb_log->out){
+    fprintf(stderr, "Failed to open log file \"%s\".\n", default_log_file);
+  }
   if(!init_vndb_ssl_ctx()){
     fprintf(stderr, "Failed to initialize ssl context.\n");
     exit(EXIT_FAILURE);
   }
   atexit(free_vndb_ssl_ctx);
-  vndb_log->log_debug("Initializing vndb_main object.\n");
+  vndb_log->log_debug("DEBUG | Initializing vndb_main object.\n");
   vndb_main vndb(db_filename, username, password);
   if(!vndb.init_all(auto_connect)){
     exit(EXIT_FAILURE);

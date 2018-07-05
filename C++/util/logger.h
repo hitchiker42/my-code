@@ -28,14 +28,14 @@ enum class log_level : int8_t {
   all = 8
 };
 static constexpr std::array<std::string_view, 9> log_level_names = {{
-    "disabled", "emergency", "critical", "error", "warn",
-    "notice", "info", "debug", "all"
+    "disabled"sv, "emergency"sv, "critical"sv, "error"sv, "warn"sv,
+    "notice"sv, "info"sv, "debug"sv, "all"sv
 }};
 //Core logger struct, uses integer log levels & logs to a single FILE*,
 //provides support for using an enumeration for log levels via templated wrappers,
 //the above log_level enum is provided as a convenient default.
 struct logger {
-  FILE* out;
+  FILE* out = nullptr;
   int log_level_max;
   //If logging to a file change to line buffering so tail -f can be used.
   logger(const char *outfile, int max_level, bool append = false)
@@ -143,9 +143,9 @@ struct logger {
     return format(to_underlying(level), fmt, args...);
   }
 #endif
-#define gen_log_wrapper(level)                                  \
-  template<typename ... Ts>                         \
-  void CAT(log_, level)(const char *fmt, const Ts& ... args){   \
+#define gen_log_wrapper(level)                                        \
+  template<typename ... Ts>                                           \
+  void CAT(log_, level)(const char *fmt, const Ts& ... args){         \
     return this->format(util::log_level::level, fmt, args...);        \
   }
 //  gen_log_wrapper(emergency);
@@ -154,7 +154,7 @@ struct logger {
 //  gen_log_wrapper(warning);
   gen_log_wrapper(warn);
 //  gen_log_wrapper(notice);
-//  gen_log_wrapper(info);
+  gen_log_wrapper(info);
   gen_log_wrapper(debug);
 //  gen_log_wrapper(all);
 };
