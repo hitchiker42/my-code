@@ -205,10 +205,10 @@ struct string_view {
     }
   }
   int compare(const std::string &other) const {
-    return other.compare(this->to_std_string_view());
+    return -other.compare(this->to_std_string_view());
   }
   constexpr int compare(const std::string_view &other) const {
-    return other.compare(this->to_std_string_view());
+    return -other.compare(this->to_std_string_view());
   }
   constexpr int compare(const char *other) const {
     size_t len = __builtin_strlen(other);
@@ -233,7 +233,8 @@ struct string_view {
   }
   friend bool operator==(const char* lhs, const util::string_view& rhs){
     return rhs.compare(lhs) == 0;
-  }  
+  }
+
   #define do_cmp(lhs, rhs) lhs.compare(rhs)
   generate_comparison_operators_via_compare(string_view, do_cmp);
   #undef do_cmp

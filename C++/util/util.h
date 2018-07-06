@@ -223,16 +223,39 @@ static inline bool has_prefix(const std::string_view sv,
   return is_prefix_of(prefix, sv);
 }
 //constexpr versions of C functions
+#ifdef __GNUC__
+static constexpr size_t constexpr_strlen(const char *s){
+  return __builtin_strlen(s);
+}
+static constexpr int constexpr_strcmp(const char *s1, const char *s2){
+  return __builtin_strcmp(s1,s2);
+}
+static constexpr int constexpr_strncmp(const char *s1, const char *s2, size_t n){
+  return __builtin_strncmp(s1,s2,n);
+}
+static constexpr int constexpr_memcmp(const void *s1, const void *s2, size_t n){
+  return __builtin_memcmp(s1,s2,n);
+}
+#else
 static constexpr size_t constexpr_strlen(const char *s, size_t len = 0){
   return *s ? constexpr_strlen(s+1,len+1) : len;
 }
-static constexpr int constexpr_strcmp(const char *s, const char *s2){
-  return (*s == *s2 ? (*s ? constexpr_strcmp(s+1,s2+1) : 0) : (*s - *s2));
+static constexpr int constexpr_strcmp(const char *s1, const char *s2){
+  return (*s1 == *s2 ? (*s ? constexpr_strcmp(s1+1,s2+1) : 0) : (*s1 - *s2));
 }
-static constexpr int constexpr_strncmp(const char *s, const char *s2, size_t n){
-  return (*s == *s2 ?
-          ((n && *s) ? constexpr_strncmp(s+1,s2+1,n-1) : 0) : (*s - *s2));
+static constexpr int constexpr_strncmp(const char *s1, const char *s2, size_t n){
+  return (n ? (*s == *s2 ?
+               (*s ? constexpr_strncmp(s+1,s2+1,n-1) : 0) : (*s - *s2)) : 0);
 }
+static constexpr int constexpr_memcmp(const unsigned char *s1,
+                                      const unsigned char *s2, size_t n){
+  return (n ? (*s == *s2 ? constexpr_strncmp(s+1,s2+1,n-1) : (*s - *s2)) : 0);
+}
+static constexpr int constexpr_memcmp(const void *s1, const void *s2, size_t n){
+  return constexpr_memcmp(static_cast<unsigned char *>(s1),
+                          static_cast<unsigned char*>(s2), n);
+}
+#endif
 /*
   mempcpy and stpcpy for non gnuc compiliers.
 */

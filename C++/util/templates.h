@@ -420,6 +420,30 @@ static constexpr size_t hash_combine(size_t x, size_t y){
   return (x ^ (y + 0x9e3779b9 + (x<<6) + (x>>2)));
 }
 */
+template<typename MapType, typename K,
+         std::enable_if_t<
+           std::is_convertible_v<K, typename MapType::key_type>, int> = 0>
+auto find_or_null(const MapType& map, const K& key){
+  auto it = map.find(key);
+  return (it == map.end() ? nullptr : &(it->second));
+}
+template<typename MapType, typename K,
+         std::enable_if_t<
+           std::is_convertible_v<K, typename MapType::key_type>, int> = 0>
+
+auto find_or_null(MapType& map, const K& key){
+  auto it = map.find(key);
+  return (it == map.end() ? nullptr : &(it->second));
+}
+template <typename MapType, typename K, typename V,
+          std::enable_if_t<
+            std::is_convertible_v<K, typename MapType::key_type> &&
+            std::is_convertible_v<typename MapType::value_type, V>, int> = 0>
+const V& find_or_default(const MapType &map,
+                         const K &key, const V& deflt){
+  auto it = map.find(key);
+  return (it == map.end() ? deflt : it->second);
+}
 template<typename K, typename V>
 auto hash_find_or_null(const std::unordered_map<K,V> &hash, const K &key){
   auto it = hash.find(key);
