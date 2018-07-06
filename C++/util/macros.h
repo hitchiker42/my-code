@@ -217,6 +217,22 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
 //Will only work when debugging is enabled but it's better than nothing.
 #define unreachable() assert(false);
 #endif
+
+//some macros for cleaner attribute syntax
+#define ATTRIBUTE(...) [[__VA_ARGS__]]
+#define attribute_unused ATTRIBUTE(maybe_unused)
+#define attribute_noreturn ATTRIBUTE(noreturn)
+#define attribute_fallthrough ATTRIBUTE(fallthrough)
+#if __cplusplus > 202000L //C++20
+#define attribute_likely(...) [[likely]] __VA_ARGS__
+#define attribute_unlikely(...) [[unlikely]] __VA_ARGS__
+#elif (defined __GNUC__)
+#define attribute_likely(...) __builtin_expect(__VA_ARGS__, 1)
+#define attribute_unlikely(...) __builtin_expect(__VA_ARGS__, 0)
+#else
+#define attribute_likely(...) __VA_ARGS__
+#define attribute_unlikely(...) __VA_ARGS__
+#endif
 /*
   Super tricky way to test if something is a string literal.
 

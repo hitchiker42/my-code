@@ -157,16 +157,15 @@ json* follow_json_path(const json *val, std::string_view path){
   const json *current = val;
   const char *ptr = path.data();
   const char *end = &path.back();
-  char c;
   //TODO: Need to check that index is in range / subobject exists and
   //print an error if not. This shouldn't crash the program if given a
   //path to a nonexistant object.
   while(ptr < end){
-    c = *ptr;
-    if(c != '['){
-      printf("Unexpected character %c in json path, expected '[' or end of path.\n", c);
+    if(*ptr != '['){
+      printf("Unexpected character %c in json path, expected '[' or end of path.\n", *ptr);
       return nullptr;
     }
+    char c = *(++ptr);
     if(c >= '0' && c <= '9'){
       long idx = strtol(ptr, (char**)(&ptr), 10);
       if(!current->is_array()){
@@ -182,7 +181,6 @@ json* follow_json_path(const json *val, std::string_view path){
         printf("Missing closing ']' in json path.\n");
         return nullptr;
       }
-
       current = &current->operator[](idx);
     } else {
       const char *next_ptr = strchr(ptr, ']');
@@ -196,6 +194,7 @@ json* follow_json_path(const json *val, std::string_view path){
         printf("Could not find '%.*s' in json object.\n", (int)name.size(), name.data());
         return nullptr;
       }
+      ptr = next_ptr;
     }
     ptr++;//skip ']' character.
   }
@@ -244,8 +243,10 @@ bool eval_expr(vndb_main *vndb, std::string_view expr, json *val_ptr){
     }
   } else if((ch == '$') || isalpha(ch)){
     const char *var_start = ptr;
-    //I'd use strchrnul, but expr may not end in a nul character.
-    ptr = strpbrk(ptr, " ;");
+    //Currently anything after the variable will be ignored, but I intend
+    //to support more complex expressions, which is why there are so many
+    //possible characters than can end a variable.
+    ptr = strpbrk(ptr, " ;()+-*/%&|!<>=");
     std::string_view var(var_start, ptr - var_start);
     return expand_variable(vndb, var, val_ptr);
   } else {
@@ -276,7 +277,7 @@ int do_sql_command(vndb_main *vndb, const char *sql){
     std::vector<std::string_view> vars;
     do {
       vndb->buf.append(prev_var_end, var_start - prev_var_end).append(" ? ");
-      prev_var_end = strpbrk(var_start, " ;");
+      prev_var_end = strpbrk(var_start, " ;()+-*/%&|!<>=");
       vars.emplace_back(var_start, prev_var_end - var_start);
       if(*prev_var_end == ';'){ break; }
     } while((var_start = find_var_start(prev_var_end)));
@@ -409,6 +410,7 @@ int do_command(vndb_main *vndb, std::string_view command){
         return -1;
       } else {
         val.pprint(stdout);
+        fputc('\n', stdout);
         return 0;
       }
     }
@@ -568,9 +570,9 @@ static constexpr bool have_history = true;
   }
 
   //SDL support temporally commented out.
-  //  if(!vndb.init_sdl()){
-  //    printf("Could not initialize SDL, will not be able to display images.\n");
-  //  }
+  if(!vndb.init_sdl()){
+    printf("Could not initialize SDL, will not be able to display images.\n");
+  }
   while(1){
     const char *prompt = "vndb >";
     vndb.buf.clear();

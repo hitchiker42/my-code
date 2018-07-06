@@ -566,7 +566,7 @@ struct malloc_allocator {
   static pointer allocate(size_type n){
     return (pointer)malloc(n * sizeof(value_type));
   }
-  static void deallocate(pointer ptr, size_type n){
+  static void deallocate(pointer ptr, [[maybe_unused]] size_type n){
     free(ptr);
   }
   static pointer reallocate(pointer ptr, size_type n,
@@ -576,12 +576,12 @@ struct malloc_allocator {
   }
   //does nothing
   template<class... Args>
-  static void construct(Args&&... args){
+  static void construct([[maybe_unused]] Args&&... args){
     return;
   }
   //also does nothing
   template<class... Args>
-  static void destroy(Args&&... args){
+  static void destroy([[maybe_unused]] Args&&... args){
     return;
   }
 };
@@ -603,7 +603,7 @@ struct calloc_allocator {
   static pointer allocate(size_type n){
     return (pointer)calloc(n,sizeof(value_type));
   }
-  static void deallocate(pointer ptr, size_type n){
+  static void deallocate(pointer ptr, [[maybe_unused]] size_type n){
     free(ptr);
   }
   //Newly allocated memory will not be zeroed, if old_length 
@@ -620,12 +620,12 @@ struct calloc_allocator {
   }
   //does nothing
   template<class... Args>
-  static void construct(Args&&... args){
+  static void construct([[maybe_unused]] Args&&... args){
     return;
   }
   //also does nothing
   template<class... Args>
-  static void destroy(Args&&... args){
+  static void destroy([[maybe_unused]] Args&&... args){
     return;
   }
 };
@@ -920,7 +920,8 @@ struct transform_iter {
   }
   template<class It2, class Fn2,
            std::enable_if_t<!std::is_same_v<It,It2> || !std::is_same_v<Fn,Fn2>, int> = 0>
-  friend bool operator==(const transform_iter &lhs, const transform_iter<It2,Fn2> &rhs){
+  friend bool operator==([[maybe_unused]] const transform_iter &lhs,
+                         [[maybe_unused]] const transform_iter<It2,Fn2> &rhs){
     return false;
   }
   template<class It2, class Fn2>

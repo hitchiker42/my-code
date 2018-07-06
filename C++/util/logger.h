@@ -118,6 +118,11 @@ struct logger {
   void printf(T level, const char *fmt, const Ts&... args){
     return this->printf(to_underlying(level), fmt, args...);
   }
+  template<typename T,
+           std::enable_if_t<std::is_enum_v<T>, int> = 0>
+  void printf(T level, const char *fmt){
+    return this->printf(to_underlying(level), fmt);
+  } 
 #if (defined USE_FMT)
   template<typename ... Ts>
   void format(int level, std::string_view fmt, const Ts&... args){
@@ -159,7 +164,13 @@ struct logger {
 //  gen_log_wrapper(all);
 };
 #undef gen_log_wrapper
+//Specialization for printf with no format args to avoid Wformat-security
+//warnigs.
+template<>
+inline void logger::printf(int level, const char *fmt){
+  return this->print(level, fmt);
 }
+}//namespace util  
 
 //Only works with a string literal as str.
 #define LOG_HERE(logger, level, str, ...)                               \

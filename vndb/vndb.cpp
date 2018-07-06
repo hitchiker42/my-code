@@ -5,7 +5,8 @@
 std::unordered_map<std::string_view, vndb_main::table_type> vndb_main::table_name_map;
 
 bool vndb_main::init_insert_stmts(){
-  static constexpr std::array<std::string_view, this->num_tables_total> sql = {{
+  static constexpr std::array<std::string_view,
+                              vndb_main::num_tables_total> sql = {{
       sql_insert_vn, sql_insert_release, sql_insert_producer,
       sql_insert_character, sql_insert_staff, sql_insert_tag, sql_insert_trait,
       sql_insert_vn_producer_relation, sql_insert_vn_character_actor_relation,
@@ -39,14 +40,14 @@ bool vndb_main::init_insert_stmts(){
 }
 
 bool vndb_main::init_get_id_stmts(){
-  std::array<std::string_view, this->num_base_tables> sql = {{
+  std::array<std::string_view, vndb_main::num_base_tables> sql = {{
       sql_select_vn_by_id, sql_select_release_by_id,
       sql_select_producer_by_id, sql_select_character_by_id,
       sql_select_staff_by_id, sql_select_tag_by_id,
       sql_select_trait_by_id
   }};
   using table_type = vndb_main::table_type;
-  static constexpr std::array<table_type, this->num_base_tables> types = {{
+  static constexpr std::array<table_type, vndb_main::num_base_tables> types = {{
       table_type::VNs, table_type::releases, table_type::producers,
       table_type::characters, table_type::staff, table_type::tags,
       table_type::traits
