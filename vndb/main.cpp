@@ -82,7 +82,7 @@ int get_command_type(std::string_view command){
   but it should work.
 */
 int do_download_command(vndb_main& vndb, int argc,
-                        char *argv[], int arg_idx, 
+                        char *const argv[], int arg_idx, 
                         bool update, bool no_derived_tables){
   static constexpr int num_meta_arguments = 3;
   static constexpr std::array<std::string_view, num_meta_arguments> meta_arguments =
@@ -290,7 +290,7 @@ void ignore_signal(int sig){
   //fprintf(stderr, "Igoring signal %d.\n", sig);
   return;
 }
-int main(int argc, char *argv[]){
+int main(int argc, char * const argv[]){
   static const struct option options[] = {
     {"username", required_argument, 0, 'u'},
     {"password", required_argument, 0, 'p'},
@@ -427,7 +427,11 @@ int main(int argc, char *argv[]){
     //TODO: Actually parse the arguments to this command.
     vndb.build_derived_tables();
   } else if(cmd == command_type::eval){
-    print_help_and_exit();
+    std::string command(argv[arg_idx]);
+    if(command.back() != ';'){
+      command.push_back(';');
+    }
+    return do_command(&vndb, command);    
   } else if(cmd == command_type::interactive){
     run_interactively(vndb);
   } else {

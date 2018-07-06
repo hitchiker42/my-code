@@ -302,7 +302,7 @@ static json get_text_column_as_json(sqlite3_stmt_wrapper *stmt, int idx){
     //Only arrays and objects are stored as json, so if it
     //can't be one of those it must just be a string.
     if(col_text[0] != '[' && col_text[0] != '{'){
-      return json(text);
+      return json(col_text);
     }
     json_parser p(col_text);
     json j;

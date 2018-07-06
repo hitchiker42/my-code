@@ -13,7 +13,7 @@
   print value | print the result of evaluating value to stdout
   write filename value | print value to the file 'filename'
   select ... | shorthand for sql select ...
-  
+
   There are also some auxiliary commands which take the form
   .command args* # note the lack of a semicolon
   these are:
@@ -82,7 +82,7 @@ std::string_view skip_space(std::string_view sv){
   }
   return sv.substr(idx);
 }
-  
+
 #ifdef __unix__
 [[noreturn]] void open_url_exec(const char *url){
   char buf[256];
@@ -118,7 +118,6 @@ void open_url(const char *url){
   ShellExecute(NULL, "open", buf, NULL, NULL, SW_SHOWNORMAL);
 }
 #endif
-
 //val_ptr needs to point to an actual json value.
 bool eval_expr(vndb_main *vndb, std::string_view expr, json *val_ptr);
 int set_var_to_sql(vndb_main *vndb, std::string_view var,
@@ -129,8 +128,15 @@ int set_var_to_sql(vndb_main *vndb, std::string_view var,
     fprintf(stderr, "Failed to execute sql.\n");
     return err;
   }
+  vndb_log->log_debug("Result of sql \"%s\" = \"%s\".\n",
+                      stmt.get_sql().c_str(), val.dump().c_str());
   /*auto [it, inserted] = */
-  vndb->symbol_table.insert_or_assign(util::string_view(var, true),
+  //vndb->symbol_table.insert_or_assign(util::string_view(var, true),
+  //std::move(val));
+  auto var_name = util::string_view(var, true);
+  vndb_log->log_debug("Adding variable %.*s.\n",
+                      (int)var_name.size(), var_name.data());
+  vndb->symbol_table.insert_or_assign(std::move(var_name),
                                       std::move(val));
   return SQLITE_OK;
 }
@@ -204,9 +210,10 @@ bool expand_variable(vndb_main *vndb, std::string_view var, json *val_ptr){
     ++idx;
   }
   util::string_view var_base = var.substr(start, idx - start);
-  json *val = hash_find_or_null(vndb->symbol_table, var_base);
+  json *val = find_or_null(vndb->symbol_table, var_base);
   if(!val){
-    printf("Undefined variable %.*s.\n", (int)var_base.size(), var_base.data());
+    printf("Undefined variable %.*s.\n",
+           (int)var_base.size(), var_base.data());
     return false;
   }
   //now follow the path if one exists
@@ -222,8 +229,9 @@ bool expand_variable(vndb_main *vndb, std::string_view var, json *val_ptr){
 bool eval_expr(vndb_main *vndb, std::string_view expr, json *val_ptr){
   const char *ptr = expr.data();
   assert(expr.back() == ';');
-  while(*ptr == ' '){ ++ptr; }  //skip space
-  if(isdigit(*ptr)){ //Just a number.
+  ptr = skip_space(ptr);
+  char ch = *ptr;
+  if(isdigit(ch)){ //Just a number.
     long val = strtol(ptr, (char**)&ptr, 10);
     while(*ptr == ' '){ ++ptr; }  //skip space
     if(*ptr != ';'){
@@ -234,7 +242,7 @@ bool eval_expr(vndb_main *vndb, std::string_view expr, json *val_ptr){
       *val_ptr = val;
       return true;
     }
-  } else if(isalpha(*ptr)){
+  } else if((ch == '$') || isalpha(ch)){
     const char *var_start = ptr;
     //I'd use strchrnul, but expr may not end in a nul character.
     ptr = strpbrk(ptr, " ;");
@@ -300,6 +308,11 @@ int do_sql_command(vndb_main *vndb, const char *sql){
   //print rows, We may print results differently depending on if there was
   //one column in the result or more than one.
   const json &last = vndb->symbol_table["last"];
+  if(last.empty()){ //No results found
+    //Maybe print something like "No results for sql command.\n"
+    fputc('\n', stdout);
+    return SQLITE_OK;
+  }
   //TODO: add some formatting options
   if(last.is_array() && !(last[0].is_object())){
     if(last.size() == 1){
@@ -340,8 +353,9 @@ static constexpr util::array command_names(util::va_init_tag,
                                            "sql"sv, "select"sv, "set"sv, "print"sv,
                                            "write"sv, "view"sv, "help"sv);
 int do_command(vndb_main *vndb, std::string_view command){
-  const char *cmd_end = strpbrk(command.data(), " ;");
-  std::string_view cmd = command.substr(0, cmd_end - command.data());
+  const char *cmd_start = skip_space(command.data());
+  const char *cmd_end = strpbrk(cmd_start, " ;");
+  std::string_view cmd(cmd_start, cmd_end - cmd_start);
   int cmd_val = is_unique_prefix(cmd, command_names.data(), command_names.size());
   if(cmd_val < 0){
     if(cmd_val == -1){
@@ -399,7 +413,8 @@ int do_command(vndb_main *vndb, std::string_view command){
       }
     }
     case command_type::set:{
-      const char *name_end = strchr(skip_space(cmd_end), ' ');
+      const char *name_start = skip_space(cmd_end);
+      const char *name_end = strchr(name_start, ' ');
       if(!name_end){
         printf("Malformed set command.\n");
         return -1;
@@ -410,8 +425,10 @@ int do_command(vndb_main *vndb, std::string_view command){
         return -1;
       }
       //might be off by one for the size.
-      std::string_view name = command.substr(cmd.size()+1, name_end - cmd_end);
-      vndb->symbol_table[name] = val;
+      auto name =
+        util::string_view(command.substr(cmd.size()+1, name_end - name_start), true);
+      vndb_log->log_debug("Adding new variable %.*s.\n", (int)name.size(), name.data());
+      vndb->symbol_table.insert_or_assign(std::move(name), std::move(val));
       return 0;
     }
     case command_type::view:{
@@ -465,7 +482,7 @@ static constexpr util::array dot_command_names(util::va_init_tag,
 int do_dot_command(vndb_main *vndb, std::string_view command){
   std::string_view cmd = skip_space(command);
   assert(command[0] == '.');
-  int cmd_val = is_unique_prefix(cmd, dot_command_names.data(),
+  int cmd_val = is_unique_prefix(cmd.substr(1), dot_command_names.data(),
                                  dot_command_names.size());
   if(cmd_val < 0){
     if(cmd_val == -1){
@@ -482,7 +499,7 @@ int do_dot_command(vndb_main *vndb, std::string_view command){
       return 0;
     case dot_command_type::vars:{
       for(auto &&[key, val] : vndb->symbol_table){
-        printf("%.*s\n", (int)key.size(),key.data());
+        printf("'%.*s'\n", (int)key.size(),key.data());
       }
       return 0;
     }
@@ -491,12 +508,12 @@ int do_dot_command(vndb_main *vndb, std::string_view command){
       //a bit lazy and inefficent but it should work.
       printf("%s\n", log_file.to_string().c_str());
       return 0;
-    }      
+    }
     default:
       printf("Unknown dot command");
       return -1;
   }
-} 
+}
 //Functions to proved generic access to readline type libraries, so that I'm not
 //tied to one particular library.
 #define HAVE_READLINE
@@ -541,7 +558,7 @@ static constexpr bool have_history = true;
   util::string_view line;
   static constexpr size_t histfile_name_bufsz = 512;
   static constexpr const char *histfile_basename = ".vndb_cpp_history";
-  char histfile_name[histfile_name_bufsz];    
+  char histfile_name[histfile_name_bufsz];
   if(have_history){
     char *homedir = getenv("HOME");
     snprintf(histfile_name, histfile_name_bufsz,
@@ -549,9 +566,7 @@ static constexpr bool have_history = true;
     vndb_read_history(histfile_name);
     vndb_limit_history(2000);
   }
-    
-  
-  
+
   //SDL support temporally commented out.
   //  if(!vndb.init_sdl()){
   //    printf("Could not initialize SDL, will not be able to display images.\n");
@@ -562,6 +577,7 @@ static constexpr bool have_history = true;
     lineptr = vndb_readline(prompt);
     if(!lineptr){
       fputc('\n', stdout);
+      err = 0;
       goto end;
     }
     char c = *skip_space(lineptr);//first nonspace character
@@ -572,7 +588,7 @@ static constexpr bool have_history = true;
       } else {
         free(lineptr);
       }
-    }    
+    }
     if(!(endptr = strchr(lineptr, ';'))){
       prompt = " ... >";
       do {
