@@ -1,5 +1,17 @@
 #include "gui.h"
 #include "image.h"
+#include <stdarg.h>
+//defined in vndb.cpp, returns the file pointer for the current log file,
+//to allow for rudimentary logging in C.
+FILE* get_vndb_log_file_pointer();
+static int vndb_log(const char *fmt, ...){
+  va_list ap;
+  va_start(ap, fmt);
+  int ret = vfprintf(get_vndb_log_file_pointer(), fmt, ap);
+  va_end(ap);
+  return ret;
+}
+
 SDL_EventType jpeg_event_type = -1;
 int sdl_running = 0;
 int my_event_filter(void *data, SDL_Event *event){
@@ -18,10 +30,12 @@ void destroy_sdl_context(struct sdl_context *ctx){
   SDL_DestroyWindow(ctx->window);
   SDL_DestroyRenderer(ctx->renderer);
   SDL_DestroyTexture(ctx->texture);
-  //We deliberately don't destroy the semaphore, 
-  //since it's `owned` by another thread.
+  //We deliberately don't destroy the semaphore, we do however
+  //call sem post on it after we're done.
+  SDL_sem *sem = ctx->sem;
   free(ctx);
   sdl_running = 0;
+  SDL_SemPost(sem);
 }
 struct sdl_context* create_sdl_context(SDL_sem *sem){
   struct sdl_context *ret = NULL;
@@ -51,6 +65,7 @@ struct sdl_context* create_sdl_context(SDL_sem *sem){
   //No reason not to enable vsync.
   ret->renderer = SDL_CreateRenderer(ret->window, -1, SDL_RENDERER_PRESENTVSYNC);
   if(!ret->renderer){ goto error; }
+  SDL_SetRenderDrawColor(ret->renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
   //Create a texture that's larger than we need since we can re-size the window,
   //but we can't resize a texture (though we could just create another one).
   ret->texture = SDL_CreateTexture(ret->renderer,
@@ -151,14 +166,16 @@ int render_jpeg(struct sdl_context *ctx){
 }
 //This doesn't really need to be a seperate function, but making it one
 //make it easy to change from hiding to minimizing the window if I want.
-int do_hide_window(struct sdl_context *ctx){
+void do_hide_window(struct sdl_context *ctx){
   SDL_HideWindow(ctx->window);
-  return 0;
+}
+void do_show_window(struct sdl_context *ctx){
+  SDL_ShowWindow(ctx->window);
 }
 //Called when requested to display an image, exitied when window closed.
 int active_event_loop(struct sdl_context *ctx){
   SDL_Event *evt = &ctx->evt;
-  //We don't need to redraw on every frame so use WaitEvent rather than 
+  //We don't need to redraw on every frame so use WaitEvent rather than
   //PollEvent to allow the thread to sleep if possible.
   while(SDL_WaitEvent(evt)){
     switch(evt->type){
@@ -166,7 +183,8 @@ int active_event_loop(struct sdl_context *ctx){
         return 1;
       case SDL_KEYUP:
         if(evt->key.keysym.sym == SDL_SCANCODE_ESCAPE){
-          return do_hide_window(ctx);
+          do_hide_window(ctx);
+          return 0;
         }
         break;
       case SDL_USEREVENT:
@@ -176,18 +194,15 @@ int active_event_loop(struct sdl_context *ctx){
       //just redraw the image.
       case SDL_WINDOWEVENT:
         if(evt->window.event == SDL_WINDOWEVENT_CLOSE){
-          return do_hide_window(ctx);
+          do_hide_window(ctx);
+          return 0;
         } else {
+          SDL_RenderClear(ctx->renderer);
           render_texture(ctx);
         }
         break;
       default:
         ;//do nothing
-    }
-    if(ctx->evt.type == SDL_WINDOWEVENT){
-    } else if(ctx->evt.type == SDL_USEREVENT){
-    } else if(ctx->evt.type == SDL_QUIT){
-      return 1;
     }
   }
   fprintf(stderr, "Error in SDL_WaitEvent: %s.\n", SDL_GetError());
@@ -195,7 +210,7 @@ int active_event_loop(struct sdl_context *ctx){
 }
 int sdl_main_loop(void *data){
   SDL_sem *sem = data;
-  struct sdl_context *ctx = create_sdl_context(sem);  
+  struct sdl_context *ctx = create_sdl_context(sem);
   //The thread waiting on the semaphore uses a timed wait with a decently
   //long timeout, we use that timeout as an indication that we got an error
   //here, so it's important to not call sem_post if we fail.
@@ -203,7 +218,6 @@ int sdl_main_loop(void *data){
     SDL_SemPost(ctx->sem);
     return -1;
   }
-
   SDL_SemPost(ctx->sem);
   //We don't care about mouse motion and ignoring it should
   //help avoid waking up the thread unnecessarily
@@ -216,13 +230,14 @@ int sdl_main_loop(void *data){
       goto end;
     }
     if(ctx->evt.type == jpeg_event_type){
+      do_show_window(ctx);
       render_jpeg(ctx);
       //This may cause a crash I'm not sure, there doesn't appear to be
       //a documented way to remove an existing event filter.
       SDL_SetEventFilter(NULL, NULL);
       if(active_event_loop(ctx) != 0){
         goto end;
-      }      
+      }
     }
   }
  end:
@@ -243,7 +258,7 @@ SDL_sem* launch_sdl_thread(){
   }
   return sem;
 }
-  
+
 
 
 #if 0
@@ -291,3 +306,89 @@ int main(){
   return ret;
 }
 #endif
+const char* get_event_type(SDL_Event *evt){
+  switch(evt->type){
+    case SDL_AUDIODEVICEADDED:
+    case SDL_AUDIODEVICEREMOVED:
+      return "AudioDeviceEvent";
+      
+    case SDL_CONTROLLERAXISMOTION:
+      return "ControllerAxisEvent";
+      
+    case SDL_CONTROLLERBUTTONDOWN:
+    case SDL_CONTROLLERBUTTONUP:
+      return "ControllerButtonEvent";
+
+    case SDL_CONTROLLERDEVICEADDED:
+    case SDL_CONTROLLERDEVICEREMOVED:
+    case SDL_CONTROLLERDEVICEREMAPPED:
+      return "ControllerDeviceEvent";
+
+    case SDL_DOLLARGESTURE:
+    case SDL_DOLLARRECORD:
+      return "DollarGestureEvent";
+
+    case SDL_DROPFILE:
+    case SDL_DROPTEXT:
+    case SDL_DROPBEGIN:
+    case SDL_DROPCOMPLETE:
+      return "DropEvent";
+
+    case SDL_FINGERMOTION:
+    case SDL_FINGERDOWN:
+    case SDL_FINGERUP:
+      return "TouchFingerEvent";
+
+    case SDL_KEYDOWN:
+    case SDL_KEYUP:
+      return "KeyboardEvent";
+
+    case SDL_JOYAXISMOTION:
+      return "JoyAxisEvent";
+
+    case SDL_JOYBALLMOTION:
+      return "JoyBallEvent";
+
+    case SDL_JOYHATMOTION:
+      return "JoyHatEvent";
+
+    case SDL_JOYBUTTONDOWN:
+    case SDL_JOYBUTTONUP:
+      return "JoyButtonEvent";
+
+    case SDL_JOYDEVICEADDED:
+    case SDL_JOYDEVICEREMOVED:
+      return "JoyDeviceEvent";
+
+    case SDL_MOUSEMOTION:
+      return "MouseMotionEvent";
+
+    case SDL_MOUSEBUTTONDOWN:
+    case SDL_MOUSEBUTTONUP:
+      return "MouseButtonEvent";
+
+    case SDL_MOUSEWHEEL:
+      return "MouseWheelEvent";
+
+    case SDL_MULTIGESTURE:
+      return "MultiGestureEvent";
+
+    case SDL_QUIT:
+      return "QuitEvent";
+
+    case SDL_SYSWMEVENT:
+      return "SysWMEvent";
+
+    case SDL_TEXTEDITING:
+      return "TextEditingEvent";
+
+    case SDL_TEXTINPUT:
+      return "TextInputEvent";
+
+    case SDL_USEREVENT:
+      return "UserEvent";
+
+    case SDL_WINDOWEVENT:
+      return "WindowEvent";
+  }
+}

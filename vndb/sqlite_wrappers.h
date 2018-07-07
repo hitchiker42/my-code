@@ -508,10 +508,19 @@ struct sqlite3_wrapper {
                                  const char** tail = nullptr,
                                  bool persistant = false){
     sqlite3_stmt *stmt;
-//    vndb_log->log_debug("Compiling sql '%s'.\n", sql);
+    if(len == -1){
+      //for whatever reason sqlite benifits from being given the length
+      //including the null terminator.
+      len = strlen(sql)+1;
+    }
+    vndb_log->log_debug("Compiling sql '%.*s'.\n", len, sql);
     db_err = sqlite3_prepare_v3(db, sql, len, 
                                 (persistant ? SQLITE_PREPARE_PERSISTENT : 0),
                                 &stmt, tail);
+    if(db_err != SQLITE_OK){
+      fprintf(stderr, "Failed to compile sql error %s(%d) :\n%.*s.\n",
+              errmsg(), errcode(), len, sql);
+    }
     return stmt;
   }
 };

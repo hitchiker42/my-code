@@ -153,37 +153,45 @@ struct vndb_main {
     tags,
     traits,
     num_base_tables = traits + 1,
+    vn_images = num_base_tables,
+    character_images,
+    num_aux_tables = (character_images + 1) - num_base_tables,
+    //Currently I haven't written all the code for lists so I'm not counting
+    //them in aux tables yet.
+    vnlist = num_aux_tables + num_base_tables,
+    //not actually a table but part of the vnlist table, however since
+    //it's stored seperately on the server we need to have a seperate insert statement.
+    votelist,
+    wishlist,
+    //num_aux_tables = (wishlist + 1) - num_base_tables,
     //derived tables, define relations between the base tables.
-    vn_producer_relations = num_base_tables,
+    vn_producer_relations, //= num_base_tables + num_aux_tables,
     vn_character_actor_relations,
     vn_staff_relations,
     staff_aliases,
     vn_tags,
     character_traits,
-    //Auxiliary tables image data & vn/wishlist
-    //TODO: Maybe move these to before derived tables.
-    vnlist,
-    //not actually a table but part of the vnlist table, however since
-    //it's stored seperately on the server we need to have a seperate insert statement.
-    votelist,
-    wishlist,
-    vn_images,
-    character_images,
-    num_tables_total = character_images + 1
+    num_tables_total = character_traits + 1
   };
   static constexpr int num_base_tables = static_cast<int>(table_type::num_base_tables);
+  static constexpr int num_aux_tables = static_cast<int>(table_type::num_aux_tables);
+  //I may change the name of this later, I can't think of a really good name right now.
+  static constexpr int num_primary_tables = num_base_tables + num_aux_tables;
   static constexpr int num_tables_total = static_cast<int>(table_type::num_tables_total);
   static constexpr std::array<std::string_view,num_tables_total> table_names = {{
+      //base
       "VNs"sv,"releases"sv, "producers"sv, "characters"sv, "staff"sv,
-      "tags"sv, "traits"sv,"vn_producer_relations"sv,
-      "vn_character_actor_relations"sv, "vn_staff_relations"sv, "vn_tags"sv,
-      "character_traits"sv, "vnlist"sv, "votelist"sv, "wishlist"sv,
-      "vn_images"sv, "character_images"sv
+      "tags"sv, "traits"sv,
+      //aux
+      "vn_images"sv, "character_images"sv, "vnlist"sv, "votelist"sv, "wishlist"sv,
+      //derived
+      "vn_producer_relations"sv, "vn_character_actor_relations"sv,
+      "vn_staff_relations"sv, "staff_aliases"sv, "vn_tags"sv, "character_traits"sv      
     }};
   static std::unordered_map<std::string_view, table_type> table_name_map;
   bool is_derived_table(table_type tt){
     auto ttv = util::to_underlying(tt);
-    return (ttv >= num_base_tables && ttv < util::to_underlying(table_type::vn_images));
+    return (ttv >= (num_primary_tables));
   }
   sqlite3_wrapper db;
   vndb_connection conn;
@@ -200,7 +208,7 @@ struct vndb_main {
   //These are not automatically initialized, you need to explicitly initialize
   //them, this is to avoid the overhead of creating prepared statments you
   //may never use.
-  std::array<sqlite3_stmt_wrapper, num_base_tables> get_by_id_stmts = {{}};
+  std::array<sqlite3_stmt_wrapper, num_primary_tables> get_by_id_stmts = {{}};
   std::array<sqlite3_stmt_wrapper, num_tables_total> insert_stmts = {{}};
   //holds variables for the interactive front end. The key type is util::string_view
   //so it can own memory but also avoid having to allocate memory just for
@@ -405,6 +413,7 @@ struct vndb_main {
     }
   }
   json get_by_id(int id, table_type what){
+    assert(to_underlying(what) < (num_base_tables + num_aux_tables));
     auto& stmt = get_by_id_stmts[to_underlying(what)];
     stmt.bind(1, id);
     json ret = json_null;
@@ -430,7 +439,7 @@ struct vndb_main {
   }
   //not called get_get_by_id_stmt, because that sounds really silly.
   sqlite3_stmt_wrapper& get_select_by_id_stmt(table_type what){
-    assert(to_underlying(what) > num_base_tables);
+    assert(to_underlying(what) < num_primary_tables);
     return get_by_id_stmts[to_underlying(what)];
   }
   sqlite3_stmt_wrapper& get_insert_stmt(table_type what){

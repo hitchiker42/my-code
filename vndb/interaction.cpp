@@ -144,7 +144,6 @@ int set_var_to_sql(vndb_main *vndb, std::string_view var,
                    std::string_view sql, bool as_object = true){
   auto stmt = vndb->db.prepare_stmt(sql);
   if(!stmt){
-    fprintf(stderr, "Failed to compile sql.\n");
     return vndb->db.errcode();
   }
   return set_var_to_sql(vndb, var, stmt, as_object);
@@ -439,7 +438,8 @@ int do_command(vndb_main *vndb, std::string_view command){
         return -1;
       }
       //This should be sql_select_vn_image_by_id, compiled.
-      sqlite3_stmt_wrapper stmt;
+      sqlite3_stmt_wrapper& stmt =
+        vndb->get_select_by_id_stmt(vndb_main::table_type::vn_images);
       cmd_end = skip_space(cmd_end);
       char *tmp;
       int id = strtol(cmd_end, &tmp, 10);
@@ -447,6 +447,7 @@ int do_command(vndb_main *vndb, std::string_view command){
         printf("Missing id in view command.\n");
         return -1;
       }
+      stmt.bind(1, id);
       int res = stmt.step();
       if(res == SQLITE_DONE){
         printf("Could not find an image for vn %d.\n", id);
@@ -477,7 +478,7 @@ int do_command(vndb_main *vndb, std::string_view command){
 enum class dot_command_type {
   help,
   vars,
-  log,
+  log
 };
 static constexpr util::array dot_command_names(util::va_init_tag,
                                                "help"sv, "vars"sv, "log"sv);
@@ -621,6 +622,12 @@ static constexpr bool have_history = true;
  end:
   free(lineptr);
   write_history(histfile_name);
+  if(sdl_running){
+    SDL_Event evt;
+    evt.type = SDL_QUIT;
+    SDL_PushEvent(&evt);
+    SDL_SemWait(vndb.sdl_sem);
+  }
   exit(abs(err));
 }
 /*

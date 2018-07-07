@@ -163,6 +163,45 @@ row_limiter integer not null primary key check (row_limiter = 1)
 );
 -- Make sure db_info has a row, since we modify it using update statements.
 insert or ignore into db_info values (0,0,0,0,0,0,0,0,0,0,0,0,0,0,1);
+
+-- Aux tables, Don't hold core database objects, but still contain unique data.
+
+-- Tables to hold images for characters and vns, these store
+-- the raw jpeg image as a blob.
+create table if not exists vn_images (
+vn integer primary key not null references VNs (id),
+image blob
+);
+create table if not exists character_images (
+character integer primary key not null references characters (id),
+image blob
+);
+
+-- Tables for wishlist / vnlist
+create table if not exists vnlist (
+vn integer primary key not null references VNs (id),
+status integer check (status between 0 and 4),
+added integer, -- unix timestamp
+notes text, 
+-- Information from votelist, votes on vns not on the vnlist aren't stored.
+vote real,
+vote_added integer, --unix timestamp
+-- Info exclusive to the local database.
+path text, -- where this vn is located
+-- If the VN doesn't work for some reason (text hooking, needs a crack, 
+-- locale issues, etc) this will be non null and explain the reason.
+not_playable text
+);
+-- Indexes go here.
+
+create table if not exists wishlist (
+vn integer primary key not null references VNs(id),
+priority integer check (priority between 0 and 3),
+added integer, --unix timestamp
+-- exclusive to local database
+notes text
+);
+
 -- Derived tables
 -- Store relations between tables, most are without rowid tables. 
 
@@ -245,41 +284,7 @@ create index if not exists character_traits_character_idx
        on character_traits (character);
 create index if not exists character_traits_trait_idx
        on character_traits (trait);
--- Tables for wishlist / vnlist
-create table if not exists vnlist (
-vn integer primary key not null references VNs (id),
-status integer check (status between 0 and 4),
-added integer, -- unix timestamp
-notes text, 
--- Information from votelist, votes on vns not on the vnlist aren't stored.
-vote real,
-vote_added integer, --unix timestamp
--- Info exclusive to the local database.
-path text, -- where this vn is located
--- If the VN doesn't work for some reason (text hooking, needs a crack, 
--- locale issues, etc) this will be non null and explain the reason.
-not_playable text
-);
--- Indexes go here.
 
-create table if not exists wishlist (
-vn integer primary key not null references VNs(id),
-priority integer check (priority between 0 and 3),
-added integer, --unix timestamp
--- exclusive to local database
-notes text
-);
-
--- Tables to hold images for characters and vns, these store
--- the raw jpeg image as a blob.
-create table if not exists vn_images (
-vn integer primary key not null references VNs (id),
-image blob
-);
-create table if not exists character_images (
-character integer primary key not null references characters (id),
-image blob
-);
 -- Local Variables:
 -- sql-product: sqlite
 -- End:

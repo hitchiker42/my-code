@@ -9,11 +9,12 @@ bool vndb_main::init_insert_stmts(){
                               vndb_main::num_tables_total> sql = {{
       sql_insert_vn, sql_insert_release, sql_insert_producer,
       sql_insert_character, sql_insert_staff, sql_insert_tag, sql_insert_trait,
+      sql_insert_vn_image, sql_insert_character_image,
+      sql_insert_vnlist_entry, sql_insert_votelist_entry,
+      sql_insert_wishlist_entry,
       sql_insert_vn_producer_relation, sql_insert_vn_character_actor_relation,
       sql_insert_vn_staff_relation, sql_insert_staff_alias,
-      sql_insert_vn_tag, sql_insert_character_trait,
-      sql_insert_vnlist_entry, sql_insert_votelist_entry,
-      sql_insert_wishlist_entry, sql_insert_vn_image, sql_insert_character_image
+      sql_insert_vn_tag, sql_insert_character_trait
     }};
   if(this->insert_stmts_initialized){
     return true;
@@ -40,22 +41,23 @@ bool vndb_main::init_insert_stmts(){
 }
 
 bool vndb_main::init_get_id_stmts(){
-  std::array<std::string_view, vndb_main::num_base_tables> sql = {{
+  std::array<std::string_view, vndb_main::num_primary_tables> sql = {{
       sql_select_vn_by_id, sql_select_release_by_id,
       sql_select_producer_by_id, sql_select_character_by_id,
       sql_select_staff_by_id, sql_select_tag_by_id,
-      sql_select_trait_by_id
+      sql_select_trait_by_id, sql_select_vn_image_by_id,
+      sql_select_character_image_by_id
   }};
   using table_type = vndb_main::table_type;
-  static constexpr std::array<table_type, vndb_main::num_base_tables> types = {{
+  static constexpr std::array<table_type, vndb_main::num_primary_tables> types = {{
       table_type::VNs, table_type::releases, table_type::producers,
       table_type::characters, table_type::staff, table_type::tags,
-      table_type::traits
+      table_type::traits, table_type::vn_images, table_type::character_images
   }};
   if(this->get_by_id_stmts_initialized){
     return true;
   }
-  for(int i = 0; i < this->num_base_tables; i ++){
+  for(int i = 0; i < this->num_primary_tables; i ++){
     sqlite3_stmt *ptr = this->db.prepare_stmt_ptr(sql[i], true);
     if(!ptr){
       return false;
@@ -85,14 +87,13 @@ vndb_main::bitvector vndb_main::build_missing_ids_bitvector(sqlite3_stmt_wrapper
 //multiple functions just makes it harder to understand.
 bool vndb_main::build_vn_tags(){
   sqlite3_wrapper &db = this->db;
-  auto stmt = db.prepare_stmt("select id, tags from VNs;");
+  static constexpr const char *sql = "select id, tags from VNs;";
+  auto stmt = db.prepare_stmt(sql);
   if(!stmt){
-    db.print_errmsg("Failed to compile sql");
     return false;
   }
   auto missing_ids_stmt = db.prepare_stmt(sql_find_missing_tags);
   if(!missing_ids_stmt){
-    db.print_errmsg("Failed to compile sql");
     return false;
   }
   //VNs can be tagged with tags that haven't been approved yet, so we need to
@@ -114,9 +115,9 @@ bool vndb_main::build_vn_tags(){
   while((res = stmt.step()) == SQLITE_ROW){
     int vn_id = stmt.get_column<int>(0);
     json tags = stmt.get_column<json>(1);
-    if(tags.empty()){ 
+    if(tags.empty()){
       ++pb;
-      continue; 
+      continue;
     }
     ins_stmt.bind(1, vn_id);
     //vndb_log->log_debug("Inserting tags for vn %d.\n", vn_id);
@@ -156,13 +157,13 @@ bool vndb_main::build_vn_tags(){
 }
 bool vndb_main::build_character_traits(){
   sqlite3_wrapper &db = this->db;
-  auto stmt = db.prepare_stmt("select id, traits from characters;");
+  static constexpr const char *sql = "select id, traits from characters;";
+  auto stmt = db.prepare_stmt(sql);
   if(!stmt){
-    db.print_errmsg("Failed to compile sql");
+    return false;
   }
   auto missing_ids_stmt = db.prepare_stmt(sql_find_missing_traits);
   if(!missing_ids_stmt){
-    db.print_errmsg("Failed to compile sql");
     return false;
   }
   int max_trait_id = this->db_info["max_trait_id"].get<int>();
@@ -181,9 +182,9 @@ bool vndb_main::build_character_traits(){
   while((res = stmt.step()) == SQLITE_ROW){
     int character_id = stmt.get_column<int>(0);
     json traits = stmt.get_column<json>(1);
-    if(traits.empty()){ 
+    if(traits.empty()){
       ++pb;
-      continue; 
+      continue;
     }
     ins_stmt.bind(1, character_id);
     //traits is an array of [id, spoliler_level]
@@ -221,7 +222,7 @@ bool vndb_main::build_vn_producer_relations(){
   sqlite3_wrapper &db = this->db;
   auto stmt = db.prepare_stmt("select id, vn, producers from releases;");
   if(!stmt){
-    db.print_errmsg("Failed to compile sql");
+    return false;
   }
   auto &ins_stmt =
     this->get_insert_stmt(vndb_main::table_type::vn_producer_relations);
@@ -256,7 +257,7 @@ bool vndb_main::build_staff_derived_tables(){
   sqlite3_wrapper &db = this->db;
   auto stmt = db.prepare_stmt("select id, aliases, vns, voiced from staff;");
   if(!stmt){
-    db.print_errmsg("Failed to compile sql");
+    return false;
   }
   auto &vca_ins_stmt =
     this->get_insert_stmt(vndb_main::table_type::vn_character_actor_relations);
@@ -285,20 +286,18 @@ bool vndb_main::build_staff_derived_tables(){
     err = sqlite_insert_vn_staff_relations(id, vns, vs_ins_stmt);
     if(err != SQLITE_OK){
       db.print_errmsg("Failed to insert into vn_staff_relations");
-      vndb_log->printf(util::log_level::warn,
-                       "Failed to insert into vn_staff_relations for "
-                       "staff = %d, vn = %s\n",
-                       id, vns.dump().c_str());
+      vndb_log->log_warn("Failed to insert into vn_staff_relations for "
+                         "staff = %d, vn = %s\n",
+                         id, vns.dump().c_str());
       db.rollback_transaction();
       return false;
     }
     err = sqlite_insert_staff_aliases(id, aliases, sa_ins_stmt);
     if(err != SQLITE_OK){
       db.print_errmsg("Failed to insert into staff_aliases");
-      vndb_log->printf(util::log_level::warn,
-                       "Failed to insert into staff_aliases for "
-                       "staff = %d, aliases = %s\n",
-                       id, aliases.dump().c_str());
+      vndb_log->log_warn("Failed to insert into staff_aliases for "
+                         "staff = %d, aliases = %s\n",
+                         id, aliases.dump().c_str());
       db.rollback_transaction();
       return false;
     }
@@ -326,7 +325,7 @@ static bool build_image_table(sqlite3_wrapper &db,
     std::string_view uri = stmt.get_column<std::string_view>(1);
     int err = conn.http_get(uri, buf);
     //If we can't read from the bio, wait a bit and retry.
-    if(err == -1){      
+    if(err == -1){
       vndb_log->log_debug("Error reading from bio, waiting then retrying.");
       int wait = 15;
       while(err == -1){
@@ -336,7 +335,7 @@ static bool build_image_table(sqlite3_wrapper &db,
         vndb_log->log_debug("Trying to reconnect.\n", wait);
         if(!conn.reconnect()){
           fprintf(stderr,"Couldn't reconnect.\n");
-          return false;          
+          return false;
         }
         vndb_log->log_debug("Reconnected.\n");
         err = conn.http_get(uri, buf);
@@ -405,7 +404,7 @@ bool vndb_main::build_vn_images(){
   auto stmt = db.prepare_stmt(
     "select id, substr(image, 19) from VNs where image is not null");
   if(!stmt){
-    db.print_errmsg("Failed to compile sql");
+    return false;
   }
   auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
 
@@ -418,7 +417,7 @@ bool vndb_main::build_character_images(){
   auto stmt = db.prepare_stmt(
     "select id, substr(image, 19) from characters where image is not null");
   if(!stmt){
-    db.print_errmsg("Failed to compile sql");
+    return false;
   }
   auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
   progress_bar pb(db_info["num_characters"].get<int>(), "VN images");
@@ -429,11 +428,10 @@ static int get_image_count(sqlite3_wrapper &db, const char *what){
   snprintf(buf, 256, "select count(*) from %s_images where image is not null;", what);
   auto stmt = db.prepare_stmt(buf);
   if(!stmt){
-    db.print_errmsg("Failed to compile sql");
     return -1;
   }
   if(stmt.step() != SQLITE_ROW){
-    db.print_errmsg("Error executing sql"); 
+    db.print_errmsg("Error executing sql");
     return -1;
   }
   int count = stmt.get_column<int>(0);
@@ -441,7 +439,7 @@ static int get_image_count(sqlite3_wrapper &db, const char *what){
     vndb_log->log_warn("Too many rows returned when querying image count.\n");
   }
   return count;
-}  
+}
 bool vndb_main::update_vn_images(){
   sqlite3_wrapper &db = this->db;
   int img_count = get_image_count(db, "vn");
@@ -452,10 +450,10 @@ bool vndb_main::update_vn_images(){
   auto stmt = db.prepare_stmt(
     R"(select id, substr(image, 19) from VNs
          where image is not null and
-               not exists (select vn from vn_images 
+               not exists (select vn from vn_images
                             where vn = VNs.id and image is not null);)");
   if(!stmt){
-    db.print_errmsg("Failed to compile sql");
+    return false;
   }
   auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
 
@@ -465,17 +463,20 @@ bool vndb_main::update_vn_images(){
 bool vndb_main::update_character_images(){
   sqlite3_wrapper &db = this->db;
   int img_count = get_image_count(db, "character");
-  if(img_count < 0){ return false; }  
+  if(img_count < 0){ return false; }
   //substr(image,19) cuts the leading "https://s.vndb.org" from the link
   auto stmt = db.prepare_stmt(
     R"(select id, substr(image, 19) from characters
          where image is not null and
-               not exists (select character from character_images 
+               not exists (select character from character_images
                             where character = characters.id and image is not null);)");
   if(!stmt){
-    db.print_errmsg("Failed to compile sql");
+    return false;
   }
   auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
   progress_bar pb(db_info["num_characters"].get<int>() - img_count, "character images");
   return build_image_table(db, stmt, ins_stmt, &pb);
+}
+extern "C" FILE* get_vndb_log_file_pointer(){
+  return vndb_log->out;
 }
