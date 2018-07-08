@@ -1506,7 +1506,7 @@ namespace detail {
 
 This class implements a recursive decent parser.
 */
-template <typename basic_json> class parser {
+template class parser {
   using number_integer_t = typename basic_json::number_integer_t;
   using number_unsigned_t = typename basic_json::number_unsigned_t;
   using number_float_t = typename basic_json::number_float_t;

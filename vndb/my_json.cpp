@@ -609,3 +609,529 @@ lexer::token_type lexer::scan() {
       return token_type::parse_error;
   }
 }
+template class parser {
+  using number_integer_t = typename basic_json::number_integer_t;
+  using number_unsigned_t = typename basic_json::number_unsigned_t;
+  using number_float_t = typename basic_json::number_float_t;
+  using string_t = typename basic_json::string_t;
+  using lexer_t = lexer<basic_json>;
+  using token_type = typename lexer_t::token_type;
+
+  enum class parse_event_t : uint8_t {
+    /// the parser read `{` and started to process a JSON object
+    object_start,
+    /// the parser read `}` and finished processing a JSON object
+    object_end,
+    /// the parser read `[` and started to process a JSON array
+    array_start,
+    /// the parser read `]` and finished processing a JSON array
+    array_end,
+    /// the parser read a key of a value in an object
+    key,
+    /// the parser finished reading a JSON value
+    value
+  };
+
+  using parser_callback_t = std::function<bool(int depth, parse_event_t event,
+                                               basic_json& parsed)>;
+
+  /// a parser reading from an input adapter
+  explicit parser(detail::input_adapter_t adapter,
+                  const parser_callback_t cb = nullptr,
+                  const bool allow_exceptions_ = false)
+      : callback(cb), m_lexer(adapter), allow_exceptions(allow_exceptions_) {}
+  explicit parser(detail::input_adapter adapter,
+                  const parser_callback_t cb = nullptr,
+                  const bool allow_exceptions_ = false)
+      : parser(static_cast<detail::input_adapter_t>(adapter), cb,
+               allow_exceptions_) {}
+
+  /*!
+  @brief public parser interface
+
+  @param[in] strict      whether to expect the last token to be EOF
+  @param[in,out] result  parsed JSON value
+
+  @throw parse_error.101 in case of an unexpected token
+  @throw parse_error.102 if to_unicode fails or surrogate error
+  @throw parse_error.103 if to_unicode fails
+  */
+  void parse(const bool strict, basic_json& result) {
+    // read first token
+    get_token();
+
+    parse_internal(true, result);
+    result.assert_invariant();
+
+    // in strict mode, input must be completely read
+    if (strict) {
+      get_token();
+      expect(token_type::end_of_input);
+    }
+
+    // in case of an error, return discarded value
+    if (errored) {
+      result = value_t::discarded;
+      return;
+    }
+
+    // set top-level value to null if it was discarded by the callback
+    // function
+    if (result.is_discarded()) {
+      result = nullptr;
+    }
+  }
+  // Code Added to allow resuing a parser to parse multiple json values
+  // from on input stream.
+  bool at_eof() { return last_token == token_type::end_of_input; }
+  bool test_eof() {
+    get_token();
+    return last_token == token_type::end_of_input;
+  }
+  void init() { get_token(); }
+  // Try to parse a value, return false if parsing failed, use when
+  // you're not sure if the input is json and it's ok if it's not.
+  bool try_parse(basic_json& result, const bool strict = true) {
+    get_token();
+    parse_internal(true, result);
+    if (errored) {
+      goto error;
+    }
+    if (strict && test_eof()) {
+      goto error;
+    }
+    return true;
+  error:
+    result = value_t::discarded;
+    return false;
+  }
+
+  basic_json parse(const bool strict = true) {
+    basic_json ret;
+    parse(strict, ret);
+    return ret;
+  }
+  basic_json parse_next() {
+    if (at_eof()) {
+      errored = true;
+    }
+    if (errored) {
+      return value_t::discarded;
+    }
+    basic_json ret;
+    parse_internal(true, ret);
+    ret.assert_invariant();
+    get_token();
+    return ret;
+  }
+
+  /*!
+  @brief public accept interface
+
+  @param[in] strict  whether to expect the last token to be EOF
+  @return whether the input is a proper JSON text
+  */
+  bool accept(const bool strict = true) {
+    // read first token
+    get_token();
+
+    if (!accept_internal()) {
+      return false;
+    }
+
+    // strict => last token must be EOF
+    return !strict || (get_token() == token_type::end_of_input);
+  }
+
+  /*!
+  @brief the actual parser
+  @throw parse_error.101 in case of an unexpected token
+  @throw parse_error.102 if to_unicode fails or surrogate error
+  @throw parse_error.103 if to_unicode fails
+  */
+  void parse_internal(bool keep, basic_json& result) {
+    // never parse after a parse error was detected
+    assert(!errored);
+
+    // start with a discarded value
+    if (!result.is_discarded()) {
+      result.m_value.destroy(result.m_type);
+      result.m_type = value_t::discarded;
+    }
+
+    switch (last_token) {
+    case token_type::begin_object: {
+      if (keep) {
+        if (callback) {
+          keep = callback(depth++, parse_event_t::object_start, result);
+        }
+
+        if (!callback || keep) {
+          // explicitly set result to object to cope with {}
+          result.m_type = value_t::object;
+          result.m_value = value_t::object;
+        }
+      }
+
+      // read next token
+      get_token();
+
+      // closing } -> we are done
+      if (last_token == token_type::end_object) {
+        if (keep && callback &&
+            !callback(--depth, parse_event_t::object_end, result)) {
+          result.m_value.destroy(result.m_type);
+          result.m_type = value_t::discarded;
+        }
+        break;
+      }
+
+      // parse values
+      string_t key;
+      basic_json value;
+      while (true) {
+        // store key
+        if (!expect(token_type::value_string)) {
+          return;
+        }
+        key = m_lexer.move_string();
+
+        bool keep_tag = false;
+        if (keep) {
+          if (callback) {
+            basic_json k(key);
+            keep_tag = callback(depth, parse_event_t::key, k);
+          } else {
+            keep_tag = true;
+          }
+        }
+
+        // parse separator (:)
+        get_token();
+        if (!expect(token_type::name_separator)) {
+          return;
+        }
+
+        // parse and add value
+        get_token();
+        value.m_value.destroy(value.m_type);
+        value.m_type = value_t::discarded;
+        parse_internal(keep, value);
+
+        if (JSON_UNLIKELY(errored)) {
+          return;
+        }
+
+        if (keep && keep_tag && !value.is_discarded()) {
+          result.m_value.object->emplace(std::move(key), std::move(value));
+        }
+
+        // comma -> next value
+        get_token();
+        if (last_token == token_type::value_separator) {
+          get_token();
+          continue;
+        }
+
+        // closing }
+        if (!expect(token_type::end_object)) {
+          return;
+        }
+        break;
+      }
+
+      if (keep && callback &&
+          !callback(--depth, parse_event_t::object_end, result)) {
+        result.m_value.destroy(result.m_type);
+        result.m_type = value_t::discarded;
+      }
+      break;
+    }
+
+    case token_type::begin_array: {
+      if (keep) {
+        if (callback) {
+          keep = callback(depth++, parse_event_t::array_start, result);
+        }
+
+        if (!callback || keep) {
+          // explicitly set result to array to cope with []
+          result.m_type = value_t::array;
+          result.m_value = value_t::array;
+        }
+      }
+
+      // read next token
+      get_token();
+
+      // closing ] -> we are done
+      if (last_token == token_type::end_array) {
+        if (callback && !callback(--depth, parse_event_t::array_end, result)) {
+          result.m_value.destroy(result.m_type);
+          result.m_type = value_t::discarded;
+        }
+        break;
+      }
+
+      // parse values
+      basic_json value;
+      while (true) {
+        // parse value
+        value.m_value.destroy(value.m_type);
+        value.m_type = value_t::discarded;
+        parse_internal(keep, value);
+
+        if (JSON_UNLIKELY(errored)) {
+          return;
+        }
+
+        if (keep && !value.is_discarded()) {
+          result.m_value.array->push_back(std::move(value));
+        }
+
+        // comma -> next value
+        get_token();
+        if (last_token == token_type::value_separator) {
+          get_token();
+          continue;
+        }
+
+        // closing ]
+        if (!expect(token_type::end_array)) {
+          return;
+        }
+        break;
+      }
+
+      if (keep && callback &&
+          !callback(--depth, parse_event_t::array_end, result)) {
+        result.m_value.destroy(result.m_type);
+        result.m_type = value_t::discarded;
+      }
+      break;
+    }
+
+    case token_type::literal_null: {
+      result.m_type = value_t::null;
+      break;
+    }
+
+    case token_type::value_string: {
+      result.m_type = value_t::string;
+      result.m_value = m_lexer.move_string();
+      break;
+    }
+
+    case token_type::literal_true: {
+      result.m_type = value_t::boolean;
+      result.m_value = true;
+      break;
+    }
+
+    case token_type::literal_false: {
+      result.m_type = value_t::boolean;
+      result.m_value = false;
+      break;
+    }
+
+    case token_type::value_unsigned: {
+      result.m_type = value_t::number_unsigned;
+      result.m_value = m_lexer.get_number_unsigned();
+      break;
+    }
+
+    case token_type::value_integer: {
+      result.m_type = value_t::number_integer;
+      result.m_value = m_lexer.get_number_integer();
+      break;
+    }
+
+    case token_type::value_float: {
+      result.m_type = value_t::number_float;
+      result.m_value = m_lexer.get_number_float();
+
+      // throw in case of infinity or NAN
+      if (JSON_UNLIKELY(!std::isfinite(result.m_value.number_float))) {
+        if (allow_exceptions) {
+          JSON_THROW(out_of_range::create(406, "number overflow parsing '" +
+                                                   m_lexer.get_token_string() +
+                                                   "'"));
+        }
+        expect(token_type::uninitialized);
+      }
+      break;
+    }
+
+    case token_type::parse_error: {
+      // using "uninitialized" to avoid "expected" message
+      if (!expect(token_type::uninitialized)) {
+        return;
+      }
+      break; // LCOV_EXCL_LINE
+    }
+
+    default: {
+      // the last token was unexpected; we expected a value
+      if (!expect(token_type::literal_or_value)) {
+        return;
+      }
+      break; // LCOV_EXCL_LINE
+    }
+    }
+
+    if (keep && callback && !callback(depth, parse_event_t::value, result)) {
+      result.m_value.destroy(result.m_type);
+      result.m_type = value_t::discarded;
+    }
+  }
+
+  /*!
+  @brief the actual acceptor
+
+  @invariant 1. The last token is not yet processed. Therefore, the caller
+                of this function must make sure a token has been read.
+             2. When this function returns, the last token is processed.
+                That is, the last read character was already considered.
+
+  This invariant makes sure that no token needs to be "unput".
+  */
+  bool accept_internal() {
+    switch (last_token) {
+    case token_type::begin_object: {
+      // read next token
+      get_token();
+
+      // closing } -> we are done
+      if (last_token == token_type::end_object) {
+        return true;
+      }
+
+      // parse values
+      while (true) {
+        // parse key
+        if (last_token != token_type::value_string) {
+          return false;
+        }
+
+        // parse separator (:)
+        get_token();
+        if (last_token != token_type::name_separator) {
+          return false;
+        }
+
+        // parse value
+        get_token();
+        if (!accept_internal()) {
+          return false;
+        }
+
+        // comma -> next value
+        get_token();
+        if (last_token == token_type::value_separator) {
+          get_token();
+          continue;
+        }
+
+        // closing }
+        return (last_token == token_type::end_object);
+      }
+    }
+
+    case token_type::begin_array: {
+      // read next token
+      get_token();
+
+      // closing ] -> we are done
+      if (last_token == token_type::end_array) {
+        return true;
+      }
+
+      // parse values
+      while (true) {
+        // parse value
+        if (!accept_internal()) {
+          return false;
+        }
+
+        // comma -> next value
+        get_token();
+        if (last_token == token_type::value_separator) {
+          get_token();
+          continue;
+        }
+
+        // closing ]
+        return (last_token == token_type::end_array);
+      }
+    }
+
+    case token_type::value_float: {
+      // reject infinity or NAN
+      return std::isfinite(m_lexer.get_number_float());
+    }
+
+    case token_type::literal_false:
+    case token_type::literal_null:
+    case token_type::literal_true:
+    case token_type::value_integer:
+    case token_type::value_string:
+    case token_type::value_unsigned: return true;
+
+    default: // the last token was unexpected
+      return false;
+    }
+  }
+
+  /// get next token from lexer
+  token_type get_token() { return (last_token = m_lexer.scan()); }
+
+  /*!
+  @throw parse_error.101 if expected token did not occur
+  */
+  bool expect(token_type t) {
+    if (JSON_UNLIKELY(t != last_token)) {
+      errored = true;
+      expected = t;
+      if (allow_exceptions) {
+        throw_exception();
+      } else {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  [[noreturn]] void throw_exception() const {
+    std::string error_msg = "syntax error - ";
+    if (last_token == token_type::parse_error) {
+      error_msg += std::string(m_lexer.get_error_message()) + "; last read: '" +
+                   m_lexer.get_token_string() + "'";
+    } else {
+      error_msg +=
+          "unexpected " + std::string(lexer_t::token_type_name(last_token));
+    }
+
+    if (expected != token_type::uninitialized) {
+      error_msg +=
+          "; expected " + std::string(lexer_t::token_type_name(expected));
+    }
+
+    JSON_THROW(parse_error::create(101, m_lexer.get_position(), error_msg));
+  }
+
+  /// current level of recursion
+  int depth = 0;
+  /// callback function
+  const parser_callback_t callback = nullptr;
+  /// the type of the last read token
+  token_type last_token = token_type::uninitialized;
+  /// the lexer
+  lexer_t m_lexer;
+  /// whether a syntax error occurred
+  bool errored = false;
+  /// possible reason for the syntax error
+  token_type expected = token_type::uninitialized;
+  /// whether to throw exceptions in case of errors
+  const bool allow_exceptions = true;
+};

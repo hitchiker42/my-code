@@ -82,7 +82,7 @@ void jpeg_mem_src(j_decompress_ptr cinfo, const unsigned char *inbuffer,
   src->next_input_byte = (const JOCTET *)inbuffer;
 }
 #endif
-int decompress_jpeg(uint8_t *src, size_t src_sz, 
+int decompress_jpeg(uint8_t *src, size_t src_sz,
                     struct decompressed_image *dst){
   struct jpeg_decompress_struct cinfo;
   struct my_error_mgr jerr;
@@ -101,6 +101,9 @@ int decompress_jpeg(uint8_t *src, size_t src_sz,
   jpeg_create_decompress(&cinfo);
   jpeg_mem_src(&cinfo, src, src_sz);
   jpeg_read_header(&cinfo, TRUE);
+  //  fprintf(stderr,"Read jpeg header: %dx%d, %d components, colorspace %d.\n",
+  //               cinfo.image_width, cinfo.image_height, cinfo.num_components,
+  //               cinfo.jpeg_color_space);
   //Code taken from SDL_IMG
   if(cinfo.num_components == 4) {
     /* Set 32-bit Raw output */
@@ -113,12 +116,6 @@ int decompress_jpeg(uint8_t *src, size_t src_sz,
     /* Set 24-bit RGB output */
     cinfo.out_color_space = JCS_RGB;
     cinfo.quantize_colors = FALSE;
-#ifdef FAST_JPEG
-    cinfo.scale_num   = 1;
-    cinfo.scale_denom = 1;
-    cinfo.dct_method = JDCT_FASTEST;
-    cinfo.do_fancy_upsampling = FALSE;
-#endif
     jpeg_calc_output_dimensions(&cinfo);
     dst->img = malloc(cinfo.output_width * cinfo.output_height * 3);
   } else {
@@ -127,6 +124,8 @@ int decompress_jpeg(uint8_t *src, size_t src_sz,
     jpeg_calc_output_dimensions(&cinfo);
     dst->img = malloc(cinfo.output_width * cinfo.output_height);
   }
+//  fprintf(stderr,"Set out color space to %d (%d components).\n",
+//          cinfo.out_color_space, cinfo.out_color_components);
   dst->width = cinfo.output_width;
   dst->height = cinfo.output_height;
   dst->num_components = cinfo.num_components;

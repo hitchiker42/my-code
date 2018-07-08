@@ -29,6 +29,9 @@ sdl_gui.o: sdl_gui.c gui.h
 # the .o file doesn't actually depend on the .h file, but it
 # makes more sense to put the dependency here rather than vndb_cpp.
 progress_bar.o: progress_bar.c progress_bar.h
+
+# temporary (hopefull)
+sdl_test.o: sdl_test.cpp vndb.h
 # compile c++ to asm
 %.s:%.cpp
 	$(CXX) $(CXXFLAGS_NDEBUG) $(CPPFLAGS) -S $< -o $@
@@ -51,6 +54,8 @@ sqlite3.o: sqlite3.c
 vndb_cpp: vndb.o connection.o sqlite_wrappers.o interaction.o progress_bar.o main.o image.o tag_trait_parser.o sqlite3.o sdl_gui.o sqlite_ext.o misc.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
+sdl_test_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o image.o tag_trait_parser.o sqlite3.o sdl_gui.o sqlite_ext.o misc.o sdl_test.o
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 clean:
 	rm -f *.o $(PROGRAM_FILES) a.out
 tags: TAGS

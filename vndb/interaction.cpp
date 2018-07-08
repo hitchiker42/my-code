@@ -51,7 +51,9 @@ Commands are terminated with semicolons, not newlines.
 help                 | print this help message
 sql stmt             | execute sql statement, bind result to the variable 'last'
 select select-stmt   | shorthand for sql select select-stmt
-set variable value   | set the value of 'variable' to the result value
+set variable expr    | set the value of 'variable' to the result of value
+length expr          | print the length of an array or number of values in an object
+type expr            | print the type of an expression
 print value          | print the result of evaluating value to stdout
 write value filename | print value to the file 'filename'
 view image           | view the image using SDL
@@ -67,7 +69,8 @@ and are newline rather than semicolon terminated.
            the entire file if n is not given. (currently
            the whole file is always printed).
 )EOF"sv;
-
+//characters which indicate the end of a varible
+static constexpr const char *variable_delimiters = " ;()+-*/%&|!<>=";
 const char* skip_space(const char *str){
   while(*str && *str == ' '){
     ++str;
@@ -120,6 +123,25 @@ void open_url(const char *url){
 #endif
 //val_ptr needs to point to an actual json value.
 bool eval_expr(vndb_main *vndb, std::string_view expr, json *val_ptr);
+int set_val_to_sql(vndb_main *vndb, sqlite3_stmt_wrapper& stmt,
+                   json* val_ptr, bool as_object = true){
+  int err;
+  json val = stmt.exec_json(as_object, &err);
+  if(err != SQLITE_OK){
+    fprintf(stderr, "Failed to execute sql.\n");
+    return err;
+  }
+  *val_ptr = std::move(val);
+  return SQLITE_OK;
+}
+int set_val_to_sql(vndb_main *vndb, std::string_view sql,
+                    json* val_ptr, bool as_object = true){
+  auto stmt = vndb->db.prepare_stmt(sql);
+  if(!stmt){
+    return vndb->db.errcode();
+  }
+  return set_val_to_sql(vndb, stmt, val_ptr, as_object);
+}
 int set_var_to_sql(vndb_main *vndb, std::string_view var,
                    sqlite3_stmt_wrapper& stmt, bool as_object = true){
   int err;
@@ -128,14 +150,12 @@ int set_var_to_sql(vndb_main *vndb, std::string_view var,
     fprintf(stderr, "Failed to execute sql.\n");
     return err;
   }
-  vndb_log->log_debug("Result of sql \"%s\" = \"%s\".\n",
-                      stmt.get_sql().c_str(), val.dump().c_str());
-  /*auto [it, inserted] = */
-  //vndb->symbol_table.insert_or_assign(util::string_view(var, true),
-  //std::move(val));
+  //vndb_log->log_debug("Result of sql \"%s\" = \"%s\".\n",
+  //stmt.get_sql().c_str(), val.dump().c_str()); 
   auto var_name = util::string_view(var, true);
   vndb_log->log_debug("Adding variable %.*s.\n",
                       (int)var_name.size(), var_name.data());
+  /*auto [it, inserted] = */
   vndb->symbol_table.insert_or_assign(std::move(var_name),
                                       std::move(val));
   return SQLITE_OK;
@@ -242,12 +262,21 @@ bool eval_expr(vndb_main *vndb, std::string_view expr, json *val_ptr){
     }
   } else if((ch == '$') || isalpha(ch)){
     const char *var_start = ptr;
-    //Currently anything after the variable will be ignored, but I intend
-    //to support more complex expressions, which is why there are so many
-    //possible characters than can end a variable.
-    ptr = strpbrk(ptr, " ;()+-*/%&|!<>=");
+    //Find the end of the variable currently only ' ' and ';'
+    //have any real use, but I do intend to add more complex expressions    
+    ptr = strpbrk(ptr, variable_delimiters);
     std::string_view var(var_start, ptr - var_start);
+    //Kind of a hack, I may limit sql to only be in parentheses.
+    if(var == "select"sv){
+      return (set_val_to_sql(vndb, var_start, val_ptr) == SQLITE_OK);
+    }
     return expand_variable(vndb, var, val_ptr);
+  } else if(ch == '('){
+    const char* endptr = &expr.back();
+    //find closing parentheses
+    const char* end = (char*)memrchr(endptr, ')', endptr - ptr);
+    std::string_view sql(ptr, end - ptr);
+    return (set_val_to_sql(vndb, sql, val_ptr) == SQLITE_OK);
   } else {
     printf("Unexpected character '%c' in expression '%.*s'.\n",
            *ptr, (int)expr.size(), expr.data());
@@ -276,7 +305,7 @@ int do_sql_command(vndb_main *vndb, const char *sql){
     std::vector<std::string_view> vars;
     do {
       vndb->buf.append(prev_var_end, var_start - prev_var_end).append(" ? ");
-      prev_var_end = strpbrk(var_start, " ;()+-*/%&|!<>=");
+      prev_var_end = strpbrk(var_start, variable_delimiters);
       vars.emplace_back(var_start, prev_var_end - var_start);
       if(*prev_var_end == ';'){ break; }
     } while((var_start = find_var_start(prev_var_end)));
@@ -341,17 +370,28 @@ int do_sql_command(vndb_main *vndb, const char *sql){
   return SQLITE_OK;
 }
 enum class command_type {
-  sql,
+  help,
+  length,
+  print,
   select,
   set,
-  print,
-  write,
+  sql,
+  type,
   view,
-  help
+  write
 };
-static constexpr util::array command_names(util::va_init_tag,
-                                           "sql"sv, "select"sv, "set"sv, "print"sv,
-                                           "write"sv, "view"sv, "help"sv);
+static constexpr util::array command_names(
+  util::va_init_tag,
+  "help"sv,
+  "length"sv,
+  "print"sv,
+  "select"sv,
+  "set"sv,
+  "sql"sv,
+  "type"sv,
+  "view"sv,
+  "write"sv
+);
 int do_command(vndb_main *vndb, std::string_view command){
   const char *cmd_start = skip_space(command.data());
   const char *cmd_end = strpbrk(cmd_start, " ;");
@@ -413,6 +453,29 @@ int do_command(vndb_main *vndb, std::string_view command){
         return 0;
       }
     }
+    case command_type::length:{
+      json val;
+      if(!eval_expr(vndb,command.substr(cmd.size()), &val)){
+        return -1;
+      } else {
+        if(!val.is_array() && !val.is_object()){
+          printf("Expr has non compound type %s.\n", val.type_name());
+          return -1;
+        } else {
+          printf("%lu.\n", val.size());
+          return 0;
+        }
+      }
+    }
+    case command_type::type:{
+      json val;
+      if(!eval_expr(vndb,command.substr(cmd.size()), &val)){
+        return -1;
+      } else {
+        printf("%s.\n", val.type_name());
+        return 0;
+      }
+    }
     case command_type::set:{
       const char *name_start = skip_space(cmd_end);
       const char *name_end = strchr(name_start, ' ');
@@ -463,7 +526,8 @@ int do_command(vndb_main *vndb, std::string_view command){
         //The pointer to data is only valid until we call stmt.step/reset
         //so we need to wait for the other thread to be done with it.
         SDL_SemWait(vndb->sdl_sem);
-        return 0;
+        assert(stmt.step() == SQLITE_DONE);
+        return stmt.reset();
       } else {
         printf("Error executing sql.\n");
         return -1;
