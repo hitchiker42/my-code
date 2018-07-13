@@ -633,10 +633,12 @@ static constexpr bool have_history = true;
     vndb_read_history(histfile_name);
     vndb_limit_history(2000);
   }
-
-  //SDL support temporally commented out.
-  if(!vndb.init_sdl()){
-    printf("Could not initialize SDL, will not be able to display images.\n");
+  if(vndb.gui == vndb_main::gui_type::sdl){
+    if(!vndb.init_sdl()){
+      printf("Could not initialize SDL, will not be able to display images.\n");
+    }
+  } else if(vndb.gui == vndb_main::gui_type::fltk){
+    printf("FLTK gui is currently unimplemented.\n");
   }
   while(1){
     const char *prompt = "vndb >";
@@ -694,144 +696,3 @@ static constexpr bool have_history = true;
   }
   exit(abs(err));
 }
-/*
-struct json_path {
-  std::vector<json> path;
-  json_path() = default;
-  json_path(const json_path &other) = default;
-  json_path(json_path &&other) = default;
-
-  //Appending elements to the path
-  json_path& append(std::string_view obj_name){
-    path.emplace_back(obj_name);
-    return *this;
-  }
-  json_path& append(int64_t idx){
-    path.emplace_back(idx);
-    return *this;
-  }
-  json_path& append(const json_path &p){
-    path.append(p.path);
-    return *this;
-  }
-  json_path& operator/=(std::string_view obj_name){
-    return append(obj_name);
-  }
-  json_path& operator/=(int64_t idx){
-    return append(idx);
-  }
-  json_path& operator/=(const json_path &p){
-    append(p);
-  }
-  json_path& operator/(int64_t idx){
-    json_path p(*this);
-    return p.append(idx);
-  }
-  json_path& operator/(std::string_view obj_name){
-    json_path p(*this);
-    return p.append(obj_name);
-  }
-  json_path& operator/(const json_path &p){
-    json_path p2(*this);
-    return p2.append(p);
-  }
-  //Convert a path into a string
-  std::string to_string(){
-    std::string ret("$");
-    char buf[64] num_to_string_buf;
-    for(auto&& elt : path){
-      if(!append_path_element_to_string(elt, num_to_string_buf)){
-        return "";
-      }
-    }
-    return ret;
-  }
-  char* format_int(int val, char *buf){
-    snprintf(buf, 64, "%d", val);
-    return buf;
-  }
-  bool append_path_element_to_string(std::string &str, json elt,
-                                     char *buf){
-    if(elt.is_string()){
-      str.push_back('.');
-      str.append(elt.get<json::string_view_t>());
-      return true;
-    } else if (elt.is_number_integer()){
-      int idx = elt.get<int>();
-      assert(idx >= 0);
-      str.push_back('[');
-      str.append(format_int(idx));
-      str.push_back(']');
-      return true;
-    } else {
-      fprintf(stderr, "Error unexpected type in json_path : %s\n");
-      return false;
-    }
-  }
-  //parse a path given as a string.
-  bool parse(const char *str){
-    const char *start;//for use in printing error messages.
-    if(*str++ != '$'){
-      return false;
-    }
-    char c;
-    while((c = *str) != '\0'){
-      if(*str == '.'){
-        char *obj_name = ++str;
-        //I'm not going to verify that this is a valid object name, I'll
-        //just deal with that when looking for the object.
-        while((c = *str)){
-          if(c == '.' || c == '['){ break; }
-          ++str;
-        }
-        path.emplace_back(std::string_view(obj_name, str));
-      } else if(*str == ']'){
-        char *idx_str = ++str;
-        long idx = strtol(idx_str, &str, 10);
-        if(*str != ']' && *str != '\0' || idx < 0){
-          fprintf(stderr,
-                  "Error parsing number in json path %s at index %d\n",
-                  start, str - start);
-          return false;
-        }
-        path.emplace_back(idx);
-      } else {
-        fprintf(stderr,
-                "Error malformed json path %s, error at index %d\n",
-                start, str-start);
-        return false;
-      }
-    }
-    return true;
-  }
-  //Return the a pointer to the value the json object pointed
-  //to by 'ptr' has at the location given by this path, or nullptr if
-  //no such location exists.
-  json* follow(json *ptr){
-    for(auto &&elt : path){
-      if(elt.is_int()){
-        if(!ptr->is_array() || elt >= ptr->size()){
-          return nullptr;
-        } else {
-          ptr = &((*ptr)[elt.get<int>()]);
-        }
-      } else {//elt.is_string()
-        //json::find is defined to always return json::end when called on
-        //a non object type.
-        auto it = ptr->find(elt.get<json::string_view_t>());
-        if(it == ptr->end()){
-          return nullptr;
-        }
-        ptr = &(*it);
-      }
-    }
-    return ptr;
-  }
-  //version of follow_path that takes its argument by value, the only
-  //difference is that this will als return nullptr for an empty path.
-  json* follow(json val){
-    if(path.empty()){ return nullptr; }
-    return follow(&val);
-  }
-};
-*/

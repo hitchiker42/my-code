@@ -193,6 +193,12 @@ struct vndb_main {
     auto ttv = util::to_underlying(tt);
     return (ttv >= (num_primary_tables));
   }
+  enum class gui_type {
+    none = 0,
+    sdl = 1,
+    fltk = 2
+  };
+  static constexpr const char* gui_type_names[3] = {"none", "sdl", "fltk"};
   sqlite3_wrapper db;
   vndb_connection conn;
   //result of the dbstats command from the server, used for progress bars
@@ -215,8 +221,9 @@ struct vndb_main {
   //a look up (like you would for a std::string). This makes inserting elements
   //a bit more complicated however.
   std::unordered_map<util::string_view, json> symbol_table;
+  gui_type gui = gui_type::none;
   //Used for comunication with SDL which is used to display images.
-  SDL_sem *sdl_sem = NULL;
+  SDL_sem *sdl_sem = nullptr;
   //Used to store multiline input and to expand variables embedded in sql commands.
   util::string_buf buf;
   //Open the databas in db_filename and create a connection with the given

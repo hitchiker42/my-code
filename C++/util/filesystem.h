@@ -94,6 +94,11 @@ struct FILE_wrapper {
   FILE* unwrap(){
     return f;
   }
+  //explicitly close the file to avoid waiting for the destructor.
+  void close(){
+    fclose(f);
+    f = nullptr;
+  }
   //Use this if you don't want the FILE to close when this goes out of scope
   void set_to_null(){
     f = nullptr;

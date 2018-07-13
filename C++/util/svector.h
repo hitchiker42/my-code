@@ -165,11 +165,11 @@ struct svector {
   //Moves the last element out of the vector and returns it
   T pop(){
     //len < sz checks to see if len has wrapped around
-    assert(len > 0 && len < sz);
+    assert(len > 0 && len <= sz);
     return std::move(vec[--len]);
   }
   void pop_back(){
-    assert(len > 0 && len < sz);
+    assert(len > 0 && len <= sz);
     len--;
     destruct(len);
   }

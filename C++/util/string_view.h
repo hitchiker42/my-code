@@ -95,7 +95,7 @@ struct string_view {
   constexpr string_view(string_view&& sv) noexcept
     : ptr{sv.ptr}, sz{sv.sz}, flags{sv.flags} {
     sv.flags &= ~flag_owned;
-  } 
+  }
   //string views are immutable, the copy assigment/move operators are
   //really just to allow reusing a variable
   string_view& operator=(string_view &other) {
@@ -211,11 +211,11 @@ struct string_view {
     return -other.compare(this->to_std_string_view());
   }
   constexpr int compare(const char *other) const {
-    size_t len = __builtin_strlen(other);
+    size_t len = constexpr_strlen(other);
     int cmp_result = constexpr_strncmp(data(), other, std::min(size(), len));
     return (cmp_result ? cmp_result : three_way_compare(size(), len));
   }
-  
+
   friend bool operator==(const util::string_view& lhs, const std::string_view rhs){
     return lhs.compare(rhs) == 0;
   }
@@ -260,13 +260,24 @@ struct string_view {
   string_view substr_copy(size_type start, size_type stop) const {
     return string_view(ptr + start, stop - start, true);
   }
+  size_type find(const std::string_view v, size_type pos = 0) const {
+    char *ptr = (char*)memmem(data() + pos, size() - pos, v.data(), v.size());
+    return (ptr ? ptr - data() : (size_t)-1);
+  }
+  size_type find(char c, size_type pos = 0) const {
+    char *ptr = (char*)memchr(data() + pos, c, size() - pos);
+    return (ptr ? ptr - data() : (size_t)-1);
+  }  
   //Need to use std::string_view to make this constexpr
   constexpr size_type find_first_of(const std::string_view v, size_type pos = 0) const {
-    return memcspn(ptr + pos, sz - pos, v.data(), v.size());
+    size_t ret = memcspn(ptr + pos, sz - pos, v.data(), v.size());
+    return ((ret == sz) ? (size_type)-1 : ret);
   }
-  constexpr size_type find_first_of_not(const std::string_view v, size_type pos = 0) const {
-    return memrspn(ptr + pos, sz - pos, v.data(), v.size());
-  }  
+  constexpr size_type find_first_not_of(const std::string_view v, size_type pos = 0) const {
+    size_t ret = memrspn(ptr + pos, sz - pos, v.data(), v.size());
+    return ((ret == sz) ? (size_type)-1 : ret);
+  }
+
 };
 //Copying the std libraries naming hierarchy.
 namespace literals {
@@ -279,8 +290,8 @@ inline namespace string_literals {
 }
 
 namespace std {
-//Specialization of std::hash such that a hash of a util::string_view 
-//is the same as a std::string/string_view with the same contents. 
+//Specialization of std::hash such that a hash of a util::string_view
+//is the same as a std::string/string_view with the same contents.
 template<> struct hash<::util::string_view> {
   size_t operator()(const ::util::string_view& arg) const noexcept {
     return std::hash<std::string_view>{}(arg.to_std_string_view());

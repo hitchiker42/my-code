@@ -7,7 +7,8 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-
+#include <semaphore.h>
+#include <pthread.h>
 extern SDL_EventType jpeg_event_type;//needs to be set using SDL_RegisterEvents
 //indicates if the sdl thread is running, mostly used to check if
 //initialization was successful.

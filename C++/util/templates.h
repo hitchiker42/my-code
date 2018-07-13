@@ -180,7 +180,7 @@ T find_or_default(const Container<T>& container, const T& val,
 //Version which takes a container
 template<class T, class U = typename T::value_type>
 ssize_t position(const T& container, const U& value){
-  return position(container.begin(), container.end(), value);
+  return position(std::begin(container), std::end(container), value);
 }
 //version for initializer list
 template<typename T>
@@ -192,7 +192,7 @@ ssize_t position(const std::initializer_list<T>&& lst, const T& value){
 template<typename T, typename U,
          std::enable_if_t<std::is_same_v<typename T::value_type,U>, int> = 0>
 bool in_container(const T &seq, const U &val){
-  return std::find(seq.begin(), seq.end(), val) != seq.end();
+  return std::find(std::begin(seq), std::end(seq), val) != std::end(seq);
 }
 template<typename T, typename U,
          std::enable_if_t<!std::is_same_v<typename T::value_type,U>,
@@ -208,7 +208,7 @@ bool in_sequence(const InputIt begin, const InputIt end, const U &val){
 }
 
 //Simple templates
-#if 0
+#if __cplusplus < 201703L
 template<typename T>
 constexpr const T clamp(const T value, const T lo, const T hi){
   return std::min(hi, std::max(value, lo));

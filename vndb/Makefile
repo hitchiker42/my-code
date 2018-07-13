@@ -42,10 +42,10 @@ sdl_test.o: sdl_test.cpp vndb.h
 
 # Compile the sqlite library, We complile it outselves since we use a fairly recent
 # sql extension, but this also allows us to improve performance quite a bit since
-# we can disable things we don't need (like multithreading).
+# we can disable things we don't need.
 sqlite3.o: sqlite3.c
 	$(CC) -c -Os -o $@ $^ -Wall -DSQLITE_ENABLE_JSON1 \
-	-DSQLITE_THREADSAFE=0 -DSQLITE_DEFAULT_MEMSTATUS=0 \
+	-DSQLITE_DEFAULT_MEMSTATUS=0 \
 	-DSQLITE_LIKE_DOESNT_MATCH_BLOBS -DSQLITE_OMIT_SHARED_CACHE=1 \
 	-DSQLITE_OMIT_DEPRECATED=1 -DSQLITE_OMIT_PROGRESS_CALLBACK=1 \
 	-DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_USE_ALLOCA=1 \

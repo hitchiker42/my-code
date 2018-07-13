@@ -15,7 +15,7 @@ static int vndb_log(const char *fmt, ...){
 
 SDL_EventType jpeg_event_type = -1;
 int sdl_running = 0;
-int my_event_filter(void *data, SDL_Event *event){
+static int my_event_filter(void *data, SDL_Event *event){
   if(event->type == SDL_QUIT || event->type == jpeg_event_type){
     return 1;
   } else {
@@ -59,9 +59,6 @@ struct sdl_context* create_sdl_context(SDL_sem *sem){
   }
   ret = (struct sdl_context*)calloc(sizeof(struct sdl_context), 1);
   if(!ret){ goto error; }
-  ret->hack = SDL_CreateWindow("hack",SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                               0, 0, SDL_WINDOW_HIDDEN);
-  if(!ret->hack){ goto error; }
   ret->window = SDL_CreateWindow("vndb_cpp",
                                  SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                  default_window_width, default_window_height,
@@ -83,6 +80,10 @@ struct sdl_context* create_sdl_context(SDL_sem *sem){
                                    SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING,
                                    dm.w, dm.h);
   if(!ret->texture){ goto error; }
+  ret->hack = SDL_CreateWindow("hack",SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                               0, 0, SDL_WINDOW_HIDDEN);
+  if(!ret->hack){ goto error; }
+
   ret->sem = sem;
   sdl_running = 1;//make sure to set this only at the very end.
   return ret;
@@ -92,7 +93,7 @@ struct sdl_context* create_sdl_context(SDL_sem *sem){
 }
 //Create an SDL_Rect to use for rendering the given src rectangle as large
 //a possible within height x width and without changing its aspect ratio.
-SDL_Rect create_dest_rect(SDL_Rect src, int width, int height){
+static SDL_Rect create_dest_rect(SDL_Rect src, int width, int height){
   double scale = 1;
   //limit to 8x, just to prevent issues with really small images
   //or really just as a sanity check to avoid an infinite loop.
@@ -109,7 +110,7 @@ SDL_Rect create_dest_rect(SDL_Rect src, int width, int height){
   dst.y = height / 2 - dst.h / 2;
   return dst;
 }
-SDL_Rect create_src_rect(struct sdl_context *ctx){
+static SDL_Rect create_src_rect(struct sdl_context *ctx){
   SDL_Rect ret;
   ret.x = ret.y = 0;
   ret.w = ctx->img_width;
@@ -121,7 +122,7 @@ SDL_Rect create_src_rect(struct sdl_context *ctx){
   I've already written the code to do things the fast way.
 */
 //Draw the image currently stored in ctx->texture to the screen.
-int render_texture(struct sdl_context *ctx){
+static int render_texture(struct sdl_context *ctx){
   SDL_RenderClear(ctx->renderer);
   SDL_Rect src_rect = create_src_rect(ctx);
   int width, height;
@@ -139,7 +140,7 @@ int render_texture(struct sdl_context *ctx){
 }
 //Currently the jpeg is stored in the data fields of a user event, I'll
 //likely change this at some point.
-int render_jpeg(struct sdl_context *ctx){
+static int render_jpeg(struct sdl_context *ctx){
   //Clear the screen first so that we can see if we fail to render the image.
   SDL_RenderClear(ctx->renderer);
   struct decompressed_image img;
@@ -181,16 +182,47 @@ int render_jpeg(struct sdl_context *ctx){
   SDL_UnlockTexture(ctx->texture);
   return render_texture(ctx);
 }
+static int render_random_colors(struct sdl_context *ctx){
+  int width, height;
+  if(SDL_GetRendererOutputSize(ctx->renderer, &width, &height) != 0){
+    fprintf(stderr, "Error quering renderer dimensions.\n");
+    return -1;
+  }
+  SDL_Rect dst_rect;
+  dst_rect.w = width;
+  dst_rect.h = height;
+  dst_rect.x = 0;
+  dst_rect.y = 0;
+  int stride;
+  unsigned char *pixels;
+  if(SDL_LockTexture(ctx->texture, &dst_rect, (void**)&pixels, &stride) != 0){
+    fprintf(stderr, "Error locking texture.\n");
+    return -1;
+  }
+  for(size_t i = 0; i < height; i++){
+    for(size_t j = 0; j < width*3; j++){
+      *(pixels + i*stride + j) = rand();
+    }
+  }
+  SDL_UnlockTexture(ctx->texture);
+  SDL_RenderClear(ctx->renderer);
+  if(SDL_RenderCopy(ctx->renderer, ctx->texture, &dst_rect, &dst_rect) != 0){
+    fprintf(stderr, "Error copying texture to renderer.\n");
+    return -1;
+  }
+  SDL_RenderPresent(ctx->renderer);
+  return 0;
+}
 //This doesn't really need to be a seperate function, but making it one
 //make it easy to change from hiding to minimizing the window if I want.
-void do_hide_window(struct sdl_context *ctx){
+static void do_hide_window(struct sdl_context *ctx){
   SDL_HideWindow(ctx->window);
 }
-void do_show_window(struct sdl_context *ctx){
+static void do_show_window(struct sdl_context *ctx){
   SDL_ShowWindow(ctx->window);
 }
 //Called when requested to display an image, exitied when window closed.
-int active_event_loop(struct sdl_context *ctx){
+static int active_event_loop(struct sdl_context *ctx){
   SDL_Event *evt = &ctx->evt;
   //We don't need to redraw on every frame so use WaitEvent rather than
   //PollEvent to allow the thread to sleep if possible.
@@ -249,8 +281,9 @@ int sdl_main_loop(void *data){
     if(ctx->evt.type == jpeg_event_type){
       do_show_window(ctx);
       render_jpeg(ctx);
-      //This may cause a crash I'm not sure, there doesn't appear to be
-      //a documented way to remove an existing event filter.
+      //There doesn't appear to be a documented way to remove an event
+      //filter, but looking at the actual SDL code shows that setting
+      //the event filter to NULL is the same as not having an event filter.
       SDL_SetEventFilter(NULL, NULL);
       if(active_event_loop(ctx) != 0){
         goto end;
