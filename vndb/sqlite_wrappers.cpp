@@ -1,10 +1,6 @@
 #include "vndb.h"
 #include "sql.h"
 
-template<typename T>
-using vector = util::svector<T>;//can change to std::vector
-using string = util::string;//can change to std::string
-
 //Convert a list stored in a string using delim as a seperator into a
 //json array. eg "a,b,c",',' -> ["a","b","c"];
 static json parse_delimted_string(const char *str, char delim){

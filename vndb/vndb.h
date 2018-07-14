@@ -26,6 +26,8 @@ static inline void set_close_on_exec(int fd){
   fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | FD_CLOEXEC);
 }
 #elif (defined _WIN32)
+//Avoid compiler warnings when using posix functions without a leading '_'.
+#define _CRT_NONSTDC_NO_DEPRECATE 1
 #include <windows.h>
 static inline void set_close_on_exec(int fd){}
 #endif
@@ -221,6 +223,9 @@ struct vndb_main {
   //a look up (like you would for a std::string). This makes inserting elements
   //a bit more complicated however.
   std::unordered_map<util::string_view, json> symbol_table;
+  //Holds prepared statments for the front end. Several are predefined and more can
+  //be added.
+  std::map<util::string_view, sqlite3_stmt_wrapper> interactive_prepared_stmts;
   gui_type gui = gui_type::none;
   //Used for comunication with SDL which is used to display images.
   SDL_sem *sdl_sem = nullptr;

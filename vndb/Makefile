@@ -4,7 +4,7 @@ CXXFLAGS:= $(CXXFLAGS) -std=gnu++17 $(DEBUGFLAGS)  -fno-rtti -fno-exceptions -Wn
 CXXFLAGS_NDEBUG=-std=gnu++17 -O2 -DNDEBUG -fno-rtti -fno-exceptions -Wno-class-memaccess
 CFLAGS=-std=gnu11 -lm $(DEBUGFLAGS)
 
-LDFLAGS=-lssl -lcrypto -lpcre2-8 -lz -ljpeg -ldl -lSDL2 -lreadline
+LDFLAGS=-lssl -lcrypto -lpcre2-8 -lz -ljpeg -ldl -lSDL2 -lreadline -pthread
 
 SOURCES=$(wildcard *.cpp) $(wildcard *.h) $(wildcard *.c) json.hpp
 

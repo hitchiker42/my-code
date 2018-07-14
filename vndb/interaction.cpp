@@ -1,6 +1,11 @@
 #include "vndb.h"
 /*
 //TODO: add update command
+//TODO: Add support for parsing [url] tags in descriptions and other text
+//      example regex: \[url(?:=(.*?))\](.*?)\[/url\]
+//                     const char *url = (\1 ? \1 : \2);
+//TODO: Support downloading jpgs and viewing them given a url (probably one
+//      from a description). The downloading should be done in the gui thread.
   Simple interactive loop, read until we encounter a semicolon, it's not
   the most elegent solution but it allows multi-line commands without
   having to actually parse the input.
@@ -48,23 +53,25 @@ v = vn
 static constexpr std::string_view help_string =
 R"EOF(Input takes the form of: <command> <arguments>*
 Commands are terminated with semicolons, not newlines.
-help                 | print this help message
-sql stmt             | execute sql statement, bind result to the variable 'last'
-select select-stmt   | shorthand for sql select select-stmt
-set name [=] expr    | set the value of 'variable' to the result of expr
-length expr          | print the length of an array or number of values in an object
-type expr            | print the type of an expression
-print value          | print the result of evaluating value to stdout
-write value filename | print value to the file 'filename'
-view image           | view the image using SDL
-[open-]url url       | open the url in the default web browser
+help                   | print this help message
+sql stmt               | execute sql statement, bind result to the variable 'last'
+                       | stmt may be raw sql or a prepared statement.
+select select-stmt     | shorthand for sql select select-stmt
+set name [=] expr      | set the value of 'variable' to the result of expr
+length expr            | print the length of an array or number of values in an object
+type expr              | print the type of an expression
+print value            | print the result of evaluating value to stdout
+prepare stmt           | create a prepared sql statement, several are already predefined.
+write value filename   | print value to the file 'filename'
+view image             | view the image using SDL
+[open-]url url         | open the url in the default web browser
 [open-]vndb [cprsuv]id | open the vndb page for the object of the
                          given type, with the given id. (FIXME bad description).
-
 There aro also several utility commands which begin with a '.'
 and are newline rather than semicolon terminated.
-.help | print help message.
-.vars | print a list of defined variables.
+.help    | print help message.
+.vars    | print a list of defined variables.
+.stmts   | print a list of prepared statements avaliable.
 .log [n] | print the last n lines of the current log file, or
            the entire file if n is not given. (currently
            the whole file is always printed).
@@ -151,7 +158,7 @@ int set_var_to_sql(vndb_main *vndb, std::string_view var,
     return err;
   }
   //vndb_log->log_debug("Result of sql \"%s\" = \"%s\".\n",
-  //stmt.get_sql().c_str(), val.dump().c_str()); 
+  //stmt.get_sql().c_str(), val.dump().c_str());
   auto var_name = util::string_view(var, true);
   vndb_log->log_debug("Adding variable %.*s.\n",
                       (int)var_name.size(), var_name.data());
@@ -224,7 +231,7 @@ bool expand_variable(vndb_main *vndb, std::string_view var, json *val_ptr){
   int start = (var[0] == '$' ? 1 : 0);//ignore a '$' prefix.
   size_t idx = start+1;
   //could definately be optimized
-  
+
   while(idx < var.size() && var[idx] != '['){
     ++idx;
   }
@@ -264,7 +271,7 @@ bool eval_expr(vndb_main *vndb, std::string_view expr, json *val_ptr){
   } else if((ch == '$') || isalpha(ch)){
     const char *var_start = ptr;
     //Find the end of the variable currently only ' ' and ';'
-    //have any real use, but I do intend to add more complex expressions    
+    //have any real use, but I do intend to add more complex expressions
     ptr = strpbrk(ptr, variable_delimiters);
     std::string_view var(var_start, ptr - var_start);
     //Kind of a hack, I may limit sql to only be in parentheses.
@@ -379,7 +386,8 @@ enum class command_type {
   sql,
   type,
   view,
-  write
+  write,
+
 };
 static constexpr util::array command_names(
   util::va_init_tag,
@@ -395,7 +403,7 @@ static constexpr util::array command_names(
 );
 int do_command(vndb_main *vndb, std::string_view command){
   const char *cmd_start = skip_space(command.data());
-  const char *cmd_end = strpbrk(cmd_start, " ;");
+  const char *cmd_end = strpbrk(cmd_start, " _;");
   std::string_view cmd(cmd_start, cmd_end - cmd_start);
   int cmd_val = is_unique_prefix(cmd, command_names.data(), command_names.size());
   if(cmd_val < 0){
@@ -413,8 +421,8 @@ int do_command(vndb_main *vndb, std::string_view command){
       printf("%s.\n", help_string.data());
       return 0;
     }
-    case command_type::sql:
-    case command_type::select:{
+    case command_type::select:
+    case command_type::sql:{
       const char *sql = (cmd_type == command_type::sql ? cmd_end : command.data());
       return do_sql_command(vndb, sql);
     }
@@ -486,7 +494,7 @@ int do_command(vndb_main *vndb, std::string_view command){
         return -1;
       }
       const char *expr_start = skip_space(name_end);
-      if(*expr_start == '='){ 
+      if(*expr_start == '='){
         ++expr_start;
         expr_start = skip_space(expr_start);
       }
@@ -548,11 +556,12 @@ int do_command(vndb_main *vndb, std::string_view command){
 }
 enum class dot_command_type {
   help,
-  vars,
-  log
+  log,
+  stmts,
+  vars
 };
 static constexpr util::array dot_command_names(util::va_init_tag,
-                                               "help"sv, "vars"sv, "log"sv);
+                                               "help"sv, "log"sv, "stmts"sv, "vars"sv);
 int do_dot_command(vndb_main *vndb, std::string_view command){
   std::string_view cmd = skip_space(command);
   assert(command[0] == '.');
@@ -588,6 +597,10 @@ int do_dot_command(vndb_main *vndb, std::string_view command){
       return -1;
   }
 }
+//IDEA: in order to support completion for multiline input I would need to
+//make the vndb_main buffer accessable globally (or at least to the whole file).
+//it would also make parsing for completions a bit more annoying, but it is doable.
+
 //Functions to proved generic access to readline type libraries, so that I'm not
 //tied to one particular library.
 #define HAVE_READLINE
@@ -600,8 +613,48 @@ int do_dot_command(vndb_main *vndb, std::string_view command){
 #include <editline/readline.h>
 #endif
 
+#if (defined HAVE_READLINE) || (defined HAVE_EDITLINE) || (defined HAVE_LINENOISE)
+static constexpr bool have_line_editing = true;
+//The interface to completion for both readline and linenoise don't let you pass
+//in a userdata pointer so we need to use a global list of completions in order
+//to make a useable generic completion function.
+static util::svector<char*> current_completions;
+//Generic completion function. Given a pair of iterators to an ordered
+//range of std::string_view compatible types and a prefix populate completions
+//with copies of all values in the range that begin with prefix.
+//Could be optimized by using lower_bound for map and binary seach for arrays.
+template<typename It,
+         std::enable_if_t<
+           std::is_convertible_v<typename std::iterator_traits<It>::value_type, 
+                                 std::string_view>, int> = 0>
+bool generate_completions_generic(It first, It last,
+                                  const char *prefix, 
+                                  util::svector<char*>* completions = &current_completions){
+  size_t len = strlen(prefix);
+  int c = *prefix;
+  It current = first;
+  while((current != last) && (c > current->front())){
+    ++current;
+  }
+  if(current == last || (c < current->front())){
+    return false;
+  }
+  completions->clear();
+  while((current != last) && (c == current->front())){
+    if(len <= current->size() &&
+       !memcmp(prefix, current->data(), len)){
+      completions->push_back(util::strdup_sv((*current)));
+    }
+    ++current;
+  }
+  return completions->size();
+}
+  
+#else
+static constexpr bool have_line_editing = true;
+#endif
+
 #if (defined HAVE_READLINE) || (defined HAVE_EDITLINE)
-static constexpr bool have_history = true;
 char *vndb_readline(const char *prompt){
   return readline(prompt);
 }
@@ -621,10 +674,130 @@ int vndb_write_history(const char *filename){
 void vndb_limit_history(int cnt) {
   stifle_history(cnt);
 }
+static char* readline_completion_generator(const char *prefix, int initialized){
+  //We don't care about the arguments, the list of possible completions has
+  //already been generated and stored in current_completions.
+  if(current_completions.empty()){
+    return nullptr;
+  } else {
+    return current_completions.pop();
+  }
+}
+static char* command_completion_generator_rl(const char *prefix, int initialized){
+  //The array of command names is sorted so we use that to speed up completion.
+  static size_t idx, len;
+  static int c;
+  if(!initialized){
+    idx = 0;
+    len = strlen(prefix);
+    c = *prefix;
+    while((idx < command_names.size()) && (c > command_names[idx][0])){
+      ++idx;
+    }
+  }
+  while((idx < command_names.size()) && (c == command_names[idx][0])){
+    if(len < command_names[idx].size() &&
+       !memcmp(prefix, command_names[idx].data(), len)){
+      char *ret = util::strdup_sv(command_names[idx]);
+      idx++;
+      return ret;
+    }
+    idx++;
+  }
+  return nullptr;
+}
+//We could generate the array returned by this function ourselves, but if we
+//do the first element needs to be the longest common prefix of all the
+//possible completions.
+char **vndb_readline_completion_func(const char *text, int start, int end){
+  vndb_log->log_debug("calling readline completion with '%s'.\n", text);
+  char** matches = nullptr;
+  rl_attempted_completion_over = true;
+  bool is_first_word = (start == 0);
+  if(!is_first_word){ //see if there is leading space we should ignore.
+    int offset = skip_space(rl_line_buffer) - rl_line_buffer;
+    if(offset == start){ is_first_word = true; }
+  }
+  //TODO: Support for completion of things that aren't commands.
+  if(is_first_word){
+    vndb_log->log_debug("Actually looking for matches.\n");
+    if(generate_completions_generic(command_names.begin(), 
+                                    command_names.end(), text)){
+      matches = rl_completion_matches(text, readline_completion_generator);
+    }
+  }
+  return matches;
+}
+void vndb_completion_init(){
+  rl_attempted_completion_function = vndb_readline_completion_func;
+}
 #elif (defined USE_LINENOISE)
+char *vndb_readline(const char *prompt){
+  return linenoise(prompt);
+}
+void vndb_add_to_history(const char *str, bool copy = false){
+  if(copy){
+    const char *tmp = str;
+    str = strdup(tmp);
+  }
+  linenoiseHistoryAdd(str);
+}
+int vndb_read_history(const char *filename){
+  return linenoiseHistoryLoad(filename);
+}
+int vndb_write_history(const char *filename){
+  return linenoiseHistorySave(filename);
+}
+void vndb_limit_history(int cnt) {
+  linenoiseHistorySetMaxLen(cnt);
+}
+//Don't rely on prefix being null terminated.
+static void command_completion_generator_ln(std::string_view prefix, 
+                                            linenoiseCompletions *lc){
+  //The array of command names is sorted so we use that to speed up completion.
+  size_t idx = 0;
+  int c = prefix[0];
+  while((idx < command_names.size()) && (c > command_names[idx][0])){
+    ++idx;
+  }
+  while((idx < command_names.size()) && (c == command_names[idx][0])){
+    if(prefix.size() < command_names[idx].size() &&
+       !memcmp(prefix.data(), command_names[idx].data(), prefix.size())){
+      linenoiseAddCompletion(lc, command_names.data());
+    }
+  }
+}
+//completion using linenoise requires manually parsing the line in all cases.
+void vndb_linenoise_completion_func(const char *text, linenoiseCompletions *lc){
+  char *start = skip_space(text);
+  if(!(*start)){ return; } //nothing to complete (should I add all commands in this case?)
+  char *cmd_end = strchrnul(start, ' ');
+  if(!(*cmd_end)){
+    //this is the first word on the line, complete it as a command.
+    command_completion_generator_ln(std::string_view(start, cmd_end - start), lc);
+    return;
+  }
+  //ADD other completions here.
+  return;
+}
+void vndb_completion_init(){
+  linenoiseSetCompletionCallback(vndb_linenoise_completion_func);
+}
 #else
-static constexpr bool have_history = true;
+char *vndb_readline(const char *prompt){
+  char *lineptr = nullptr;
+  size_t n = 0; 
+  fputs(prompt, stdout);
+  getline(&lineptr, &n, stdout);
+  return lineptr;
+}
+void vndb_add_to_history(const char *str, bool copy = false){}
+int vndb_read_history(const char *filename){}
+int vndb_write_history(const char *filename){}
+void vndb_limit_history(int cnt) {}
+void vndb_completion_init(){}
 #endif
+
 [[noreturn]] void run_interactively(vndb_main &vndb){
   char *lineptr = nullptr;
   char *endptr = nullptr;
@@ -633,12 +806,13 @@ static constexpr bool have_history = true;
   static constexpr size_t histfile_name_bufsz = 512;
   static constexpr const char *histfile_basename = ".vndb_cpp_history";
   char histfile_name[histfile_name_bufsz];
-  if(have_history){
+  if(have_line_editing){
     char *homedir = getenv("HOME");
     snprintf(histfile_name, histfile_name_bufsz,
              "%s/.%s", homedir, histfile_basename);
     vndb_read_history(histfile_name);
     vndb_limit_history(2000);
+    vndb_completion_init();
   }
   if(vndb.gui == vndb_main::gui_type::sdl){
     if(!vndb.init_sdl()){
@@ -703,3 +877,165 @@ static constexpr bool have_history = true;
   }
   exit(abs(err));
 }
+
+
+//This will be needed if I want to generate my own list of completions for readline.
+#if 0
+/* Find the common prefix of the list of matches, and put it into
+   matches[0]. */
+static int
+compute_lcd_of_matches (char **match_list, int matches, const char *text){
+  register int i, c1, c2, si;
+  int low;		/* Count of max-matched characters. */
+  int lx;
+  char *dtext;		/* dequoted TEXT, if needed */
+#if defined (HANDLE_MULTIBYTE)
+  int v;
+  size_t v1, v2;
+  mbstate_t ps1, ps2;
+  wchar_t wc1, wc2;
+#endif
+
+  /* If only one match, just use that.  Otherwise, compare each
+     member of the list with the next, finding out where they
+     stop matching. */
+  if (matches == 1)
+    {
+      match_list[0] = match_list[1];
+      match_list[1] = (char *)NULL;
+      return 1;
+    }
+
+  for (i = 1, low = 100000; i < matches; i++)
+    {
+#if defined (HANDLE_MULTIBYTE)
+      if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
+	{
+	  memset (&ps1, 0, sizeof (mbstate_t));
+	  memset (&ps2, 0, sizeof (mbstate_t));
+	}
+#endif
+      if (_rl_completion_case_fold)
+	{
+	  for (si = 0;
+	       (c1 = _rl_to_lower(match_list[i][si])) &&
+	       (c2 = _rl_to_lower(match_list[i + 1][si]));
+	       si++)
+#if defined (HANDLE_MULTIBYTE)
+	    if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
+	      {
+		v1 = mbrtowc(&wc1, match_list[i]+si, strlen (match_list[i]+si), &ps1);
+		v2 = mbrtowc (&wc2, match_list[i+1]+si, strlen (match_list[i+1]+si), &ps2);
+		if (MB_INVALIDCH (v1) || MB_INVALIDCH (v2))
+		  {
+		    if (c1 != c2)	/* do byte comparison */
+		      break;
+		    continue;
+		  }
+		wc1 = towlower (wc1);
+		wc2 = towlower (wc2);
+		if (wc1 != wc2)
+		  break;
+		else if (v1 > 1)
+		  si += v1 - 1;
+	      }
+	    else
+#endif
+	    if (c1 != c2)
+	      break;
+	}
+      else
+	{
+	  for (si = 0;
+	       (c1 = match_list[i][si]) &&
+	       (c2 = match_list[i + 1][si]);
+	       si++)
+#if defined (HANDLE_MULTIBYTE)
+	    if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
+	      {
+		mbstate_t ps_back;
+		ps_back = ps1;
+		if (!_rl_compare_chars (match_list[i], si, &ps1, match_list[i+1], si, &ps2))
+		  break;
+		else if ((v = _rl_get_char_len (&match_list[i][si], &ps_back)) > 1)
+		  si += v - 1;
+	      }
+	    else
+#endif
+	    if (c1 != c2)
+	      break;
+	}
+
+      if (low > si)
+	low = si;
+    }
+
+  /* If there were multiple matches, but none matched up to even the
+     first character, and the user typed something, use that as the
+     value of matches[0]. */
+  if (low == 0 && text && *text)
+    {
+      match_list[0] = (char *)xmalloc (strlen (text) + 1);
+      strcpy (match_list[0], text);
+    }
+  else
+    {
+      match_list[0] = (char *)xmalloc (low + 1);
+
+      /* XXX - this might need changes in the presence of multibyte chars */
+
+      /* If we are ignoring case, try to preserve the case of the string
+	 the user typed in the face of multiple matches differing in case. */
+      if (_rl_completion_case_fold)
+	{
+	  /* We're making an assumption here:
+		IF we're completing filenames AND
+		   the application has defined a filename dequoting function AND
+		   we found a quote character AND
+		   the application has requested filename quoting
+		THEN
+		   we assume that TEXT was dequoted before checking against
+		   the file system and needs to be dequoted here before we
+		   check against the list of matches
+		FI */
+	  dtext = (char *)NULL;
+	  if (rl_filename_completion_desired &&
+	      rl_filename_dequoting_function &&
+	      rl_completion_found_quote &&
+	      rl_filename_quoting_desired)
+	    {
+	      dtext = (*rl_filename_dequoting_function) ((char *)text, rl_completion_quote_character);
+	      text = dtext;
+	    }
+
+	  /* sort the list to get consistent answers. */
+	  if (rl_sort_completion_matches)
+	    qsort (match_list+1, matches, sizeof(char *), (QSFUNC *)_rl_qsort_string_compare);
+
+	  si = strlen (text);
+	  lx = (si <= low) ? si : low;	/* check shorter of text and matches */
+	  /* Try to preserve the case of what the user typed in the presence of
+	     multiple matches: check each match for something that matches
+	     what the user typed taking case into account; use it up to common
+	     length of matches if one is found.  If not, just use first match. */
+	  for (i = 1; i <= matches; i++)
+	    if (strncmp (match_list[i], text, lx) == 0)
+	      {
+		strncpy (match_list[0], match_list[i], low);
+		break;
+	      }
+	  /* no casematch, use first entry */
+	  if (i > matches)
+	    strncpy (match_list[0], match_list[1], low);
+
+	  FREE (dtext);
+	}
+      else
+        strncpy (match_list[0], match_list[1], low);
+
+      match_list[0][low] = '\0';
+    }
+
+  return matches;
+}
+#endif
