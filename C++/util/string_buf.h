@@ -2,7 +2,7 @@
 #define _STRING_BUF_H_
 
 #include "string_view.h"
-#include "my_string.h"
+//#include "my_string.h"
 #include "svector.h"
 namespace util {
 /*
@@ -306,12 +306,12 @@ struct string_buf {
   }
   //Destructively convert the buffer into a util::string,
   //memory is transfered from the buffer to the string.
-  util::string move_to_string(){
+/*  util::string move_to_string(){
     null_terminate();
     util::string ret{buf.data(), buf.size()-1, true};
     (void)buf.take_memory();
     return ret;
-  }
+  }*/
   std::string_view std_string_view(){
     null_terminate();
     return std::string_view(buf.data(), buf.size());

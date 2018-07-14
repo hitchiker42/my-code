@@ -257,7 +257,8 @@ static constexpr int constexpr_memcmp(const void *s1, const void *s2, size_t n){
 }
 #endif
 /*
-  mempcpy and stpcpy for non gnuc compiliers.
+  Simple (if inefficent) definitions of some gnu extension functions for
+  non gnuc compilers (aka microsoft).
 */
 #ifndef __GNUC__
 typedef fs::file_status fs_status;
@@ -269,6 +270,10 @@ static inline void* mempcpy(void *dest, const void* src, size_t n){
 static inline char* stpcpy(char *dest, const char *src){
   size_t len = strlen(src);
   return (char*)mempcpy(dest, src, len);
+}
+static inline char* strchrnul(const char *str, int c){
+  size_t n = strlen(str);
+  return ((char*)memchr(str, c, n) || (str + n));
 }
 #endif
 
@@ -352,6 +357,19 @@ uint64_t fnv_hash(const T& key){
 template<>
 inline uint64_t fnv_hash(const char* const& key){
   return fnv_hash(key, strlen(key));
+}
+//copy a string_view to a malloc'd buffer
+static inline char *strdup_sv(std::string_view sv){
+  char *buf = (char*)malloc(sv.size() + 1);
+  memcpy(buf, sv.data(), sv.size());
+  buf[sv.size()] = '\0';
+  return buf;
+}
+//Like strdup but with an explicit size argument
+static inline void *memdup(const void *src, size_t sz){
+  void *dest = malloc(sz);
+  memcpy(dest, src, sz);
+  return dest;
 }
 //Wrappers around strtoX which return a std::optional value, internally
 //they use errno to check the result.

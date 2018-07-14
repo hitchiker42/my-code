@@ -67,25 +67,70 @@ even if this sorta cheating.
   friend bool operator!=(const name& a, const name& b){                 \
     return a.member_name != b.member_name;                              \
   }
+//same as above but only define '<' and '=='
+#define generate_basic_comparison_operators_via_member(name, member_name) \
+  friend bool operator<(const name& a, const name& b){                  \
+    return a.member_name < b.member_name;                               \
+  }                                                                     \
+  friend bool operator==(const name& a, const name& b){                 \
+    return a.member_name == b.member_name;                              \
+  }
 //Generate all 6 relational operators from a 3 way comparison operator
-#define generate_comparison_operators_via_compare(name, cmp)    \
-  friend bool operator==(const name& lhs, const name& rhs){     \
-    return cmp(lhs,rhs) == 0;                                   \
-  }                                                             \
-  friend bool operator!=(const name& lhs, const name& rhs){     \
-    return cmp(lhs,rhs) != 0;                                   \
-  }                                                             \
-  friend bool operator< (const name& lhs, const name& rhs){     \
-    return cmp(lhs,rhs) <  0;                                   \
-  }                                                             \
-  friend bool operator> (const name& lhs, const name& rhs){     \
-    return cmp(lhs,rhs) >  0;                                   \
-  }                                                             \
-  friend bool operator<=(const name& lhs, const name& rhs){     \
-    return cmp(lhs,rhs) <= 0;                                   \
-  }                                                             \
-  friend bool operator>=(const name& lhs, const name& rhs){     \
-    return cmp(lhs,rhs) >= 0;                                   \
+#define generate_comparison_operators_via_compare(type1, type2, cmp)    \
+  friend bool operator==(const type1& lhs, const type2 &rhs){           \
+    return cmp(lhs,rhs) == 0;                                           \
+  }                                                                     \
+  friend bool operator!=(const type1& lhs, const type2 &rhs){           \
+    return cmp(lhs,rhs) != 0;                                           \
+  }                                                                     \
+  friend bool operator< (const type1& lhs, const type2 &rhs){           \
+    return cmp(lhs,rhs) <  0;                                           \
+  }                                                                     \
+  friend bool operator> (const type1& lhs, const type2 &rhs){           \
+    return cmp(lhs,rhs) >  0;                                           \
+  }                                                                     \
+  friend bool operator<=(const type1& lhs, const type2 &rhs){           \
+    return cmp(lhs,rhs) <= 0;                                           \
+  }                                                                     \
+  friend bool operator>=(const type1& lhs, const type2 &rhs){           \
+    return cmp(lhs,rhs) >= 0;                                           \
+  }
+//same as above but only define '<' and '=='
+#define generate_basic_comparison_operators_via_compare(type1, type2, cmp) \
+  friend bool operator< (const type1& lhs, const type2 &rhs){           \
+    return cmp(lhs,rhs) <  0;                                           \
+  }                                                                     \
+  friend bool operator==(const type1& lhs, const type2 &rhs){           \
+    return cmp(lhs,rhs) == 0;                                           \
+  }
+//Generate all 6 relational operators from a 3 way comparison operator that
+//is a member function of type1
+#define generate_comparison_operators_via_compare_member(type1, type2, cmp) \
+  friend bool operator==(const type1& lhs, const type2 &rhs){           \
+    return lhs.cmp(rhs) == 0;                                           \
+  }                                                                     \
+  friend bool operator!=(const type1& lhs, const type2 &rhs){           \
+    return lhs.cmp(rhs) != 0;                                           \
+  }                                                                     \
+  friend bool operator< (const type1& lhs, const type2 &rhs){           \
+    return lhs.cmp(rhs) <  0;                                           \
+  }                                                                     \
+  friend bool operator> (const type1& lhs, const type2 &rhs){           \
+    return lhs.cmp(rhs) >  0;                                           \
+  }                                                                     \
+  friend bool operator<=(const type1& lhs, const type2 &rhs){           \
+    return lhs.cmp(rhs) <= 0;                                           \
+  }                                                                     \
+  friend bool operator>=(const type1& lhs, const type2 &rhs){           \
+    return lhs.cmp(rhs) >= 0;                                           \
+  }
+//same as above but only define '<' and '=='
+#define generate_basic_comparison_operators_via_compare_member(type1, type2, cmp) \
+  friend bool operator< (const type1& lhs, const type2 &rhs){           \
+    return lhs.cmp(rhs) <  0;                                           \
+  }                                                                     \
+  friend bool operator==(const type1& lhs, const type2 &rhs){           \
+    return lhs.cmp(rhs) == 0;                                           \
   }
 //Requires: operator< and operator==
 //Provides: operator>, operator<=, operator>=, operator!=

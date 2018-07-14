@@ -215,7 +215,28 @@ struct string_view {
     int cmp_result = constexpr_strncmp(data(), other, std::min(size(), len));
     return (cmp_result ? cmp_result : three_way_compare(size(), len));
   }
-
+  #define do_cmp_lhs(lhs, rhs) lhs.compare(rhs)
+  #define do_cmp_rhs(lhs, rhs) -rhs.compare(lhs)
+  //Generate a full suite of comparison operators for two util::string_views
+  generate_comparison_operators_via_compare(util::string_view, 
+                                            util::string_view, do_cmp_lhs);
+  //Generate '==' and '<' operators for a util::string_view 
+  //and a char*/std::string/std::string_view
+  generate_basic_comparison_operators_via_compare(util::string_view, 
+                                                  char*, do_cmp_lhs);
+  generate_basic_comparison_operators_via_compare(util::string_view, 
+                                                  std::string, do_cmp_lhs);
+  generate_basic_comparison_operators_via_compare(util::string_view,
+                                                  std::string_view, do_cmp_lhs);
+  generate_basic_comparison_operators_via_compare(char*, 
+                                                  util::string_view,  do_cmp_rhs);
+  generate_basic_comparison_operators_via_compare(std::string,
+                                                  util::string_view,  do_cmp_rhs);
+  generate_basic_comparison_operators_via_compare(std::string_view,
+                                                  util::string_view, do_cmp_rhs);
+  #undef do_cmp_lhs
+  #undef do_cmp_rhs
+/*
   friend bool operator==(const util::string_view& lhs, const std::string_view rhs){
     return lhs.compare(rhs) == 0;
   }
@@ -238,7 +259,7 @@ struct string_view {
   #define do_cmp(lhs, rhs) lhs.compare(rhs)
   generate_comparison_operators_via_compare(string_view, do_cmp);
   #undef do_cmp
-
+*/
   //Substring functions
   string_view substr(size_t start) const {
     return substr(start, size());

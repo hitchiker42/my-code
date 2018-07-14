@@ -67,6 +67,8 @@ struct svector {
       vec[i] = val;
     }
   }
+  //Copy constructor makes a deep copy, use the shallow_copy function
+  //if you don't want this.
   svector(const svector& other) noexcept : svector(other.size()) {
     len = other.size();
     for(size_t i = 0; i < len; i++){
