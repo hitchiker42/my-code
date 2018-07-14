@@ -51,7 +51,7 @@ Commands are terminated with semicolons, not newlines.
 help                 | print this help message
 sql stmt             | execute sql statement, bind result to the variable 'last'
 select select-stmt   | shorthand for sql select select-stmt
-set variable expr    | set the value of 'variable' to the result of value
+set name [=] expr    | set the value of 'variable' to the result of expr
 length expr          | print the length of an array or number of values in an object
 type expr            | print the type of an expression
 print value          | print the result of evaluating value to stdout
@@ -224,7 +224,8 @@ bool expand_variable(vndb_main *vndb, std::string_view var, json *val_ptr){
   int start = (var[0] == '$' ? 1 : 0);//ignore a '$' prefix.
   size_t idx = start+1;
   //could definately be optimized
-  while(idx < var.size() && isalnum(var[idx])){
+  
+  while(idx < var.size() && var[idx] != '['){
     ++idx;
   }
   util::string_view var_base = var.substr(start, idx - start);
@@ -445,7 +446,7 @@ int do_command(vndb_main *vndb, std::string_view command){
     }
     case command_type::print:{
       json val;
-      if(!eval_expr(vndb,command.substr(cmd.size()), &val)){
+      if(!eval_expr(vndb, command.substr(cmd.size()), &val)){
         return -1;
       } else {
         val.pprint(stdout);
@@ -476,12 +477,18 @@ int do_command(vndb_main *vndb, std::string_view command){
         return 0;
       }
     }
+    //set name [=] expr
     case command_type::set:{
       const char *name_start = skip_space(cmd_end);
-      const char *name_end = strchr(name_start, ' ');
+      const char *name_end = strpbrk(name_start, " =");
       if(!name_end){
         printf("Malformed set command.\n");
         return -1;
+      }
+      const char *expr_start = skip_space(name_end);
+      if(*expr_start == '='){ 
+        ++expr_start;
+        expr_start = skip_space(expr_start);
       }
       json val;
       std::string_view expr = command.substr(name_end - command.data());
