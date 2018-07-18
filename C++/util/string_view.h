@@ -289,14 +289,23 @@ struct string_view {
     char *ptr = (char*)memchr(data() + pos, c, size() - pos);
     return (ptr ? ptr - data() : (size_t)-1);
   }  
+  //I haven't tested these yet.
   //Need to use std::string_view to make this constexpr
   constexpr size_type find_first_of(const std::string_view v, size_type pos = 0) const {
-    size_t ret = memcspn(ptr + pos, sz - pos, v.data(), v.size());
+    size_t ret = memcspn(ptr + pos, sz - pos, v.data(), v.size()) + pos;
     return ((ret == sz) ? (size_type)-1 : ret);
   }
   constexpr size_type find_first_not_of(const std::string_view v, size_type pos = 0) const {
-    size_t ret = memrspn(ptr + pos, sz - pos, v.data(), v.size());
+    size_t ret = memspn(ptr + pos, sz - pos, v.data(), v.size()) + pos;
     return ((ret == sz) ? (size_type)-1 : ret);
+  }
+  constexpr size_type find_last_of(const std::string_view v, size_type pos = 0) const {
+    ssize_t ret = memrcspn(ptr + pos, sz - pos, v.data(), v.size()) - pos;    
+    return ((ret < pos) ? (size_type)-1 : ret - pos);
+  }
+  constexpr size_type find_last_not_of(const std::string_view v, size_type pos = 0) const {
+    ssize_t ret = memrspn(ptr + pos, sz - pos, v.data(), v.size());
+    return ((ret < pos) ? (size_type)-1 : ret - pos);
   }
 
 };

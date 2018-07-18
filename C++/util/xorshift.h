@@ -11,7 +11,7 @@
 //Actual functions
 namespace util {
 using splitmix64_state = uint64_t;
-static inline uint64_t splitmix64_next(splitmix64_state &x) {
+inline uint64_t splitmix64_next(splitmix64_state &x) {
   uint64_t z = (x += 0x9E3779B97F4A7C15ULL);
   z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
   z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
@@ -28,7 +28,7 @@ static uint64_t xorshift128_add_next(xorshift128_add_state &state){
     return result;
 }
 //same as 2^64 calls to next.
-void xorshift128_add_jump(xorshift128_add_state &state) {
+static void xorshift128_add_jump(xorshift128_add_state &state) {
   static const uint64_t JUMP[2] = { 0x8a5cd789635d2dffULL, 0x121fd2155c472f96ULL };
   uint64_t s0 = 0;
   uint64_t s1 = 0;
@@ -126,26 +126,28 @@ static void xorshift1024_star_jump(xorshift1024_star_state &state) {
     state[(j + state.idx) & 15] = t[j];
   }
 }
-namespace detail {
 template<typename T, uint64_t(*NEXT)(T&), void(*JUMP)(T&)>
-struct xorshift_rng {
+struct xorshift_rng_engine {
   typedef uint64_t result_type;
   typedef T state_type;
   //Random permutiation of the 15 hex digits, + and extra a.
   static constexpr uint64_t default_seed = 0x7e4b9f0c83162daa;
   state_type state;
-  xorshift_rng(uint64_t seed){
+  xorshift_rng_engine(uint64_t seed){
     state[0] = seed;
     for(size_t i = 1; i < state.size(); i++){
       state[i] = splitmix64_next(seed);
     }
   }
-  xorshift_rng()
-    : xorshift_rng(default_seed) {};
+  constexpr xorshift_rng_engine()
+    : xorshift_rng_engine(default_seed) {};
 
-  xorshift_rng(const state_type &state)
+  constexpr xorshift_rng_engine(const state_type &state)
     : state{state} {};
-  xorshift_rng(std::random_device& rd){
+  xorshift_rng_engine(std::random_device& rd){
+    seed_from_rd(rd);
+  }
+  xorshift_rng_engine(std::random_device&& rd){
     seed_from_rd(rd);
   }
   void seed_from_rd(std::random_device& rd){
@@ -179,24 +181,31 @@ struct xorshift_rng {
   result_type operator()(){
     return next(state);
   }
-  friend bool operator==(const xorshift_rng &lhs, const xorshift_rng &rhs){
+  friend bool operator==(const xorshift_rng_engine &lhs, const xorshift_rng_engine &rhs){
     return lhs.state == rhs.state;
   }
-  friend bool operator!=(const xorshift_rng &lhs, const xorshift_rng &rhs){
+  friend bool operator!=(const xorshift_rng_engine &lhs, const xorshift_rng_engine &rhs){
     return lhs.state != rhs.state;
   }
 };
+
+using xoroshiro128_add = xorshift_rng_engine<xoroshiro128_add_state,
+                                                     xoroshiro128_add_next,
+                                                     xoroshiro128_add_jump>;
+using xorshift128_add = xorshift_rng_engine<xorshift128_add_state,
+                                                    xorshift128_add_next,
+                                                    xorshift128_add_jump>;
+using xorshift1024_star = xorshift_rng_engine<xorshift1024_star_state,
+                                                      xorshift1024_star_next,
+                                                      xorshift1024_star_jump>;
+//Simple typedef for most commonly used version.
+using xorshift_rng = xoroshiro128_add;
+inline uint64_t rand(){
+  static xorshift_rng static_engine;
+  return static_engine();
 }
-using xoroshiro128_add = detail::xorshift_rng<xoroshiro128_add_state,
-                                              xoroshiro128_add_next,
-                                              xoroshiro128_add_jump>;
-using xorshift128_add = detail::xorshift_rng<xorshift128_add_state,
-                                             xorshift128_add_next,
-                                             xorshift128_add_jump>;
-using xorshift1024_star = detail::xorshift_rng<xorshift1024_star_state,
-                                               xorshift1024_star_next,
-                                               xorshift1024_star_jump>;
-}
+}//namespace util
+//Old version.
 #if 0
 struct xoroshiro128_add {
   typedef uint64_t result_type;

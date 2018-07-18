@@ -233,6 +233,13 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
 #define attribute_likely(...) __VA_ARGS__
 #define attribute_unlikely(...) __VA_ARGS__
 #endif
+
+//Shut up a super annoying g++ warning.
+#if (defined __GNUC__) && (defined __GNUC_MINOR__) && (defined __GNUC_PATCHLEVEL__) 
+#if __GNUC__ >= 8
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
+#endif
 /*
   Super tricky way to test if something is a string literal.
 

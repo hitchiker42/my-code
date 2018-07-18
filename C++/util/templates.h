@@ -548,9 +548,7 @@ unordered_multimap_equal_range_count(std::unordered_multimap<K,V> &ht, const K& 
   return std::make_pair(start, count);
 }
 /*
-  An allocator using malloc, does not initialize/construct anything
-  nor does it destruct anything, using this with anything but POD
-  types will cause serious issues.
+  An allocator using malloc.
 */
 template <typename T>
 struct malloc_allocator {
@@ -574,6 +572,10 @@ struct malloc_allocator {
                             [[maybe_unused]] size_type old_size = -1){
     return realloc(ptr, n*sizeof(value_type));
   }
+};
+//same as above but doesn't call constructors or destructors.
+template<typename T>
+struct raw_malloc_allocator : malloc_allocator<T>{
   //does nothing
   template<class... Args>
   static void construct([[maybe_unused]] Args&&... args){
@@ -594,7 +596,7 @@ struct calloc_allocator {
   using pointer = T*;
   using const_pointer = const T*;
   using void_pointer = void*;
-  using const_void_pointer =const void* ;
+  using const_void_pointer = const void* ;
   using value_type = T;
   using size_type = size_t;
   using difference_type = ptrdiff_t;
@@ -618,6 +620,11 @@ struct calloc_allocator {
     }
     return ret;
   }
+
+};
+//same as above but doesn't call constructors/destructors
+template <typename T>
+struct raw_calloc_allocator : calloc_allocator<T> {
   //does nothing
   template<class... Args>
   static void construct([[maybe_unused]] Args&&... args){
@@ -631,7 +638,7 @@ struct calloc_allocator {
 };
 template <typename T,
           std::enable_if_t<std::is_pod_v<T>, int> = 0>
-using raw_vector = std::vector<T, malloc_allocator<T>>;
+using raw_vector = std::vector<T, raw_malloc_allocator<T>>;
 
 template <typename T>
 T* typed_malloc(size_t sz){
@@ -710,22 +717,6 @@ T* reconstruct(T& obj, Ts&&... Args){
 #define delete_copy_constructors(name)          \
   name& operator=(const name&) = delete;        \
   name(const name&) = delete;
-
-#if (defined __GNUC__)
-#define object_to_string(obj)                   \
-  ({auto ss = std::stringstream();              \
-    ss.operator<<(obj);                         \
-    ss.str();})
-#else
-//Making this a template is a horrible idea, but if we can't use
-//gnu extensions it'll have to do.
-template <typename T>
-std::string object_to_string(const T& obj){
-  auto ss = std::stringstream();
-  ss.operator<<(obj);
-  return ss.str();
-}
-#endif
 /*
   Variadic templates (parameter packs)
 */
