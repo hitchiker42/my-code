@@ -485,6 +485,8 @@ int do_command(vndb_main *vndb, std::string_view command){
         return 0;
       }
     }
+    //FIXME: Need to check that name is a valid variable name
+    // right now I just accept anything.
     //set name [=] expr
     case command_type::set:{
       const char *name_start = skip_space(cmd_end);
@@ -499,7 +501,7 @@ int do_command(vndb_main *vndb, std::string_view command){
         expr_start = skip_space(expr_start);
       }
       json val;
-      std::string_view expr = command.substr(name_end - command.data());
+      std::string_view expr = command.substr(expr_start - command.data());
       if(!eval_expr(vndb, expr, &val)){
         return -1;
       }
@@ -797,12 +799,7 @@ int vndb_write_history(const char *filename){}
 void vndb_limit_history(int cnt) {}
 void vndb_completion_init(){}
 #endif
-
-[[noreturn]] void run_interactively(vndb_main &vndb){
-  char *lineptr = nullptr;
-  char *endptr = nullptr;
-  int err = 0;
-  util::string_view line;
+[[noreturn]] static void interactive_input_loop(vndb_main *vndb){
   static constexpr size_t histfile_name_bufsz = 512;
   static constexpr const char *histfile_basename = ".vndb_cpp_history";
   char histfile_name[histfile_name_bufsz];
@@ -814,16 +811,13 @@ void vndb_completion_init(){}
     vndb_limit_history(2000);
     vndb_completion_init();
   }
-  if(vndb.gui == vndb_main::gui_type::sdl){
-    if(!vndb.init_sdl()){
-      printf("Could not initialize SDL, will not be able to display images.\n");
-    }
-  } else if(vndb.gui == vndb_main::gui_type::fltk){
-    printf("FLTK gui is currently unimplemented.\n");
-  }
+  char *lineptr = nullptr;
+  char *endptr = nullptr;
+  int err = 0;
+  util::string_view line;
   while(1){
     const char *prompt = "vndb >";
-    vndb.buf.clear();
+    vndb->buf.clear();
     lineptr = vndb_readline(prompt);
     if(!lineptr){
       fputc('\n', stdout);
@@ -832,7 +826,7 @@ void vndb_completion_init(){}
     }
     char c = *skip_space(lineptr);//first nonspace character
     if(c == '.'){
-      if(do_dot_command(&vndb, lineptr) >= 0){
+      if(do_dot_command(vndb, lineptr) >= 0){
         vndb_add_to_history(lineptr);
         continue;
       } else {
@@ -842,14 +836,14 @@ void vndb_completion_init(){}
     if(!(endptr = strchr(lineptr, ';'))){
       prompt = " ... >";
       do {
-        vndb.buf.append(lineptr).append(' ');//translate newlines to spaces
+        vndb->buf.append(lineptr).append(' ');//translate newlines to spaces
         free(lineptr);
         lineptr = vndb_readline(prompt);
         if(!lineptr){ goto end; }
       } while(!(endptr = strchr(lineptr, ';')));
     }
     //append everything upto and including the semicolon.
-    vndb.buf.append(lineptr, (endptr - lineptr) + 1);
+    vndb->buf.append(lineptr, (endptr - lineptr) + 1);
     //make sure there's no actual text after the semicolon
     while(*(++endptr) != '\0'){
       if(!isspace(*endptr)){
@@ -858,11 +852,11 @@ void vndb_completion_init(){}
       }
     }
     //grab the memory allocated by the buffer so we can store in the history.
-    line = vndb.buf.move_to_string_view();
+    line = vndb->buf.move_to_string_view();
     line.release_memory(); //we're transfering ownership to the history manager.
     vndb_add_to_history(line.data());
     //There isn't really anything to do with the return value of do_command...
-    err = do_command(&vndb, line);
+    err = do_command(vndb, line);
   next:
     free(lineptr);
   }
@@ -873,9 +867,46 @@ void vndb_completion_init(){}
     SDL_Event evt;
     evt.type = SDL_QUIT;
     SDL_PushEvent(&evt);
-    SDL_SemWait(vndb.sdl_sem);
+    SDL_SemWait(vndb->sdl_sem);
   }
+  //destructor for vndb_main doesn't get called when calling exit,
+  //so valgrind, etc will report some memory leaks which aren't really leaks.
+  //vndb->~vndb_main();
   exit(abs(err));
+}
+[[noreturn]] static void run_without_gui(vndb_main *vndb){
+  interactive_input_loop(vndb);
+}
+[[noreturn]] static void run_with_sdl(vndb_main *vndb){
+  SDL_Thread *thrd;
+  SDL_sem *sem = SDL_CreateSemaphore(0);
+  sdl_context *ctx = create_sdl_context(sem);
+  if(!ctx){
+    printf("Could not initialize SDL, will not be able to display images.\n");
+    SDL_DestroySemaphore(sem);
+    run_without_gui(vndb);
+  }
+  vndb->sdl_sem = sem;
+  thrd = SDL_CreateThread((int(*)(void*))(void*)interactive_input_loop,
+                          "input_thread", vndb);
+  sdl_main_loop(ctx);
+  //This won't return since the other thread calls exit
+  SDL_WaitThread(thrd, nullptr);
+  //we'll never get here.
+  exit(0);
+}
+[[noreturn]] static void run_with_fltk(vndb_main *vndb){
+  printf("FLTK gui is currently unimplemented.\n");
+  run_without_gui(vndb);
+}
+[[noreturn]] void run_interactively(vndb_main &vndb){
+  if(vndb.gui == vndb_main::gui_type::sdl){
+    run_with_sdl(&vndb);
+  } else if(vndb.gui == vndb_main::gui_type::fltk){
+    run_with_fltk(&vndb);
+  } else {
+    run_without_gui(&vndb);
+  }
 }
 
 
@@ -885,157 +916,70 @@ void vndb_completion_init(){}
    matches[0]. */
 static int
 compute_lcd_of_matches (char **match_list, int matches, const char *text){
-  register int i, c1, c2, si;
+  int i, c1, c2, si;
   int low;		/* Count of max-matched characters. */
   int lx;
   char *dtext;		/* dequoted TEXT, if needed */
-#if defined (HANDLE_MULTIBYTE)
-  int v;
-  size_t v1, v2;
-  mbstate_t ps1, ps2;
-  wchar_t wc1, wc2;
-#endif
-
   /* If only one match, just use that.  Otherwise, compare each
      member of the list with the next, finding out where they
      stop matching. */
-  if (matches == 1)
-    {
-      match_list[0] = match_list[1];
-      match_list[1] = (char *)NULL;
-      return 1;
+  if (matches == 1){
+    match_list[0] = match_list[1];
+    match_list[1] = (char *)NULL;
+    return 1;
+  }
+
+  for (i = 1, low = INT_MAX; i < matches; i++) {
+    if (_rl_completion_case_fold) {
+      //The assignment to c1/c2 implicitly checks for nul terminators.
+      for (si = 0;
+           ((c1 = _rl_to_lower(match_list[i][si])) &&
+            (c2 = _rl_to_lower(match_list[i + 1][si])) &&
+            (c1 == c2));
+           si++); //empty loop body
+    } else {
+      for (si = 0;
+           ((c1 = match_list[i][si]) &&
+            (c2 = match_list[i + 1][si]) &&
+            (c1 == c2));
+           si++);
     }
-
-  for (i = 1, low = 100000; i < matches; i++)
-    {
-#if defined (HANDLE_MULTIBYTE)
-      if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
-	{
-	  memset (&ps1, 0, sizeof (mbstate_t));
-	  memset (&ps2, 0, sizeof (mbstate_t));
-	}
-#endif
-      if (_rl_completion_case_fold)
-	{
-	  for (si = 0;
-	       (c1 = _rl_to_lower(match_list[i][si])) &&
-	       (c2 = _rl_to_lower(match_list[i + 1][si]));
-	       si++)
-#if defined (HANDLE_MULTIBYTE)
-	    if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
-	      {
-		v1 = mbrtowc(&wc1, match_list[i]+si, strlen (match_list[i]+si), &ps1);
-		v2 = mbrtowc (&wc2, match_list[i+1]+si, strlen (match_list[i+1]+si), &ps2);
-		if (MB_INVALIDCH (v1) || MB_INVALIDCH (v2))
-		  {
-		    if (c1 != c2)	/* do byte comparison */
-		      break;
-		    continue;
-		  }
-		wc1 = towlower (wc1);
-		wc2 = towlower (wc2);
-		if (wc1 != wc2)
-		  break;
-		else if (v1 > 1)
-		  si += v1 - 1;
-	      }
-	    else
-#endif
-	    if (c1 != c2)
-	      break;
-	}
-      else
-	{
-	  for (si = 0;
-	       (c1 = match_list[i][si]) &&
-	       (c2 = match_list[i + 1][si]);
-	       si++)
-#if defined (HANDLE_MULTIBYTE)
-	    if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
-	      {
-		mbstate_t ps_back;
-		ps_back = ps1;
-		if (!_rl_compare_chars (match_list[i], si, &ps1, match_list[i+1], si, &ps2))
-		  break;
-		else if ((v = _rl_get_char_len (&match_list[i][si], &ps_back)) > 1)
-		  si += v - 1;
-	      }
-	    else
-#endif
-	    if (c1 != c2)
-	      break;
-	}
-
-      if (low > si)
-	low = si;
-    }
-
+    low = std::min(low, si);
+  }
   /* If there were multiple matches, but none matched up to even the
      first character, and the user typed something, use that as the
      value of matches[0]. */
-  if (low == 0 && text && *text)
-    {
-      match_list[0] = (char *)xmalloc (strlen (text) + 1);
-      strcpy (match_list[0], text);
-    }
-  else
-    {
-      match_list[0] = (char *)xmalloc (low + 1);
-
-      /* XXX - this might need changes in the presence of multibyte chars */
-
-      /* If we are ignoring case, try to preserve the case of the string
-	 the user typed in the face of multiple matches differing in case. */
-      if (_rl_completion_case_fold)
-	{
-	  /* We're making an assumption here:
-		IF we're completing filenames AND
-		   the application has defined a filename dequoting function AND
-		   we found a quote character AND
-		   the application has requested filename quoting
-		THEN
-		   we assume that TEXT was dequoted before checking against
-		   the file system and needs to be dequoted here before we
-		   check against the list of matches
-		FI */
-	  dtext = (char *)NULL;
-	  if (rl_filename_completion_desired &&
-	      rl_filename_dequoting_function &&
-	      rl_completion_found_quote &&
-	      rl_filename_quoting_desired)
-	    {
-	      dtext = (*rl_filename_dequoting_function) ((char *)text, rl_completion_quote_character);
-	      text = dtext;
-	    }
-
-	  /* sort the list to get consistent answers. */
-	  if (rl_sort_completion_matches)
-	    qsort (match_list+1, matches, sizeof(char *), (QSFUNC *)_rl_qsort_string_compare);
-
-	  si = strlen (text);
-	  lx = (si <= low) ? si : low;	/* check shorter of text and matches */
-	  /* Try to preserve the case of what the user typed in the presence of
-	     multiple matches: check each match for something that matches
-	     what the user typed taking case into account; use it up to common
-	     length of matches if one is found.  If not, just use first match. */
-	  for (i = 1; i <= matches; i++)
-	    if (strncmp (match_list[i], text, lx) == 0)
-	      {
-		strncpy (match_list[0], match_list[i], low);
-		break;
-	      }
-	  /* no casematch, use first entry */
-	  if (i > matches)
-	    strncpy (match_list[0], match_list[1], low);
-
-	  FREE (dtext);
-	}
-      else
+  if (low == 0 && text && *text) {
+    match_list[0] = strdup(text);
+  } else {
+    match_list[0] = (char *)xmalloc (low + 1);
+    /* If we are ignoring case, try to preserve the case of the string
+       the user typed in the face of multiple matches differing in case. */
+    if (_rl_completion_case_fold) {
+      /* sort the list to get consistent answers. */
+      if (rl_sort_completion_matches)
+        qsort (match_list+1, matches, sizeof(char *), (QSFUNC *)_rl_qsort_string_compare);
+      si = strlen (text);
+      lx = (si <= low) ? si : low;  /* check shorter of text and matches */
+      /* Try to preserve the case of what the user typed in the presence of
+         multiple matches: check each match for something that matches
+         what the user typed taking case into account; use it up to common
+         length of matches if one is found.  If not, just use first match. */
+      for (i = 1; i <= matches; i++)
+        if (strncmp (match_list[i], text, lx) == 0){
+          strncpy (match_list[0], match_list[i], low);
+          break;
+        }
+      /* no casematch, use first entry */
+      if (i > matches) {
         strncpy (match_list[0], match_list[1], low);
-
-      match_list[0][low] = '\0';
+      }
+      free(dtext);
+    } else {
+      strncpy (match_list[0], match_list[1], low);
     }
-
+    match_list[0][low] = '\0';
+  }
   return matches;
 }
 #endif

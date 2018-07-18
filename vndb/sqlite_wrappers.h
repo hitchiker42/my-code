@@ -406,6 +406,12 @@ struct sqlite3_wrapper {
       sqlite3_close(db);
     }
   }
+  void close(){
+    if(!is_view){
+      sqlite3_close(db);
+    }
+    db = nullptr;
+  }
   //Conversion to bool to check for error in constructor
   operator bool(){
     return db;

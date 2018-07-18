@@ -257,17 +257,8 @@ static int active_event_loop(struct sdl_context *ctx){
   fprintf(stderr, "Error in SDL_WaitEvent: %s.\n", SDL_GetError());
   return 1;
 }
-int sdl_main_loop(void *data){
-  SDL_sem *sem = data;
-  struct sdl_context *ctx = create_sdl_context(sem);
-  //The thread waiting on the semaphore uses a timed wait with a decently
-  //long timeout, we use that timeout as an indication that we got an error
-  //here, so it's important to not call sem_post if we fail.
-  if(!ctx){
-    SDL_SemPost(ctx->sem);
-    return -1;
-  }
-  SDL_SemPost(ctx->sem);
+int sdl_main_loop(struct sdl_context *ctx){
+//  struct sdl_context *ctx = (struct sdl_context*)data;
   //We don't care about mouse motion and ignoring it should
   //help avoid waking up the thread unnecessarily
   SDL_EventState(SDL_MOUSEMOTION, SDL_DISABLE);
@@ -294,23 +285,6 @@ int sdl_main_loop(void *data){
   destroy_sdl_context(ctx);
   return 0;
 }
-SDL_sem* launch_sdl_thread(){
-  SDL_Thread *thrd;
-  SDL_sem *sem = SDL_CreateSemaphore(0);
-  if(!sem){
-    return NULL;
-  }
-  thrd = SDL_CreateThread(sdl_main_loop, "sdl_thread", sem);
-  SDL_SemWait(sem);
-  if(!sdl_running){
-    SDL_DestroySemaphore(sem);
-    return NULL;
-  }
-  return sem;
-}
-
-
-
 #if 0
 //Silly little test program to make sure I can do video stuff on a thread
 //than I create.

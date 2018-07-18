@@ -249,10 +249,6 @@ struct vndb_main {
   }
   bool init_insert_stmts();
   bool init_get_id_stmts();
-  bool init_sdl(){
-    sdl_sem = launch_sdl_thread();
-    return (sdl_sem != nullptr);
-  }
   //get_dbstats defaults to true, but it's only meaningful if
   //do_connect is also true.
   bool init_all(bool do_connect = false, bool get_dbstats = true){
