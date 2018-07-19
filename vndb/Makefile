@@ -26,6 +26,7 @@ misc.o: misc.cpp vndb.h
 sqlite_ext.o: sqlite_ext.c
 image.o: image.c image.h
 sdl_gui.o: sdl_gui.c gui.h
+#	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $< -o $@ -c
 # the .o file doesn't actually depend on the .h file, but it
 # makes more sense to put the dependency here rather than vndb_cpp.
 progress_bar.o: progress_bar.c progress_bar.h
@@ -54,10 +55,10 @@ sqlite3.o: sqlite3.c
 vndb_cpp: vndb.o connection.o sqlite_wrappers.o interaction.o progress_bar.o main.o image.o tag_trait_parser.o sqlite3.o sdl_gui.o sqlite_ext.o misc.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
-sdl_test_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o image.o tag_trait_parser.o sqlite3.o sdl_gui.o sqlite_ext.o misc.o sdl_test.o
+sdl_test_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o image.o tag_trait_parser.o sqlite3.o sqlite_ext.o misc.o sdl_test.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 clean:
-	rm -f *.o $(PROGRAM_FILES) a.out
+	rm -f *.o $(PROGRAM_FILES) a.out sdl_test_cpp
 tags: TAGS
 TAGS: $(SOURCES)
 	ctags -eR *

@@ -833,6 +833,9 @@ void vndb_completion_init(){}
         free(lineptr);
       }
     }
+    if(c == 'n' || c == '\0'){
+      continue;
+    }
     if(!(endptr = strchr(lineptr, ';'))){
       prompt = " ... >";
       do {
@@ -878,9 +881,11 @@ void vndb_completion_init(){}
   interactive_input_loop(vndb);
 }
 [[noreturn]] static void run_with_sdl(vndb_main *vndb){
-  SDL_Thread *thrd;
-  SDL_sem *sem = SDL_CreateSemaphore(0);
-  sdl_context *ctx = create_sdl_context(sem);
+  if(!vndb->init_sdl()){
+    printf("Could not initialize SDL, will not be able to display images.\n");
+  }
+  run_without_gui(vndb);
+/*  sdl_context *ctx = create_sdl_context(sem);
   if(!ctx){
     printf("Could not initialize SDL, will not be able to display images.\n");
     SDL_DestroySemaphore(sem);
@@ -892,8 +897,7 @@ void vndb_completion_init(){}
   sdl_main_loop(ctx);
   //This won't return since the other thread calls exit
   SDL_WaitThread(thrd, nullptr);
-  //we'll never get here.
-  exit(0);
+  unreachable();*/
 }
 [[noreturn]] static void run_with_fltk(vndb_main *vndb){
   printf("FLTK gui is currently unimplemented.\n");

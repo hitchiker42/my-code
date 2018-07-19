@@ -12,22 +12,21 @@ static int vndb_log(const char *fmt, ...){
   va_end(ap);
   return ret;
 }
-
-SDL_EventType jpeg_event_type = -1;
-int sdl_running = 0;
-static int my_event_filter(void *data, SDL_Event *event){
-  if(event->type == SDL_QUIT || event->type == jpeg_event_type){
-    return 1;
+static int print_sdl_error(const char *str){
+  if(str && *str){
+    return fprintf(stderr, "%s: %s.\n", str, SDL_GetError());
   } else {
-    return 0;
+    return fprintf(stderr, "%s.\n", SDL_GetError());
   }
 }
+SDL_EventType jpeg_event_type = -1;
+int sdl_running = 0;
 //don't capitalize SDL since that would be using the naming convention
 //of SDL itself, which would effectively be using their `namespace`.
 
 void destroy_sdl_context(struct sdl_context *ctx){
   if(!ctx){ return; }
-  SDL_DestroyWindow(ctx->hack);
+//  SDL_DestroyWindow(ctx->hack);
   SDL_DestroyWindow(ctx->window);
   SDL_DestroyRenderer(ctx->renderer);
   SDL_DestroyTexture(ctx->texture);
@@ -76,13 +75,13 @@ struct sdl_context* create_sdl_context(SDL_sem *sem){
   //difficult to figure out why things weren't working because of this.
   //Create a texture that's larger than we need since we can re-size the window,
   //but we can't resize a texture (though we could just create another one).
-  ret->texture = SDL_CreateTexture(ret->renderer,                                   
+  ret->texture = SDL_CreateTexture(ret->renderer,
                                    SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING,
                                    dm.w, dm.h);
   if(!ret->texture){ goto error; }
-  ret->hack = SDL_CreateWindow("hack",SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                               0, 0, SDL_WINDOW_HIDDEN);
-  if(!ret->hack){ goto error; }
+//  ret->hack = SDL_CreateWindow("hack",SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+//                               0, 0, SDL_WINDOW_HIDDEN);
+//  if(!ret->hack){ goto error; }
 
   ret->sem = sem;
   sdl_running = 1;//make sure to set this only at the very end.
@@ -127,12 +126,12 @@ static int render_texture(struct sdl_context *ctx){
   SDL_Rect src_rect = create_src_rect(ctx);
   int width, height;
   if(SDL_GetRendererOutputSize(ctx->renderer, &width, &height) != 0){
-    fprintf(stderr, "Error quering renderer dimensions.\n");
+    print_sdl_error("Error quering renderer dimensions");
     return -1;
   }
   SDL_Rect dst_rect = create_dest_rect(src_rect, width, height);
   if(SDL_RenderCopy(ctx->renderer, ctx->texture, &src_rect, &dst_rect) != 0){
-    fprintf(stderr, "Error copying texture to renderer.\n");
+    print_sdl_error("Error copying texture to renderer");
     return -1;
   }
   SDL_RenderPresent(ctx->renderer);
@@ -141,6 +140,7 @@ static int render_texture(struct sdl_context *ctx){
 //Currently the jpeg is stored in the data fields of a user event, I'll
 //likely change this at some point.
 static int render_jpeg(struct sdl_context *ctx){
+  vndb_log("Rendering jpeg.\n");
   //Clear the screen first so that we can see if we fail to render the image.
   SDL_RenderClear(ctx->renderer);
   struct decompressed_image img;
@@ -167,7 +167,7 @@ static int render_jpeg(struct sdl_context *ctx){
     fclose(out);
   }
   ctx->img_width = img.width;
-  ctx->img_height = img.height;  
+  ctx->img_height = img.height;
   SDL_Rect img_rect = create_src_rect(ctx);
   int stride;
   unsigned char *pixels;
@@ -185,7 +185,7 @@ static int render_jpeg(struct sdl_context *ctx){
 static int render_random_colors(struct sdl_context *ctx){
   int width, height;
   if(SDL_GetRendererOutputSize(ctx->renderer, &width, &height) != 0){
-    fprintf(stderr, "Error quering renderer dimensions.\n");
+    print_sdl_error("Error quering renderer dimensions");
     return -1;
   }
   SDL_Rect dst_rect;
@@ -196,18 +196,18 @@ static int render_random_colors(struct sdl_context *ctx){
   int stride;
   unsigned char *pixels;
   if(SDL_LockTexture(ctx->texture, &dst_rect, (void**)&pixels, &stride) != 0){
-    fprintf(stderr, "Error locking texture.\n");
+    print_sdl_error("Error locking texture");
     return -1;
   }
-  for(size_t i = 0; i < height; i++){
-    for(size_t j = 0; j < width*3; j++){
+  for(int i = 0; i < height; i++){
+    for(int j = 0; j < width*3; j++){
       *(pixels + i*stride + j) = rand();
     }
   }
   SDL_UnlockTexture(ctx->texture);
   SDL_RenderClear(ctx->renderer);
   if(SDL_RenderCopy(ctx->renderer, ctx->texture, &dst_rect, &dst_rect) != 0){
-    fprintf(stderr, "Error copying texture to renderer.\n");
+    print_sdl_error("Error copying texture to renderer");
     return -1;
   }
   SDL_RenderPresent(ctx->renderer);
@@ -220,70 +220,65 @@ static void do_hide_window(struct sdl_context *ctx){
 }
 static void do_show_window(struct sdl_context *ctx){
   SDL_ShowWindow(ctx->window);
+  SDL_RenderClear(ctx->renderer);
 }
-//Called when requested to display an image, exitied when window closed.
-static int active_event_loop(struct sdl_context *ctx){
-  SDL_Event *evt = &ctx->evt;
-  //We don't need to redraw on every frame so use WaitEvent rather than
-  //PollEvent to allow the thread to sleep if possible.
-  while(SDL_WaitEvent(evt)){
-    vndb_log("Got SDL event : %s.\n", get_event_type(evt));
-    switch(evt->type){
-      case SDL_QUIT:
-        return 1;
-      case SDL_KEYUP:
-        if(evt->key.keysym.sym == SDLK_ESCAPE){
-          do_hide_window(ctx);
-          return 0;
-        }
-        break;
-      //If the window is closed just hide it, for any other window event
-      //just redraw the image.
-      case SDL_WINDOWEVENT:
-        if(evt->window.event == SDL_WINDOWEVENT_CLOSE){
-          do_hide_window(ctx);
-          return 0;
-        } else {
-          SDL_RenderClear(ctx->renderer);
-          render_texture(ctx);
-        }
-        break;
-      default:
-        if(evt->type == jpeg_event_type){
-          render_jpeg(ctx);
-        }
-    }
-  }
-  fprintf(stderr, "Error in SDL_WaitEvent: %s.\n", SDL_GetError());
-  return 1;
-}
-int sdl_main_loop(struct sdl_context *ctx){
-//  struct sdl_context *ctx = (struct sdl_context*)data;
-  //We don't care about mouse motion and ignoring it should
-  //help avoid waking up the thread unnecessarily
+int sdl_main_loop(void *data){
+  SDL_sem *sem = (SDL_sem *)data;
+  struct sdl_context* ctx =  create_sdl_context(sem);
+  SDL_SemPost(sem);
+  if(!ctx){
+    return 0;
+  } 
   SDL_EventState(SDL_MOUSEMOTION, SDL_DISABLE);
-  //  int quit = 0;
   while(1){
-    SDL_SetEventFilter(my_event_filter, NULL);
-    SDL_WaitEvent(&ctx->evt);
-    if(ctx->evt.type == SDL_QUIT){
-      goto end;
-    }
-    if(ctx->evt.type == jpeg_event_type){
-      do_show_window(ctx);
-      render_jpeg(ctx);
-      //There doesn't appear to be a documented way to remove an event
-      //filter, but looking at the actual SDL code shows that setting
-      //the event filter to NULL is the same as not having an event filter.
-      SDL_SetEventFilter(NULL, NULL);
-      if(active_event_loop(ctx) != 0){
-        goto end;
+    //  while(SDL_WaitEvent(evt)){
+    //    do_vndb_log("Got SDL event : %s.\n", get_event_type(evt));
+    SDL_Event *evt = &ctx->evt;
+    while(SDL_WaitEvent(evt)){
+      switch(evt->type){
+        case SDL_QUIT:
+          destroy_sdl_context(ctx);
+          return 0;
+        case SDL_KEYUP:
+          if(evt->key.keysym.sym == SDLK_ESCAPE){
+            do_hide_window(ctx);
+          }
+          break;
+          //If the window is closed just hide it, for any other window event
+          //just redraw the image.
+        case SDL_WINDOWEVENT:
+          if(evt->window.event == SDL_WINDOWEVENT_CLOSE){
+            SDL_FlushEvent(SDL_QUIT);
+            do_hide_window(ctx);
+          } else {
+            SDL_RenderClear(ctx->renderer);
+            render_texture(ctx);
+          }
+          break;
+        default:
+          if(evt->type == jpeg_event_type){
+            do_show_window(ctx);
+            render_jpeg(ctx);
+          }
       }
     }
   }
- end:
   destroy_sdl_context(ctx);
-  return 0;
+  return -1;
+}
+SDL_sem* launch_sdl_thread(){
+  SDL_Thread *thrd;
+  SDL_sem *sem = SDL_CreateSemaphore(0);
+  if(!sem){
+    return NULL;
+  }
+  thrd = SDL_CreateThread(sdl_main_loop, "sdl_thread", sem);
+  SDL_SemWait(sem);
+  if(!sdl_running){
+    SDL_DestroySemaphore(sem);
+    return NULL;
+  }
+  return sem;
 }
 #if 0
 //Silly little test program to make sure I can do video stuff on a thread

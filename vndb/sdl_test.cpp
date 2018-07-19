@@ -1,9 +1,9 @@
 #define __GUI_H__
 #include <SDL2/SDL.h>
-SDL_sem* launch_sdl_thread();
+//SDL_sem* launch_sdl_thread();
 #include "vndb.h"
 #include "image.h"
-
+SDL_EventType my_event_type;
 std::unique_ptr<util::logger> vndb_log;
 const char* get_event_type(SDL_Event *evt);
 static const int default_window_width = 640;
@@ -49,7 +49,7 @@ struct sdl_context* create_sdl_context(){
   ret->window = SDL_CreateWindow("vndb_cpp",
                                  SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                                  default_window_width, default_window_height,
-                                 SDL_WINDOW_RESIZABLE);
+                                 SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
   if(!ret->window){ goto error; }
   //No reason not to enable vsync.
   ret->renderer = SDL_CreateRenderer(ret->window, -1, SDL_RENDERER_PRESENTVSYNC);
@@ -187,9 +187,9 @@ int render_random_colors(struct sdl_context *ctx){
   SDL_RenderPresent(ctx->renderer);
   return 0;
 }
-static vndb_main *vndb;
 int event_loop(vndb_main *vndb, struct sdl_context *ctx,
                std::vector<int> images){
+  SDL_EventState(SDL_MOUSEMOTION, SDL_DISABLE);
   sqlite3_stmt_wrapper& stmt =
     vndb->get_select_by_id_stmt(vndb_main::table_type::vn_images);
   SDL_Event *evt = &ctx->evt;
@@ -251,26 +251,22 @@ int event_loop(vndb_main *vndb, struct sdl_context *ctx,
         }
         break;
       default:
-        ;//do nothing
+        if(evt->type == my_event_type){
+          SDL_ShowWindow(ctx->window);
+        }
     }
   }
  quit:
   destroy_sdl_context(ctx);
   return 0;
 }
-SDL_sem* launch_sdl_thread(){
-  SDL_Thread *thrd;
-  SDL_sem *sem = SDL_CreateSemaphore(0);
-  if(!sem){
-    return NULL;
-  }
-  thrd = SDL_CreateThread(sdl_main_loop, "sdl_thread", sem);
-  SDL_SemWait(sem);
-  if(!sdl_running){
-    SDL_DestroySemaphore(sem);
-    return NULL;
-  }
-  return sem;
+int thread_main(void* data){
+  SDL_Delay(1000);
+  SDL_Event evt;
+  memset(&evt, '\0', sizeof(SDL_Event));
+  evt.type = my_event_type;
+  SDL_PushEvent(&evt);
+  return 0;
 }
 int main(int argc, char *const argv[]){
   if(argc < 2){
@@ -284,8 +280,7 @@ int main(int argc, char *const argv[]){
   if(!vndb_log->out){
     fprintf(stderr, "Failed to open log file \"%s\".\n", default_log_file);
   }
-  vndb_main vndb_(default_db_file);
-  vndb = &vndb_;
+  vndb_main vndb(default_db_file);
   if(!vndb.init_all()){
     exit(EXIT_FAILURE);
   }
@@ -295,6 +290,9 @@ int main(int argc, char *const argv[]){
     ids.push_back(strtol(argv[i], nullptr, 0));
   }  
   struct sdl_context *ctx = create_sdl_context();  
+  my_event_type = (SDL_EventType)SDL_RegisterEvents(1);
+  SDL_Thread *thrd = SDL_CreateThread(thread_main, "sub-thread", nullptr);
+  SDL_DetachThread(thrd);
   return event_loop(&vndb, ctx, ids);
 }
 const char* get_event_type(SDL_Event *evt){

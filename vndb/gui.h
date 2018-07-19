@@ -45,7 +45,8 @@ static inline void init_jpeg_user_event(SDL_Event *evt, const void *data, size_t
 }
 void destroy_sdl_context(struct sdl_context *ctx);
 struct sdl_context* create_sdl_context(SDL_sem *sem);
-int sdl_main_loop(struct sdl_context *ctx);
+int sdl_main_loop(void *sem);
+SDL_sem* launch_sdl_thread();
 #ifdef __cplusplus
 }
 #endif
