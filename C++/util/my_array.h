@@ -76,6 +76,12 @@ struct array {
       *ptr++ = x;
     }
   }
+  constexpr array(const std::initializer_list<std::pair<size_t, T>> v)  : length(N){
+    T *ptr = arr;
+    for(auto &&[idx, val] : v){
+      ptr[idx] = val;
+    }
+  }
   //Constructor for use with template type deduction.
   //If there's a way to do this with initilizer lists I don't know how.
   template<typename ... Ts>

@@ -1,73 +1,10 @@
 #include "my_json.h"
-struct lexer {
-  using number_integer_t = typename basic_json::number_integer_t;
-  using number_unsigned_t = typename basic_json::number_unsigned_t;
-  using number_float_t = typename basic_json::number_float_t;
-  using string_t = typename basic_json::string_t;
-
-  /// token types for the parser
-  enum class token_type {
-    uninitialized,  ///< indicating the scanner is uninitialized
-    literal_true,   ///< the `true` literal
-    literal_false,  ///< the `false` literal
-    literal_null,   ///< the `null` literal
-    value_string,   ///< a string -- use get_string() for actual value
-    value_unsigned, ///< an unsigned integer -- use get_number_unsigned() for
-                    ///< actual value
-    value_integer,  ///< a signed integer -- use get_number_integer() for actual
-                    ///< value
-    value_float,    ///< an floating point number -- use get_number_float() for
-                    ///< actual value
-    begin_array,    ///< the character for array begin `[`
-    begin_object,   ///< the character for object begin `{`
-    end_array,      ///< the character for array end `]`
-    end_object,     ///< the character for object end `}`
-    name_separator, ///< the name separator `:`
-    value_separator, ///< the value separator `,`
-    parse_error,     ///< indicating a parse error
-    end_of_input,    ///< indicating the end of the input buffer
-    literal_or_value ///< a literal or the begin of a value (only for
-                     ///< diagnostics)
-  };
-
-  /// return name of values of type token_type (only used for errors)
-  static const char* token_type_name(const token_type t) noexcept {
-    switch (t) {
-    case token_type::uninitialized: return "<uninitialized>";
-    case token_type::literal_true: return "true literal";
-    case token_type::literal_false: return "false literal";
-    case token_type::literal_null: return "null literal";
-    case token_type::value_string: return "string literal";
-    case lexer::token_type::value_unsigned:
-    case lexer::token_type::value_integer:
-    case lexer::token_type::value_float: return "number literal";
-    case token_type::begin_array: return "'['";
-    case token_type::begin_object: return "'{'";
-    case token_type::end_array: return "']'";
-    case token_type::end_object: return "'}'";
-    case token_type::name_separator: return "':'";
-    case token_type::value_separator: return "','";
-    case token_type::parse_error: return "<parse error>";
-    case token_type::end_of_input: return "end of input";
-    case token_type::literal_or_value: return "'[', '{', || a literal";
-    default:                  // catch non-enum values
-      return "unknown token"; // LCOV_EXCL_LINE
-    }
-  }
-
-  explicit lexer(detail::input_adapter_t adapter)
-      : ia(std::move(adapter)), decimal_point_char(get_decimal_point()) {}
-
-  // delete because of pointer members
-  lexer(const lexer&) = delete;
-  lexer& operator=(lexer&) = delete;
-}
 /////////////////////
 // locales
 /////////////////////
 
 /// return the locale-dependent decimal point
-  static char get_decimal_point() noexcept {
+static char get_decimal_point() noexcept {
   const auto loc = localeconv();
   assert(loc != nullptr);
   return (loc->decimal_point == nullptr) ? '.' : *(loc->decimal_point);
@@ -288,7 +225,30 @@ token_type lexer::scan_string() {
   this->reset();
   // we entered the function by reading an open quote
   assert(this->current == '\"');
-  while (true) {
+  if(this->validate_utf8){ 
+    while (true) {
+      // get next character
+      int ch = this->get();
+      if(ch == std::char_traits<char>::eof()){
+        // end of file while parsing string
+        lex->error_message = "invalid string: missing closing quote";
+        return token_type::parse_error;
+      } else if(ch == '\"'){ //closing quote
+        return token_type::value_string;
+      } else if(ch == '\\'){ //escape
+        if(!parse_escape(this)){
+          return token_type::parse_error;
+        }
+      } else if(ch <= 0x1F){ //unescaped control character
+        lex->error_message = "invalid string: control character must be escaped";
+        return token_type::parse_error;
+      } else { //regular utf8 character
+        if(!check_utf8_char(ch)){
+          return token_type::parse_error;
+        }
+      }
+    }
+  } else {
     // get next character
     int ch = this->get();
     if(ch == std::char_traits<char>::eof()){
@@ -301,13 +261,8 @@ token_type lexer::scan_string() {
       if(!parse_escape(this)){
         return token_type::parse_error;
       }
-    } else if(ch <= 0x1F){ //unescaped control character
-      lex->error_message = "invalid string: control character must be escaped";
-      return token_type::parse_error;
-    } else { //regular utf8 character
-      if(!check_utf8_char(ch)){
-        return token_type::parse_error;
-      }
+    } else {
+      this->add_current();
     }
   }
 }
@@ -559,7 +514,206 @@ static void skip_space(lexer *lex){
     c = lex->get();
   } while (c == ' ' || c == '\t' || c = '\n' || c = '\r');
 }
-  
+//Parsing scalar values
+//We need to parse strings for object keys as well as json values,
+//so we have 2 overloads for parse_string.
+static bool parse_string(lexer *lex, json::string_t& str) {
+  // reset token_buffer (ignore opening quote)
+  lex->reset();
+  // we entered the function by reading an open quote
+  assert(lex->current == '\"');
+  if(lex->validate_utf8){ 
+    while (true) {
+      // get next character
+      int ch = lex->get();
+      if(ch == std::char_traits<char>::eof()){
+        // end of file while parsing string
+        lex->error_message = "invalid string: missing closing quote";
+        return false;
+      } else if(ch == '\"'){ //closing quote
+        return break;
+      } else if(ch == '\\'){ //escape
+        if(!parse_escape(lex)){
+          return false;
+        }
+      } else if(ch <= 0x1F){ //unescaped control character
+        lex->error_message = "invalid string: control character must be escaped";
+        return token_type::parse_error;
+      } else { //regular utf8 character
+        if(!check_utf8_char(ch)){
+          return false;
+        }
+      }
+    }
+  } else {
+    // get next character
+    int ch = lex->get();
+    if(ch == std::char_traits<char>::eof()){
+      // end of file while parsing string
+      lex->error_message = "invalid string: missing closing quote";
+      return false;
+    } else if(ch == '\"'){ //closing quote
+      break;
+    } else if(ch == '\\'){ //escape
+      if(!parse_escape(lex)){
+        return false;
+      }
+    } else {
+      lex->add_current();
+    }
+  }
+  str = std::move(lex->token_buffer);
+  return true;
+}
+static bool parse_string(lexer *lex, basic_json& json) {
+  json = basic_json(value_t::string);
+  return parse_string(lex, *(json.m_value.string));
+}
+//super basic parsing for literals but it gets the job done
+static bool parse_null(lexer *lex, basic_json& json){
+  assert(lex->current == 'n');
+  if(lex->get() != 'u'){ return false; }
+  if(lex->get() != 'l'){ return false; }
+  if(lex->get() != 'l'){ return false; }
+  json = basic_json(nullptr);
+  return true;
+}
+static bool parse_true(lexer *lex, basic_json& json){
+  assert(lex->current == 't');
+  if(lex->get() != 'r'){ return false; }
+  if(lex->get() != 'u'){ return false; }
+  if(lex->get() != 'e'){ return false; }
+  json = basic_json(true);
+  return true;
+}
+static bool parse_false(lexer *lex, basic_json& json){
+  assert(lex->current == 'f');
+  if(lex->get() != 'a'){ return false; }
+  if(lex->get() != 'l'){ return false; }
+  if(lex->get() != 's'){ return false; }
+  if(lex->get() != 'e'){ return false; }
+  json = basic_json(false);
+  return true;
+}
+static bool parse_number(lexer *lex, basic_json& json) {
+  // reset token_buffer to store the number's bytes
+  lex->reset();
+
+  // the type of the parsed number; initially set to unsigned; will be
+  // changed if minus sign, decimal point or exponent is read
+  token_type number_type = token_type::value_unsigned;
+    
+  // state (init): we just found out we need to scan a number
+  if(lex->current == '-'){
+    lex->add_current();
+    number_type = token_type::value_signed;
+  }
+  lex->get();
+  while(lex->current >= '0' && lex->current <= '9'){
+    lex->add_current();
+    get(lex->current);
+  }
+  if(lex->current == '.' || (lex->current | 0x20) == 'e'){
+    bool is_exp = (lex->current | 0x20) == 'e';
+    number_type = token_type::value_float;
+    lex->add_current();
+    lex->get();
+    if(is_exp && (lex->current == '+' || lex->current == '-')){
+      lex->add_current;
+      lex->get();
+    }
+    while(lex->current >= '0' && lex->current <= '9'){
+      lex->add_current();
+      get(lex->current);
+    }
+  }
+  lex->unget();
+  char* ptr = lex->token_buffer.data();
+  char* endptr = nullptr;
+  errno = 0;
+  // try to parse integers first and fall back to floats
+  if (number_type != lexer::token_type::value_float) {
+    const auto x = std::strtoull(lex->token_buffer.data(), &endptr, 10);
+    // we checked the number format before
+    assert(endptr == lex->token_buffer.data() + lex->token_buffer.size());
+    if (errno == 0) {
+      if(number_type == lexer::token_type::value_unsigned){
+        json = basic_json(static_cast<number_unsigned_t>x);
+      } else {
+        json = basic_json(static_cast<number_integer_t>x);
+      }
+      return true;
+    }
+    errno = 0;
+  }
+  //If we fail to parse an integer we parse it as a float instead, at the cost
+  //of a bit of precision.
+  double x = std::strtod(lex->token_buffer.data(), &endptr);
+  // we checked the number format before
+  if(errno != 0 ||
+     endptr != (lex->token_buffer.data() + lex->token_buffer.size())){
+    lex->error_message = "invalid number; " + lex->token_buffer;
+    return false;
+  } else{
+    json = = basic_json(static_cast<number_float_t>x);
+    return true;
+  }
+}
+static bool parse_object(lexer *lex, basic_json& json){
+  assert(lex->current = '{');
+  skip_space(lex);
+  json::object_t* obj = json.m_value.object;
+  while(lex->current != std::char_traits<char>::eof() && lex->current != '}'){
+    json::string_t key;
+    basic_json value;
+    if(lex->current != '"' || !parse_string(lex, key)){
+      lex->error_message = "invalid object: expected string as object key";
+      return false;
+    }
+    skip_space(lex);
+    if(lex->current != ':'){
+      lex->error_message = "invalid object: expected ':' between key and value";
+      return false;
+    }
+    skip_space(lex);
+    if(!parse(lex, value)){
+      return false;
+    }
+    //try_emplace returns std::pair<iterator, bool>, we don't need the iterator.
+    bool inserted = obj->try_emplace(key, value).second;
+    if(!inserted){
+      lex->error_message = "invalid object: duplicate key";
+      return false;
+    }
+    skip_space(lex);
+    if(lex->current != ','){
+      lex->error_message = "invalid object: missing ',' between members";
+      return false;
+    }
+    skip_space(lex)
+  }
+  return true;
+}
+static bool parse_array(lexer *lex, basic_json& json){
+  assert(lex->current = '[');
+  skip_space(lex);
+  json::array_t* arr = json.m_value.array;
+  while(lex->current != std::char_traits<char>::eof() && lex->current != ']'){
+    basic_json value;
+    if(!parse(lex, value)){
+      return false;
+    }
+    arr->emplace_back(value);
+    skip_space(lex);
+    if(lex->current != ','){
+      lex->error_message = "invalid object: missing ',' between members";
+      return false;
+    }
+    skip_space(lex)
+  }
+  return true;
+}
+    
 lexer::token_type lexer::scan() {
   // read next character and ignore whitespace
   skip_space(this);
@@ -609,7 +763,264 @@ lexer::token_type lexer::scan() {
       return token_type::parse_error;
   }
 }
+<<<<<<< Updated upstream
 template class parser {
+=======
+bool parse(lexer *lex, basic_json& json) {
+  // never parse after a parse error was detected
+  assert(!errored);
+  switch(lex->get()){
+    case '{':
+      return parse_object(lex, json):
+    case  '[':
+      return parse_array(lex, json):
+    case 't': return this->scan_literal("true", 4, token_type::literal_true);
+    case 'f': return this->scan_literal("false", 5, token_type::literal_false);
+    case 'n':
+      return this->scan_literal("null", 4, token_type::literal_null);
+
+      // string
+    case '\"':
+      return this->scan_string();
+    case '-':
+    case '0':
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5':
+    case '6':
+    case '7':
+    case '8':
+    case '9':
+      return parse_number(lex, json);
+
+    basic_json ret(value_t::object);
+    
+      if (keep) {
+        if (callback) {
+          keep = callback(depth++, parse_event_t::object_start, result);
+        }
+
+        if (!callback || keep) {
+          // explicitly set result to object to cope with {}
+          result.m_type = value_t::object;
+          result.m_value = value_t::object;
+        }
+      }
+
+      // read next token
+      get_token();
+
+      // closing } -> we are done
+      if (last_token == token_type::end_object) {
+        if (keep && callback &&
+            !callback(--depth, parse_event_t::object_end, result)) {
+          result.m_value.destroy(result.m_type);
+          result.m_type = value_t::discarded;
+        }
+        break;
+      }
+
+      // parse values
+      string_t key;
+      basic_json value;
+      while (true) {
+        // store key
+        if (!expect(token_type::value_string)) {
+          return;
+        }
+        key = m_lexer.move_string();
+
+        bool keep_tag = false;
+        if (keep) {
+          if (callback) {
+            basic_json k(key);
+            keep_tag = callback(depth, parse_event_t::key, k);
+          } else {
+            keep_tag = true;
+          }
+        }
+
+        // parse separator (:)
+        get_token();
+        if (!expect(token_type::name_separator)) {
+          return;
+        }
+
+        // parse and add value
+        get_token();
+        value.m_value.destroy(value.m_type);
+        value.m_type = value_t::discarded;
+        parse_internal(keep, value);
+
+        if (JSON_UNLIKELY(errored)) {
+          return;
+        }
+
+        if (keep && keep_tag && !value.is_discarded()) {
+          result.m_value.object->emplace(std::move(key), std::move(value));
+        }
+
+        // comma -> next value
+        get_token();
+        if (last_token == token_type::value_separator) {
+          get_token();
+          continue;
+        }
+
+        // closing }
+        if (!expect(token_type::end_object)) {
+          return;
+        }
+        break;
+      }
+
+      if (keep && callback &&
+          !callback(--depth, parse_event_t::object_end, result)) {
+        result.m_value.destroy(result.m_type);
+        result.m_type = value_t::discarded;
+      }
+      break;
+    }
+
+    case token_type::begin_array: {
+      if (keep) {
+        if (callback) {
+          keep = callback(depth++, parse_event_t::array_start, result);
+        }
+
+        if (!callback || keep) {
+          // explicitly set result to array to cope with []
+          result.m_type = value_t::array;
+          result.m_value = value_t::array;
+        }
+      }
+
+      // read next token
+      get_token();
+
+      // closing ] -> we are done
+      if (last_token == token_type::end_array) {
+        if (callback && !callback(--depth, parse_event_t::array_end, result)) {
+          result.m_value.destroy(result.m_type);
+          result.m_type = value_t::discarded;
+        }
+        break;
+      }
+
+      // parse values
+      basic_json value;
+      while (true) {
+        // parse value
+        value.m_value.destroy(value.m_type);
+        value.m_type = value_t::discarded;
+        parse_internal(keep, value);
+
+        if (JSON_UNLIKELY(errored)) {
+          return;
+        }
+
+        if (keep && !value.is_discarded()) {
+          result.m_value.array->push_back(std::move(value));
+        }
+
+        // comma -> next value
+        get_token();
+        if (last_token == token_type::value_separator) {
+          get_token();
+          continue;
+        }
+
+        // closing ]
+        if (!expect(token_type::end_array)) {
+          return;
+        }
+        break;
+      }
+
+      if (keep && callback &&
+          !callback(--depth, parse_event_t::array_end, result)) {
+        result.m_value.destroy(result.m_type);
+        result.m_type = value_t::discarded;
+      }
+      break;
+    }
+
+    case token_type::literal_null: {
+      result.m_type = value_t::null;
+      break;
+    }
+
+    case token_type::value_string: {
+      result.m_type = value_t::string;
+      result.m_value = m_lexer.move_string();
+      break;
+    }
+
+    case token_type::literal_true: {
+      result.m_type = value_t::boolean;
+      result.m_value = true;
+      break;
+    }
+
+    case token_type::literal_false: {
+      result.m_type = value_t::boolean;
+      result.m_value = false;
+      break;
+    }
+
+    case token_type::value_unsigned: {
+      result.m_type = value_t::number_unsigned;
+      result.m_value = m_lexer.get_number_unsigned();
+      break;
+    }
+
+    case token_type::value_integer: {
+      result.m_type = value_t::number_integer;
+      result.m_value = m_lexer.get_number_integer();
+      break;
+    }
+
+    case token_type::value_float: {
+      result.m_type = value_t::number_float;
+      result.m_value = m_lexer.get_number_float();
+
+      // throw in case of infinity or NAN
+      if (JSON_UNLIKELY(!std::isfinite(result.m_value.number_float))) {
+        if (allow_exceptions) {
+          JSON_THROW(out_of_range::create(406, "number overflow parsing '" +
+                                          m_lexer.get_token_string() +
+                                          "'"));
+        }
+        expect(token_type::uninitialized);
+      }
+      break;
+    }
+
+    case token_type::parse_error: {
+      // using "uninitialized" to avoid "expected" message
+      if (!expect(token_type::uninitialized)) {
+        return;
+      }
+      break; // LCOV_EXCL_LINE
+    }
+
+    default: {
+      // the last token was unexpected; we expected a value
+      if (!expect(token_type::literal_or_value)) {
+        return;
+      }
+      break; // LCOV_EXCL_LINE
+    }
+  }
+
+  if (keep && callback && !callback(depth, parse_event_t::value, result)) {
+    result.m_value.destroy(result.m_type);
+    result.m_type = value_t::discarded;
+  }
+}
+template <typename basic_json> class parser {
   using number_integer_t = typename basic_json::number_integer_t;
   using number_unsigned_t = typename basic_json::number_unsigned_t;
   using number_float_t = typename basic_json::number_float_t;
@@ -631,20 +1042,11 @@ template class parser {
     /// the parser finished reading a JSON value
     value
   };
-
-  using parser_callback_t = std::function<bool(int depth, parse_event_t event,
-                                               basic_json& parsed)>;
-
   /// a parser reading from an input adapter
-  explicit parser(detail::input_adapter_t adapter,
-                  const parser_callback_t cb = nullptr,
-                  const bool allow_exceptions_ = false)
-      : callback(cb), m_lexer(adapter), allow_exceptions(allow_exceptions_) {}
-  explicit parser(detail::input_adapter adapter,
-                  const parser_callback_t cb = nullptr,
-                  const bool allow_exceptions_ = false)
-      : parser(static_cast<detail::input_adapter_t>(adapter), cb,
-               allow_exceptions_) {}
+  explicit parser(detail::input_adapter_t adapter, bool validate_utf8 = true)
+      : m_lexer(adapter, validate_utf8) {}
+  explicit parser(detail::input_adapter adapter, bool validate_utf8 = true)
+      : parser(static_cast<detail::input_adapter_t>(adapter), validate_utf8) {}
 
   /*!
   @brief public parser interface
@@ -668,17 +1070,10 @@ template class parser {
       get_token();
       expect(token_type::end_of_input);
     }
-
     // in case of an error, return discarded value
     if (errored) {
       result = value_t::discarded;
       return;
-    }
-
-    // set top-level value to null if it was discarded by the callback
-    // function
-    if (result.is_discarded()) {
-      result = nullptr;
     }
   }
   // Code Added to allow resuing a parser to parse multiple json values
