@@ -1,5 +1,5 @@
 DEBUGFLAGS= -DDEBUG -g -Og # -fsanitize=address # Asan is great, but it breaks under gdb
-CPPFLAGS:= $(CPPFLAGS) -I$(PWD)/../C++/util -Wall -Wextra -Wno-unused-function -Wmissing-braces
+CPPFLAGS:= $(CPPFLAGS) -I$(PWD)/../C++_util -Wall -Wextra -Wno-unused-function -Wmissing-braces
 CXXFLAGS:= $(CXXFLAGS) -std=gnu++17 $(DEBUGFLAGS)  -fno-rtti -fno-exceptions -Wno-class-memaccess
 CXXFLAGS_NDEBUG=-std=gnu++17 -O2 -DNDEBUG -fno-rtti -fno-exceptions -Wno-class-memaccess
 CFLAGS=-std=gnu11 -lm $(DEBUGFLAGS)
