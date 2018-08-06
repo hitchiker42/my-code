@@ -1,4 +1,5 @@
 #include "unicode.h"
+namespace util {
 /*
   Simple UTF-8 spec
   bits of    | First      | Last         | Num Bytes | Leading    |
@@ -58,7 +59,49 @@ int32_t utf8_decode_char(const uint8_t* src){
   }
   return static_cast<int32_t>(ret);
 }
-int is_valid_codepoint(int32_t ch){
+//Decode
+int32_t utf8_decode_char_backwards(const uint8_t** src){
+  //utf8_min_codepoint[i] is minimum value of a valid codepoint for a
+  //byte sequence of length i+1.
+  static constexpr std::array<int,6> utf8_min_codepoint = 
+    {{0, 0x80, 0x800, 0x10000, 0x200000, 0x4000000}};
+  static constexpr std::array<uint8_t, 8> utf8_lead_char_mask = 
+    {{0x7f, 0x1F, 0x0F, 0x07, 0x03, 0x01}};  
+  uint8_t ch;
+  uint32_t ret, min;
+
+  if(!src){
+    errno = EINVAL;
+    return -1;
+  }
+  int len = utf8_char_size(*src);
+  if(len <= 0){
+    errno = EILSEQ;
+    return -1;
+  }
+  //early return for ascii.
+  if(len == 1){
+    return *str;
+  }
+  int remain = len - 1;
+  int32_t min = utf8_min_codepoint[remain];
+  uint32_t ret = (*src++) & utf8_lead_char_mask[remain];
+  while(remain--) {
+    uint8_t ch = *src++;
+    if((ch & 0xC0) != 0x80) {
+      errno = EILSEQ;
+      return -1;
+    }
+    ret <<= 6;
+    ret |= ch & 0x3F;
+  }
+  if(ret < min) {
+    errno = EILSEQ;
+    return -1;
+  }
+  return static_cast<int32_t>(ret);
+}
+bool is_valid_codepoint(int32_t ch){
     return ch >= 0 && ch <= 0x10FFFF
         && (ch < 0xD800 || ch > 0xDFFF)
         && (ch != 0xFFFE) && (ch != 0xFFFF);
@@ -66,7 +109,7 @@ int is_valid_codepoint(int32_t ch){
 std::array<uint8_t,8> utf8_encode_char(uint32_t c){
   std::array<uint8_t,8> retval;
   uint8_t *dest = retval.data();
-  if(!utf8_isutf32(c)) {
+  if(!is_valid_codepoint(c)) {
     *dest = '\0'
     return retval;
   }
@@ -123,7 +166,7 @@ uint32_t utf8_nth_char(const uint8_t *str, uint32_t n){
     i += size;
     j++;
   }
-  return utf8_decode_char(str+i, NULL);
+  return utf8_decode_char(str+i);
 }
 const char *utf8_nth_ptr(const uint8_t *str, uint32_t n){
   //optimize ascii strings/leading ascii characters
@@ -163,6 +206,9 @@ const char* utf8_strchr(const uint8_t *str, uint32_t len, uint32_t chr){
     i += sz;
   }
   return nullptr;
+  //Could also implement as:
+  //std::array<char,8> needle_arr = utf8_encode_char(chr)
+  //
 }
 const char* utf8_rstrchr(const uint8_t *str, uint32_t len, uint32_t chr){
   size_t sz;
@@ -212,6 +258,7 @@ uint32_t utf8_char_pos_to_byte_pos(const uint8_t *str, uint32_t len, uint32_t po
   }
   return byte_pos;
 }
+#if 0
 union utf16_char {
   uint16_t *val;
   struct {
@@ -223,10 +270,12 @@ union utf16_char {
     uint8_t a;
   } le;
 };
-uint32_t utf16_decode_char(const uint8_t *str, int byteorder, int *used){
+uint32_t utf16_decode_char(const uint16_t *str, bool big_endian = false);
+std::array<uint16,2> utf16_encode_char(const uint32_t c, bool big_endian = false);
+int32_t utf16_decode_char(const uint8_t *str, int byteorder, int *used){
   if(!str){
     errno = EINVAL;
-    return (uint32_t)-1;
+    return -1;
   }
   uint16_t c = *((const uint16_t *)str);
   str += 2;
@@ -276,6 +325,8 @@ uint32_t utf16_decode_char(const uint8_t *str, int byteorder, int *used){
     D800 to DFFF are reserved for the high and low surregates
 
 */
+#endif
+#if 0
 utf8_str_iter* make_string_iter(sl_string *str){
   utf8_str_iter *iter = malloc(sizeof(utf8_str_iter));
   iter->str = *str;
@@ -381,3 +432,5 @@ int32_t string_iter_prev_n(utf8_str_iter *iter, unsigned int num_chars){
   //I think this should work, but I might be off by an iteration
   return retval;
 }
+}//namespace util
+#endif
