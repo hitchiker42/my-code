@@ -261,16 +261,16 @@ struct string_view {
   #undef do_cmp
 */
   //Substring functions
-  string_view substr(size_t start) const {
+  constexpr string_view substr(size_t start) const {
     return substr(start, size());
   }
-  string_view substr(size_type start, size_type stop) const {
+  constexpr string_view substr(size_type start, size_type stop) const {
     return string_view(ptr + start, stop - start, false, false);
   }
-  string_view substr(iterator start) const {
+  constexpr string_view substr(iterator start) const {
     return string_view(start, end() - start, false, is_null_terminated());
   }
-  string_view substr(iterator start, iterator stop) const {
+  constexpr string_view substr(iterator start, iterator stop) const {
     return string_view(start, stop - start, false, false);
   }
   //Substring functions which return a copy, this is the only way to get

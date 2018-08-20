@@ -9,25 +9,20 @@ namespace util {
   |    11    |  0x80      |  0x7FF       |    2      | 0b110xxxxx |
   |    16    |  0x800     |  0xFFFF      |    3      | 0b1110xxxx |
   |    21    |  0x10000   |  0x1FFFFF    |    4      | 0b11110xxx |
-  |    26    |  0x200000  |  0x3FFFFFF   |    5      | 0b111110xx |
-  |    31    |  0x4000000 |  0x7FFFFFFF  |    6      | 0b1111110x |
 
   All bytes following the leading byte in a multibyte sequence have the form
   0b10xxxxxx
   in any instance the bytes 0b11111110 and 0b11111111 are illegal.
-  The xs above are the bits of the actual codepoint. 
-  A valid utf8 character must use the fewest bytes needed.  
+  The xs above are the bits of the actual codepoint.
+  A valid utf8 character must use the fewest bytes needed.
  */
 int32_t utf8_decode_char(const uint8_t* src){
   //utf8_min_codepoint[i] is minimum value of a valid codepoint for a
   //byte sequence of length i+1.
-  static constexpr std::array<int,6> utf8_min_codepoint = 
-    {{0, 0x80, 0x800, 0x10000, 0x200000, 0x4000000}};
-  static constexpr std::array<uint8_t, 8> utf8_lead_char_mask = 
-    {{0x7f, 0x1F, 0x0F, 0x07, 0x03, 0x01}};  
-  uint8_t ch;
-  uint32_t ret, min;
-
+  static constexpr std::array<int, utf8_max_char_size> utf8_min_codepoint =
+    {{0, 0x80, 0x800, 0x10000}};//, 0x200000, 0x4000000}};
+  static constexpr std::array<uint8_t, utf8_max_char_size> utf8_lead_char_mask =
+    {{0x7f, 0x1F, 0x0F, 0x07}};//, 0x03, 0x01}};
   if(!src){
     errno = EINVAL;
     return -1;
@@ -43,15 +38,36 @@ int32_t utf8_decode_char(const uint8_t* src){
   }
   int remain = len - 1;
   int32_t min = utf8_min_codepoint[remain];
-  uint32_t ret = (*src++) & utf8_lead_char_mask[remain];
-  while(remain--) {
-    uint8_t ch = *src++;
-    if((ch & 0xC0) != 0x80) {
-      errno = EILSEQ;
-      return -1;
-    }
-    ret <<= 6;
-    ret |= ch & 0x3F;
+  int32_t ret = (*src++) & utf8_lead_char_mask[remain];
+  uint8_t ch = 0;
+  //Unroll the loop, this will always be a function call, so we can afford it.
+  switch(remain){
+    case 3:
+      ch = *src++;
+      if((ch & 0xC0) != 0x80) {
+        errno = EILSEQ;
+        return -1;
+      }
+      ret <<= 6;
+      ret |= ch & 0x3F;
+      [[fallthrough]]
+    case 2:
+      ch = *src++;
+      if((ch & 0xC0) != 0x80) {
+        errno = EILSEQ;
+        return -1;
+      }
+      ret <<= 6;
+      ret |= ch & 0x3F;
+      [[fallthrough]]
+    case 1:
+      ch = *src++;
+      if((ch & 0xC0) != 0x80) {
+        errno = EILSEQ;
+        return -1;
+      }
+      ret <<= 6;
+      ret |= ch & 0x3F;
   }
   if(ret < min) {
     errno = EILSEQ;
@@ -59,54 +75,7 @@ int32_t utf8_decode_char(const uint8_t* src){
   }
   return static_cast<int32_t>(ret);
 }
-//Decode
-int32_t utf8_decode_char_backwards(const uint8_t** src){
-  //utf8_min_codepoint[i] is minimum value of a valid codepoint for a
-  //byte sequence of length i+1.
-  static constexpr std::array<int,6> utf8_min_codepoint = 
-    {{0, 0x80, 0x800, 0x10000, 0x200000, 0x4000000}};
-  static constexpr std::array<uint8_t, 8> utf8_lead_char_mask = 
-    {{0x7f, 0x1F, 0x0F, 0x07, 0x03, 0x01}};  
-  uint8_t ch;
-  uint32_t ret, min;
-
-  if(!src){
-    errno = EINVAL;
-    return -1;
-  }
-  int len = utf8_char_size(*src);
-  if(len <= 0){
-    errno = EILSEQ;
-    return -1;
-  }
-  //early return for ascii.
-  if(len == 1){
-    return *str;
-  }
-  int remain = len - 1;
-  int32_t min = utf8_min_codepoint[remain];
-  uint32_t ret = (*src++) & utf8_lead_char_mask[remain];
-  while(remain--) {
-    uint8_t ch = *src++;
-    if((ch & 0xC0) != 0x80) {
-      errno = EILSEQ;
-      return -1;
-    }
-    ret <<= 6;
-    ret |= ch & 0x3F;
-  }
-  if(ret < min) {
-    errno = EILSEQ;
-    return -1;
-  }
-  return static_cast<int32_t>(ret);
-}
-bool is_valid_codepoint(int32_t ch){
-    return ch >= 0 && ch <= 0x10FFFF
-        && (ch < 0xD800 || ch > 0xDFFF)
-        && (ch != 0xFFFE) && (ch != 0xFFFF);
-}
-std::array<uint8_t,8> utf8_encode_char(uint32_t c){
+std::array<uint8_t,utf8_max_char_size> utf8_encode_char(uint32_t c){
   std::array<uint8_t,8> retval;
   uint8_t *dest = retval.data();
   if(!is_valid_codepoint(c)) {
@@ -127,6 +96,8 @@ std::array<uint8_t,8> utf8_encode_char(uint32_t c){
     *dest++ = 0x80 | ((c >> 12) & 0x3F);
     *dest++ = 0x80 | ((c >> 6) & 0x3F);
     *dest++ = 0x80 | (c & 0x3F);
+  }
+/*
   } else if(c < 0x4000000) {
     *dest++ = 0xF8 | ((c >> 24) & 0x3);
     *dest++ = 0x80 | ((c >> 18) & 0x3F);
@@ -141,6 +112,7 @@ std::array<uint8_t,8> utf8_encode_char(uint32_t c){
     *dest++ = 0x80 | ((c >> 6) & 0x3F);
     *dest++ = 0x80 | (c & 0x3F);
   }
+*/
   *dest = '\0';
   return retval;
 }
@@ -197,8 +169,8 @@ const char* utf8_strchr(const uint8_t *str, uint32_t len, uint32_t chr){
   errno = 0;
   while(i < len){
     c = utf8_decode_char(str + i, &sz);
-    if(c == -1){ 
-      return nullptr; 
+    if(c == -1){
+      return nullptr;
     }
     if(c == chr){
       return str+i;
@@ -258,64 +230,12 @@ uint32_t utf8_char_pos_to_byte_pos(const uint8_t *str, uint32_t len, uint32_t po
   }
   return byte_pos;
 }
-#if 0
-union utf16_char {
-  uint16_t *val;
-  struct {
-    uint8_t a;
-    uint8_t b;
-  } be;
-  struct {
-    uint8_t b;
-    uint8_t a;
-  } le;
-};
-uint32_t utf16_decode_char(const uint16_t *str, bool big_endian = false);
-std::array<uint16,2> utf16_encode_char(const uint32_t c, bool big_endian = false);
-int32_t utf16_decode_char(const uint8_t *str, int byteorder, int *used){
-  if(!str){
-    errno = EINVAL;
-    return -1;
-  }
-  uint16_t c = *((const uint16_t *)str);
-  str += 2;
-  //99% of the time this is all we need
-  if(byteorder == BIG_ENDIAN){
-    c = __builtin_bswap16(c);
-  } else {
-    assert(byteorder == LITTLE_ENDIAN);
-  }
-  if(c <= 0xD7FF || c >= 0xE000){
-    return c;
-  }
-  if(c >= 0xDC00){
-    errno = EILSEQ;
-    return (uint32_t)-1;
-  }
-  uint16_t c2 = *((const uint16_t *)str);
-  str += 2;
-  if(byteorder == BIG_ENDIAN){
-    c2 = __builtin_bswap16(c2);
-  }
-  if(c2 < 0xDC00 || c2 > 0xDFF){
-    errno = EILSEQ;
-    return (uint32_t)-1;
-  }
-  //Each of these is a 10 bit integer
-  uint32_t high = c - 0xD800;
-  uint32_t low = c2 - 0xDC00;
-  //now we need to put them together into a 20 bit integer
-  uint32_t ret = (high << 10) | low;
-  return ret + 0x10000;
-}
-//utf16_char_str utf16_encode_str(uint32_t c){
-//  if(c >
 /*
-    High \ Low 	DC00 	DC01 	…       DFFF
-    D800 	010000 	010001 	… 	0103FF
-    D801 	010400 	010401 	… 	0107FF
-      ⋮ 	⋮ 	⋮ 	⋱ 	⋮
-    DBFF 	10FC00 	10FC01 	… 	10FFFF
+    High \ Low  DC00    DC01    …       DFFF
+    D800        010000  010001  …       0103FF
+    D801        010400  010401  …       0107FF
+      ⋮         ⋮       ⋮       ⋱       ⋮
+    DBFF        10FC00  10FC01  …       10FFFF
 
 
     0x010000 is subtracted from the code point, leaving a 20-bit number in the range 0..0x0FFFFF.
@@ -325,7 +245,35 @@ int32_t utf16_decode_char(const uint8_t *str, int byteorder, int *used){
     D800 to DFFF are reserved for the high and low surregates
 
 */
-#endif
+uint32_t utf16_decode_char(const uint16_t *str, bool big_endian = false);
+std::array<uint16,2> utf16_encode_char(const uint32_t c, bool big_endian = false);
+int32_t utf16_decode_char(const uint16_t *str){
+  if(!str){
+    errno = EINVAL;
+    return -1;
+  }
+  uint16_t c = *str++;
+  if(c <= 0xD7FF || c >= 0xE000){
+    return c;
+  }
+  if(c >= 0xDC00){
+    errno = EILSEQ;
+    return -1;
+  }
+  uint16_t c2 = *str++;
+  if(c2 < 0xDC00 || c2 > 0xDFF){
+    errno = EILSEQ;
+    return -1;
+  }
+  //Each of these is a 10 bit integer
+  int32_t high = c - 0xD800;
+  int32_t low = c2 - 0xDC00;
+  //now we need to put them together into a 20 bit integer
+  int32_t ret = (high << 10) | low;
+  return ret + 0x10000;
+}
+//utf16_char_str utf16_encode_str(uint32_t c){
+//  if(c >
 #if 0
 utf8_str_iter* make_string_iter(sl_string *str){
   utf8_str_iter *iter = malloc(sizeof(utf8_str_iter));
@@ -432,5 +380,6 @@ int32_t string_iter_prev_n(utf8_str_iter *iter, unsigned int num_chars){
   //I think this should work, but I might be off by an iteration
   return retval;
 }
+#endif
 }//namespace util
 #endif

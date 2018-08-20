@@ -1,10 +1,12 @@
 #ifndef __TEMPLATES_H__
 #define __TEMPLATES_H__
 #include <type_traits>
+#include <map>
 //Macros, most notably  macros for defining templates to test for the existance
 //of a member function/variable.
 #include "macros.h"
 namespace util {
+inline //on a seperate line to avoid confusing emacs
 namespace templates {
 
 /*
@@ -24,6 +26,14 @@ using iter_traits_iterator_category =
   typename std::iterator_traits<It>::iterator_category;
 template <class It>
 using iter_traits_category = iter_traits_iterator_category<It>;
+
+
+template <class It>
+struct is_input_iterator :
+    std::is_base_of<std::input_iterator_tag,
+                    iter_traits_iterator_category<It>> {};
+template <class It>
+inline constexpr bool is_input_iterator_v = is_input_iterator<It>::value;
 
 template <class It>
 struct is_forward_iterator :
@@ -45,7 +55,6 @@ struct is_random_access_iterator :
                     iter_traits_iterator_category<It>> {};
 template <class It>
 inline constexpr bool is_random_access_iterator_v = is_random_access_iterator<It>::value;
-
 /*
   Functions for mapping over stl containers.
 */
@@ -444,109 +453,35 @@ const V& find_or_default(const MapType &map,
   auto it = map.find(key);
   return (it == map.end() ? deflt : it->second);
 }
-template<typename K, typename V>
-auto hash_find_or_null(const std::unordered_map<K,V> &hash, const K &key){
-  auto it = hash.find(key);
-  return (it == hash.end() ? nullptr : &(it->second));
+//Searches an ordered container of type 'OrderedType' for an element
+//which compares equal to K. It returns a pair of a boolean and an iterator,
+//the boolean is true if an element was found and false otherwise. The
+//iterator points to the location of the first item not less than the
+//given value. Equivlent to:
+//std::make_pair(C.count(val)>0, C.lower_bound(val))
+template <typename OrderedType, typename K>
+decltype(auto) find_item_location(const OrderedType &C, const K& val){
+  auto [nlt,gt] = C.equal_range(val);
+  return std::make_pair(nlt != gt, nlt);
 }
-template<typename K, typename V>
-auto hash_find_or_null(std::unordered_map<K,V> &hash, const K &key){
-  auto it = hash.find(key);
-  return (it == hash.end() ? nullptr : &(it->second));
+//Depreciated aliases of the above template functions, I didn't use to
+//have the container type as a template paramter so I had seperate
+//versions for different types
+template<typename MapType, typename K, typename V>
+auto hash_find_or_null(MapType &hash, const K &key){
+  return find_or_null(hash, key);
 }
-template<typename K, typename V>
-V hash_find_or_default(const std::unordered_map<K,V> &hash,
+template<typename MapType, typename K, typename V>
+V hash_find_or_default(MapType &hash,
                        const K &key, const V deflt){
-  auto it = hash.find(key);
-  return (V)(it == hash.end() ? deflt : it->second);
+  return find_or_default(hash, key, deflt);
 }
-//I need to make seperate templates for a multimap since
-//you can't partially specialize function templates.
-template<typename K, typename V>
-auto hash_find_or_null(const std::unordered_multimap<K,V> &hash, const K &key){
-  auto it = hash.find(key);
-  return (it == hash.end() ? nullptr : &(it->second));
-}
-template<typename K, typename V>
-auto hash_find_or_null(std::unordered_multimap<K,V> &hash, const K &key){
-  auto it = hash.find(key);
-  return (it == hash.end() ? nullptr : &(it->second));
-}
-template<typename K, typename V>
-V hash_find_or_default(const std::unordered_multimap<K,V> &hash,
-                       const K &key, const V deflt){
-  auto it = hash.find(key);
-  return (V)(it == hash.end() ? deflt : it->second);
-}
-template<typename K, typename V>
-V* map_find_or_null(std::map<K,V> m, const K &key){
-  auto it = m.find(key);
-  if(it == m.end()){
-    return nullptr;
-  } else {
-    return &(it->second);
-  }
-}
-/*
-  Searches the map for a element with the given key returns
-  a pair of an iterator an a boolean, if the boolean is true
-  the iterator pointes to the element with the given key, if
-  it is false it points to the first element with a key greater
-  that the given key, such that when passed to emplace_hint it will
-  result in amortized constant time insertion.
-*/
-template<typename K, typename V>
-std::pair<typename std::map<K,V>::iterator, bool>
-map_find_location(const std::map<K,V> &m, const K& key){
-  auto it = m.begin();
-  auto cmp = m.key_comp();
-  while(it != m.end()){
-    if(!cmp(it->first, key)){//element is not less than key
-      if(!cmp(key, it->first)){
-        return {it, true};//we found the element
-      } else {
-        return {it, false};
-      }
-    }
-  }
-  return {it, false};//element is greater than all elements in the map
+template<typename OrderedType, typename K>
+decltype(auto)
+map_find_location(const OrderedType& m, const K& key){
+  return find_item_location(m,key);
 }
 
-/*
-  Returns a pair of bucket iterators, the first points to the
-  first instance of key, the second is the end iterator of the bucket.
-*/
-template<typename K, typename V>
-decltype(auto) //since the return type is a mess
-unordered_multimap_find_first(std::unordered_multimap<K,V> &ht, const K& key){
-  auto idx = ht.bucket(key);
-  auto start = ht.begin(idx);
-  auto stop = ht.end(idx);
-  auto cmp = ht.key_eq();
-  while(!cmp(start->first, key) && start != stop){
-    ++start;
-  }
-  return std::make_pair(start,stop);
-}
-/*
-  Returns the equivlent of:
-  std::make_pair(ht.equal_range(key).first, ht.count(key));
-  without having to iterate across the range multiple times.
-*/
-template<typename K, typename V>
-decltype(auto)
-unordered_multimap_equal_range_count(std::unordered_multimap<K,V> &ht, const K& key){
-  auto [start, stop] = unordered_multimap_find_first(ht, key);
-  decltype(ht.count(key)) count = 0;
-  auto cmp = ht.key_eq();
-  if(start != stop){
-    auto next = start;
-    do {
-      ++count;
-    } while(++next != stop && cmp(key, next->first));
-  }
-  return std::make_pair(start, count);
-}
 /*
   An allocator using malloc.
 */
@@ -652,12 +587,12 @@ T* typed_calloc(size_t sz, size_t nmemb){
 //Templates to simplify placement new & related functions
 template<class T, class... Ts>
 T* placement_new(void *mem, Ts&&... Args){
-  return new(mem) T(std::forward<Ts>(Args)...);
+  return ::new(mem) T(std::forward<Ts>(Args)...);
 }
 template<class T, class... Ts>
 T* reconstruct(T& obj, Ts&&... Args){
   obj.~T();
-  return new(&obj) T(std::forward<Ts>(Args)...);
+  return ::new((void*)&obj) T(std::forward<Ts>(Args)...);
 }
 
 // template <typename T>
@@ -774,9 +709,12 @@ template<typename T, typename U,
 const U convert(const T arg){
   return static_cast<U>(arg);
 }
-template<typename T, typename U, typename V>
-std::function<T(V,U)> flip(const std::function<T(U,V)> &fn){
-  return [&fn](V arg1, U arg2){return fn(arg2, arg1);};
+//Bit of a cumbersome defination, but it avoids having to declare
+//std::function.
+template<template <typename> typename fn_type,
+         typename T, typename U, typename V>
+fn_type<T(V,U)> flip(const fn_type<T(U,V)> &fn){
+  return fn_type<T(V,U)>([&fn](V arg1, U arg2){return fn(arg2, arg1);});
 }
 /*
 namespace util {
@@ -857,7 +795,7 @@ struct value_iter {
     ++it;
     return *this;
   }
-  value_iter& operator++(int){//post increment
+  value_iter operator++(int){//post increment
     value_iter ret = value_iter(it);
     ++it;
     return ret;
@@ -1201,11 +1139,87 @@ constexpr details::return_type<D, Types...> make_array(Types&&... t) {
   return {std::forward<Types>(t)... };
 }
 }
-using namespace util::templates;
+//This used to be in a seperate header, but its simple and useful
+//enough to be put here, it's just the util namespace since
+//I don't want it pulled in when using namespace util::templates.
+
+//Range class, structurally it's just a pair of iterators, but thank's
+//to c++17's template class deduction rules any object which can be
+//passed to std::begin and std::end can be implicitly converted to a range.
+template <class It>
+struct range {
+  //type aliases for templates.
+  using value_type = iter_traits_value_type<It>;
+  using iter_type = It;
+  It start;
+  It stop;
+  range(It start, It stop)
+    : start{start}, stop{stop} {};
+  range(std::pair<It,It> start_stop)
+    : start{start_stop.first}, stop{start_stop.second} {};
+  template<typename T>
+  range(const T& container)
+    : range(std::begin(container), std::end(container)) {};
+
+  It begin(){ return start; }
+  const It begin() const {return const_cast<const It>(start); }
+
+  It end(){ return stop; }
+  const It end() const {return const_cast<const It>(stop); }
+};
+//template deduction rule for ranges from containers.
+template <typename T>
+range(const T& container) ->
+  range<decltype(std::begin(container))>;
+//Range wrappers around std algorithms.
+template<class Range, class T = typename Range::value_type>
+auto find(const Range r, const T& what) {
+  return std::find(r.begin(), r.end(), what);
+}
+template<class Range, class T = typename Range::value_type>
+T find_default(const Range r, const T& value,
+               const T& deflt = T()){
+  auto it = std::find(r.begin(), r.end(), value);
+  if(it == r.end()){
+    return deflt;
+  } else {
+    return (*it);
+  }
+}
+template<class Range, class Generator,
+         std::enable_if_t<
+           std::is_invocable_r_v<Range::value_type,
+                                 Generator>, int> = 0>
+void generate(Range r, const Generator &gen){
+  std::generate(r.begin(), r.end(), gen);
+}
+template<class Range, class Fn,
+         std::enable_if_t<
+           std::is_invocable_r_v<Range::value_type,
+                                 Fn, Range::value_type>, int> = 0>
+void fmap(const Fn &f, Range r){
+  std::transform(r.begin(), r.end(), r.begin(), f);
+}
+template<class Range, class Fn,
+         std::enable_if_t<
+           std::is_invocable_r_v<Range::value_type,
+                                 Fn, Range::value_type>, int> = 0>
+void fmap(const Fn &f, const Range in, Range out){
+  std::transform(in.begin(), in.end(), out.begin(), f);
+}
+template<class Range, class Fn, class OutputIt>
+void fmap(const Fn &f, const Range in, OutputIt out){
+  std::transform(in.begin(), in.end(), out, f);
+}
+template<class Range, class Fn, class U = typename Range::value_type,
+         std::enable_if_t<std::is_invocable_r_v<U, Fn, Range::value_type>, int> = 0>
+U reduce(const Fn &f, const Range in){
+  return std::transform(in.begin(0, in.end(), f));
+}
 }//namespace util
 //originally all the above functions were in the global namespace,
 //and I'm fine with them staying there, it's just useful to have them
-//in a namespace as well. In generally 'using namespace XXX' is not a good idea.
+//in a namespace as well. In general 'using namespace XXX' is not a good idea.
 using namespace util::templates;
 
 #endif /* __TEMPLATES_H__ */

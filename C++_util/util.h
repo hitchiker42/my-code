@@ -23,9 +23,11 @@
 
 #include "macros.h"
 #include "templates.h"
-#include "range.h"
 #include "my_array.h"
 #include "svector.h"
+//TODO: This header shouldn't have this much code in it, move the
+//      code to other headers, this should mostly just include
+//      other headers.
 using namespace std::literals::string_view_literals;
 using namespace std::literals::string_literals;
 namespace util {
@@ -117,6 +119,8 @@ template <typename T>
 int compare(const T& lhs, const T& rhs){
   return three_way_compare(lhs, rhs);
 }
+//some templates that rely on other class definations
+namespace templates {
 //std::unordered map extended with overloads to operator()
 //to lookup values and return either a pointer or default value.
 template<typename K, typename V,
@@ -142,7 +146,44 @@ struct unordered_map : std::unordered_map<K,V,Hash,KeyEq,Allocator> {
     }
   }
 };
-
+#if 0
+/*
+  Returns a pair of bucket iterators, the first points to the
+  first instance of key, the second is the end iterator of the bucket.
+*/
+template<typename K, typename V>
+decltype(auto) //since the return type is a mess
+unordered_multimap_find_first(std::unordered_multimap<K,V> &ht, const K& key){
+  auto idx = ht.bucket(key);
+  auto start = ht.begin(idx);
+  auto stop = ht.end(idx);
+  auto cmp = ht.key_eq();
+  while(!cmp(start->first, key) && start != stop){
+    ++start;
+  }
+  return std::make_pair(start,stop);
+}
+/*
+  Returns the equivlent of:
+  std::make_pair(ht.equal_range(key).first, ht.count(key));
+  without having to iterate across the range multiple times.
+*/
+template<typename K, typename V>
+decltype(auto)
+unordered_multimap_equal_range_count(std::unordered_multimap<K,V> &ht, const K& key){
+  auto [start, stop] = unordered_multimap_find_first(ht, key);
+  decltype(ht.count(key)) count = 0;
+  auto cmp = ht.key_eq();
+  if(start != stop){
+    auto next = start;
+    do {
+      ++count;
+    } while(++next != stop && cmp(key, next->first));
+  }
+  return std::make_pair(start, count);
+}
+#endif
+} // namespace templates
 } // namespace util
 //Functions to make working with tagged pointers eaiser,
 //test if ptr is a tagged pointer, by default checks any of the bits
@@ -277,6 +318,7 @@ static inline char* strchrnul(const char *str, int c){
 }
 #endif
 
+#if 0
 //Convert a number into a string stored in a static buffer. This is
 //only meant to be used in cases where the result is immediately copied,
 //eg. by appending it to another string.
@@ -306,6 +348,7 @@ struct bitset_32 {
     return (bits & (1 << i));
   }
 };
+#endif
 /*
   In case you need a custom hash function.
 */

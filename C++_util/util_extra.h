@@ -7,7 +7,6 @@
 #include "string_buf.h"
 #include "my_array.h"
 #include "svector.h"
-#include "range.h"
 #include "regex.h"
 #include "text.h"
 #endif /* __UTIL_EXTRA_H__ */
