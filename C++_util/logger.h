@@ -34,39 +34,65 @@ static constexpr std::array<std::string_view, 9> log_level_names = {{
 //Core logger struct, uses integer log levels & logs to a single FILE*,
 //provides support for using an enumeration for log levels via templated wrappers,
 //the above log_level enum is provided as a convenient default.
+//It also supports using flags to govern logging instead of levels.
 struct logger {
   FILE* out = nullptr;
-  int log_level_max;
+  union {
+    int log_level;
+    int log_flags;
+  };
+  //If true logging is governed by independent flags rather than levels.
+  //this should probably be the default, since it's much more flexible
+  bool use_flags = false;
   //If logging to a file change to line buffering so tail -f can be used.
-  logger(const char *outfile, int max_level, bool append = false)
-    : out{fopen(outfile, (append ? "a" : "w"))}, log_level_max{max_level} {
+  logger(const char *outfile, int level, 
+         bool use_flags = false, bool append = false)
+    : out{fopen(outfile, (append ? "a" : "w"))}, 
+      log_level{level}, use_flags{use_flags}{
       setlinebuf(out);
     }
-  logger(FILE *out, int max_level)
-    : out{out}, log_level_max{max_level} {
+  logger(FILE *out, int level, bool use_flags = false)
+    : out{out}, log_level{level}, use_flags{use_flags} {
       setlinebuf(out);
     }
-  logger(int max_level)
-    : out{stderr}, log_level_max{max_level} {}
+  logger(int level, bool use_flags = false)
+    : out{stderr}, log_level{level}, use_flags{use_flags} {}
   template<typename T,
            std::enable_if_t<std::is_enum_v<T>, int> = 0>
-  logger(const char *outfile, T max_level, bool append = false)
+  logger(const char *outfile, T level, 
+         bool use_flags = false, bool append = false)
     : out{fopen(outfile, (append ? "a" : "w"))},
-      log_level_max{to_underlying(max_level)} {}
+      log_level{to_underlying(level)}, use_flags{use_flags} {}
   template<typename T,
            std::enable_if_t<std::is_enum_v<T>, int> = 0>
-  logger(FILE *out, T max_level)
-    : out{out}, log_level_max{to_underlying(max_level)} {}
+  logger(FILE *out, T level, bool use_flags = false)
+    : out{out}, log_level{to_underlying(level)}, use_flags{use_flags} {}
   template<typename T,
            std::enable_if_t<std::is_enum_v<T>, int> = 0>
-  logger(T max_level)
-    : out{stderr}, log_level_max{to_underlying(max_level)} {}
+  logger(T level, bool use_flags = false)
+    : out{stderr}, log_level{to_underlying(level)}, use_flags{use_flags} {}
 
   ~logger(){
     //If we're logging to stdout/stderr don't close them when we go out of scope.
     if(out != stdout && out == stderr){
       fclose(out);
     }
+  }
+  void add_flag(int flag){
+    log_flags |= flag;
+  }
+  template<typename T,
+           std::enable_if_t<std::is_enum_v<T>, int> = 0>
+  void add_flag(T flag){
+    log_flags |= to_underlying(flag);
+  }
+  void clear_flag(int flag){
+    log_flags &= ~flag;
+  }
+  template<typename T,
+           std::enable_if_t<std::is_enum_v<T>, int> = 0>
+  void add_flag(T flag){
+    log_flags &= ~to_underlying(flag);
   }
   operator bool(){
     return out;
@@ -81,9 +107,21 @@ struct logger {
       return false;
     }
   }
+  bool should_log(int test){
+    if(use_flags){
+      return log_flags & test;
+    } else {
+      return test <= log_level;
+    }
+  }
+  template<typename T,
+           std::enable_if_t<std::is_enum_v<T>, int> = 0>
+  bool should_log(T test){
+    return should_log(to_underlying(test));
+  }
   //Log pthe msg exactly as is
   void log(int level, std::string_view msg){
-    if(level <= log_level_max){
+    if(should_log(level)){
       fwrite(msg.data(), msg.size(), 1, out);
     }
   }
@@ -94,7 +132,7 @@ struct logger {
   }
   //log the msg and append a newline if it doesn't already end with one.
   void print(int level, std::string_view msg){
-    if(level <= log_level_max){
+    if(should_log(level)){
       fwrite(msg.data(), msg.size(), 1, out);
       ensure_newline(msg);
     }
@@ -106,7 +144,7 @@ struct logger {
   }
   template<typename ... Ts>
   void printf(int level, const char *fmt, const Ts&... args){
-    if(level <= log_level_max){
+    if(should_log(level)){
       fprintf(out, fmt, args...);
       //if fmt ends in %c or %s its possible we already output a newline,
       //but there's no easy way to check that.
@@ -126,7 +164,7 @@ struct logger {
 #if (defined USE_FMT)
   template<typename ... Ts>
   void format(int level, std::string_view fmt, const Ts&... args){
-    if(level <= log_level_max){
+    if(should_log(level)){
       fmt::print(out, fmt, args...);
       ensure_newline(fmt);
     }
