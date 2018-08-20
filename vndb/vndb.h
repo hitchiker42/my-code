@@ -94,9 +94,9 @@ static constexpr const char* vndb_port_number = "19534";
 static constexpr const char* vndb_tls_port_number = "19535";
 static constexpr const char* vndb_hostname = "api.vndb.org";
 //default name for the database file
-static constexpr const char* default_db_file = "vn.db";
+static constexpr const char* default_db_file = "data/vn.db";
 //file of sql code used to initialize the database tables.
-static constexpr const char* db_init_file = "database_init.sql";
+static constexpr const char* db_init_file = "database_schema.sql";
 //TODO: try and merge this with vndb_main::table_type somehow.
 namespace vndb {
 //Possible targets of the get command
@@ -218,6 +218,10 @@ struct vndb_main {
   //may never use.
   std::array<sqlite3_stmt_wrapper, num_primary_tables> get_by_id_stmts = {{}};
   std::array<sqlite3_stmt_wrapper, num_tables_total> insert_stmts = {{}};
+  //These get passed to the gui thread where they are used to get image data and
+  //vn/character names from ids.
+  sqlite3_stmt_wrapper select_vn_image_stmt;
+  sqlite3_stmt_wrapper select_character_image_stmt;
   //holds variables for the interactive front end. The key type is util::string_view
   //so it can own memory but also avoid having to allocate memory just for
   //a look up (like you would for a std::string). This makes inserting elements

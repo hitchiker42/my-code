@@ -7,3 +7,4 @@ TAGS
 # logs and backups
 *.log
 *.bkup
+data/

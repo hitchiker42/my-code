@@ -7,8 +7,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <semaphore.h>
-#include <pthread.h>
+#include "sqlite3.h"
 extern SDL_EventType jpeg_event_type;//needs to be set using SDL_RegisterEvents
 //indicates if the sdl thread is running, mostly used to check if
 //initialization was successful.
@@ -26,7 +25,7 @@ struct sdl_context {
   SDL_Window *hack; 
   //Semaphore for synchronization (Passed to the initialization function)
   SDL_sem *sem;
-  //store an event just to make it eaiser to break event
+p  //store an event just to make it eaiser to break event
   //handling into seperate functions
   SDL_Event evt;
 //  I don't really have a use for this, but if I ever need to check if
@@ -37,17 +36,34 @@ struct sdl_context {
   int img_width;
   int img_height;
 };
-static inline void init_jpeg_user_event(SDL_Event *evt, const void *data, size_t sz){
-  memset(evt, 0, sizeof(SDL_Event));
-  evt->type = jpeg_event_type;
-  evt->user.data1 = (void*)data;
-  evt->user.data2 = (void*)sz;
-}
 void destroy_sdl_context(struct sdl_context *ctx);
 struct sdl_context* create_sdl_context(SDL_sem *sem);
 int sdl_main_loop(void *sem);
 SDL_sem* launch_sdl_thread();
 #ifdef __cplusplus
+}
+/*
+  In the SDL_UserEvent struct we get a 32 bit integer and 2 void pointers to store data.
+  We need more than this to store all the data we need, but we can use it to store 
+  what we need to generate that information. We store a sqlite3_stmt* in one of the pointers
+  and either a single id in the second or a pointer to an array of ids. We use the
+  integer to store the length of this array or 0 if it is just an integer.
+*/
+inline void init_jpeg_user_event(SDL_Event *evt, sqlite3_stmt* stmt,
+                                        int id){
+  memset(evt, 0, sizeof(SDL_Event));
+  evt->type = jpeg_event_type;
+  evt->user.data1 = (void*)stmt;
+  evt->user.data2 = (void*)id;
+  evt->user.code = 0;
+}
+inline void init_jpeg_user_event(SDL_Event *evt, sqlite3_stmt* stmt,
+                                 int* ids, int num_ids){
+  memset(evt, 0, sizeof(SDL_Event));
+  evt->type = jpeg_event_type;
+  evt->user.data1 = (void*)stmt;
+  evt->user.data2 = (void*)ids;
+  evt->user.code = num_ids;
 }
 #endif
 #endif /* __GUI_H__ */

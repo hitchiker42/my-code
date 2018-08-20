@@ -63,7 +63,7 @@ bool vndb_main::init_get_id_stmts(){
       return false;
     }
     this->get_by_id_stmts[to_underlying(types[i])].stmt = ptr;
-  }
+  }  
   this->get_by_id_stmts_initialized = true;
   return true;
 }
