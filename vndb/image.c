@@ -82,8 +82,16 @@ void jpeg_mem_src(j_decompress_ptr cinfo, const unsigned char *inbuffer,
   src->next_input_byte = (const JOCTET *)inbuffer;
 }
 #endif
+#if (defined JCS_ALPHA_EXTENSIONS)
+static const int max_color_space = 16;
+#elif (defined JCS_EXTENSIONS)
+static const int max_color_space = 11;
+#else
+static const int max_color_space = 5;
+#endif
 int decompress_jpeg(uint8_t *src, size_t src_sz,
-                    struct decompressed_image *dst){
+                    struct decompressed_image *dst,
+                    J_COLOR_SPACE color_space){
   struct jpeg_decompress_struct cinfo;
   struct my_error_mgr jerr;
   cinfo.err = jpeg_std_error(&jerr.err_mgr);
@@ -104,32 +112,22 @@ int decompress_jpeg(uint8_t *src, size_t src_sz,
   //  fprintf(stderr,"Read jpeg header: %dx%d, %d components, colorspace %d.\n",
   //               cinfo.image_width, cinfo.image_height, cinfo.num_components,
   //               cinfo.jpeg_color_space);
-  //Code taken from SDL_IMG
-  if(cinfo.num_components == 4) {
-    /* Set 32-bit Raw output */
-    cinfo.out_color_space = JCS_CMYK;
-    cinfo.quantize_colors = FALSE; //FALSE is defined by jpeglib.h
-    jpeg_calc_output_dimensions(&cinfo);
-    dst->img = malloc(cinfo.output_width * cinfo.output_height * 4);
 
-  } else if(cinfo.num_components > 1){
-    /* Set 24-bit RGB output */
-    cinfo.out_color_space = JCS_RGB;
-    cinfo.quantize_colors = FALSE;
-    jpeg_calc_output_dimensions(&cinfo);
-    dst->img = malloc(cinfo.output_width * cinfo.output_height * 3);
-  } else {
-    cinfo.out_color_space = JCS_GRAYSCALE;
-    cinfo.quantize_colors = FALSE;
-    jpeg_calc_output_dimensions(&cinfo);
-    dst->img = malloc(cinfo.output_width * cinfo.output_height);
-  }
 //  fprintf(stderr,"Set out color space to %d (%d components).\n",
 //          cinfo.out_color_space, cinfo.out_color_components);
+  cinfo.quantize_colors = FALSE;
+  //By default libjpeg will set out_color_space to match the input.
+  if(color_space != JCS_UNKNOWN && color_space <= max_color_space){
+    cinfo.out_color_space = color_space;
+  }
+//  cinfo.scale_num = 2;
+//  cinfo.scale_denom = 1;
+  jpeg_calc_output_dimensions(&cinfo);
+  dst->num_components = cinfo.output_components;
+  dst->color_space = cinfo.out_color_space;
   dst->width = cinfo.output_width;
   dst->height = cinfo.output_height;
-  dst->num_components = cinfo.num_components;
-  dst->color_space = cinfo.out_color_space;
+  dst->img = malloc(dst->width * dst->height * dst->num_components);
 
   jpeg_start_decompress(&cinfo);
 
@@ -143,4 +141,74 @@ int decompress_jpeg(uint8_t *src, size_t src_sz,
   jpeg_destroy_decompress(&cinfo);
 
   return 0;
+}
+//Mostly just copied from the above function, if I add another function
+//I'll abstract away the common stuff.
+SDL_Texture* decompress_jpeg_to_texture(SDL_Renderer *renderer,
+                                        uint8_t *src, size_t src_sz,
+                                        int use_alpha){
+#ifndef JCS_ALPHA_EXTENSIONS
+  if(use_alpha){ return NULL; }
+#endif
+  struct jpeg_decompress_struct cinfo;
+  struct my_error_mgr jerr;
+  SDL_Texture *tex = NULL;
+  cinfo.err = jpeg_std_error(&jerr.err_mgr);
+  jerr.err_mgr.error_exit = my_error_exit;
+  jerr.err_mgr.output_message = my_output_message;
+
+  if(setjmp(jerr.dest) != 0){
+    //int ret = jerr.err_mgr.msg_code;
+    jpeg_destroy_decompress(&cinfo);
+    SDL_DestroyTexture(tex);
+    return NULL;
+  }
+
+  jpeg_create_decompress(&cinfo);
+  jpeg_mem_src(&cinfo, src, src_sz);
+  jpeg_read_header(&cinfo, TRUE);
+  //  fprintf(stderr,"Read jpeg header: %dx%d, %d components, colorspace %d.\n",
+  //               cinfo.image_width, cinfo.image_height, cinfo.num_components,
+  //               cinfo.jpeg_color_space);
+
+//  fprintf(stderr,"Set out color space to %d (%d components).\n",
+//          cinfo.out_color_space, cinfo.out_color_components);
+  cinfo.quantize_colors = FALSE;
+#ifdef JCS_ALPHA_EXTENSIONS
+  cinfo.out_color_space = (use_alpha ? JCS_EXT_ARGB : JCS_EXT_RGB);
+#else
+  cinfo.out_color_space = JCS_RGB;
+#endif
+  cinfo.scale_num = 2;
+  cinfo.scale_denom = 1;
+  jpeg_calc_output_dimensions(&cinfo);
+  tex = SDL_CreateTexture(renderer,
+                                       (use_alpha ? SDL_PIXELFORMAT_ARGB8888 :
+                                        SDL_PIXELFORMAT_RGB888),
+                                       SDL_TEXTUREACCESS_STREAMING,
+                                       cinfo.output_width, 
+                                       cinfo.output_height);
+  int err = 0;
+  void *pixels;
+  int stride;
+  if(tex){
+    err = SDL_LockTexture(tex, NULL, &pixels, &stride);
+  }
+  if(!tex || err){
+    SDL_DestroyTexture(tex);
+    jpeg_destroy_decompress(&cinfo);
+    return NULL;
+  }
+  jpeg_start_decompress(&cinfo);
+
+  JSAMPROW rowptr[1];
+  while(cinfo.output_scanline < cinfo.output_height){
+    rowptr[0] = (JSAMPROW) pixels +
+      (cinfo.output_scanline * cinfo.output_width * cinfo.num_components);
+    jpeg_read_scanlines(&cinfo, rowptr, 1);
+  }
+  jpeg_finish_decompress(&cinfo);
+  jpeg_destroy_decompress(&cinfo);
+  SDL_UnlockTexture(tex);
+  return tex;
 }

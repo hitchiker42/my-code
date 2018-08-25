@@ -50,6 +50,11 @@ inline constexpr bool is_utf8_lead_char(uint8_t c){
 inline constexpr bool is_utf8_cont_char(uint8_t c){
   return ((c & 0xC0) == 0x80);
 }
+/*
+  A lot of these functions could probably be made constexpr,
+  but doing so would likely require some changes and I 
+  don't really see an advantage to making them constexpr.
+*/
 //decode a character from str, returns -1 on error,
 //the number of bytes consumed is utf8_char_size(*str).
 inline int32_t utf8_decode_char(const uint8_t *str);
@@ -127,7 +132,7 @@ inline size_t utf8_encode_char(int32_t c, char *buf){
 //the maximum length of a utf8 character is 6 bytes + 1 for the null terminator
 //and we round up to 8 since it's going to take that much space anyway.
 inline std::array<char,utf8_max_char_size> utf8_encode_char(int32_t c){
-  std::array<char,utf8_max_char_size> ret = {0};
+  std::array<char,utf8_max_char_size> ret = {{0}};
   utf8_encode_char(c, ret.data());
   return ret;
 }
@@ -264,6 +269,63 @@ inline size_t utf8_encode_char(int32_t c, uint8_t *buf){
   }
   return utf8_encode_char_unchecked(c, buf);
 }
+//Count the number of characters in a utf8 string, doesn't check
+//that the string is valid utf8, just counts utf8 lead characters.
+inline constexpr size_t utf8_strlen(const uint8_t *str, size_t nbytes){
+  size_t len = 0;
+  for(size_t idx = 0; idx < nbytes; idx++){
+    len += is_utf8_lead_char(str[idx]);
+  }
+  return len;
+}
+inline constexpr size_t utf8_strlen(const uint8_t *str){
+  size_t len = 0;
+  while(*str != '\0'){
+    len += is_utf8_lead_char(*str++);
+  }
+  return len;
+}
+inline constexpr size_t utf8_strlen(std::string_view sv){
+  return utf8_strlen((const uint8_t*)sv.data(), sv.size());
+}
+inline constexpr size_t utf8_strlen(const char* str, size_t nbytes){
+  return utf8_strlen((const uint8_t*)str, nbytes);
+}
+inline constexpr size_t utf8_strlen(const char* str){
+  return utf8_strlen((const uint8_t*)str);
+}
+//Validate a utf8 string and return its length in characters, return
+//(size_t)-1 if it is invalid utf8.
+inline constexpr size_t utf8_strlen_validate(const uint8_t *str, size_t nbytes){
+  size_t len = 0;
+  size_t idx = 0;
+  while(idx < nbytes){
+    int cnt = utf8_char_size(str[idx++]);
+    if(cnt <= 0){ return -1; }
+    while(--cnt){
+      if(idx >= nbytes ||
+         !is_utf8_cont_char(str[idx++])){
+        return -1;
+      }
+    }
+    len++;
+  }
+  return len;
+}
+inline constexpr size_t utf8_strlen_validate(const uint8_t *str){
+  size_t len = 0;
+  while(*str != '\0'){
+    int cnt = utf8_char_size(*str++);
+    while(--cnt){
+      //Will catch null since it's not a cont_char.
+      if(!is_utf8_cont_char(*str++)){
+        return -1;
+      }
+    }
+    len++;
+  }
+  return len;
+}
 //utf16 is awful, but we're kinda stuck with it (mostly due to windows),
 //so I have minimal utf16 conversion functions.
 /*
@@ -284,7 +346,7 @@ inline constexpr int utf16_char_size(uint16_t c){
   return ((c <= 0xd7ff || c >= 0xe000) ? 1 : 2);
 }
 //decode a character from a native endian utf16 byte stream.
-inline int32_t utf16_decode_char(const uint16_t *str){
+inline constexpr int32_t utf16_decode_char(const uint16_t *str){
   if(!str){
     errno = EINVAL;
     return -1;

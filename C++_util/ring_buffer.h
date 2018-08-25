@@ -21,7 +21,7 @@ struct ring_buffer {
   typedef const value_type*                       const_pointer;
   typedef value_type&                             reference;
   typedef const value_type&                       const_reference;
-  ptypedef std::size_t                             size_type;
+  typedef std::size_t                             size_type;
   typedef std::ptrdiff_t                          difference_type;
   typedef std::reverse_iterator<iterator>	  reverse_iterator;
   typedef std::reverse_iterator<const_iterator>   const_reverse_iterator;
@@ -45,13 +45,17 @@ struct ring_buffer {
   
   size_type oldest;//index of oldest element
   size_type newest;//index of to newest element.
-  size_type len;//number of elements, computable from start, cur and sz,
+  size_type len;//number of elements, computable from oldest, newest and sz,
                 //but the math is eaiser if we keep a copy of it.
 #if 0 
   //this iterator iterates from the oldest element to the newest.
   struct iterator {
-    ring_buffer *buf;
-    size_type idx;
+    const ring_buffer *buf;
+    size_type idx = -1;
+    iterator(const ring_buffer* rb, size_type idx = -1)
+      : buf{rb}, idx{idx} {}
+    iterator(const ring_buffer& rb, size_type idx = -1)
+      : buf{&rb}, idx{idx} {}
     //The end iterator is represented by an index of -1, it represents
     //the point inbetween the beginning and the end of the buffer, so
     //incrementing it gives you the begin iterator.
@@ -76,6 +80,7 @@ struct ring_buffer {
       }
       return (*this);
     } 
+    
   };
   size_type get_insertion_index(){
     if(len == 0){
@@ -119,6 +124,11 @@ struct ring_buffer {
     destruct(newest);
     newest = prev_index(newest, sz);
   }
-  
+  //Indexing is a bit weird, the way I'm doing it is that 0 is the
+  //oldest element and len-1 is the newest.
+  T& operator[](size_t idx){
+    idx += len;
+    
+}
   
 #endif /* __RING_BUFFER_H__ */

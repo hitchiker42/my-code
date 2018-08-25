@@ -1,7 +1,7 @@
 #ifndef __TEMPLATES_H__
 #define __TEMPLATES_H__
 #include <type_traits>
-#include <map>
+#include <algorithm> 
 //Macros, most notably  macros for defining templates to test for the existance
 //of a member function/variable.
 #include "macros.h"
@@ -571,9 +571,6 @@ struct raw_calloc_allocator : calloc_allocator<T> {
     return;
   }
 };
-template <typename T,
-          std::enable_if_t<std::is_pod_v<T>, int> = 0>
-using raw_vector = std::vector<T, raw_malloc_allocator<T>>;
 
 template <typename T>
 T* typed_malloc(size_t sz){
@@ -594,7 +591,12 @@ T* reconstruct(T& obj, Ts&&... Args){
   obj.~T();
   return ::new((void*)&obj) T(std::forward<Ts>(Args)...);
 }
-
+template<class T>
+void destroy_if_non_null(T* ptr){
+  if(ptr){
+    ptr->~T();
+  }
+}
 // template <typename T>
 // svector<T> vector_iota(T start, T stop, T step = T(1)){
 //   T range = stop - start;

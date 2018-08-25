@@ -1,6 +1,12 @@
 #include "gui.h"
 #include "image.h"
 #include <stdarg.h>
+#ifndef MIN
+#define MIN(a,b) (a < b ? a : b)
+#endif
+#ifndef MAX
+#define MAX(a,b) (a > b ? a : b)
+#endif
 //defined in vndb.cpp, returns the file pointer for the current log file,
 //to allow for rudimentary logging in C.
 FILE* get_vndb_log_file_pointer();
@@ -76,7 +82,7 @@ struct sdl_context* create_sdl_context(SDL_sem *sem){
   //Create a texture that's larger than we need since we can re-size the window,
   //but we can't resize a texture (though we could just create another one).
   ret->texture = SDL_CreateTexture(ret->renderer,
-                                   SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING,
+                                   SDL_PIXELFORMAT_ARGB32, SDL_TEXTUREACCESS_STREAMING,
                                    dm.w, dm.h);
   if(!ret->texture){ goto error; }
 //  ret->hack = SDL_CreateWindow("hack",SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -90,17 +96,26 @@ struct sdl_context* create_sdl_context(SDL_sem *sem){
   destroy_sdl_context(ret);
   return NULL;
 }
+//find the largest value 'scale' of 'step' less than 'limit' such that
+//src_width*scale <= dest_width*scale && src_height*scale <= dest_height*scale
+//If no nonzero value fits these constraints then step is returned.
+double compute_scale_factor(double src_width, double src_height,
+                            double dest_width, double dest_height,
+                            double limit, double step){
+  double width_scale = dest_width / src_width;
+  double height_scale = dest_height / src_height;
+  double exact_scale = 
+    MAX(MIN(MIN(width_scale, height_scale), limit), step);
+  double scale = round(exact_scale / step) * step;
+  return scale;
+}
+
 //Create an SDL_Rect to use for rendering the given src rectangle as large
 //a possible within height x width and without changing its aspect ratio.
-static SDL_Rect create_dest_rect(SDL_Rect src, int width, int height){
-  double scale = 1;
-  //limit to 8x, just to prevent issues with really small images
-  //or really just as a sanity check to avoid an infinite loop.
-  while((scale <= 7) &&
-        ((src.w * (scale+0.25)) < width) &&
-        ((src.h * (scale+0.25)) < height)){
-    scale+=0.25;
-  }
+SDL_Rect create_dest_rect(SDL_Rect src, int width, int height){
+
+  double scale = compute_scale_factor(src.w, src.h,
+                                      width, height, 10.0, 0.125);
   SDL_Rect dst = src;
   dst.w *= scale;
   dst.h *= scale;
@@ -148,14 +163,14 @@ static int render_jpeg(struct sdl_context *ctx){
   //semaphore in the sdl_context argument to indicate when we're done with it.
   uint8_t *jpeg = (uint8_t*)ctx->evt.user.data1;
   size_t jpeg_sz = (uintptr_t)ctx->evt.user.data2;
-  int err = decompress_jpeg(jpeg, jpeg_sz, &img);
+  int err = decompress_jpeg(jpeg, jpeg_sz, &img, JCS_EXT_ARGB);
 //  ctx->err = err;
   SDL_SemPost(ctx->sem);//Needs to be called even if we fail at decoding.
   if(err != 0){
     fprintf(stderr, "Error decoding jpeg.\n");
     return -1;
   }
-  if(img.color_space != JCS_RGB){
+  if(img.color_space != JCS_EXT_ARGB){
     fprintf(stderr, "Don't know how to handle non RGB jpeg.\n");
     return -1;
   }
@@ -228,7 +243,7 @@ int sdl_main_loop(void *data){
   SDL_SemPost(sem);
   if(!ctx){
     return 0;
-  } 
+  }
   SDL_EventState(SDL_MOUSEMOTION, SDL_DISABLE);
   while(1){
     //  while(SDL_WaitEvent(evt)){
@@ -248,6 +263,8 @@ int sdl_main_loop(void *data){
           //just redraw the image.
         case SDL_WINDOWEVENT:
           if(evt->window.event == SDL_WINDOWEVENT_CLOSE){
+            //When the last window is closed SDL automatically sends
+            //an SDL_QUIT event, this gets rid of that.
             SDL_FlushEvent(SDL_QUIT);
             do_hide_window(ctx);
           } else {

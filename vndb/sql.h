@@ -28,13 +28,13 @@ static constexpr std::string_view sql_select_trait_by_id =
 //they are more useful, and can be used the same was as the simple 
 //versions if needed.
 static constexpr std::string_view sql_select_vn_image_by_id =
-  "select vn_images.image, VNs.title from 
-     VNs join vn_images on VNs.id == vn_images.vn where VNs.id == @id;"sv;
+  R"EOF(select vn_images.image, VNs.title from 
+     VNs join vn_images on VNs.id == vn_images.vn where VNs.id == @id;)EOF"sv;
 static constexpr std::string_view sql_select_character_image_by_id =
-  "select character_images.image, characters.name from 
+  R"EOF(select character_images.image, characters.name from 
      characters join character_images on 
-       character.id == character_images.character
-     where character.id == @id;"sv;
+       characters.id == character_images.character
+     where characters.id == @id;)EOF"sv;
 /*
   Select statements using derived tables
 */

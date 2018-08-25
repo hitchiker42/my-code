@@ -25,7 +25,7 @@ struct sdl_context {
   SDL_Window *hack; 
   //Semaphore for synchronization (Passed to the initialization function)
   SDL_sem *sem;
-p  //store an event just to make it eaiser to break event
+  //store an event just to make it eaiser to break event
   //handling into seperate functions
   SDL_Event evt;
 //  I don't really have a use for this, but if I ever need to check if
@@ -49,12 +49,12 @@ SDL_sem* launch_sdl_thread();
   and either a single id in the second or a pointer to an array of ids. We use the
   integer to store the length of this array or 0 if it is just an integer.
 */
-inline void init_jpeg_user_event(SDL_Event *evt, sqlite3_stmt* stmt,
-                                        int id){
+inline void init_jpeg_user_event(SDL_Event *evt, 
+                                 const void *data, uintptr_t size){
   memset(evt, 0, sizeof(SDL_Event));
   evt->type = jpeg_event_type;
-  evt->user.data1 = (void*)stmt;
-  evt->user.data2 = (void*)id;
+  evt->user.data1 = (void*)data;
+  evt->user.data2 = (void*)size;
   evt->user.code = 0;
 }
 inline void init_jpeg_user_event(SDL_Event *evt, sqlite3_stmt* stmt,

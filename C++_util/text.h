@@ -26,7 +26,7 @@ inline std::string_view trim(const std::string_view sv,
 inline std::vector<std::string_view> split(const std::string_view sv,
                                            const std::string_view filter = whitespace_sv){
   std::vector<std::string_view> ret;
-  size_t l = sv.find_first_of(filter);
+  size_t l = sv.find_first_not_of(filter);
   while(l != (size_t)-1){
     size_t r = std::min(sv.find_first_of(filter, l), sv.size());
     size_t len = r-l;

@@ -3,21 +3,24 @@
 //SDL_sem* launch_sdl_thread();
 #include "vndb.h"
 #include "image.h"
+#include "font.h"
 SDL_EventType my_event_type;
 std::unique_ptr<util::logger> vndb_log;
+std::unique_ptr<ft_library_wrapper> ft_lib_ptr;
+static constexpr const char *sans_font_path = "data/NotoSansJP.otf";
 const char* get_event_type(SDL_Event *evt);
-static const int default_window_width = 640;
-static const int default_window_height = 480;
+static constexpr int default_window_width = 640;
+static constexpr int default_window_height = 480;
 struct sdl_context {
   SDL_Window *window;
   SDL_Renderer *renderer;
-  SDL_Texture *texture;
+  SDL_Texture *img_texture;
+  SDL_Texture *saved_texture;
+  SDL_Texture *text_texture;
   //store an event just to make it eaiser to break event
   //handling into seperate functions
   SDL_Event evt;
-//  I don't really have a use for this, but if I ever need to check if
-//  I failed at rendering a jpeg I can uncomment this.
-//  int err;
+  ft_face_wrapper *font;
   //Width and height of last image drawn, we need to save these so we can
   //redraw the image if the window is moved/resized/etc..
   int img_width;
@@ -27,7 +30,9 @@ void destroy_sdl_context(struct sdl_context *ctx){
   if(!ctx){ return; }
   SDL_DestroyWindow(ctx->window);
   SDL_DestroyRenderer(ctx->renderer);
-  SDL_DestroyTexture(ctx->texture);
+  SDL_DestroyTexture(ctx->img_texture);
+  SDL_DestroyTexture(ctx->saved_texture);
+  ft_face_wrapper::destroy_free(ctx->font);
   free(ctx);
 }
 struct sdl_context* create_sdl_context(){
@@ -57,26 +62,44 @@ struct sdl_context* create_sdl_context(){
   SDL_SetRenderDrawColor(ret->renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
   //Create a texture that's larger than we need since we can re-size the window,
   //but we can't resize a texture (though we could just create another one).
-  ret->texture = SDL_CreateTexture(ret->renderer,
-                                   SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING,
-                                   dm.w, dm.h);
-  if(!ret->texture){ goto error; }
+  ret->img_texture = SDL_CreateTexture(ret->renderer,
+                                       SDL_PIXELFORMAT_ARGB8888,
+                                       SDL_TEXTUREACCESS_STREAMING,
+                                       dm.w, dm.h);
+  if(!ret->img_texture){ goto error; }
+  ret->saved_texture = SDL_CreateTexture(ret->renderer,
+                                         SDL_PIXELFORMAT_ARGB8888,
+                                         SDL_TEXTUREACCESS_TARGET,
+                                         dm.w, dm.h);
+  if(!ret->saved_texture){ goto error; }
+  ret->font = ft_face_wrapper::init_create(ft_lib_ptr,
+                                           sans_font_path, 16);
+  if(!ret->font){ goto error; }
   return ret;
  error:
   destroy_sdl_context(ret);
   return NULL;
 }
+double compute_scale_factor(int src_width, int src_height,
+                            int dest_width, int dest_height,
+                            double limit = 10.0,
+                            double scale_step = 0.25){
+  double width_scale = ((double)src_width) / dest_width;
+  double height_scale = ((double)src_height) / dest_height;
+  double exact_scale = std::min(std::min(width_scale, height_scale), limit);
+  double scale = floor(exact_scale);
+  while((scale + scale_step) < exact_scale){
+    scale += exact_scale;
+  }
+  return scale;
+}
+  
 //Create an SDL_Rect to use for rendering the given src rectangle as large
 //a possible within height x width and without changing its aspect ratio.
 SDL_Rect create_dest_rect(SDL_Rect src, int width, int height){
-  double scale = 1; 
-  //limit to 8x, just to prevent issues with really small images
-  //or really just as a sanity check to avoid an infinite loop.
-  while((scale <= 7) &&
-        ((src.w * (scale+0.25)) < width) &&
-        ((src.h * (scale+0.25)) < height)){
-    scale+=0.25;
-  }
+
+  double scale = compute_scale_factor(src.w, src.h,
+                                      width, height);
   SDL_Rect dst = src;
   dst.w *= scale;
   dst.h *= scale;
@@ -96,8 +119,8 @@ SDL_Rect create_src_rect(struct sdl_context *ctx){
   I could probably just use a static texture & SDL_UpdateTexture, But
   I've already written the code to do things the fast way.
 */
-//Draw the image currently stored in ctx->texture to the screen.
 int render_texture(struct sdl_context *ctx){
+  SDL_SetRenderTarget(ctx->renderer, nullptr);
   SDL_RenderClear(ctx->renderer);
   SDL_Rect src_rect = create_src_rect(ctx);
   int width, height;
@@ -106,7 +129,8 @@ int render_texture(struct sdl_context *ctx){
     return -1;
   }
   SDL_Rect dst_rect = create_dest_rect(src_rect, width, height);
-  if(SDL_RenderCopy(ctx->renderer, ctx->texture, &src_rect, &dst_rect) != 0){
+  if(SDL_RenderCopy(ctx->renderer, ctx->saved_texture,
+                    &src_rect, &dst_rect) != 0){
     fprintf(stderr, "Error copying texture to renderer.\n");
     return -1;
   }
@@ -117,8 +141,7 @@ int render_texture(struct sdl_context *ctx){
 //likely change this at some point.
 int render_jpeg(struct sdl_context *ctx){
   //Clear the screen first so that we can see if we fail to render the image.
-  SDL_RenderClear(ctx->renderer);
-
+  //SDL_RenderClear(ctx->renderer);
   struct decompressed_image img;
   //We're `borrowing` the jpeg data from another thread, and we use the
   //semaphore in the sdl_context argument to indicate when we're done with it.
@@ -145,7 +168,7 @@ int render_jpeg(struct sdl_context *ctx){
   unsigned char *pixels;
   //it's weird that char* implictly converts to void* but char** has to be
   //explicitly cast to void**.
-  if(SDL_LockTexture(ctx->texture, &img_rect, (void**)&pixels, &stride) != 0){
+  if(SDL_LockTexture(ctx->img_texture, &img_rect, (void**)&pixels, &stride) != 0){
     fprintf(stderr, "Error locking texture.\n");
     return -1;
   }
@@ -153,7 +176,7 @@ int render_jpeg(struct sdl_context *ctx){
   for(size_t i = 0; i < img.height; i++){
     memcpy(pixels + i*stride, img.img + (i * row_bytes), row_bytes);
   }
-  SDL_UnlockTexture(ctx->texture);
+  SDL_UnlockTexture(ctx->img_texture);
   return render_texture(ctx);
 }
 int render_random_colors(struct sdl_context *ctx){
@@ -260,14 +283,6 @@ int event_loop(vndb_main *vndb, struct sdl_context *ctx,
   destroy_sdl_context(ctx);
   return 0;
 }
-int thread_main(void* data){
-  SDL_Delay(1000);
-  SDL_Event evt;
-  memset(&evt, '\0', sizeof(SDL_Event));
-  evt.type = my_event_type;
-  SDL_PushEvent(&evt);
-  return 0;
-}
 int main(int argc, char *const argv[]){
   if(argc < 2){
     printf("%s id ids...\n", argv[0]);
@@ -275,11 +290,14 @@ int main(int argc, char *const argv[]){
   }
   //rename old log file, we only do this if not logging to stderr to avoid
   //removing an old log file unnecessarily.
-  rename(default_log_file, default_log_file_bkup);
-  vndb_log = std::make_unique<util::logger>(default_log_file, util::log_level::debug);
+  rename("sdl_test.log", "sdl_test.log.bkup");
+  vndb_log = std::make_unique<util::logger>("sdl_test.log",
+                                            util::log_level::debug);
   if(!vndb_log->out){
-    fprintf(stderr, "Failed to open log file \"%s\".\n", default_log_file);
+    fprintf(stderr, "Failed to open log file \"%s\".\n", "sdl_test.log");
   }
+  ft_lib_ptr = std::make_unique<ft_library_wrapper>();
+
   vndb_main vndb(default_db_file);
   if(!vndb.init_all()){
     exit(EXIT_FAILURE);
@@ -288,11 +306,9 @@ int main(int argc, char *const argv[]){
   //start from the last id given since a vector is lifo not fifo.
   for(int i = argc-1; i > 0; i--){
     ids.push_back(strtol(argv[i], nullptr, 0));
-  }  
-  struct sdl_context *ctx = create_sdl_context();  
+  }
+  struct sdl_context *ctx = create_sdl_context();
   my_event_type = (SDL_EventType)SDL_RegisterEvents(1);
-  SDL_Thread *thrd = SDL_CreateThread(thread_main, "sub-thread", nullptr);
-  SDL_DetachThread(thrd);
   return event_loop(&vndb, ctx, ids);
 }
 const char* get_event_type(SDL_Event *evt){
@@ -300,10 +316,10 @@ const char* get_event_type(SDL_Event *evt){
     case SDL_AUDIODEVICEADDED:
     case SDL_AUDIODEVICEREMOVED:
       return "AudioDeviceEvent";
-      
+
     case SDL_CONTROLLERAXISMOTION:
       return "ControllerAxisEvent";
-      
+
     case SDL_CONTROLLERBUTTONDOWN:
     case SDL_CONTROLLERBUTTONUP:
       return "ControllerButtonEvent";

@@ -1,14 +1,15 @@
 DEBUGFLAGS= -DDEBUG -g -Og # -fsanitize=address # Asan is great, but it breaks under gdb
-CPPFLAGS:= $(CPPFLAGS) -I$(PWD)/../C++_util -Wall -Wextra -Wno-unused-function -Wmissing-braces
+CPPFLAGS:= $(CPPFLAGS) -I$(PWD)/../C++_util -I/usr/include/freetype2 -Wall -Wextra -Wno-unused-function -Wmissing-braces
 CXXFLAGS:= $(CXXFLAGS) -std=gnu++17 $(DEBUGFLAGS)  -fno-rtti -fno-exceptions -Wno-class-memaccess
 CXXFLAGS_NDEBUG=-std=gnu++17 -O2 -DNDEBUG -fno-rtti -fno-exceptions -Wno-class-memaccess
-CFLAGS=-std=gnu11 -lm $(DEBUGFLAGS)
+CFLAGS := $(CFLAGS) -std=gnu11 -lm $(DEBUGFLAGS)
 
-LDFLAGS=-lssl -lcrypto -lpcre2-8 -lz -ljpeg -ldl -lSDL2 -lreadline -pthread
+LDFLAGS=-lssl -lcrypto -lpcre2-8 -lz -ljpeg -ldl -lSDL2\
+	-lreadline -pthread -lfreetype
 
 SOURCES=$(wildcard *.cpp) $(wildcard *.h) $(wildcard *.c) json.hpp
 
-PROGRAM_FILES=vndb_cpp
+PROGRAM_FILES=vndb_cpp sdl_test_cpp font_test_cpp
 
 .PHONY: all clean tags
 
@@ -22,6 +23,7 @@ sqlite_wrappers.o : sqlite_wrappers.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
 tag_trait_parser.o: tag_trait_parser.cpp vndb.h json.hpp sql.h sqlite_wrappers.h
 interaction.o: interaction.cpp vndb.h json.hpp gui.h
 misc.o: misc.cpp vndb.h
+font.o: font.cpp font.h
 # C files
 sqlite_ext.o: sqlite_ext.c
 image.o: image.c image.h
@@ -31,8 +33,9 @@ sdl_gui.o: sdl_gui.c gui.h
 # makes more sense to put the dependency here rather than vndb_cpp.
 progress_bar.o: progress_bar.c progress_bar.h
 
-# temporary (hopefull)
+# test files
 sdl_test.o: sdl_test.cpp vndb.h
+font_test.o: font_test.cpp font.h
 # compile c++ to asm
 %.s:%.cpp
 	$(CXX) $(CXXFLAGS_NDEBUG) $(CPPFLAGS) -S $< -o $@
@@ -56,6 +59,8 @@ vndb_cpp: vndb.o connection.o sqlite_wrappers.o interaction.o progress_bar.o mai
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
 sdl_test_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o image.o tag_trait_parser.o sqlite3.o sqlite_ext.o misc.o sdl_test.o
+	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
+font_test_cpp: font_test.o font.o image.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 clean:
 	rm -f *.o $(PROGRAM_FILES) a.out sdl_test_cpp

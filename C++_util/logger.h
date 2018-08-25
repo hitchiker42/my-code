@@ -13,6 +13,7 @@
 //#include "fmt/printf.h"
 #endif
 #include "macros.h"
+using namespace std::literals::string_view_literals;
 namespace util {
 //Names borrowed from linux printk levels
 enum class log_level : int8_t {
@@ -91,7 +92,7 @@ struct logger {
   }
   template<typename T,
            std::enable_if_t<std::is_enum_v<T>, int> = 0>
-  void add_flag(T flag){
+  void clear_flag(T flag){
     log_flags &= ~to_underlying(flag);
   }
   operator bool(){

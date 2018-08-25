@@ -1,3 +1,19 @@
+#include <functional>
+#undef __cplusplus
+extern "C" {
+#include <string.h>
+}
+template<template <typename> typename fn_type,
+         typename T, typename U, typename V>
+fn_type<T(V,U)> flip(const fn_type<T(U,V)> &fn){
+  return fn_type<T(V,U)>([&fn](V arg1, U arg2){return fn(arg2, arg1);});
+}
+int main(){
+  std::function f(strchr);
+  auto g = flip(f);
+  return f("strchr",'c') == g('c',"strchr");
+}
+#if 0
 #include "util_extra.h"
 #include <assert.h>
 void test_text_functions(){
@@ -23,7 +39,6 @@ int main(){
   test_text_functions();
   return 0;
 }
-#if 0
 template<typename T>
 void print_int_container(const T& C){
   for(auto&& x : C){

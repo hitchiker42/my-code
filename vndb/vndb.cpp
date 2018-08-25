@@ -458,7 +458,8 @@ bool vndb_main::update_vn_images(){
   auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
 
   progress_bar pb(db_info["num_vns"].get<int>() - img_count, "VN images");
-  return build_image_table(db, stmt, ins_stmt, &pb);
+  bool ret = build_image_table(db, stmt, ins_stmt, &pb);
+  return ret;
 }
 bool vndb_main::update_character_images(){
   sqlite3_wrapper &db = this->db;

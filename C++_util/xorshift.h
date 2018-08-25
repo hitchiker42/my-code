@@ -77,7 +77,7 @@ static void xoroshiro128_add_jump(xoroshiro128_add_state& state) {
   state[1] = s1;
 }
 struct xorshift1024_star_state {
-  std::array<uint64_t,16> state = {0};
+  std::array<uint64_t,16> state = {{0}};
   int idx = 0;
   uint64_t& operator[](size_t idx){
     return state[idx];

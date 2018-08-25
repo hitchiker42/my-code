@@ -45,8 +45,13 @@ struct FILE_wrapper {
   FILE_wrapper(const char* path, const char* mode) noexcept
     : f{fopen(path, mode)} {};
 
-  FILE_wrapper(std::string_view path, const char* mode) noexcept
-    : f{fopen(path.data(), mode)} {};
+  FILE_wrapper(std::string_view path, const char* mode) noexcept {
+    char buf[PATH_MAX];
+    memcpy(buf, path.data(), path.size());
+    buf[path.size()] = '\0';
+    f = fopen(buf, mode);
+  }
+      
   //Takes ownership of the given FILE pointer.
   explicit FILE_wrapper(FILE *f) noexcept
     : f{f} {};
