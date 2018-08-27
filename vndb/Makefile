@@ -58,7 +58,7 @@ sqlite3.o: sqlite3.c
 vndb_cpp: vndb.o connection.o sqlite_wrappers.o interaction.o progress_bar.o main.o image.o tag_trait_parser.o sqlite3.o sdl_gui.o sqlite_ext.o misc.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
-sdl_test_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o image.o tag_trait_parser.o sqlite3.o sqlite_ext.o misc.o sdl_test.o
+sdl_test_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o image.o tag_trait_parser.o sqlite3.o sqlite_ext.o misc.o sdl_test.o font.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 font_test_cpp: font_test.o font.o image.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^

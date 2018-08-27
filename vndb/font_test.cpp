@@ -1,6 +1,6 @@
-#define __GUI_H__
 #include <SDL2/SDL.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "font.h"
 #include "image.h"
 #include "text.h"
@@ -9,10 +9,10 @@
 #include "hello.h"
 std::unique_ptr<ft_library_wrapper> ft_lib_ptr;
 std::unique_ptr<util::logger> vndb_log;
-static constexpr const char *sans_font_path = "data/NotoSansJP.otf";
+static constexpr const char *sans_font_path = "fonts/NotoSansCJK.ttc";
 static constexpr int default_window_width = 640;
 static constexpr int default_window_height = 480;
-static constexpr int font_pt_size = 24;
+static constexpr int font_pt_size = 12;
 const char* get_event_type(SDL_Event *evt);
 struct sdl_context {
   SDL_Window *window;
@@ -116,8 +116,8 @@ int render_texture(struct sdl_context *ctx){
     return -1;
   }
   SDL_Rect dst_rect = create_dest_rect(src_rect, width, height);
-  fprintf(stderr, "Copying texture of size %dx%d to output of size %dx%d at (%d,%d).\n",
-          src_rect.w, src_rect.h, width, height, dst_rect.x, dst_rect.y);
+//  fprintf(stderr, "Copying texture of size %dx%d to output of size %dx%d at (%d,%d).\n",
+//          src_rect.w, src_rect.h, width, height, dst_rect.x, dst_rect.y);
   if(SDL_RenderCopy(ctx->renderer, ctx->text_texture, &src_rect, &dst_rect)){
     fprintf(stderr, "Error copying texture to renderer.\n");
     return -1;
@@ -184,8 +184,8 @@ static int render_jpeg(struct sdl_context *ctx,
 int event_loop(struct sdl_context *ctx,
                std::string_view text){
   SDL_EventState(SDL_MOUSEMOTION, SDL_DISABLE);
-  std::vector<std::string_view> lines = util::split(text, "\n"sv);
-  size_t line_idx = 0;
+//  std::vector<std::string_view> lines = util::split(text, "\n"sv);
+//  size_t line_idx = 0;
   SDL_Event *evt = &ctx->evt;
   while(SDL_WaitEvent(evt)){
     switch(evt->type){
@@ -197,16 +197,16 @@ int event_loop(struct sdl_context *ctx,
             goto quit;
           case SDLK_SPACE:
           case SDLK_RETURN:{
-            if(line_idx >= lines.size()){
+            if(ctx->text_texture){
               goto quit;
             }
-            std::string_view line = lines[line_idx++];
-            SDL_DestroyTexture(ctx->text_texture);
+//            std::string_view line = lines[line_idx++];
+//            SDL_DestroyTexture(ctx->text_texture);
             //Swap between alpha and non alpha.
 //            if(line_idx & 1){
               ctx->text_texture =
-                ctx->font->render_utf8_text_argb(line, 0xff00ff,
-                                                 ctx->renderer);
+                ctx->font->render_utf8_text_argb_multiline(text, 0xff00ff,
+                                                           ctx->renderer);
 //            } else {
 //              ctx->text_texture =
 //                ctx->font->render_utf8_text_rgb(line,
@@ -219,8 +219,8 @@ int event_loop(struct sdl_context *ctx,
               exit(1);
             }
             render_texture(ctx);            
-            save_texture_bmp(ctx->text_texture, 
-                             line.substr(0, line.find_first_of(' ')));
+//            save_texture_bmp(ctx->text_texture, 
+//                             line.substr(0, line.find_first_of(' ')));
           }
         }
         break;
@@ -240,32 +240,17 @@ int event_loop(struct sdl_context *ctx,
   return 0;
 }
 int main(int argc, char *const argv[]){
-  //rename old log file, we only do this if not logging to stderr to avoid
-  //removing an old log file unnecessarily.
-  //rename("font_test.log", "font_test.log.bkup");
-  vndb_log = std::make_unique<util::logger>(stderr,//"font_test.log",
+  struct stat buf;
+  stat("font_test.log", &buf);
+  if(buf.st_size > 0){
+    rename("font_test.log", "font_test.log.bkup");
+  }
+  vndb_log = std::make_unique<util::logger>("font_test.log",
                                             util::log_level::debug);
   if(!vndb_log->out){
     fprintf(stderr, "Failed to open log file \"%s\".\n", "sdl_test.log");
   }
   ft_lib_ptr = std::make_unique<ft_library_wrapper>();
-  //FILE_wrapper hello_file("hello.txt", "r");
-  //std::string hello_str = hello_file.to_string();
-  //hello_file.close();
   sdl_context *ctx = create_sdl_context();
-  // for(auto c : "Hello, world!"){
-  //   fprintf(stderr, "%c\n", c);
-  //   int err = ctx->font->get_glyph(c);
-  //   if(err){
-  //     fprintf(stderr,"Error %d.\n", err);
-  //     exit(1);
-  //   }
-  //   output_glyph(ctx->font->current);
-  // }
-  // return 0;
-  char buf[PATH_MAX];
-  getcwd(buf, PATH_MAX);
-  strcat(buf, "/tmp");
-  chdir(buf);
   return event_loop(ctx, hello_string_simple);
 }

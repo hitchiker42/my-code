@@ -1,4 +1,5 @@
 #include "font.h"
+#include <assert.h>
 //inline floor/ceil for 26.6 fixed point integers
 static inline int ft_floor_26dot6(long x){
   return x >> 6;
@@ -70,7 +71,7 @@ int ft_face_wrapper::init_ascii_cache(){
   for(size_t i = 0; i < this->ascii_cache_size; i++){
     int err = this->Load_Glyph(i + codepoint_offest, this->ascii_cache + i);
     if(err){
-      fprintf(stderr, "Error loding glyph %c.\n", i + codepoint_offest);
+      fprintf(stderr, "Error loding glyph %c.\n", (int)i + codepoint_offest);
       return err;
     }
   }
@@ -126,12 +127,12 @@ FT_Error ft_face_wrapper::Load_Glyph(ft_face_wrapper *font,
 
 int ft_face_wrapper::size_text(std::string_view text, int *w_ptr, int *h_ptr){
   auto codepoints = util::utf8_string_iter::utf8_iter_range(text);
-  int minx = 0, maxx = 0, miny = 0, maxy = 0;
+  int minx = 0, maxx = 0;
   int prev_index = -1;//index of last codepoint, for kerning.
   int penx = 0;
   cached_glyph *&glyph = this->current;
   //iterate over the codepoints
-  for(auto cp : codepoints){    
+  for(auto cp : codepoints){
     int err = this->get_glyph(cp);
     //fprintf(stderr, "Metrics for codeponit %d:\n", cp);
     //print_glyph_metrics(this->current, stderr);
@@ -139,22 +140,74 @@ int ft_face_wrapper::size_text(std::string_view text, int *w_ptr, int *h_ptr){
     if(prev_index > 0){
       FT_Vector delta;
       FT_Get_Kerning(this->face, prev_index, glyph->index,
-                     ft_kerning_default, &delta);      
+                     ft_kerning_default, &delta);
       penx += ft_round_26dot6(delta.x);
     }
-    //Can this ever be negitive?
+    if(glyph->minx < 0){
+      fprintf(stderr,"Glyph %s(%d) has a minx of %d.\n",
+              util::utf8_encode_char(cp).data(), cp, glyph->minx);
+    }
     minx = std::min(minx, penx + glyph->minx);
     //shouldn't glyph->advance always be > than glyph->maxx?
     maxx = std::max(maxx, penx + std::max(glyph->maxx, glyph->advance));
     penx += glyph->advance;
-    miny = std::min(miny, glyph->miny);
-    maxy = std::max(maxy, glyph->maxy);
     prev_index = glyph->index;
   }
   *w_ptr = (maxx - minx);
-  //SDL_TTF pretty much always sets this to 'this->height' so I'm not
-  //sure if I should too.
   *h_ptr = this->height;
+  return 0;
+}
+//May merge this with the previous function, if/when I start using
+//fast text sizing (i.e just counting chracters and multiplying by
+//the maximum glyph size).
+//Knowing line widths is necessary for centering text.
+int ft_face_wrapper::size_text_multiline(std::string_view text,
+                                         int *w_ptr, int *h_ptr,
+                                         int *line_widths){
+  auto codepoints = util::utf8_string_iter::utf8_iter_range(text);
+  int minx = 0, maxx = 0, maxy = this->height;
+  int prev_index = -1;//index of last codepoint, for kerning.
+  int penx = 0;
+  int num_lines = 0;
+  cached_glyph *&glyph = this->current;
+  //iterate over the codepoints
+  for(auto cp : codepoints){
+    if(cp == '\r'){
+      prev_index = 0;
+      continue;
+    }
+    if(cp == '\n'){
+      prev_index = 0;
+      maxy += this->height;
+      if(++num_lines >= this->max_lines_rendered){
+        //return -1 for now, ultimately we should just return early,
+        //but if we do we need to return the offset into the text.
+        return -1;
+      }
+      *line_widths++ = penx;
+      continue;
+    }
+    int err = this->get_glyph(cp);
+    //fprintf(stderr, "Metrics for codeponit %d:\n", cp);
+    //print_glyph_metrics(this->current, stderr);
+    if(err){ return err; }
+    if(prev_index > 0){
+      FT_Vector delta;
+      FT_Get_Kerning(this->face, prev_index, glyph->index,
+                     ft_kerning_default, &delta);
+      penx += ft_round_26dot6(delta.x);
+    } else {
+      penx = 0;
+    }
+
+    minx = std::min(minx, penx + glyph->minx);
+    //shouldn't glyph->advance always be > than glyph->maxx?
+    maxx = std::max(maxx, penx + std::max(glyph->maxx, glyph->advance));
+    penx += glyph->advance;
+    prev_index = glyph->index;
+  }
+  *w_ptr = maxx - minx;
+  *h_ptr = maxy;
   return 0;
 }
 //A union for an argb tuplet stored in big-endian mode,
@@ -183,13 +236,14 @@ union argb_color {
     uint8_t b;
   };
 };
-SDL_Texture* ft_face_wrapper::render_utf8_text_argb(std::string_view text,
-                                                    int rgb,
-                                                    SDL_Renderer *renderer){
+static inline SDL_Texture*
+size_text_and_init_texture(ft_face_wrapper *font,
+                           std::string_view text,
+                           int &w, int &h,
+                           SDL_Renderer *renderer){
   vndb_log->log_debug("Rendering text: %.*s",
                       (int)text.size(), text.data());
-  int w, h;
-  int err = this->size_text(text, &w, &h);
+  int err = font->size_text(text, &w, &h);
   if(err){
     return nullptr;
   }
@@ -203,14 +257,25 @@ SDL_Texture* ft_face_wrapper::render_utf8_text_argb(std::string_view text,
     return nullptr;
   }
   SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+  return tex;
+}
+SDL_Texture* ft_face_wrapper::render_utf8_text_argb(std::string_view text,
+                                                    int rgb,
+                                                    SDL_Renderer *renderer){
+
+  int w, h;
+  SDL_Texture *tex = size_text_and_init_texture(this, text, w, h, renderer);
+  if(!tex){ return nullptr; }
   argb_color color(rgb, true);
-  fprintf(stderr, "Text color is: a = %02X, r = %02X, g = %02X, b = %02X.\n"
-          "packed = %08X\n", color.a, color.r, color.g, color.b, color.packed);
+  vndb_log->log_debug(
+    "Text color is: a = %02X, r = %02X, g = %02X, b = %02X.\n"
+    "packed = %08X\n", color.a, color.r, color.g, color.b, color.packed);
   void *pixels;
   int stride;
-  err = SDL_LockTexture(tex, nullptr, &pixels, &stride);
+  int err = SDL_LockTexture(tex, nullptr, &pixels, &stride);
   if(err){
     fprintf(stderr, "Error locking texture.\n");
+    //I'd use goto error here, but I can't because C++.
     SDL_DestroyTexture(tex);
     return nullptr;
   }
@@ -221,37 +286,28 @@ SDL_Texture* ft_face_wrapper::render_utf8_text_argb(std::string_view text,
   int prev_index = -1;
   int penx = 0;
   cached_glyph *&glyph = this->current;
+  FT_Vector kerning_delta;
   for(auto cp : codepoints){
     int err = this->get_glyph(cp);
-    if(err){      
+    if(err){
       fprintf(stderr, "Error %d in get_glyph.\n", err);
       goto error;
     }
     if(prev_index > 0){
-      FT_Vector delta;
       FT_Get_Kerning(this->face, prev_index, glyph->index,
-                     ft_kerning_default, &delta);
-      penx += ft_round_26dot6(delta.x);
+                     ft_kerning_default, &kerning_delta);
+      penx += ft_round_26dot6(kerning_delta.x);
     }
     for(unsigned int row = 0; row < glyph->bitmap.rows; row++){
-      int offset = row + glyph->yoffset;
-      //skip empty
-      if(offset < 0 || offset > h){
+      int _offset = row + glyph->yoffset;
+      if(_offset < 0 || _offset > h){
+        fprintf(stderr, "Offset out of range: offest = %d, h = %d.\n",
+                _offset, h);
         continue;
       }
-      //copy each pixel as a single unit, hopefully this won't
-      //come back to bite me in the ass due to enidaness issues.
-      uint32_t *dst =
-        ((uint32_t*)pixels) + ((row + glyph->yoffset) * (stride/4)) + 
-        penx + glyph->minx;
+      size_t offset = ((row + glyph->yoffset) * (stride/4)) + penx + glyph->minx;
+      uint32_t *dst = ((uint32_t*)pixels) + offset;
       uint8_t *src = glyph->bitmap.buffer + (row * glyph->bitmap.pitch);
-      // if(uintptr_t(dst) > uintptr_t(pixels + (w * h * 4))){
-      //   fprintf(stderr, "Bounds error for row %d of codepoint %d.\n",
-      //           row, cp);
-      //   SDL_UnlockTexture(tex);
-      //   SDL_DestroyTexture(tex);
-      //   return nullptr;
-      // }
       for(unsigned int col = 0; col < glyph->bitmap.width; col++){
         color.a = *src++;
         *dst++ = color.packed;
@@ -267,6 +323,120 @@ SDL_Texture* ft_face_wrapper::render_utf8_text_argb(std::string_view text,
   SDL_DestroyTexture(tex);
   return nullptr;
 }
+static inline int center_line(int line_width, int max_width){
+  return (max_width - line_width)/2;
+}
+static inline int right_justify(int line_width, int max_width){
+  return (max_width - line_width);
+}
+static inline SDL_Texture*
+size_text_and_init_texture_multiline(ft_face_wrapper *font,
+                                     std::string_view text,
+                                     int &w, int &h,
+                                     int *line_widths,
+                                     SDL_Renderer *renderer){
+  vndb_log->log_debug("Rendering text: %.*s",
+                      (int)text.size(), text.data());
+  int err = font->size_text_multiline(text, &w, &h, line_widths);
+  if(err){
+    return nullptr;
+  }
+  vndb_log->log_debug("Size of text is %d x %d", w, h);
+  //We use STREAMING rather than STATIC since we need to access the pixels,
+  //directly, not because we expect the texture to change.
+  SDL_Texture* tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB32,
+                                       SDL_TEXTUREACCESS_STREAMING, w, h);
+  if(!tex){
+    fprintf(stderr, "Error creating texture.\n");
+    return nullptr;
+  }
+  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+  return tex;
+}
+SDL_Texture*
+ft_face_wrapper::render_utf8_text_argb_multiline(std::string_view text,
+                                                 int rgb,
+                                                 SDL_Renderer *renderer){
+
+  int w, h;
+  int line_widths[this->max_lines_rendered];
+  SDL_Texture *tex = 
+    size_text_and_init_texture_multiline(this, text, w, h, 
+                                         line_widths, renderer);
+  if(!tex){ return nullptr; }
+  argb_color color(rgb, true);
+  vndb_log->log_debug(
+    "Text color is: a = %02X, r = %02X, g = %02X, b = %02X.\n"
+    "packed = %08X\n", color.a, color.r, color.g, color.b, color.packed);
+  void *pixels;
+  int stride;
+  int err = SDL_LockTexture(tex, nullptr, &pixels, &stride);
+  if(err){
+    fprintf(stderr, "Error locking texture.\n");
+    SDL_DestroyTexture(tex);
+    return nullptr;
+  }
+  //we only need to set the alpha channel to 0, but this is the eaisest way.
+  memset(pixels, '\0', h*stride);
+
+  //auto codepoints = util::utf8_string_iter::utf8_iter_range(text);
+  const uint8_t *text_ptr = (const uint8_t*)text.data();
+  size_t text_size = text.size();
+  size_t text_index = 0;
+  int prev_index = -1;
+  int penx = 0, peny = 0;
+  int line_index = 0;
+  cached_glyph *&glyph = this->current;
+  FT_Vector kerning_delta;
+  //for(auto cp : codepoints){
+  while(text_index < text_size){
+    int32_t cp = util::utf8_next_char(text_ptr, &text_index);
+    if(cp == '\r'){
+      prev_index = -1;
+      --line_index;
+      continue;
+    }
+    if(cp == '\n'){
+      if(prev_index < 0){ ++line_index; } //compensate for extra '\r'
+      prev_index = -1;
+      peny += this->height;
+      continue;
+    }
+    int err = this->get_glyph(cp);
+    if(err){
+      fprintf(stderr, "Error %d in get_glyph.\n", err);
+      goto error;
+    }
+    if(prev_index > 0){
+      FT_Get_Kerning(this->face, prev_index, glyph->index,
+                     ft_kerning_default, &kerning_delta);
+      penx += ft_round_26dot6(kerning_delta.x);
+    } else if(prev_index < 0){
+      penx = center_line(line_widths[line_index++], w);
+    }
+    for(unsigned int row = 0; row < glyph->bitmap.rows; row++){     
+      size_t yoffset = ((row + glyph->yoffset + peny) * (stride/4));
+      uint32_t *dst = ((uint32_t*)pixels) + yoffset + penx + glyph->minx;
+      uint8_t *src = glyph->bitmap.buffer + (row * glyph->bitmap.pitch);
+      for(unsigned int col = 0; col < glyph->bitmap.width; col++){
+        color.a = *src++;
+        *dst++ = color.packed;
+      }
+    }
+    penx += glyph->advance;
+    prev_index = glyph->index;
+  }
+  SDL_UnlockTexture(tex);
+  return tex;
+ error:
+  SDL_UnlockTexture(tex);
+  SDL_DestroyTexture(tex);
+  return nullptr;
+}
+//Create a table of colors where color_table[i] is created
+//as if by alpha blending fg with a = i over bg with a = 0xff.
+//We use this as a color pallette with the greyscale values of
+//the bitmaps as indexes, since textures don't support palletized color.
 static inline void build_blend_table(int fg_rgb, int bg_rgb,
                                      int *table){
   argb_color fg(fg_rgb, true);
@@ -287,26 +457,15 @@ SDL_Texture* ft_face_wrapper::render_utf8_text_rgb(std::string_view text,
                                     int fg, int bg, SDL_Renderer *renderer,
                                     int *w_ptr, int *h_ptr){
   int w, h;
-  int err = this->size_text(text, &w, &h);
-  if(err){
-    return nullptr;
-  }
-  //Create a table of colors where color_table[i] is created
-  //as if by alpha blending fg with a = i over bg with a = 0xff.
-  //We use this as a color pallette with the greyscale values of
-  //the bitmaps as indexes, since textures don't support palletized color.
+  SDL_Texture *tex = size_text_and_init_texture(this, text, w, h, renderer);
+  if(!tex){ return nullptr; }
+
   int color_table[256];
   build_blend_table(fg, bg, color_table);
 
-  SDL_Texture* tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB32,
-                                       SDL_TEXTUREACCESS_STREAMING, w, h);
-  if(!tex){
-    return nullptr;
-  }
-  SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-  uint8_t *pixels;
+  void *pixels;
   int stride;
-  err = SDL_LockTexture(tex, nullptr, (void**)&pixels, &stride);
+  int err = SDL_LockTexture(tex, nullptr, &pixels, &stride);
   if(err){
     SDL_DestroyTexture(tex);
     return nullptr;
@@ -319,27 +478,27 @@ SDL_Texture* ft_face_wrapper::render_utf8_text_rgb(std::string_view text,
   int prev_index = -1;
   int penx = 0;
   cached_glyph *&glyph = this->current;
+  FT_Vector kerning_delta;
   for(auto cp : codepoints){
     int err = this->get_glyph(cp);
     if(err){
-      SDL_UnlockTexture(tex);
-      SDL_DestroyTexture(tex);
-      return nullptr;
+      fprintf(stderr, "Error %d in get_glyph.\n", err);
+      goto error;
     }
     if(prev_index > 0){
-      FT_Vector delta;
       FT_Get_Kerning(this->face, prev_index, glyph->index,
-                     ft_kerning_default, &delta);
-      penx += ft_round_26dot6(delta.x);
+                     ft_kerning_default, &kerning_delta);
+      penx += ft_round_26dot6(kerning_delta.x);
     }
     for(unsigned int row = 0; row < glyph->bitmap.rows; row++){
-      int offset = row + glyph->yoffset;
-      //skip empty
-      if(offset < 0 || offset > h){
+      int _offset = row + glyph->yoffset; //Hopefully to be removed
+      if(_offset < 0 || _offset > h){
+        fprintf(stderr, "Offset out of range: offest = %d, h = %d.\n",
+                _offset, h);
         continue;
       }
-      uint32_t *dst = ((uint32_t*)pixels) +
-        (offset * (stride/4)) + penx + glyph->minx;
+      size_t offset = ((row + glyph->yoffset) * (stride/4)) + penx + glyph->minx;
+      uint32_t *dst = ((uint32_t*)pixels) + offset;
       uint8_t *src = glyph->bitmap.buffer + row * glyph->bitmap.pitch;
       for(unsigned int col = 0; col < glyph->bitmap.width; col++){
         *dst++ = color_table[*src++];
@@ -356,6 +515,10 @@ SDL_Texture* ft_face_wrapper::render_utf8_text_rgb(std::string_view text,
   }
   SDL_UnlockTexture(tex);
   return tex;
+ error:
+  SDL_UnlockTexture(tex);
+  SDL_DestroyTexture(tex);
+  return nullptr;
 }
 
 //It is assumed that pixels is an array of (*w)x(*h) 4 byte argb pixels.

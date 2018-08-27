@@ -76,6 +76,10 @@ struct ft_face_wrapper {
   //thats a prime and ensures equidistribution.
   static constexpr size_t non_ascii_cache_size = 163;
   cached_glyph non_ascii_cache[non_ascii_cache_size] = {};
+  //Maximum number of lines that can be rendered at once, it's completely
+  //arbitrary but allows allocating line widths on the stack.
+  static constexpr size_t max_lines_rendered = 100;
+  
   //A pair of functions for use in a more C-like style.
   static ft_face_wrapper* init_create(FT_Library lib, const char *font_file,
                                       int pt_size, int font_index = 0){
@@ -146,6 +150,8 @@ struct ft_face_wrapper {
   }
   //Compute an upper bound for the bounding box for rendering 'text'
   int size_text(std::string_view text, int *w, int *h);
+  int size_text_multiline(std::string_view text, int *w, int *h,
+                          int *line_widths);
   void size_text_quick(std::string_view text, int *w, int *h){
     int len = util::utf8_strlen(text);
     *w = ((len - 1) * (max_width + max_advance)) + max_width;
@@ -156,12 +162,20 @@ struct ft_face_wrapper {
     size_text(text, &ret.first, &ret.second);
     return ret;
   }
+  std::pair<int,int> size_text_quick(std::string_view text){
+    std::pair<int,int> ret = {-1,-1};
+    size_text_quick(text, &ret.first, &ret.second);
+    return ret;
+  }
   /*
     Sizes the text, creates a bounding box, sets alpha to 0 and rgb to color then
     renders the text setting alpha to the grayscale value of the glyph bithmap.
   */
   SDL_Texture* render_utf8_text_argb(std::string_view text,
                                      int color, SDL_Renderer *renderer);
+  SDL_Texture* render_utf8_text_argb_multiline(std::string_view text,
+                                               int color, 
+                                               SDL_Renderer *renderer);
   /*
     Sizes the text, creates a bounding box, sets the color to bg then
     renders the text setting the pixel to bg+(((fg-bg)*greyscale_value)/255).
@@ -171,6 +185,11 @@ struct ft_face_wrapper {
   SDL_Texture* render_utf8_text_rgb(std::string_view text,
                                     int fg, int bg, SDL_Renderer *renderer,
                                     int *w = nullptr, int *h = nullptr);
+  SDL_Texture* render_utf8_text_rgb_multiline(std::string_view text,
+                                              int fg, int bg, 
+                                              SDL_Renderer *renderer,
+                                              int *w = nullptr, 
+                                              int *h = nullptr);
   /*
     Renders the text into the array 'pixels' which has dimensions
     (*w_ptr)x(*h_ptr) with each entry having num_components bytes.
@@ -188,9 +207,9 @@ struct vndb_font_ctx* vndb_font_ctx_init(const char *sans_path,
                                          const char *serif_path,
                                          const char *mono_path);
 struct vndb_font_ctx {
-  static constexpr const char *sans_font_path = "data/NotoSansJP.otf";
-  static constexpr const char *serif_font_path = "data/NotoSerifJP.otf";
-  static constexpr const char *mono_font_path = "data/NotoSansMonoJP.otf";
+  static constexpr const char *sans_font_path = "fonts/NotoSansCJK.ttc";
+  static constexpr const char *serif_font_path = "fonts/NotoSerifJP.otf";
+  static constexpr const char *mono_font_path = "fonts/NotoSansMonoJP.otf";
   FT_Library lib;
   ft_face_wrapper sans_font;
   ft_face_wrapper serif_font;

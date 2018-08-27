@@ -36,6 +36,11 @@ inline constexpr int utf8_char_size(uint8_t c){
 inline constexpr int utf8_char_size(int c){
   return utf8_char_size_table[c];
 }
+//return the number of bytes needed to encode the codepoint cp using utf8
+inline constexpr int utf8_codepoint_size(int cp){
+    return (cp < 0x80 ? 1 : (cp < 0x800 ? 2 : (cp < 0x10000 ? 3 : 4)));
+}
+
 //returns true if c is an ascii character (i.e c < 128)
 inline constexpr bool utf8_is_ascii(uint8_t c){
   return (c < 0x80);
@@ -103,6 +108,17 @@ inline int32_t utf8_decode_char_backwards(const uint8_t **str){
   if(ret >= 0){
     *str = start;
   }
+  return ret;
+}
+inline int32_t utf8_next_char(const uint8_t *str, size_t *index){
+  int32_t ret =  utf8_decode_char(str + *index);
+  *index += utf8_char_size(*str);
+  return ret;
+}
+inline int32_t utf8_prev_char(const uint8_t *str, size_t *index){
+  const uint8_t *start = utf8_prev_char_start(str);
+  int32_t ret =  utf8_decode_char(start);
+  *index -= utf8_char_size(*start);
   return ret;
 }
 //I think this should work...
