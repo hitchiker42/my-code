@@ -31,6 +31,10 @@
 using namespace std::literals::string_view_literals;
 using namespace std::literals::string_literals;
 namespace util {
+inline constexpr uintptr_t 
+pointer_tag_bitmask = (sizeof(uintptr_t) == 8 ? 0x7 : 0x3);
+inline constexpr uintptr_t 
+tagged_pointer_bitmask = ~pointer_tag_bitmask;
 /*
   Low level bit manipulation, using compiler intrinsics
 */
@@ -186,37 +190,7 @@ unordered_multimap_equal_range_count(std::unordered_multimap<K,V> &ht, const K& 
 } // namespace templates
 } // namespace util
 //Functions to make working with tagged pointers eaiser,
-//test if ptr is a tagged pointer, by default checks any of the bits
-//that would be 0 for a word aligned pointer (i.e last 2 bits for
-//a 32bit machine and last 3 for a 64 bit machine).
-//These could be constexpr, except that you can't use reinterpret cast
-//in constexpr functions.
-inline /*constexpr*/ bool test_ptr_tag(const void *ptr,
-                                       const int bit =
-                                       (sizeof(uintptr_t) == 8 ? 0x7 : 0x3)){
-  return (((uintptr_t)ptr) & bit);
-}
-//Needs to be a template since a paramater of type void*&
-//will only accept actual void*'s
-//could change these into macros to eliminate the templates.
-template<typename T>
-const T*& set_ptr_tag(const T*& ptr, int bit){
-  ptr = (T*)(((uintptr_t)ptr) | bit);
-  return ptr;
-}
-template<typename T>
-const T*& clear_ptr_tag(const T*& ptr, int bit){
-  ptr = (T*)(((uintptr_t)ptr) & ~bit);
-  return ptr;
-}
-template<typename T>
-T get_tagged_ptr(T ptr){
-  if constexpr(sizeof(uintptr_t) == 8){ // 64 bit
-    return (T)((uintptr_t)ptr & ~0x7);
-  } else { // 32 bit
-    return (T)((uintptr_t)ptr & ~0x3);
-  }
-}
+
 static constexpr inline int tolower_ascii(int c){
   return (c > 0x40 && c < 0x5B ? c | 0x20 : c);
 }

@@ -55,6 +55,18 @@ struct is_random_access_iterator :
                     iter_traits_iterator_category<It>> {};
 template <class It>
 inline constexpr bool is_random_access_iterator_v = is_random_access_iterator<It>::value;
+
+/*
+  If T is a pointer type provides the member typedef type T otherwise
+  provides the member typedef type which is std::add_pointer_t<T>.
+*/
+template <typename T>
+struct make_pointer {
+  using type = std::conditional_t<std::is_pointer_v<T>, T, 
+                                  std::add_pointer_t<T>>;
+}
+template <typename t>
+using make_pointer_t = typename make_pointer<T>::type;
 /*
   Functions for mapping over stl containers.
 */
@@ -400,6 +412,50 @@ Os& maybe_stream_out(bool conditional, Os &stream, Args&&... args) {
 template <typename T>
 constexpr auto to_underlying(T e){
   return static_cast<std::underlying_type_t<T>>(e);
+}
+/*
+  templates for working with tagged pointers.
+*/
+//There is no way to legally convert a pointer into an integer in a 
+//constexpr function (you can't use reinterpret_cast in constexpr functions)
+//However using a union to type pun, while technically undefined behavior,
+//works with most compiliers (and is totally legal in C), and actually
+//compiles, unlike trying to use reinterpret cast.
+namespace ptr_tags {
+inline constexpr uintptr_t tag_bitmask = (sizeof(uintptr_t) == 8 ? 0x7 : 0x3);
+union ptr_int {
+  const void* ptr;
+  const uintptr_t as_int;
+  constexpr ptr_int(const void* ptr) : ptr(ptr) {};
+};
+}
+//test if ptr is a tagged pointer, by default checks any of the bits
+//that would be 0 for a word aligned pointer (i.e last 2 bits for
+//a 32bit machine and last 3 for a 64 bit machine).
+inline constexpr bool test_ptr_tag(const void *ptr,
+                                   const int bit = ptr_tags::tag_bitmask){
+  ptr_int::ptr_int tmp(ptr);
+  return (tmp.as_int & bit);
+}
+//Needs to be a template since a paramater of type void*&
+//will only accept actual void*'s
+//could change these into macros to eliminate the templates.
+template<typename T>
+const T*& set_ptr_tag(const T*& ptr, int bit){
+  ptr = (T*)(((uintptr_t)ptr) | bit);
+  return ptr;
+}
+template<typename T,
+         std::enable_if_t<std::is_pointer_v<T>, int> = 0>
+const T*& clear_ptr_tag(const T*& ptr, int bit){
+  ptr = (T*)(((uintptr_t)ptr) & ~bit);
+  return ptr;
+}
+template<typename T,
+         std::enable_if_t<std::is_pointer_v<T>, int> = 0>
+T get_tagged_ptr(T ptr){
+  return reinterpret_cast<T>(reinterpret_cast<uintptr_t>(ptr) & 
+                             ~ptr_tags::tag_bitmask);
 }
 
 
