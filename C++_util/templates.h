@@ -67,6 +67,26 @@ struct make_pointer {
 }
 template <typename t>
 using make_pointer_t = typename make_pointer<T>::type;
+
+template<int N,
+         std::enable_if_t<N <= sizeof(uintmax_t)/CHAR_BIT, int> = 0>
+struct nbyte_int {
+  using signed_type = 
+    std::conditional_t<N <= 1, int8_t,
+      std::conditional_t<N <= 2, int16_t,
+        std::conditional_t<N <= 4, int32_t,
+          std::conditional_t<N <= 8, int64_t, intmax_t>>>>;
+  using unsigned_type = 
+    std::conditional_t<N <= 1, uint8_t,
+      std::conditional_t<N <= 2, uint16_t,
+        std::conditional_t<N <= 4, uint32_t,
+          std::conditional_t<N <= 8, uint64_t, intmax_t>>>>;
+};
+template<int N>
+using nbyte_sint_t = typename nbyte_int<N>::signed_type;
+template<int N>
+using nbyte_uint_t = typename nbyte_int<N>::unsigned_type;
+
 /*
   Functions for mapping over stl containers.
 */
@@ -258,6 +278,10 @@ constexpr std::pair<double,double> quot_rem(double num, double denom){
 template<>
 constexpr std::pair<float,float> quot_rem(float num, float denom){
   return {num / denom, 0.0f};
+}
+template<typename T>
+constexpr T constexpr_abs(T val){
+  return (val > 0 ? val : -val);
 }
 /*
   This is a lot harder that you would think since signed integer

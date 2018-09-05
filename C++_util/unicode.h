@@ -93,7 +93,9 @@ inline int32_t utf8_decode_char(const uint8_t **str){
   return ret;
 }
 //returns a pointer to the start of the previous character,
-//does not check if that character is valid.
+//does not check if that character is valid. 'str' itself
+//is never dereferenced so this is safe to call with a pointer
+//one past the end of a string.
 inline const uint8_t* utf8_prev_char_start(const uint8_t *str){
   do {
     --str;
@@ -403,6 +405,21 @@ inline size_t utf16_encode_char(int32_t c, uint16_t *buf){
     return 2;
   }
 }
+#if 0
+enum class unicode_format {
+  utf8,
+  utf16,
+  utf32
+};
+union unicode_char {
+  int32_t utf32;
+  uint16_t utf16[2];
+  uint8_t utf8[4];
+  unicode_char(int32_t c) : utf32{c} {}
+  unicode_char(uint16_t *c) : utf16{c[0],c[1]} {}
+  unicode_char(uint8_t *c) : utf8{c[0],c[1],c[2],c[3]} {}
+};
+#endif
 //An iterator over the characters stored in a utf8 string stored as a pointer.
 //Acts as a bidirectional c++ iterator.
 //With a bit of work could be adapted to work with a bidirectional iterator instead

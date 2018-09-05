@@ -15,6 +15,12 @@ constexpr void constexpr_fill_n(T *ptr, size_t n, T val){
     ptr[n] = val;
   }
 }
+template<typename T>
+constexpr void constexpr_iota(T *ptr, size_t n, T start, T stop, T step){
+  while(n--){
+    ptr[n] = val;
+  }
+}
 template<typename T, typename U,
          std::enable_if_t<std::is_convertible_v<U,T>,int> = 0>
 constexpr void constexpr_va_init(T* ptr, U val){

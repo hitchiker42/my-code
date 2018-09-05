@@ -63,6 +63,8 @@ static int native_munmap(struct native_mmap_wrapper *mptr){
 
 #define MAP_SHARED    0x01
 #define MAP_PRIVATE   0x02
+#define MAP_TYPE      0x0F
+#define MAP_FIXED     0x10
 #define MAP_ANONYMOUS 0x20
 #define MAP_ANON      MAP_ANONYMOUS
 #define MAP_FAILED    ((void *) -1)
@@ -123,6 +125,9 @@ static bool native_mmap(void *addr, size_t length, int prot, int flags,
   if (prot & ~(PROT_READ | PROT_WRITE | PROT_EXEC)) {
     return false;
   }
+  //-1 is the value used to indiacte an invalid file handle,
+  //There's no particular need to force fd to be -1 when using 
+  //anonymous mmaping, but other implementions require the same thing.
   if (fd == -1) {
     if (!(flags & MAP_ANON) || offset) {
       return MAP_FAILED;
@@ -245,4 +250,5 @@ struct mmap_wrapper {
     }
     native_mmap(nullptr, length, prot, flags, fd, offset, &mapping);
   }
+}
 #endif /* __MMAP_WRAPPER_H__ */
