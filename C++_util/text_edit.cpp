@@ -4,52 +4,52 @@ namespace util {
 //for only backward movement (calling the other function if given a
 //negitive argument). It may be a better idea to just have them both
 //call a seperate function which does all the movement.
-bool piece_table::forward_char(signed_offset N, Point &point){
+bool piece_table::forward_char(Marker *mk, signed_offset_t N) {
   if(N < 0){
-    return this->backward_char(-N, point);
+    return this->backward_char(mk, -N);
   }
   //No need to finish an edit in this case (I think).
-  if(this->at_end_of_text(point)){
+  if(this->at_end_of_text(mk)){
     return false;
   }
   this->maybe_finish_edit();
-  //Move point to the right descriptor
-  while(N >= point.span_end_offset().as_chars){
-    N -= point.span_end_offset().as_chars;
-    if(!this->marker_to_next_desc(point)){
+  //Move mk to the right descriptor
+  while(N >= mk->span_end_offset().as_chars){
+    N -= mk->span_end_offset().as_chars;
+    if(!this->marker_to_next_desc(mk)){
       return false; //At end of text;
     }
   }
-  char *pt = this->get_marker_text(point);
-  char *end = this->get_descriptor_end(point.desc);
+  CharT *pt = this->get_marker_text(mk);
+  CharT *end = this->get_descriptor_end(mk->desc);
   while(N--){ //N could be 0 after prevous loop
     int count = utf8_char_size(*pt);
     //The previous loop should ensure this.
     assert((pt + count) < end);
-    point.update(count);
+    mk->update(count);
   }
   return true;
 }
-bool piece_table::backward_char(signed_offset N, Point &point){
+bool piece_table::backward_char(Marker* mk, signed_offset_t N) {
   if(N < 0){
-    return this->forward_char(-N, point);
+    return this->forward_char(mk, -N);
   }
   //No need to finish an edit in this case (I think).
-  if(this->at_start_of_text(point)){
+  if(this->at_start_of_text(mk)){
     return false;
   }
   this->maybe_finish_edit();
-  //We only use >, not >= to avoid leaving point at the end of a descriptor.
-  while(N > point.span_offset.as_chars){
-    N -= point.span_offset.as_chars;
-    if(!this->marker_to_prev_desc(point)){
+  //We only use >, not >= to avoid leaving mk at the end of a descriptor.
+  while(N > mk->span_offset.as_chars){
+    N -= mk->span_offset.as_chars;
+    if(!this->marker_to_prev_desc(mk)){
       return false; //at start of text
     }
   }
-  char *pt = this->get_marker_text(point);
+  const CharT *pt = this->get_marker_text(mk);
   do {
     pt = utf8_prev_char_start(pt);
-    point.update(-get_utf8_char_size(*pt));
+    mk->update(-utf8_char_size(*pt));
   } while(--N);
   return true;
 }
@@ -59,7 +59,7 @@ void piece_table::split_for_deletion(Marker *pt){
   }
   if(pt->span_offset.zerop()){
     pt->desc = pt->desc->next();
-    pt->span_offset = pt->desc.piece.length;
+    pt->span_offset = pt->desc->len();
     return;
   }
   //It shouldn't be possible for pt to already point past the end
@@ -82,53 +82,59 @@ void piece_table::split_for_insertion(Marker *pt){
   //Split descriptor in two at the begining, leaving 'pt' pointing to an
   //empty descriptor
   this->split_at_marker(pt);
-  assert(pt->desc->piece.length == {0,0});
+  assert(pt->desc->piece.length.zerop());
   pt->desc->piece.start = this->current - this->buf;
   pt->desc->piece.buffer = 0;
   return;
 }
+void piece_table::begin_edit(edit_type type){
+  this->current_edit_type() = type;
+}  
+//   if(type == edit_type::insertion){
+//     }
+// }
 void piece_table::do_insert(const CharT *bytes, offset_t nbytes,
                             offset_t nchars){
   this->maybe_resize(nbytes);
-  if(!this->is_continuous_edit(edit_type::insert)){
+  if(!this->is_continuous_edit(edit_type::insertion)){
     this->maybe_finish_edit();
     this->split_for_insertion();
-    this->current_edit_type = edit_type::insert;
+    this->begin_edit(edit_type::insertion);
   }
-  this->current = mempcpy(this->current, bytes, nbytes);
+  this->current = (CharT*)mempcpy(this->current, bytes, nbytes);
   this->text_length.update(nbytes, nchars);
   this->point.update(nbytes, nchars);
   this->point.desc->piece.update(nbytes, nchars);
-  this->current_edit_length.update(nbytes, nchars);
+  this->current_edit_length().update(nbytes, nchars);
 }
 void piece_table::insert_char(const CharT *utf8_char){
   int count = utf8_char_size(*utf8_char);
   this->do_insert(utf8_char, count, 1);
 }
-void piece_table::insert_string(std::string_view sv, signed_offset nchars){
+void piece_table::insert_string(std::string_view sv, signed_offset_t nchars){
   if(nchars == -1){
     nchars = utf8_strlen(sv);
   }
-  this->do_insert(sv.data(), (offset_t)sv.size(), (offset_t)nchars);
+  this->do_insert((CharT*)sv.data(), (offset_t)sv.size(), (offset_t)nchars);
 }
 static void delete_backwards_simple(piece_table *p, int N){
-  piece_table::CharT *pt = p->get_point_text();
-  piece_table::CharT *start = pt;
-  for(signed_offset i = 0; i < N; i++){
+  const piece_table::CharT *pt = p->get_point_text();
+  const piece_table::CharT *start = pt;
+  for(int i = 0; i < N; i++){
     pt = utf8_prev_char_start(pt);
   }
   int count = start - pt;
   p->point.update(-count, -N);
   p->point.desc->piece.update(-count, -N);
   p->text_length.update(-count, -N);
-  p->current_edit_length.update(count, N);
-  return;  
+  p->current_edit_length().update(count, N);
+  return;
 }
 static void delete_forwards_simple(piece_table *p, int N){
-  piece_table::CharT *pt = p->get_point_text();
-  piece_table::CharT *start = pt;
-  for(signed_offset i = 0; i < N; i++){
-    pt = utf8_next_char(pt);
+  const piece_table::CharT *pt = p->get_point_text();
+  const piece_table::CharT *start = pt;
+  for(int i = 0; i < N; i++){
+    pt = utf8_next_char_start(pt);
   }
   int count = start - pt;
   //deleting forward, point doesn't move
@@ -136,17 +142,17 @@ static void delete_forwards_simple(piece_table *p, int N){
   //We need to move the start of the span forwards
   p->point.desc->piece.start += count;
   p->text_length.update(-count, -N);
-  p->current_edit_length.update(count, N);
-  return;  
+  p->current_edit_length().update(count, N);
+  return;
 }
-void piece_table::delete_char(signed_offset N){
+bool piece_table::delete_char(signed_offset_t N){
   if(N < 0){
     return this->delete_char_backwards(-N);
   }
   if(!this->is_continuous_edit(edit_type::forward_deletion)){
     this->maybe_finish_edit();
     this->split_for_deletion();
-    this->current_edit_type = edit_type::forward_deletion;
+    this->current_edit_type() = edit_type::forward_deletion;
   }
   while(N >= this->point.span_end_offset().as_chars){
     N -= this->point.span_end_offset().as_chars;
@@ -160,14 +166,14 @@ void piece_table::delete_char(signed_offset N){
   }
   return true;
 }
-void piece_table::delete_char_backwards(signed_offset N){
+bool piece_table::delete_char_backwards(signed_offset_t N){
   if(N < 0){
     return this->delete_char(-N);
   }
   if(!this->is_continuous_edit(edit_type::backward_deletion)){
     this->maybe_finish_edit();
     this->split_for_deletion();
-    this->current_edit_type = edit_type::backward_deletion;
+    this->current_edit_type() = edit_type::backward_deletion;
   }
   //Unlike in backward_char we can leave point at the end of a descriptor.
   while(N >= this->point.span_offset.as_chars){
@@ -186,19 +192,40 @@ void piece_table::delete_char_backwards(signed_offset N){
 //The complexity of this comes from creating an Edit structure for supporting
 //undo, since I'm putting that off for now this doesn't really do much yet.
 void piece_table::finish_edit(){
-  edit_type type = this->current_edit_type_unsafe();
-  offset count = abs(this->currently_editing);
+  edit_type type = this->current_edit_type();
+  Offset count = this->current_edit_length();
   //Edit edit;
   //edit.type = type;
   if(type == edit_type::insertion){
     //Nothing for now
-  } else if(type == edit_type::forward_deletion){  
+  } else if(type == edit_type::forward_deletion){
     //Nothing for now
   } else {
     //Point is currently at the end of a dsecriptor, move it to the
     //start of the next so it is ponting to a valid character.
     this->point_to_next_desc();
   }
-  this->current_edit_length.reset();
-  this->current_edit_type = edit_type::none;
+  this->current_edit_length().reset();
+  this->current_edit_type() = edit_type::none;
 }
+static void to_string_unsafe(piece_table *ptab, void *mem){
+  auto desc = ptab->table;
+  while(desc){
+    auto txt = ptab->get_descriptor_text(desc);
+    auto sz = desc->size();
+    mem = mempcpy(mem, txt, sz);
+    desc = desc->next();
+  }
+  *((char*)mem) = '\0';
+}
+size_t piece_table::to_string(CharT **ptr){
+  *ptr = (CharT*)malloc(this->size() + 1);
+  to_string_unsafe(this, *ptr);
+  return this->size();
+}
+std::string piece_table::to_string(){
+  std::string str(this->size() + 1, '\0');
+  to_string_unsafe(this, str.data());
+  return str;
+}
+} //Namespace util

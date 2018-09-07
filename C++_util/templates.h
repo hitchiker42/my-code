@@ -64,8 +64,8 @@ template <typename T>
 struct make_pointer {
   using type = std::conditional_t<std::is_pointer_v<T>, T, 
                                   std::add_pointer_t<T>>;
-}
-template <typename t>
+};
+template <typename T>
 using make_pointer_t = typename make_pointer<T>::type;
 
 template<int N,
@@ -458,7 +458,7 @@ union ptr_int {
 //a 32bit machine and last 3 for a 64 bit machine).
 inline constexpr bool test_ptr_tag(const void *ptr,
                                    const int bit = ptr_tags::tag_bitmask){
-  ptr_int::ptr_int tmp(ptr);
+  ptr_tags::ptr_int tmp(ptr);
   return (tmp.as_int & bit);
 }
 //Needs to be a template since a paramater of type void*&

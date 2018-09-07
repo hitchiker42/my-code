@@ -102,6 +102,11 @@ inline const uint8_t* utf8_prev_char_start(const uint8_t *str){
   } while(is_utf8_cont_char(*str));
   return str;
 }
+//Just for completeness sake
+inline const uint8_t* utf8_next_char_start(const uint8_t *str){
+  str += utf8_char_size(*str);
+  return str;
+}
 //Decodes the character that ends on (*str)-1 and updates
 //str to point to the begining of that character.
 inline int32_t utf8_decode_char_backwards(const uint8_t **str){

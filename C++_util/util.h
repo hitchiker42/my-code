@@ -23,7 +23,7 @@
 
 #include "macros.h"
 #include "templates.h"
-#inlcude "constexpr_fns.h"
+#include "constexpr_fns.h"
 #include "my_array.h"
 #include "svector.h"
 //TODO: This header shouldn't have this much code in it, move the
