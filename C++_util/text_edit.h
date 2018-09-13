@@ -22,8 +22,9 @@ struct piece_table {
   struct Offset;
   using offset_t = uint32_t;
   using signed_offset_t = int64_t;
-  using CharT = unsigned char;  
+  using CharT = unsigned char;
   using codepoint_t = int32_t;
+  using utf8_char_t = uint8_t[4];
   //Holds an offset into utf8 encoded text as both a byte offset and
   //a character offset.
   struct Offset {
@@ -40,7 +41,7 @@ struct piece_table {
     bool zerop() const {
       return (as_bytes == 0 && as_chars == 0);
     }
-    //There really shouldn't be many if 
+    //There really shouldn't be many if
     friend bool operator==(const Offset& lhs, const Offset& rhs){
       return lhs.as_bytes == rhs.as_bytes && lhs.as_chars == rhs.as_chars;
     }
@@ -56,6 +57,11 @@ struct piece_table {
       lhs.as_bytes -= rhs.as_bytes;
       lhs.as_chars -= rhs.as_chars;
       return lhs;
+    }
+    friend Offset operator+(const Offset& lhs, const Offset& rhs){
+      Offset ret = lhs;
+      ret += rhs;
+      return ret;
     }
     friend Offset operator-(const Offset& lhs, const Offset& rhs){
       Offset ret = lhs;
@@ -93,18 +99,10 @@ struct piece_table {
     Span piece;
     Descriptor *prev_ptr = nullptr;
     Descriptor *next_ptr = nullptr;
-    Descriptor* next() const {
-      return next_ptr;
-    }
-    Descriptor* prev() const {
-      return prev_ptr;
-    }
-    Descriptor*& next() {
-      return next_ptr;
-    }
-    Descriptor*& prev() {
-      return prev_ptr;
-    }
+    Descriptor* next() const { return next_ptr; }
+    Descriptor* prev() const { return prev_ptr; }
+    Descriptor*& next() { return next_ptr; }
+    Descriptor*& prev() { return prev_ptr; }
     Offset len() const { return piece.len(); }
     size_t size() const { return piece.size(); }
     void update(int nbytes, int nchars = 1){
@@ -120,8 +118,8 @@ struct piece_table {
   //the end of a descriptor if it is at the end of the text or during an edit.
   struct Marker {
     Descriptor *desc;
-    Offset span_offset;
-    Offset text_offset;
+    Offset span_offset = {0,0};
+    Offset text_offset = {0,0};
     //Just updates the offsets by the given amounts, doesn't check to
     //make sure they are still valid.
     void update(int nbytes, int nchars = 1){
@@ -155,28 +153,38 @@ struct piece_table {
       return lhs.text_offset < rhs.text_offset;
     }
   };
-  enum class edit_type : int8_t {    
+  enum class edit_type : int8_t {
     none = 0,
     backward_deletion = 1,
     insertion = 2,
-    forward_deletion = 3
+    forward_deletion = 3,
+    //Could remove these in favor of just having an undo flag
+    //I should probably do that.
+    backward_deletion_undo = 4,
+    insertion_undo = 5,
+    forward_deletion_undo = 6
   };
+  static constexpr edit_type_is_deletion(edit_type type){
+    return (type == edit_type::backward_deletion ||
+            type == edit_type::forward_deletion); // ||
+    //This is a kind of deletion, but I don't think it should count.
+    //type == edit_type::insertion_undo);
+  }
   //structure representing a modification to the text, used to store undo
   //information. Multiple modifications at the same location are combined
   //into a single edit.
   struct Edit {
-    //The descriptors used by Edits are seperate objects, they are just
-    //used to identify the text of the edit, we still need to manually
-    //find the actual location using the text_offset.
+    //The descriptors used by Edits are seperate from the descriptors used
+    //for the main text, they are just used to identify the text of the edit,
+    //we still need to manually find the actual location using the text_offset.
     Marker location;
     Offset length;
     //Should never be set to edit_type::none
     edit_type type;
-    //If true this is really multiple edits, each a single character
-    //which have been combined for effiency. If false this was really
-    //one edit and should be undone all at once
-    bool charwise;
-    Edit *next;
+    //Pointer to the next edit (the edit before this one chronologically).
+    Edit *next_ptr;
+    Edit* next() const{ return next_ptr; }
+    Edit*& next() { return next_ptr; }
   };
   //Fields
   //The memory for the actual text, new text is inserted at *current.
@@ -215,6 +223,7 @@ struct piece_table {
   bool mark_active = false;
   Descriptor *table = nullptr;
   Descriptor *table_end = nullptr;
+  mutable Descriptor *descriptor_freelist = nullptr;
   //I'd like to implement a history tree, but for now I'm just using
   //a simple undo/redo system. Except I'm not totally sure how
   //I want to implement redo, so its just undo for now.
@@ -230,17 +239,17 @@ struct piece_table {
   }
   piece_table() = default;
   Offset len() const {
-    return this->text_length; 
+    return this->text_length;
   }
   size_t size() const {
-    return this->text_length.as_bytes; 
+    return this->text_length.as_bytes;
   }
   CharT* get_buf() const {
     return buf;
   }
   //Easy way of checking if we have only ascii characters.
   bool unibyte_only() const {
-    return this->text_length.unibyte_only(); 
+    return this->text_length.unibyte_only();
   }
   bool is_mark_active(){
     return mark_active;
@@ -273,31 +282,19 @@ struct piece_table {
     };
     return str;
   }
-  CharT* get_descriptor_text(const Descriptor& desc) const {
-    return get_span_text(desc.piece);
-  }
   CharT* get_descriptor_text(const Descriptor* desc) const {
     return get_span_text(desc->piece);
-  }
-  CharT* get_descriptor_end(const Descriptor& desc) const {
-    return get_span_end(desc.piece);
   }
   CharT* get_descriptor_end(const Descriptor* desc) const {
     return get_span_end(desc->piece);
   }
-  //Should I create functions to get the a pointer to text 
+  //Should I create functions to get the a pointer to text
   //at the end of a marker's descriptor?
-  CharT* get_marker_text(const Marker& pt) const {
-    return get_descriptor_text(pt.desc) + pt.span_offset.as_bytes;
-  }
   CharT* get_marker_text(const Marker* mk) const {
     return get_descriptor_text(mk->desc) + mk->span_offset.as_bytes;
   }
   CharT* get_point_text() const {
-    return get_marker_text(this->point);
-  }
-  codepoint_t get_character_at_marker(const Marker& mk) const {
-    return utf8_decode_char(get_marker_text(mk));
+    return get_marker_text(&this->point);
   }
   codepoint_t get_character_at_marker(const Marker* mk) const {
     return utf8_decode_char(get_marker_text(mk));
@@ -305,17 +302,11 @@ struct piece_table {
   codepoint_t get_character_at_point() const {
     return utf8_decode_char(get_point_text());
   }
-  bool at_end_of_text(const Marker& mk) const {
-    return mk.text_offset == this->text_length;
-  }
   bool at_end_of_text(const Marker* mk) const {
     return mk->text_offset == this->text_length;
   }
   bool at_end_of_text() const {
     return this->point.text_offset == this->text_length;
-  }
-  bool at_start_of_text(const Marker& mk) const {
-    return mk.text_offset.zerop();
   }
   bool at_start_of_text(const Marker* mk) const {
     return mk->text_offset.zerop();
@@ -323,47 +314,109 @@ struct piece_table {
   bool at_start_of_text() const {
     return this->point.text_offset.zerop();
   }
-  //functions to create markers for the start/end iterators.
-  Marker create_marker_at_start_of_text() const {
+  Marker create_marker(Descriptor *desc, Offset span_offset, Offset text_offset) const {
     Marker ret;
-    ret.desc = table;
-    ret.reset();
+    ret.desc = desc;
+    ret.text_offset = text_offset;
+    ret.span_offset = span_offset;
     return ret;
+  }
+  void set_point(Descriptor *desc, Offset span_offset, Offset text_offset){
+    point = create_marker(desc, span_offset, text_offset);
+  }
+  void set_point(Marker mk){
+    point = mk;
+  }
+  //functions to create markers for the start/end iterators.
+  void marker_to_start_of_text(Marker *mk) const {
+    mk->reset();
+    mk->desc = table;
+  }
+  void marker_to_end_of_text(Marker *mk) const {
+    mk->desc = table_end;
+    mk->text_offset = text_length;
+    mk->span_offset = mk->desc->len();
+  }
+  Marker create_marker_at_start_of_text() const {
+    return create_marker(table, {0,0}, {0,0});
   }
   Marker create_marker_at_end_of_text() const {
-    Marker ret;
-    ret.desc = table_end;
-    ret.text_offset = text_length;
-    ret.span_offset = ret.desc->len();
+    return create_marker(table_end,  table_end->len(), text_length);
+  }
+  void point_to_start_of_text() {
+    point = create_marker_at_start_of_text();
+  }
+  void point_to_end_of_text() {
+    point = create_marker_at_end_of_text();
+  }
+  Edit* alloc_edit() const {
+    return (Edit*)calloc(sizeof(Edit), 1);
+  }
+  void free_edit(Edit *edit) const {
+    free(edit);
+  }
+/*
+  Edit* create_edit_at_point(edit_type type){
+    Edit* ret = alloc_edit();
+    ret->location = duplicate_point();
+    ret->type = type;
     return ret;
   }
-  //I may add a freelist or something so I'm putting descriptor allocation
-  //into seperate functions just in case.
-  Descriptor* alloc_descriptor() {
-    return (Descriptor*)calloc(sizeof(Descriptor), 1);
+*/
+  //Create a deep copy of a marker, i.e duplicates the underlying descriptor rather
+  //than just copying a pointer to it.
+  Marker duplicate_marker(const Marker *mk) const {
+    return duplicate_marker(mk, alloc_descriptor());
   }
-  Descriptor* copy_descriptor(Descriptor* desc){
+  //Same as above but uses 'mem' as the memory for the copy of the descriptor.
+  Marker duplicate_marker(const Marker *mk, Descriptor *mem) const {
+    memcpy(mem, mk->desc, sizeof(Descriptor));
+    Marker ret = *mk;
+    ret.desc = mem;
+    return ret;
+  }
+  //Same as above but allocates a new descriptor.
+
+  Marker duplicate_point() const {
+    return duplicate_marker(point);
+  }
+  Marker duplicate_point(Descriptor *new_desc) const {
+    return duplicate_marker(point, new_desc);
+  }
+  Descriptor* alloc_descriptor() const {
+    if(descriptor_freelist){
+      Descriptor *ret = descriptor_freelist;
+      descriptor_freelist = descriptor_freelist->next();
+      return ret;
+    } else {
+      return (Descriptor*)calloc(sizeof(Descriptor), 1);
+    }
+  }
+  Descriptor* copy_descriptor(Descriptor* desc) const {
     Descriptor *new_desc = alloc_descriptor();
     memcpy(new_desc, desc, sizeof(Descriptor));
     return new_desc;
   }
-  void free_descriptor(Descriptor *desc){
-    free(desc);
+  void free_descriptor(Descriptor *desc) const {
+    memset(desc, '\0', sizeof(Descriptor));
+    desc->next() = descriptor_freelist;
+    descriptor_freelist = desc;
+    return;
   }
   //Split a descriptor into two at the given offset. The Given descriptor
   //will point to the first (left) half of the split
   void split_descriptor(Descriptor *desc, Offset where){
     Descriptor *left = desc;
     Descriptor *right = copy_descriptor(left);
-    left->next_ptr = right;
-    right->prev_ptr = left;
+    left->next() = right;
+    right->prev() = left;
     right->piece.start = where.as_bytes;
     right->piece.length = left->piece.length - where;
     left->piece.length = where;
   }
-  //Removes the given descriptor from the list of descriptors 
-  //(and its length from the total length), but otherwise leaves it intact.
-  void unlink_descriptor(Descriptor *desc){
+  //Removes the given descriptor from the list of descriptors,
+  //but otherwise leaves it intact.
+  Descriptor* unlink_descriptor(Descriptor *desc){
     if(desc->prev() == nullptr){
       this->table = desc->next();
     }
@@ -372,13 +425,13 @@ struct piece_table {
       this->table_end = desc->prev();
     }
     desc->next()->prev() = desc->prev();
-    this->text_length -= desc->len();
+    return desc;
   }
   void delete_descriptor(Descriptor *desc){
     unlink_descriptor(desc);
     free_descriptor(desc);
   }
-
+  bool piece_table::delete_descriptor_for_edit();
   //Splits the descriptor 'pt' refers to at the location 'pt' refers to.
   //Doesn't change 'pt' so it is left pointing past the end of the left
   //descriptor.
@@ -388,7 +441,9 @@ struct piece_table {
   void split_at_marker(const Marker* pt){
     split_descriptor(pt->desc, pt->span_offset);
   }
-  //Could be static I suppose
+  //I may write alternate versions of marker_to_next/prev_desc for
+  //the case where we know the marker is at the end/begining of
+  //the current descriptor, for optimization.
   bool marker_to_prev_desc(Marker *pt) const {
     if(pt->desc->prev() == nullptr){
       pt->reset();
@@ -418,22 +473,22 @@ struct piece_table {
   bool point_to_next_desc(){
     return marker_to_next_desc(&point);
   }
-  //Updates descriptors to prepare to delete text located at the given
-  //marker 'pt'. If 'pt' points to the start / end of the text does nothing. If
-  //'pt' points to the begining of a descriptor move 'pt' to the end
-  //of the previous descriptor, othewise the descriptor 'pt' points to
-  //is split in two and 'pt' is left pointing to the end of the first part.
-  void split_for_deletion(Marker *pt);
-  void split_for_deletion(){
-    return split_for_deletion(&this->point);
-  }
-  //Updates descriptors to prepare to insert text at the location indicated
-  //by the given marker 'pt'. If at the end of the text do nothing,
-  //otherwise create a new descriptor at 'pt' and update the
-  //descriptor 'pt' currently points to, potentially splitting it into two.
-  void split_for_insertion(Marker *pt);
-  void split_for_insertion(){
-    return split_for_insertion(&this->point);
+  /*
+    Update descriptors to prepare for an edit of the given type at
+    the location indicated by 'mk'. Returns a boolean indicating if the edit
+    can be performed at the given location. For insertions always returns true,
+    for deletions returns false if at the start/end of text for backward/forward
+    deletions respectively.
+    'mk' is left pointing to the end of a descriptor for backward deletions and
+    insertions (though the descriptor may be empty for insertions) and at
+    the start of a descriptor for forward deletions.
+
+    Writing seperate functions for each type would likely be faster, but unless
+    I need the speedup this is cleaner.
+  */
+  bool split_for_edit(edit_type type, Marker *mk);
+  bool split_for_edit(edit_type type){
+    return split_for_edit(type, &this->point);
   }
   //Enlarges the underlying buffer (or allocates it in the first place)
   void resize(){
@@ -451,7 +506,7 @@ struct piece_table {
       resize();
     }
   }
-  //Functions for moving a marker forward/backward one character, 
+  //Functions for moving a marker forward/backward one character,
   //possibly premature optimization, but useful for iterators.
   bool marker_to_next_char(Marker* mk) const {
     CharT *txt = get_marker_text(mk);
@@ -501,6 +556,18 @@ struct piece_table {
   bool backward_char(signed_offset_t N = 1){
     return backward_char(&this->point, N);
   }
+  //Move the given marker 'mk' to the Nth charcater, if
+  //there are fewer than N charcters return false and 'mk' is unchanged.
+  //May be more efficent than forward/backward char if N is close to point.
+  bool goto_char(Marker *mk, offset_t N);
+  //Move point to the Nth character, just calls forward/backward char so it
+  //may not be the fastest way to get to that character.
+  bool point_to_char(offset_t N){
+    signed_offset_t pt_char = this->point->text_offset.as_chars;
+    signed_offset_t diff = (signed_offset_t)N - pt_char;
+    forward_char(diff);
+  }
+
   //Core insert function, makes sure there is enough space and possibly splits
   //descriptors then inserts the given bytes and performs necessary updates.
   void do_insert(const CharT *bytes, offset_t nbytes, offset_t nchars);
@@ -530,7 +597,7 @@ struct piece_table {
 
 
   //Start making an edit of the given type, allocates a new Edit structure
-  //and saves some necessary information. Should be called after any 
+  //and saves some necessary information. Should be called after any
   //descriptors that need to be split have been.
   void begin_edit(edit_type type);
   //Finish the current edit by modifying any descriptors that need
@@ -542,9 +609,37 @@ struct piece_table {
       finish_edit();
     }
   }
+  //Applies the given edit 'edit' (either redoing or undoing something),
+  //modifies 'edit' so that when applied it will revert the edit we just applied
+  //and returns a pointer to the modified edit structure.
+  //Put simply apply_edit(apply_edit(edit)) will leave the text unchanged.
+  Edit* apply_and_update_edit(Edit *edit);
+  //Same as above but doesn't modify the given edit, instead returns a newly
+  //allocaed edit structure.
+  Edit* apply_and_preserve_edit(const Edit *edit){
+    Edit *new_edit = alloc_edit();
+    memcpy(new_edit, edit, sizeof(Edit));
+    return apply_edit(new_edit);
+  }
+  //Undo the last edit & move it to the redo list
+  //Returns false if there are no edits to undo.
+  bool undo_last_edit(){
+    if(undo_history == nullptr){ return false; }
+    Edit *edit = undo_history;
+    undo_history = edit->next();
 
-  //Undo the last count edits.
-  void do_undo(int count = 1);
+
+  int undo_edit(int count){
+    for(int i = 0; i < count; i++){
+      if(undo_history == nullptr){
+        return i;
+      } else {
+        undo_edit();
+      }
+    }
+    return count;
+  }
+  void redo_edit(int count = 1);
   //Copies the logical text into a newly allocated null terminated string
   //and returns its length.
   size_t to_string(CharT **ptr);
@@ -560,7 +655,7 @@ struct piece_table {
   //An iterator over the characters (codepoints) of the text.
   //Consists of a pointer to the table (so we can access the actual text),
   //a marker (the location) and a cached version of the current character.
-  struct character_iterator {
+  struct codepoint_iterator {
     using pointer =  const codepoint_t*;
     using reference = const codepoint_t&;
     using value_type = codepoint_t;
@@ -572,13 +667,13 @@ struct piece_table {
     Marker mk = {};
     mutable codepoint_t c = 0;
 
-    character_iterator() {}
-    character_iterator(const piece_table* ptab) 
+    codepoint_iterator() {}
+    codepoint_iterator(const piece_table* ptab)
       : ptab{ptab}, mk{ptab->create_marker_at_start_of_text()} {}
-    character_iterator(const piece_table* ptab, Descriptor *desc,
+    codepoint_iterator(const piece_table* ptab, Descriptor *desc,
                        Offset span_offset, Offset text_offset)
       : ptab{ptab}, mk{desc, span_offset, text_offset} {}
-    character_iterator(const piece_table* ptab, Marker m)
+    codepoint_iterator(const piece_table* ptab, Marker m)
       : ptab{ptab}, mk{m} {}
     int32_t get_char() const {
       if(c == 0){
@@ -602,31 +697,31 @@ struct piece_table {
     char32_t operator*() const {
       return get_char();
     }
-    character_iterator& operator++(){//pre-increment
+    codepoint_iterator& operator++(){//pre-increment
       advance();
       return *this;
     }
-    character_iterator operator++(int){//post-increment
+    codepoint_iterator operator++(int){//post-increment
       get_char();//insure char is computed before copying to avoid doing it 2x
       auto ret = *this;
       advance();
       return ret;
     }
-    character_iterator& operator--(){//pre-decrement
+    codepoint_iterator& operator--(){//pre-decrement
       reverse();
       return *this;
     }
-    character_iterator operator--(int){//post-decrement
+    codepoint_iterator operator--(int){//post-decrement
       //Don't call get_char, this could be an end iterator.
       auto ret = *this;
       reverse();
       return ret;
     }
     //Equality needs to be defined so that it ignores the cached character.
-    bool operator==(const character_iterator& rhs) const {
+    bool operator==(const codepoint_iterator& rhs) const {
       return mk == rhs.mk;
     }
-    bool operator!=(const character_iterator& rhs) const {
+    bool operator!=(const codepoint_iterator& rhs) const {
       return !(mk == rhs.mk);
     }
   };
@@ -637,3 +732,82 @@ struct piece_table {
 /* Local Variables: */
 /* mode: c++ */
 /* End: */
+#if 0
+template<bool utf8>
+struct iterator {
+  using value_type = std::conditonal_t<use_utf8, codepoint_t, utf8_char>;
+  using pointer =  const value_type*;
+  using reference = const value_type&;
+  using size_type = offset_t;
+  using difference_type = ptrdiff_t;
+  using iterator_category = std::bidirectional_iterator_tag;
+
+  const piece_table *ptab = nullptr;
+  Marker mk = {};
+  mutable codepoint_t c = 0;
+
+  iterator() {}
+  iterator(const piece_table* ptab)
+    : ptab{ptab}, mk{ptab->create_marker_at_start_of_text()} {}
+  iterator(const piece_table* ptab, Descriptor *desc,
+                     Offset span_offset, Offset text_offset)
+    : ptab{ptab}, mk{desc, span_offset, text_offset} {}
+  iterator(const piece_table* ptab, Marker m)
+    : ptab{ptab}, mk{m} {}
+  int32_t get_codepoint() const {
+    if(c == 0){
+      c = ptab->get_character_at_marker(mk);
+    }
+    return c;
+  }
+  int32_t get_codepoint() const {
+    if(c == 0){
+      c = ptab->get_character_at_marker(mk);
+    }
+    return c;
+  }
+  Marker to_marker(){
+    return mk;
+  }
+  void advance(){
+    ptab->marker_to_next_char(&mk);
+  }
+  void reverse(){
+    ptab->marker_to_next_char(&mk);
+    //Its fine to compute the value here since decrementing the begin iterator
+    //is already undefined behavior.
+    c = ptab->get_character_at_marker(mk);
+  }
+
+  char32_t operator*() const {
+    return get_char();
+  }
+  codepoint_iterator& operator++(){//pre-increment
+    advance();
+    return *this;
+  }
+  codepoint_iterator operator++(int){//post-increment
+    get_char();//insure char is computed before copying to avoid doing it 2x
+    auto ret = *this;
+    advance();
+    return ret;
+  }
+  codepoint_iterator& operator--(){//pre-decrement
+    reverse();
+    return *this;
+  }
+  codepoint_iterator operator--(int){//post-decrement
+    //Don't call get_char, this could be an end iterator.
+    auto ret = *this;
+    reverse();
+    return ret;
+  }
+  //Equality needs to be defined so that it ignores the cached character.
+  bool operator==(const codepoint_iterator& rhs) const {
+    return mk == rhs.mk;
+  }
+  bool operator!=(const codepoint_iterator& rhs) const {
+    return !(mk == rhs.mk);
+  }
+};
+#endif

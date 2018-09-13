@@ -151,18 +151,24 @@ inline size_t utf8_encode_char(int32_t c, uint8_t *buf);
 inline size_t utf8_encode_char(int32_t c, char *buf){
   return utf8_encode_char(c, (uint8_t*)buf);
 }
-//The bytes are returned as a literal array which is null terminated,
-//the maximum length of a utf8 character is 6 bytes + 1 for the null terminator
-//and we round up to 8 since it's going to take that much space anyway.
-inline std::array<char,utf8_max_char_size> utf8_encode_char(int32_t c){
-  std::array<char,utf8_max_char_size> ret = {{0}};
-  utf8_encode_char(c, ret.data());
-  return ret;
+//Simple wrapper around a byte array large enough to hold any utf8 character,
+//with a couple of convience functions.
+struct utf8_char {
+  uint8_t c[utf8_max_char_size];
+  utf8_char(int32_t cp){ utf8_encode_char(cp, c); }
+  utf8_char(uint8_t *s){ memcpy(c, s, utf8_char_size(*s)); }
+  operator uint8_t*(){ return c; }
+  size_t size(){ return utf8_char_size(*c); }
+  int32_t codepoint(){ return utf8_decode_char(c); }
+  uint8_t* data(){ return c; }
+};
+inline utf8_char utf8_encode_char(int32_t c){
+  return utf8_char(c);
 }
 //Same as above but the return value is packed into a 64 bit integer.
 inline int32_t utf8_encode_char_packed(int32_t c){
- std::array<char,utf8_max_char_size> arr = utf8_encode_char(c);
- return *((int32_t*)arr.data());
+ auto uc = utf8_encode_char(c);
+ return *((int32_t*)uc.data());
 }
 //convert a character from a codepoint to a utf8 encoded sequence of bytes.
 //The bytes are stored in buf and the number of bytes used is returned.
@@ -410,12 +416,11 @@ inline size_t utf16_encode_char(int32_t c, uint16_t *buf){
     return 2;
   }
 }
-#if 0
-enum class unicode_format {
-  utf8,
-  utf16,
-  utf32
-};
+// enum class unicode_format {
+//   utf8,
+//   utf16,
+//   utf32
+// };
 union unicode_char {
   int32_t utf32;
   uint16_t utf16[2];
@@ -423,8 +428,30 @@ union unicode_char {
   unicode_char(int32_t c) : utf32{c} {}
   unicode_char(uint16_t *c) : utf16{c[0],c[1]} {}
   unicode_char(uint8_t *c) : utf8{c[0],c[1],c[2],c[3]} {}
+  //I don't think any of these break any ailasing rules, but I could be wrong.
+  void utf32_to_utf8(){
+    utf8_encode_char(utf32, utf8);
+  }
+  void utf32_to_utf16(){
+    utf16_encode_char(utf32, utf16);
+  }
+  //We can't convert directly between utf8 and utf16, so conversions
+  //between the two involve two steps.
+  void utf16_to_utf8(){
+    utf16_to_utf32();
+    utf32_to_utf8();
+  }
+  void utf16_to_utf32(){
+    utf32 = utf16_decode_char(utf16);
+  }
+  void utf8_to_utf16(){
+    utf8_to_utf32();
+    utf32_to_utf16();
+  }
+  void utf8_to_utf32(){
+    utf32 = utf8_decode_char(utf8);
+  }
 };
-#endif
 //An iterator over the characters stored in a utf8 string stored as a pointer.
 //Acts as a bidirectional c++ iterator.
 //With a bit of work could be adapted to work with a bidirectional iterator instead

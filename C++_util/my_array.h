@@ -15,12 +15,6 @@ constexpr void constexpr_fill_n(T *ptr, size_t n, T val){
     ptr[n] = val;
   }
 }
-template<typename T>
-constexpr void constexpr_iota(T *ptr, size_t n, T start, T stop, T step){
-  while(n--){
-    ptr[n] = val;
-  }
-}
 template<typename T, typename U,
          std::enable_if_t<std::is_convertible_v<U,T>,int> = 0>
 constexpr void constexpr_va_init(T* ptr, U val){
@@ -287,5 +281,16 @@ explicit array(va_init_t, const Ts&& ...t) ->
 
 template <typename T, size_t N, size_t M = N>
 using array_2D = array<array<T,N>,M>;
+
+//A version of std::array which does automatically decay to a pointer.
+template<typename T, size_t N>
+struct carray : std::array<T,N> {
+  constexpr operator T*(){
+    return std::array<T,N>::data();
+  }
+  constexpr operator const T*() const {
+    return std::array<T,N>::data();
+  }
 };
+}
 #endif
