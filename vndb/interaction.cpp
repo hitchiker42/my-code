@@ -605,7 +605,7 @@ int do_dot_command(vndb_main *vndb, std::string_view command){
 
 //Functions to proved generic access to readline type libraries, so that I'm not
 //tied to one particular library.
-#define HAVE_READLINE
+#define HAVE_LINENOISE
 #ifdef HAVE_READLINE
 #include <readline/readline.h>
 #include <readline/history.h>
@@ -613,6 +613,10 @@ int do_dot_command(vndb_main *vndb, std::string_view command){
 
 #ifdef HAVE_EDITLINE
 #include <editline/readline.h>
+#endif
+
+#ifdef HAVE_LINENOISE
+#include "linenoise.h"
 #endif
 
 #if (defined HAVE_READLINE) || (defined HAVE_EDITLINE) || (defined HAVE_LINENOISE)
@@ -733,7 +737,7 @@ char **vndb_readline_completion_func(const char *text, int start, int end){
 void vndb_completion_init(){
   rl_attempted_completion_function = vndb_readline_completion_func;
 }
-#elif (defined USE_LINENOISE)
+#elif (defined HAVE_LINENOISE)
 char *vndb_readline(const char *prompt){
   return linenoise(prompt);
 }
@@ -765,15 +769,16 @@ static void command_completion_generator_ln(std::string_view prefix,
   while((idx < command_names.size()) && (c == command_names[idx][0])){
     if(prefix.size() < command_names[idx].size() &&
        !memcmp(prefix.data(), command_names[idx].data(), prefix.size())){
-      linenoiseAddCompletion(lc, command_names.data());
+      linenoiseAddCompletion(lc, command_names[idx].data());
     }
+    idx++;
   }
 }
 //completion using linenoise requires manually parsing the line in all cases.
 void vndb_linenoise_completion_func(const char *text, linenoiseCompletions *lc){
-  char *start = skip_space(text);
+  const char *start = skip_space(text);
   if(!(*start)){ return; } //nothing to complete (should I add all commands in this case?)
-  char *cmd_end = strchrnul(start, ' ');
+  const char *cmd_end = strchrnul(start, ' ');
   if(!(*cmd_end)){
     //this is the first word on the line, complete it as a command.
     command_completion_generator_ln(std::string_view(start, cmd_end - start), lc);
@@ -806,7 +811,7 @@ void vndb_completion_init(){}
   if(have_line_editing){
     char *homedir = getenv("HOME");
     snprintf(histfile_name, histfile_name_bufsz,
-             "%s/.%s", homedir, histfile_basename);
+             "%s/%s", homedir, histfile_basename);
     vndb_read_history(histfile_name);
     vndb_limit_history(2000);
     vndb_completion_init();
@@ -865,7 +870,7 @@ void vndb_completion_init(){}
   }
  end:
   free(lineptr);
-  write_history(histfile_name);
+  vndb_write_history(histfile_name);
   if(sdl_running){
     SDL_Event evt;
     evt.type = SDL_QUIT;

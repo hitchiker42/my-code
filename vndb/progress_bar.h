@@ -33,13 +33,16 @@ struct progress_bar {
   } display_chars;
   int8_t finished = false;
   progress_bar(double end, const char *title = "")
-    : title{title}, title_size{strlen(title)}, end{end} {//, start_time{float_time()} {
+    : title{title}, title_size{strlen(title)}, 
+      end{std::max(end, 1.0)} {//, start_time{float_time()} {
       get_term_info(this);
       buf = (char*)malloc(termwidth + 1);
   }
   ~progress_bar(){
     finish();
+    assert(buf != nullptr);
     free(buf);
+    buf = nullptr;
   }
   void update(double amt){
     current += amt;
@@ -83,3 +86,7 @@ struct progress_bar {
 };
 static_assert(std::is_standard_layout_v<progress_bar>);
 #endif /* __PROGRESS_BAR_H__ */
+
+/* Local Variables: */
+/* mode: c++ */
+/* End: */

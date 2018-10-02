@@ -190,6 +190,8 @@ int do_download_command(vndb_main& vndb, int argc,
       }
     }
   } while(++arg_idx < argc);
+  // TODO: Split code above and below this line into seperate functions, above
+  // is argument parsing and below is actually downloading and updating.
   //Login to the vndb server if necessary.
   if(do_main_tables || do_vnlist || do_wishlist){
     vndb_log->log_debug("Logging into vndb server.\n");
@@ -262,7 +264,7 @@ int do_download_command(vndb_main& vndb, int argc,
       err = !vndb.build_vn_tags();
     }
     if(!err && (do_main_tables || do_traits)){
-      err = !vndb.build_vn_tags();
+      err = !vndb.build_character_traits();
     }
     if(!err && do_main_tables){
       err = !vndb.build_vn_producer_relations();

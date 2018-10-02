@@ -119,4 +119,10 @@ static constexpr int constexpr_memcmp(const void *s1, const void *s2, size_t n){
 }
 #endif
 }
+//for compatibility, since these didn't use to be in namespace util
+//The multiple names in one using declaration is C++17
+using util::constexpr_strlen;
+using util::constexpr_strcmp;
+using util::constexpr_strncmp;
+using util::constexpr_memcmp;
 #endif /* __CONSTEXPR_FNS_H__ */

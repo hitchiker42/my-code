@@ -407,8 +407,8 @@ bool vndb_main::build_vn_images(){
     return false;
   }
   auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
-
-  progress_bar pb(db_info["num_vns"].get<int>(), "VN images");
+  int num_vns = db_info["num_vns"].get<int>();
+  progress_bar pb(num_vns, "VN images");
   return build_image_table(db, stmt, ins_stmt, &pb);
 }
 bool vndb_main::build_character_images(){
@@ -456,8 +456,8 @@ bool vndb_main::update_vn_images(){
     return false;
   }
   auto &ins_stmt = this->get_insert_stmt(vndb_main::table_type::vn_images);
-
-  progress_bar pb(db_info["num_vns"].get<int>() - img_count, "VN images");
+  int num_vns = db_info["num_vns"].get<int>();
+  progress_bar pb(num_vns - img_count, "VN images");
   bool ret = build_image_table(db, stmt, ins_stmt, &pb);
   return ret;
 }

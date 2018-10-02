@@ -54,8 +54,10 @@ sqlite3.o: sqlite3.c
 	-DSQLITE_OMIT_DEPRECATED=1 -DSQLITE_OMIT_PROGRESS_CALLBACK=1 \
 	-DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_USE_ALLOCA=1 \
 	-DSQLITE_ENABLE_COLUMN_METADATA=1 -DSQLITE_ENABLE_STMTVTAB=1 -DHAVE_USLEEP=1
+# Linenoise library, it's small enough to just include the source rather than link to it
+linenoise.o: linenoise.c
 
-vndb_cpp: vndb.o connection.o sqlite_wrappers.o interaction.o progress_bar.o main.o image.o tag_trait_parser.o sqlite3.o sdl_gui.o sqlite_ext.o misc.o
+vndb_cpp: vndb.o connection.o sqlite_wrappers.o interaction.o progress_bar.o main.o image.o tag_trait_parser.o sqlite3.o sdl_gui.o sqlite_ext.o misc.o linenoise.o
 	$(CXX) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -o $@ $^
 
 sdl_test_cpp: vndb.o connection.o sqlite_wrappers.o progress_bar.o image.o tag_trait_parser.o sqlite3.o sqlite_ext.o misc.o sdl_test.o font.o

@@ -7,6 +7,8 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+#include <stdarg.h>
+#include <assert.h>
 struct progress_bar {
   char *title;
   char *buf;
@@ -59,6 +61,7 @@ double float_time(){
 }
 */
 void display_progress_bar(struct progress_bar *bar){
+  assert(bar->end >= 1);
   double percent_done = bar->current / bar->end;
   if(percent_done > 1){ 
     percent_done = 1; 

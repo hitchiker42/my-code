@@ -336,6 +336,7 @@ struct vndb_main {
     if(!db_info.is_null()){
       return true;
     }
+    update_db_info();
     auto stmt = db.prepare_stmt("select * from db_info;");
     if(stmt.step() != SQLITE_ROW){
       return false;
@@ -557,6 +558,7 @@ struct vndb_main {
         return false;
       }
     }
+    update_db_info();
     return true;
   }
   int get_max_id(table_type what){
