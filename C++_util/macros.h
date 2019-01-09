@@ -192,9 +192,31 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
   template<typename T, typename... Args>                                \
   inline constexpr bool CAT(struct_name, _v) = struct_name<T,Args...>::value;
 
-//Macro for portably using possibly empty __VA_ARGS__ 
+//Needs to be called from the top level namespace and type should
+//have a member function get
+#define define_tuple_info(type, sz)                                     \
+  namespace std {                                                       \
+  template<size_t N> struct tuple_element<N,type> {                     \
+    using type = decltype(std::declval<type>().get<N>());               \
+  };                                                                    \
+  template<>                                                            \
+  struct tuple_size<type> : std::integral_constant<size_t, sz> {};      \
+  };
+
+//Explicitly instantiates a template in a header, while also
+//preventing any explicit instantiations. Likely won't shorten
+//compilation times since the template is still instianteted in
+//each translation file.
+#define extern_template_header(ret, name, ...)      \
+  extern template inline ret name<__VA_ARGS__>(__VA_ARGS__);
+  template inline ret name<__VA_ARGS__>(__VA_ARGS__);
+  
+//Macro for portably using possibly empty __VA_ARGS__
+//Likely to eventually be replaced by C++20 VA_OPT
 #ifndef MAYBE_VA_ARGS
-#if (defined __GNUC__)
+#if __cplusplus > 202000L //C++20
+#define MAYBE_VA_ARGS(...) __VA_OPT__(,) __VA_ARGS__
+#elif (defined __GNUC__)
 #define MAYBE_VA_ARGS(...) ,##__VA_ARGS__
 #else
 #define MAYBE_VA_ARGS(...) ,__VA_ARGS__
@@ -235,7 +257,7 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
 #endif
 
 //Shut up a super annoying g++ warning.
-#if (defined __GNUC__) && (defined __GNUC_MINOR__) && (defined __GNUC_PATCHLEVEL__) 
+#if (defined __GNUC__) && (defined __GNUC_MINOR__) && (defined __GNUC_PATCHLEVEL__)
 #if __GNUC__ >= 8
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #endif
@@ -261,8 +283,8 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
 //The way to do this is to use macro stringification (the # character)
 
 //If x isn't a const char* return false, otherwise compare x and #x
-//#define is_literal_(x) 
-//  (std::is_same_v<std::decay_t<decltype(x)>, const char *> ? 
+//#define is_literal_(x)
+//  (std::is_same_v<std::decay_t<decltype(x)>, const char *> ?
 //   is_literal_f(#x, sizeof(#x) - 1) : false)
 #define is_literal_(x)  is_literal_f(#x, sizeof(#x) - 1)
 #define is_literal(x) is_literal_(x)
@@ -278,7 +300,7 @@ static constexpr bool is_literal_f(const char *s, size_t len){
   //quick test to eliminate most non-literals
   if(s[0] != '"') return false;
   //We need this loop to detect literals formed by contatenation
-  //i.e "hello" "world" stringifies to ""hello" "world""  
+  //i.e "hello" "world" stringifies to ""hello" "world""
   while(s != e){
     s = constexpr_strchr(s + 1, '"');
     if(s == NULL){ return false; }

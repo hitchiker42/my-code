@@ -1,7 +1,7 @@
 #ifndef __SVECTOR_H__
 #define __SVECTOR_H__
 #include "my_array.h"
-#include "macros.h"
+#include "macros.h" // NEAREST_POW_OF_TWO
 #include <utility>
 #include <type_traits>
 namespace util {
@@ -33,7 +33,8 @@ namespace util {
 
   Maybe change to take an allocator as a template parameter.
 */
-template<typename T>
+template<typename T,
+         std::enable_if_t<std::is_move_constructible_v<T>, int> = 0>
 struct svector {
   typedef T                                       value_type;
   typedef value_type*                             pointer;
@@ -69,6 +70,7 @@ struct svector {
   }
   //Copy constructor makes a deep copy, use the shallow_copy function
   //if you don't want this.
+//  template<std::enable_if_t<std::is_copy_constructible_v<T>, int> = 0>
   svector(const svector& other) noexcept : svector(other.size()) {
     len = other.size();
     for(size_t i = 0; i < len; i++){
@@ -77,6 +79,47 @@ struct svector {
   }
   svector(svector&& other) noexcept : svector(other.vec, other.len, other.sz) {
     other.len = 0;
+    other.sz = 0;
+    other.vec = nullptr;
+  }
+  //Move assignment operator to allow std::swap to work, don't acutally use it.
+  svector& operator=(svector &&other) noexcept {
+    this->~svector();
+    new (this) svector(std::move(other));
+    return *this;
+  }
+  //copy assignment, for the sake of completion not really for use.
+  template<std::enable_if_t<std::is_copy_constructible_v<T>, int> = 0>
+  svector& operator=(const svector &other) noexcept {
+    if(this != &other){
+      //if we can hold other->len elements don't allocate memory
+      if(this->capacity() <= other.size()){
+        this->clear();
+        this->len = other.len;
+        for(size_t i = 0; i < len; i++){
+          vec[i] = other[i];
+        }
+      } else {
+        this->~svector();
+        new (this) svector(other);
+      }
+    }
+    return *this;
+  }
+  bool operator==(const svector& other) noexcept {
+    if(this->size() != other.size()){
+      return false;
+    } else {
+      for(size_t i = 0; i < this->size(); i++){
+        if(!(vec[i] == other[i])){
+          return false;
+        }
+      }
+      return true;
+    }
+  }
+  bool operator!=(const svector &other) noexcept {
+    return !(this->operator==(other));
   }
   svector shallow_copy(){
     return svector(vec, len, sz);

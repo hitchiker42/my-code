@@ -32,9 +32,9 @@
 using namespace std::literals::string_view_literals;
 using namespace std::literals::string_literals;
 namespace util {
-inline constexpr uintptr_t 
+inline constexpr uintptr_t
 pointer_tag_bitmask = (sizeof(uintptr_t) == 8 ? 0x7 : 0x3);
-inline constexpr uintptr_t 
+inline constexpr uintptr_t
 tagged_pointer_bitmask = ~pointer_tag_bitmask;
 
 template <typename T>
@@ -146,7 +146,7 @@ static inline bool is_nonempty_string(const char *s){
 static inline bool is_empty_string(const char *s){
   return (!s || !s[0]);
 }
-static inline bool is_prefix_of(const std::string_view prefix, 
+static inline bool is_prefix_of(const std::string_view prefix,
                                 const std::string_view sv){
   if(prefix.size() > sv.size()){ return false; }
   return strncmp(prefix.data(), sv.data(), prefix.size()) == 0;
@@ -274,13 +274,13 @@ static inline void *memdup(const void *src, size_t sz){
 }
 //Wrappers around strtoX which return a std::optional value, internally
 //they use errno to check the result.
-std::optional<long> strtol(const char *str,
-                           const char** endptr = nullptr, int base = 0);
-std::optional<unsigned long> strtoul(const char *str,
-                                     const char** endptr = nullptr,
-                                     int base = 0);
-std::optional<double> strtod(const char *str,
-                             const char** endptr = nullptr, int base = 0);
+std::optional<long> strtol_opt(const char *str,
+                               const char** endptr = nullptr, int base = 0);
+std::optional<unsigned long> strtoul_opt(const char *str,
+                                         const char** endptr = nullptr,
+                                         int base = 0);
+std::optional<double> strtod_opt(const char *str,
+                                 const char** endptr = nullptr, int base = 0);
 //extern "C" {
 /*inline constexpr size_t memspn_table(const uint8_t *str, size_t len,
                                      const uint8_t accept[256]){
@@ -381,9 +381,55 @@ inline constexpr size_t memrcspn(const void *buf, size_t len,
 #undef build_span_table
 //} //extern "C"
 } // Namespace util
+
+#if 0
+//Wrappers around strtoX which internally zero errno and set it to
+//EINVAL if no conversion is performed, and also have sane defaults
+//for endptr and base.
+//Declared in the top level namspace to avoid possible issues
+//from hiding the standard strtoX functions in the util namespace
+//and since util::util_strtol is just a bit too verbose.
+
+//This is a bit ugly, but it's better than writing the same code 3 times
+//and using templates is just as verbose
+#define strtoX_init()                           \
+  errno = 0;                                    \
+  const char *end;                              \
+  if(!endptr){                                  \
+    endptr = &end;                              \
+  }
+#define strtoX_finish()                         \
+  if(str == *endptr){                           \
+    errno = EINVAL;                             \
+  }                                             \
+  return ret;
+
+inline long long util_strtol(const char* str,
+                             const char** endptr = nullptr, int base = 0){
+  strtoX_init();
+  long long ret = strtoll(str, endptr, base);
+  strtoX_finish();
+}
+inline unsigned long long util_strtoul(const char* str,
+                           const char** endptr = nullptr, int base = 0){
+  strtoX_init();
+  unsigned long long ret = strtoll(str, endptr, base);
+  strtoX_finish();
+}
+inline double util_strtoul(const char* str,
+               const char** endptr = nullptr, int base = 0){
+  strtoX_init();
+  unsigned long long ret = strtoll(str, endptr, base);
+  strtoX_finish();
+}
+#undef strtoX_init
+#undef strtoX_finish
+#endif
+
 #if (defined NEED_TIMER) || (defined NEED_TIMERS)
 #include "time_util.h"
 #endif
+/*
 namespace util {
 template <typename T> inline const char *printf_spec = nullptr;
 template <> inline const char *printf_spec<char> = "%c";
@@ -401,4 +447,5 @@ template <> inline const char *printf_spec<double> = "%f";
 template <> inline const char *printf_spec<float> = "%f";
 template <> inline const char *printf_spec<void*> = "%p";
 }
+*/
 #endif /* __UTIL_H__ */

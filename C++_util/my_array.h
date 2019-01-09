@@ -49,7 +49,7 @@ template<class T, size_t N>
 struct array {
   //we need to provide a default initializer in order for the
   //initializer_list and variadic constructors to be constexpr.
-  T arr[N] = {T(0)};
+  T arr[N] = {T{}};
   size_t length = N;
   typedef T                                       value_type;
   typedef value_type*                             pointer;
@@ -96,10 +96,10 @@ struct array {
   constexpr array(array&) = default;
   array& operator= (const array&) = default;
 
-  //Copy constructor from a type compatable array of equal or smaller size
+  //Copy constructor from a type compatable array of equal or smaller size  
   template<typename U, size_t M,
            std::enable_if_t<(M <= N) && std::is_convertible_v<U,T>, int> = 0>
-  constexpr array(const array<U,M>& a) : length{M} {
+  constexpr array(const array<U,M>& a) : length{a.size()} {
     T *ptr = arr;
     for(auto x : a){
       *ptr++ = x;
@@ -121,6 +121,24 @@ struct array {
       *ptr++ = x;
     }
   }
+  //Constructor for compile time concatenation
+  //This is a good starting point for implementing compile time
+  //string concatenation.
+  template<typename U, typename V, size_t M1, size_t M2,
+           std::enable_if_t<((M1 + M2) <= N) && 
+                            std::is_convertible_v<U,T> &&
+                            std::is_convertible_v<V,T>, int> = 0>
+  constexpr array(const array<U,M1>& a1, const array<V,M2>& a2) 
+    : length{a1.size() + a2.size()} {
+    T *ptr = arr;
+    for(auto x : a1){
+      *ptr++ = x;
+    }
+    for(auto x : a2){
+      *ptr++ = x;
+    }
+  }
+    
   static constexpr array iota(T start , T stop, T step) {
     size_t sz = static_cast<size_t>((stop - start) / step);
     assert(sz <= N);
@@ -253,6 +271,16 @@ struct array {
       return true;
     }
   }
+  template<typename... Ts>
+  bool emplace_back(Ts&&... Args){
+    if(length == N){
+      return false;
+    } else {
+      new (arr + length) T(std::forward<Ts>(Args)...);
+      length++;
+      return true;
+    }
+  }
   //As with a std::vector calling pop_back on an empty array is undefined
   void pop_back(){
     length--;
@@ -279,6 +307,10 @@ template<typename ... Ts>
 explicit array(va_init_t, const Ts&& ...t) ->
   array<std::common_type_t<Ts...>, sizeof...(Ts)>;
 
+template<typename U, typename V, size_t M1, size_t M2>
+explicit array(const array<U,M1> &a1, const array<V,M2> &a2) ->
+  array<std::common_type_t<U,V>, M1+M2>;
+
 template <typename T, size_t N, size_t M = N>
 using array_2D = array<array<T,N>,M>;
 
@@ -292,5 +324,5 @@ struct carray : std::array<T,N> {
     return std::array<T,N>::data();
   }
 };
-}
+} //namespace util
 #endif

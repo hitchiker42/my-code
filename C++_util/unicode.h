@@ -102,6 +102,10 @@ inline const uint8_t* utf8_prev_char_start(const uint8_t *str){
   } while(is_utf8_cont_char(*str));
   return str;
 }
+//Not super useful, but I needed it at one point so it's worth having.
+inline size_t utf8_prev_char_size(const uint8_t *str){
+  return utf8_char_size(*utf8_prev_char_start(str));
+}
 //Just for completeness sake
 inline const uint8_t* utf8_next_char_start(const uint8_t *str){
   str += utf8_char_size(*str);

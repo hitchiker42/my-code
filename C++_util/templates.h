@@ -247,6 +247,15 @@ template<typename InputIt,
 bool in_sequence(const InputIt begin, const InputIt end, const U &val){
   return std::find(begin, end, val) != end;
 }
+/*
+  Return the size of a container as an int, prevents compilier
+  warnings but can obviously cause issues if the size won't fit
+  in an int.
+*/
+template<typename T>
+int isize(const T& container){
+  return (int)std::size(container);
+}
 
 //Simple templates
 #if __cplusplus < 201703L

@@ -5,6 +5,9 @@ using pt_Descriptor = piece_table::Descriptor;
 using pt_Marker = piece_table::Marker;
 using pt_Edit = piece_table::Edit;
 using pt_Span = piece_table::Span;
+using pt_Offset = piece_table::Offset;
+using pt_offset_t = piece_table::offset_t;
+using pt_signed_offset_t = piece_table::signed_offset_t;
 //I currently use forward_char for only forward movement and backward_char
 //for only backward movement (calling the other function if given a
 //negitive argument). It may be a better idea to just have them both
@@ -79,6 +82,215 @@ bool piece_table::goto_char(Marker *mk, offset_t N){
   }
   return true;
 }
+//Scan for the given byte in a utf8 string and return the offset of the byte
+//in both characters and bytes. If the byte is not found the return value
+//byte offset will be equal to sz (i.e it doesn't return a special sentinal
+//value if the byte isn't found).
+static pt_Offset find_byte_offset_fwd_utf8(const uint8_t *str, size_t sz,
+                                           uint8_t byte){
+  pt_Offset ret = {0,0};
+  int idx = 0;
+  while(idx < sz){
+    uint8_t ch = str[idx];
+    if(ch == byte){
+      return ret;
+    } else {
+      int cnt = utf8_char_size(ch);
+      ret.update(cnt);
+      idx += cnt;
+    }
+  }
+  return ret;
+}
+//Count the number of occurances of the given byte in the given string,
+//decrementing 'cnt' for each occurance. If cnt reaches 0 return the 
+//offset of the last byte, otherwise return the end offset.
+static pt_Offset count_bytes_fwd_utf8(const uint8_t *str, size_t sz,
+                                      uint8_t byte, int& cnt){
+  pt_Offset ret = {0,0};
+  int idx = 0;
+  while(cnt && idx < sz){
+    uint8_t ch = str[idx];
+    if(ch == byte){
+      --cnt;
+    }
+    int nbytes = utf8_char_size(ch);
+    ret.update(nbytes);
+    idx += nbytes;
+  }
+  return ret;
+}
+//Wrappers to avoid casting.
+static uint8_t* u8memchr(const uint8_t *str, uint8_t byte, size_t sz){
+  return static_cast<uint8_t*>(memchr(str, byte, sz));
+}
+static uint8_t* u8memrchr(const uint8_t *str, uint8_t byte, size_t sz){
+  return static_cast<uint8_t*>(memrchr(str, byte, sz));
+}
+//Returns the offset of the first occurance of 'byte' in 'str' or 'sz'
+//if byte doesn't occur (it's just memchr with a different return value).
+static pt_offset_t find_byte_offset_fwd_ascii(const uint8_t *str, uint8_t byte,
+                                              size_t sz){
+  uint8_t *off = u8memchr(str, byte, sz);
+  return (off ? off - str : sz);
+}
+static pt_offset_t count_bytes_fwd_ascii(const uint8_t *str, uint8_t byte,
+                                         size_t sz, int &cnt){
+  size_t off = 0;
+  while(cnt){
+    uint8_t* tmp = u8memchr(str + off, byte, sz - off);
+    if(!tmp){ return sz; }
+    off += (tmp - (str + off));
+    cnt--;
+  }
+  return off;
+}
+//The way I've done these find_offset_bkwd functions is weird and kinda
+//confunsing, but it makes the actual functions scaning descriptors
+//eaiser, so I'm not sure if I should change them.
+//They also probably don't work corrently due to indexing errors.
+
+//The actual string is given by the range [(str-sz), str), so str should
+//point just past the last valid character (like an end iterator).
+//Returns an offset such that (str - (off.as_bytes + 1)) points to byte, this
+//is so that returning 'off.as_bytes == sz' will indicate that the 
+//byte wasn't found.
+static pt_Offset find_byte_offset_bkwd_utf8(const uint8_t *str, size_t sz,
+                                            uint8_t byte){
+  pt_Offset ret = {0,0};
+  int idx = 0;
+  while(idx < sz){
+    int cnt = utf8_prev_char_size(str - idx);
+    //this is also str[-(idx+cnt)], but that just looks weird.
+    uint8_t ch = *(str-(idx + cnt));
+    if(ch == byte){
+      return ret;
+    } else {
+      ret.update(nbytes);
+      idx += cnt;
+    }
+  }
+  return ret;
+}
+//Count the number of occurances of the given byte in the given string,
+//which is really [(str - sz), str)
+//decrementing 'cnt' for each occurance. If cnt reaches 0 return the 
+//offset of the last byte, otherwise return the end offset.
+static pt_Offset count_bytes_bkwd_utf8(const uint8_t *str, size_t sz,
+                                       uint8_t byte, int& cnt){
+  pt_Offset ret = {0,0};
+  int idx = 0;
+  while(cnt && (idx < sz)){
+    int nbytes = utf8_prev_char_size(str - idx);
+    uint8_t ch = *(str-(idx + cnt));
+    if(ch == byte){
+      cnt--;
+    }
+    ret.update(nbytes);
+    idx += nbytes;
+  }
+  return ret;
+}
+static pt_offset_t find_byte_offset_bkwd_ascii(const uint8_t *str, uint8_t byte,
+                                               size_t sz){
+  const uint8_t *start = str - sz;
+  uint8_t *off = u8memrchr(start, byte, sz);
+  return (off ? (sz-1) - (off - start) : sz);
+}
+static pt_offset_t count_bytes_bkwd_ascii(const uint8_t *str, uint8_t byte,
+                                          size_t sz){
+  size_t len = sz;
+  const uint8_t *start = str - sz;
+  while(cnt){
+    uint8_t* tmp = u8memrchr(start, byte, len);
+    if(!tmp){ return sz; }
+    len = (tmp - start);
+    cnt--;
+  }
+  return (sz-1) - len;
+}
+//Moves the given marker 'mk' to the first occurance of 'byte', searching
+//forward from its current position. If 'byte' isn't found 'mk' is moved
+//to the end of the text and false is returned, otherwise returns true.
+static bool find_byte_forward_acc(piece_table *ptab,
+                                  pt_Marker *mk, uint8_t byte){
+  CharT *txt = get_text_at_marker(mk);
+  if(mk->desc->unibyte_only()){
+    pt_offset_t off = find_byte_offset_fwd_ascii(txt, byte, mk->desc->size());
+    mk->update(off,off);
+  } else {
+    pt_Offset off = find_byte_offset_fwd_utf8(txt, byte, mk->desc->size());
+    mk->update(off);
+  }
+  if(!mk->at_end_of_desc()){
+    return true;
+  } else if(ptab->marker_to_next_desc_unsafe(mk)){
+    return find_byte_forward_acc(ptab, mk, byte);
+  } else {
+    return false;
+  }
+}
+//Same as above, but searchs backward and leaves 'mk' at the start
+//of text on failure.
+static bool find_byte_backward_acc(piece_table *ptab,
+                                   pt_Marker *mk, uint8_t byte){
+  CharT *txt = get_text_at_marker(mk);
+  if(mk->desc->unibyte_only()){
+    pt_offset_t off = find_byte_offset_bkwd_ascii(txt, byte, mk->desc->size());
+    mk->update(-off,-off);
+  } else {
+    pt_Offset off = find_byte_offset_fwd_utf8(txt, byte, mk->desc->size());
+    mk->update(-off);
+  }
+  if(!mk->at_start_of_desc()){
+    mk->update(-1,-1);
+    return true;
+  } else if(ptab->marker_to_prev_desc_unsafe(mk)){
+    return find_byte_backward_acc(ptab, mk, byte);
+  } else {
+    return false;
+  }
+}
+//Same as find_byte_forward_acc, but searches for 'cnt' occurances of byte,
+//'cnt' is decremented each time 'byte' is found.
+static bool count_bytes_forward_acc(piece_table *ptab, pt_Marker *mk,
+                                    uint8_t byte, int &cnt){
+  CharT *txt = get_text_at_marker(mk);
+  if(mk->desc->unibyte_only()){
+    pt_offset_t off = count_bytes_fwd_ascii(txt, byte, mk->desc->size());
+    mk->update(off,off);
+  } else {
+    pt_Offset off = count_bytes_fwd_utf8(txt, byte, mk->desc->size());
+    mk->update(off);
+  }
+  if(!mk->at_end_of_desc()){
+    return true;
+  } else if(ptab->marker_to_next_desc_unsafe(mk)){
+    return find_byte_forward_acc(ptab, mk, byte);
+  } else {
+    return false;
+  }
+}
+//same as above but search backward
+static bool count_bytes_backward_acc(piece_table *ptab,
+                                     pt_Marker *mk, uint8_t byte){
+  CharT *txt = get_text_at_marker(mk);
+  if(mk->desc->unibyte_only()){
+    pt_offset_t off = count_bytes_bkwd_ascii(txt, byte, mk->desc->size());
+    mk->update(-off,-off);
+  } else {
+    pt_Offset off = count_bytes_fwd_utf8(txt, byte, mk->desc->size());
+    mk->update(-off);
+  }
+  if(!mk->at_start_of_desc()){
+    mk->update(-1,-1);
+    return true;
+  } else if(ptab->marker_to_prev_desc_unsafe(mk)){
+    return find_byte_backward_acc(ptab, mk, byte);
+  } else {
+    return false;
+  }
+}
 
 //Creates a new empty descriptor immediately before the descriptor 'mk' is
 //pointing to which points to the end of the buffer used for insertion.
@@ -138,6 +350,13 @@ bool piece_table::split_for_edit(edit_type type, Marker *mk){
   back into the list.
 */
 void piece_table::begin_edit(edit_type type){
+  if(this->redo_history){
+    //This is the `normal` way to do undo/redo, any edit clears the redo
+    //history, I'd like to support tree style undo eventually, but
+    //this is the eaisest option, so I'm using it for now
+    this->free_memory_block_list(this->redo_history);
+    this->redo_history = nullptr;
+  }
   this->current_edit = this->alloc_edit();
   this->current_edit->type = type;
   this->current_edit->location = this->duplicate_point();
@@ -154,7 +373,7 @@ void piece_table::do_insert(const CharT *bytes, offset_t nbytes,
   this->text_length.update(nbytes, nchars);
   this->point.update(nbytes, nchars);
   this->point.desc->piece.update(nbytes, nchars);
-  this->current_edit_length().update(nbytes, nchars);
+  this->update_current_edit_length(nbytes, nchars);
 }
 void piece_table::insert_char(const CharT *utf8_char){
   int count = utf8_char_size(*utf8_char);
@@ -176,7 +395,7 @@ static void delete_backwards_simple(piece_table *p, int N){
   p->point.update(-count, -N);
   p->point.desc->piece.update(-count, -N);
   p->text_length.update(-count, -N);
-  p->current_edit_length().update(count, N);
+  p->update_current_edit_length(count, N);
   return;
 }
 static void delete_forwards_simple(piece_table *p, int N){
@@ -191,7 +410,7 @@ static void delete_forwards_simple(piece_table *p, int N){
   //We need to move the start of the span forwards
   p->point.desc->piece.start += count;
   p->text_length.update(-count, -N);
-  p->current_edit_length().update(count, N);
+  p->update_current_edit_length(count, N);
   return;
 }
 bool piece_table::delete_descriptor_for_edit(){
@@ -411,7 +630,7 @@ pt_Descriptor* redo_backward_delete(piece_table *ptab, pt_Edit *edit){
   //Change length here so point_to_end_of_text in the else branch works.
   ptab->text_length -= edit->length;
   //Potentially skip over some descriptors since we know the descriptor
-  //we need to link to. 
+  //we need to link to.
   Descriptor *next = desc->next();
   if(next){
     next->prev() = desc;

@@ -14,7 +14,7 @@ void sleep(double seconds){
 }
 //just a more convient name for std::this_thread::sleep_for
 template<typename rep, typename period>
-void sleep(const std::chrono<rep, period> &dur){
+void sleep(const std::chrono::duration<rep, period> &dur){
   std::this_thread::sleep_for(dur);
 }
 //Timer functions
@@ -65,7 +65,7 @@ static inline double float_cputime(){
 struct cpu_timer {
   double start_time = 0.0;
   double stop_time = 0.0;
-  
+
   void start(){
     start_time = float_cputime();
   }
@@ -93,5 +93,46 @@ struct cpu_timer {
     return elapsed();
   }
 };
+struct function_timer {
+  function_timer(std::function<int()> fn)
+    : fn{fn} {}
+  template<typename T, typename... Ts>
+  function_timer(T fn, Ts &&... Args)
+    : fn(std::bind(fn, std::forward<Ts>(Args)...)) {}
+  std::function<int()> fn;
+
+  double time_fn(int count = 1){
+    double start = 0.0, end = 0.0, total = 0.0;
+    for(int i = 0; i < count; i++){
+      start = float_cputime();
+      if(fn() < 0){
+        return -1.0;
+      }
+      end = float_cputime();
+      total += (end - start);
+    }
+    return total / count;
+  }
+};
+struct void_function_timer {
+  void_function_timer(std::function<void()> fn)
+    : fn{fn} {}
+  template<typename T, typename... Ts>
+  void_function_timer(T fn, Ts &&... Args)
+    : fn(std::bind(fn, std::forward<Ts>(Args)...)) {}
+  std::function<void()> fn;
+
+  double time_fn(int count = 1){
+    double start = 0.0, end = 0.0, total = 0.0;
+    for(int i = 0; i < count; i++){
+      start = float_cputime();
+      fn();
+      end = float_cputime();
+      total += (end - start);
+    }
+    return total / count;
+  }
+};
+
 }
 #endif /* __TIME_UTIL_H__ */

@@ -8,6 +8,7 @@
 #include <iterator>
 #include <functional> //for std::hash
 #include "templates.h"
+
 namespace util {
 /*
   Custom string_view class, holds an immutable string, whose
@@ -119,8 +120,7 @@ struct string_view {
   //when using a string_view we can only guarantee that we're null terminated
   //if we make a copy.
   constexpr string_view(const std::string_view& sv, bool copy = false) noexcept
-    : string_view(sv.data(), (size_type)sv.size(), copy, copy) {}
-
+    : string_view(sv.data(), (size_type)sv.size(), copy, copy) {}>
   //Destructor frees memory if it is owned.
   ~string_view() {
     if(flags & flag_owned){
