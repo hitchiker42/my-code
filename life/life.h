@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
-#include "util.h"
 //possible rules for neighbors for cells on the edge of the grid
 //bitmask for speed/familarity 
 enum edge_rules {
@@ -47,6 +46,7 @@ void resize_world(world *w, int width, int height);
 void randomize_grid(world *w);
 void write_world_to_file(world *w, char *filename);
 void run_life_debug(world *w);
+#define MAX(a,b) ((a >= b) ? a : b)
 /*
   Convert between x,y coordinates and memory offsets, the number of
   colums in the array needs to be known to do this conversion

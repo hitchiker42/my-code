@@ -4,9 +4,7 @@ jmp_buf event_loop;
 uint32_t keymod_state;
 int handle_window_resize(SDL_WindowEvent *e, SDL_context *c){
   //make the screen look nice
-  //  if(atomic_read(&running_life)){
   if(running_life){
-    //atomic_write(&running_life, 0);
     running_life = 0;
     SDL_SemWait(c->life_ctx->sem);
     SDL_UnlockTexture(c->texture);
@@ -21,11 +19,9 @@ int handle_window_resize(SDL_WindowEvent *e, SDL_context *c){
                new_height/c->life_ctx->cell_height);
   randomize_grid(c->w);
   /*
-    calling SDL_RenderClear here would allow the existing renderer to
-    continue working, but at the same size
+    Check if texture is large enough and if not then destroy it, otherwise
+    just set the viewport (or whatever it's actually called)
   */
-  //SDL_RenderClear(c->renderer);
-  //this may be a bit drastic/unecessary, but maybe not (I'm still not sure)
   SDL_DestroyTexture(c->texture);
   SDL_DestroyRenderer(c->renderer);
   c->renderer = SDL_CreateRenderer(c->window, -1, 0);
@@ -197,7 +193,8 @@ void __attribute__((noreturn)) run_life(SDL_context *c){
     SDL_RenderCopy(c->renderer, c->texture, NULL, NULL);
     SDL_RenderPresent(c->renderer);
   }
-  __builtin_unreachable();
+  //__builtin_unreachable();
+  exit(-1);
 }
 static int event_filter(void *userdata, SDL_Event *e){
   if(e->type == SDL_MOUSEMOTION || e->type == SDL_MOUSEBUTTONUP ||
@@ -223,5 +220,6 @@ void run_event_loop(SDL_context *c){
     SDL_WaitEvent(&e);
     sdl_handle_event(&e, c);
   }
-  __builtin_unreachable();
+  exit(-1);
+  //  __builtin_unreachable();
 }

@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
@@ -18,7 +17,7 @@ static inline void* xmalloc(size_t sz){
   return mem;
 }
 int life_rand(int max){
-  return random() % max;
+  return rand() % max;//random & xrand48 are posix
 }
 /*
 static uint32_t compute_edge(world *w, int x, int y){
@@ -165,8 +164,7 @@ void resize_world(world *w, int width, int height){
   w->grid_size = width*height;
   return;
 }
-int count_neighbors(world *w, int x, int y){
-  //the compiler should optimize these out
+static inline int count_neighbors(world *w, int x, int y){
   uint8_t *g = w->grid;
   int cols = w->cols;
   int neighbors =
@@ -175,6 +173,12 @@ int count_neighbors(world *w, int x, int y){
     g[(y+1)*cols + x-1] + g[(y+1)*cols + x] + g[(y+1)*cols + x+1];
   return neighbors;
 }
+static inline void swap_grid(world *w){
+  void *tmp = w->grid;
+  w->grid = w->grid_step;
+  w->grid_step = tmp;
+}
+  
 void step_world(world *w){
   int i,j;
   for(i=1;i<w->rows-1;i++){
@@ -193,13 +197,14 @@ void step_world(world *w){
       }
     }
   }
-  SWAP(w->grid, w->grid_step);
+  swap_grid(w);
 }
 void step_world_back(world *w){
   //just swap the old grid back
-  SWAP(w->grid, w->grid_step);
+  swap_grid(w);
 }
 world *read_world_from_file(char *filename){
+#ifdef __unix__
   int fd = open(filename, O_RDONLY);
   if(fd <= 0){
     return NULL;
@@ -213,6 +218,18 @@ world *read_world_from_file(char *filename){
     perror("mmap");
     return NULL;
   }
+#else
+  FILE* file = fopen(filename, "r");
+  if(fseek(file, 0, SEEK_END) == -1){
+    return NULL;
+  }
+  long end = ftell(file);
+  fseek(file, pos, SEEK_SET);
+  size_t file_size = end;
+  uint8_t *mem = xmalloc(file_size);
+  fread(mem, 1, file_size, file);
+  fclose(file);
+#endif
   world *w = xmalloc(sizeof(world));
   //this is more memory than we need, but it's much eaiser this way
   w->grid = xmalloc(file_size);
@@ -234,13 +251,21 @@ world *read_world_from_file(char *filename){
     grid_ptr += w->cols;
     mem_ptr = line_end + 1;
   }
+#ifdef __unix__
   munmap(mem, file_size);
+#else
+  free(mem);
+#endif
   return w;
 
  cleanup:
     free(w->grid);
     free(w);
+#ifdef __unix__
     munmap(mem,file_size);
+#else
+    free(mem);
+#endif
     return NULL;
 }
 
@@ -266,7 +291,7 @@ world *init_world(int rows, int cols){
   set_world_rules(w, 2, 3, 3, 3, Edge_Dead);
   return w;
 }
-void write_hline(int width, FILE *f){
+static inline void write_hline(int width, FILE *f){
   int i;
   fputc('+', f);
   for(i=0;i<width;i++){
@@ -318,19 +343,22 @@ void run_life_debug(world *w){
   }
 }
 #ifdef LIFE_MAIN
+#ifndef PATH_MAX
+#define PATH_MAX 256
+#endif
 void run_life_test(int rows, int cols, int steps){
-  char *filename1, *filename2;
+  char filename1[PATH_MAX], filename2[PATH_MAX];
   int i,j,step;
   world *w = init_world(rows, cols);
   randomize_grid(w);
-  asprintf(&filename1, "grid_step_0");
-  asprintf(&filename2, "grid_neighbors_0");
+  snprintf(filename1, PATH_MAX, "grid_step_0");
+  snprintf(filename2, PATH_MAX, "grid_neighbors_0");
   write_world_to_file(w, filename1);
   write_neighbors(w, filename2);
   for(step=0;step < steps; step++){
     step_world(w);
-    asprintf(&filename1, "grid_step_%d",step);
-    asprintf(&filename2, "grid_neighbors_%d", step);
+    snprintf(filename1, PATH_MAX, "grid_step_%d", step);
+    snprintf(filename2, PATH_MAX, "grid_neighbors_%d", step);
     write_world_to_file(w, filename1);
     write_neighbors(w, filename2);
   }
@@ -339,7 +367,7 @@ void run_life_test(int rows, int cols, int steps){
 int main(int argc, char **argv){
   int rows = 40, cols = 40, steps = 10;
   char *outdir = "life_output";
-  srandom(0);
+  srand(0);
   if(argc >= 3){
     rows = strtol(argv[1], NULL, 0);
     cols = strtol(argv[2], NULL, 0);

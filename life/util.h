@@ -19,8 +19,6 @@
 #define PAGE_SIZE 4096
 #endif
 #endif
-//define some useful macros if we're not in scilisp
-#ifndef _SL_C_MACROS_
 #define SWAP(x,y)                               \
   ({__typeof(x) __temp = x;                     \
     x = y;                                      \
@@ -57,7 +55,6 @@
 #define BITNEG(x) (~(x)+1)
 
 #define BITABS(x) (SIGNBIT(x) ? BITNEG(x) : x)
-#endif
 /*
   Given a file access mode, of the type accepted by open return a string
   representing the access mode that can be passed to fopen.

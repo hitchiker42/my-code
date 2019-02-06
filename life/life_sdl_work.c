@@ -1,32 +1,18 @@
 #include "life_sdl.h"
-/*  sigset_t *sigmask;
-  sigemptyset(sigmask);
-  sigaddset(sigmask, SIGUSR1);
-  sigaction(SIGUSR1, &interupt_work);
-  if(setjmp(work_loop)){
-    //got here from signal handler
-    sem_post(c->sem);//
-    }
-void jmp_to_work_loop(int signo){
-  sem_post(c->sem);//this tells the main loop it can unlock the texture
-  longjmp(work_loop);
-} 
-static struct sigaction interupt_work = {.sa_handler = jmp_to_work_loop};
-jmp_buf event_loop;*/
+/*
+  Code to update the life grid in a seperate thread.
+*/
 void run_worker_thread(life_context *c){
-  //  while(atomic_read(&running_life) >= 0){//this should only happen at program termination
   while(running_life >= 0){
     SDL_SemWait(c->SDL_ctx->sem);
     //I could install a signal handler for SIGUSR1 to jump to the top of this loop
     //but that seems excessive, though this way seems excessive too
     update_pixels(c);
-    //    if(atomic_read(&running_life) < 1){
     if(running_life < 1){
       SDL_SemPost(c->sem);
       continue;
     }
     step_world(c->w);
-    //    if(atomic_read(&running_life) < 1){
     if(running_life < 1){
       step_world_back(c->w);//undo the last step
       SDL_SemPost(c->sem);
@@ -43,8 +29,7 @@ void update_pixels(life_context *c){
     for(j=0;j<(w->cols - (c->cell_width -1));j++){
       uint32_t color = w->grid[i*w->cols + j] ? c->live_color : c->dead_color;
       uint32_t *cell =
-        c->pixels + (i * c->width * c->cell_height) + (j * c->cell_width);
-      //not super efficent, but I can't think of another way to do this
+        c->pixels + (i * c->width * c->cell_height) + (j * c->cell_width);      
       for(k=0;k<c->cell_height;k++){
         for(l=0;l<c->cell_width;l++){
           cell[k*c->cell_width + l] = color;
@@ -53,6 +38,21 @@ void update_pixels(life_context *c){
     }
   }
 }
+/*  sigset_t *sigmask;
+  sigemptyset(sigmask);
+  sigaddset(sigmask, SIGUSR1);
+  sigaction(SIGUSR1, &interupt_work);
+  if(setjmp(work_loop)){
+    //got here from signal handler
+    sem_post(c->sem);//
+    }
+void jmp_to_work_loop(int signo){
+  sem_post(c->sem);//this tells the main loop it can unlock the texture
+  longjmp(work_loop);
+} 
+static struct sigaction interupt_work = {.sa_handler = jmp_to_work_loop};
+jmp_buf event_loop;*/
+
 /*
   TODO: Put Code for rendering and steping world into a seperate thread.
   The code for rendering (in the seperate thread) should just deal
