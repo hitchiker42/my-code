@@ -6,7 +6,7 @@
 #include <type_traits>
 namespace util {
 /*
-  A compromise between a vector which treats it's contents as just bytes
+  A compromise between a vector which treats its contents as just bytes
   and std::vector.
 
   T doesn't need to be trivially destructable, but if a value of type T
@@ -36,17 +36,17 @@ namespace util {
 template<typename T,
          std::enable_if_t<std::is_move_constructible_v<T>, int> = 0>
 struct svector {
-  typedef T                                       value_type;
-  typedef value_type*                             pointer;
-  typedef const value_type*                       const_pointer;
-  typedef value_type&                             reference;
-  typedef const value_type&                       const_reference;
-  typedef value_type*                             iterator;
-  typedef const value_type*			  const_iterator;
-  typedef std::size_t                             size_type;
-  typedef std::ptrdiff_t                          difference_type;
-  typedef std::reverse_iterator<iterator>	  reverse_iterator;
-  typedef std::reverse_iterator<const_iterator>   const_reverse_iterator;
+  using value_type = T;
+  using pointer = value_type*;
+  using const_pointer = const value_type*;
+  using reference = value_type&;
+  using const_reference = const value_type&;
+  using iterator = value_type*;
+  using const_iterator = const value_type*;
+  using size_type = std::size_t;
+  using difference_type = std::ptrdiff_t;
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
   T *vec = nullptr;
   size_t len = 0;
@@ -174,7 +174,7 @@ struct svector {
   template<typename InputIt>
   void multipush(InputIt first, InputIt last){
     if constexpr(is_random_access_iterator_v<InputIt>){
-      size_t cnt = std::distance(first, last);      
+      size_t cnt = std::distance(first, last);
       check_length(cnt);
       std::copy(first, last, vec + len);
       len += cnt;
@@ -199,7 +199,7 @@ struct svector {
   template<typename InputIt>
   void append(InputIt first, InputIt last){
     if constexpr(is_random_access_iterator_v<InputIt>){
-      size_t cnt = std::distance(first, last);      
+      size_t cnt = std::distance(first, last);
       check_length(cnt);
       std::move(first, last, vec + len);
       len += cnt;
@@ -348,6 +348,19 @@ struct svector {
   const_reverse_iterator crend() const noexcept {
     return const_reverse_iterator(begin());
   }
+  reference front() noexcept {
+    return *begin();
+  }
+  const_reference front() const noexcept {
+    return *cbegin();
+  }
+
+  reference back() noexcept {
+    return (len ? *(end() - 1) : *end());
+  }
+  const_reference back() const noexcept {
+    return (len ? *(cend() - 1) : *cend());
+  }
 
   // Length
   size_type size() const noexcept {
@@ -384,19 +397,6 @@ struct svector {
   //Ommited, since I think exceptions are bad
   //reference at(size_type __n)
 
-  reference front() noexcept {
-    return *begin();
-  }
-  const_reference front() const noexcept {
-    return *cbegin();
-  }
-
-  reference back() noexcept {
-    return (len ? *(end() - 1) : *end());
-  }
-  const_reference back() const noexcept {
-    return (len ? *(cend() - 1) : *cend());
-  }
 
   pointer data() noexcept {
     return vec;
@@ -404,6 +404,30 @@ struct svector {
   const_pointer data() const noexcept {
     return vec;
   }
+};
+//Derived class which acts more like a python list, i.e negitive indexes
+//count from the end and if an index is out of range the svector is
+//automagically resized.
+template<typename T,
+         std::enable_if_t<std::is_move_constructible_v<T>, int> = 0>
+struct dyn_svector : svector<T> {
+  using svector::svector;
+  using ssize_type = std::make_signed_t<size_type>;
+  reference do_index(size_type n) const {
+    ssize_type idx = n;
+    if(idx < 0){
+      idx = (idx % sz) + sz;
+    } else if(idx >= sz){
+      resize(NEXT_POW_OF_2(idx+1));
+    }
+    return vec[idx];
+  }
+  reference operator[](size_type n) override noexcept {
+    return do_index(n);
+  }
+  const_reference operator[](size_type n) override const noexcept {
+    return do_index(n);
+  }  
 };
 template <typename T>
 using svector_2d = svector<svector<T>>;

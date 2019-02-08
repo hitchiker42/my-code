@@ -208,7 +208,7 @@ std::enable_if_t<!CAT(std::is_, what)<T>::value, int>
 //compilation times since the template is still instianteted in
 //each translation file.
 #define extern_template_header(ret, name, ...)      \
-  extern template inline ret name<__VA_ARGS__>(__VA_ARGS__);
+  extern template inline ret name<__VA_ARGS__>(__VA_ARGS__);\
   template inline ret name<__VA_ARGS__>(__VA_ARGS__);
   
 //Macro for portably using possibly empty __VA_ARGS__
