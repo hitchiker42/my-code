@@ -1,0 +1,86 @@
+## CMake language stuff
+# The general syntax for a cmake command is
+# command(<required_argument>*
+#        [OPTIONAL_ARGUMENT_NAME optional_argument_values]*)
+# That is to say; optional arguments are given using a sort of key / value
+# syntax with the key indicated by an uppercase name.
+
+# All cmake variables are strings, but often they will be interpreted
+# as lists if in the form: "value1[;value2]*" (ex "1;3;5;7;9")
+# variables are refereced using ${name} syntax, and expand to
+# the empty string if undefined.
+
+#set(name value1 value2 ... PARENT_SCOPE) # sets the variable 'name'
+# if multiple arguments are given they are concatenated into a ';'
+# seperated list. If PARENT_SCOPE is given sets the value of the variable
+# in the containing scope (e.g to set global variables from functions)
+
+## Required parts
+
+# Minimum required version of cmake, in this example 3.10, call this first
+cmake_minimum_required(VERSION 3.10)
+
+# Sets the project name and optionally version, decription and languages
+project(CMake_Example
+  VERSION 1.2.3.4 # major[.minor[.patch[.tweak]]]
+  DESCRIPTION "Example CMakeLists.txt file"
+  LANGUAGES C CXX ASM # Languages used, default is C CXX
+  )
+## Options
+# Don't use this:
+# option(val "desc" [default]), it's just syntatic sugar, and hides options
+
+# Basic way to create an option
+# set(name [default_value] CACHE type docstring)
+
+
+## Adding projects, each project name must be globaly unique
+
+# Add a library to the project
+add_library(example_lib # name, cmake will add a lib prefix and .so/.a suffix
+  #[STATIC | SHARED], type of library default is dependent on BUILD_SHARED_LIBS
+  #EXCLUDE_FROM_ALL, if given the library won't be built by default
+  # Sources
+  example.c example.cxx
+  )
+             
+# Add a binary to the project
+add_executable(example
+  #EXCLUDE_FROM_ALL, same as for add_library
+  main.c main.cxx
+  )
+
+# Add a dependency of one project to another.
+add_dependencies(example example_lib) #can have multiple dependencies
+
+# Sets a property for the given object
+#set_property(<GLOBAL                            |
+#              DIRECTORY [dir]                   |
+#              TARGET    [target1 [target2 ...]] |
+#              SOURCE    [src1 [src2 ...]]       |
+#              INSTALL   [file1 [file2 ...]]     |
+#              TEST      [test1 [test2 ...]]     |
+#              CACHE     [entry1 [entry2 ...]]>
+#             [APPEND] Append to existing property as list
+#             [APPEND_STRING} Append to existing property as string
+#             PROPERTY name [value1 [value2 ...]])
+
+# Set the base output name of example_lib to example
+# so it becomes eg libexample.so
+set_property(TARGET example_lib
+  OUTPUT_NAME example)
+
+# Create a config.h file from config.h.in
+# @VAR@ or ${VAR} are replaced with the value of the varible
+# #cmakedefine VAR ... is replaced with
+#   #define VAR ... if VAR is defined or
+#   /* #undef VAR ... */ if VAR is undefined
+# #cmakedefine01 VAR is replaced with
+# #define VAR 1 or #define VAR 0 depending on whether or not VAR is defined
+cmake_configure_file(config.h.in config.h)
+
+
+
+# Local Variables:
+# mode: cmake
+# End:
