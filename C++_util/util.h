@@ -42,7 +42,7 @@ int compare(const T& lhs, const T& rhs){
   return three_way_compare(lhs, rhs);
 }
 //some templates that rely on other class definations
-namespace templates {
+inline namespace templates {
 //std::unordered map extended with overloads to operator()
 //to lookup values and return either a pointer or default value.
 template<typename K, typename V,

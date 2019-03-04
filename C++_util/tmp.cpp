@@ -1,5 +1,40 @@
-#include <stdint.h>
-#include <array>
+#include "util.h"
+template<typename T1, typename T2, typename Key, typename Compare>
+bool includes(const T1 *arr1, size_t sz1,
+              const T2 *arr2, size_t sz2,
+              const std::function<Key(const T1&)> &get_key1,
+              const std::function<Key(const T2&)> &get_key2,
+              Compare cmp){
+  size_t i,j;
+  for(i = 0, j = 0; j < sz2; i++){
+    if(i == sz1){ return false; }
+    const Key& k1 = get_key1(arr1[i]);
+    const Key& k2 = get_key2(arr2[j]);
+    if(cmp(k2,k1)){
+      return false;
+    }
+    if(!(cmp(k1, k2))){
+      j++;
+    }
+  }
+  return true;
+}
+struct test1 {
+  const char *name;
+  int data1;
+  double data2;
+};
+const char* getname(const test1& a){
+  return a.name;
+}
+bool cmp(const char* a, const char *b){
+  return strcmp(a,b) < 0;
+}
+bool test(std::vector<test1> a, std::vector<const char*> b){
+  return includes(a.data(), a.size(), b.data(), b.size(),
+                  std::function(getname), std::function(util::identity<const char*>), cmp);
+} 
+#if 0
 size_t utf8_encode_char_unchecked(int32_t c, uint8_t *buf){  
   if(c < 0x80) {
     *buf++ = c;
@@ -108,5 +143,6 @@ reallocate(alloc_traits_ptr<Allocator> ptr,
     return ret;
   }
 }
+#endif
 #endif
 #endif

@@ -665,14 +665,23 @@ void variadic_for_each(Fn &&f, T val, Ts&&... vals){
 /*
   Useful generic function templates
 */
-template<typename T>
-const T identity(const T arg){
-  return arg;
-}
+/*
+template<typename T = void>
+struct identity {
+  constexpr const T& operator()(const T& arg) const { return arg;}
+  constexpr T& operator()(T& arg) const { return arg;}
+};
+template<>
+struct identity<void>{
+  template<typename T>
+  constexpr auto operator()(T&& arg){ return std::forward<T>(arg); }
+};
+*/
 template<typename T>
 T identity(T arg){
   return arg;
 }
+
 template<typename T, typename U,
          std::enable_if_t<std::is_convertible_v<T,U>, int> = 0>
 const U convert(const T arg){

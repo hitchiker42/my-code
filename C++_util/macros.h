@@ -57,10 +57,11 @@
 #define PRIMITIVE_CAT_3(a, b, c) a ## _ ## b ## _ ## c
 #define CAT_4(a, b, c, d) PRIMITIVE_CAT_4(a, b, c, d)
 #define PRIMITIVE_CAT_4(a, b, c, d) a ## _ b ## _ ## c ## _ ## d
-//Count number of vaargs upto 64
-#define __NARG__(...)  __NARG_I_(__VA_ARGS__,__RSEQ_N())
+
+#define __NARG__(...)  __NARG_I_(0 MAYBE_VA_ARGS(__VA_ARGS__), __RSEQ_N())
+#define __HAVE_ARG__(...) __NARG_I_(0 MAYBE_VA_ARGS(__VA_ARGS__), __RSEQ_1())
 #define __NARG_I_(...) __ARG_N(__VA_ARGS__)
-#define __ARG_N(_1, _2, _3, _4, _5, _6, _7, _8, _9,_10,         \
+#define __ARG_N(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9,_10,     \
                 _11,_12,_13,_14,_15,_16,_17,_18,_19,_20,        \
                 _21,_22,_23,_24,_25,_26,_27,_28,_29,_30,        \
                 _31,_32,_33,_34,_35,_36,_37,_38,_39,_40,        \
@@ -73,7 +74,17 @@
                    30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20,  \
                    19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9,   \
                    8, 7, 6, 5, 4, 3, 2, 1, 0
+#define __RSEQ_1() 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,    \
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,   \
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,   \
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,   \
+                    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,   \
+                    1, 1, 1, 1, 1, 1, 1, 1, 0
 //Macro recursion
+/*
+  This is a bit complicated (I still don't totally understand it), but it does work.
+  See below for examples of how to use it.
+*/
 #define EVAL0(...) __VA_ARGS__
 #define EVAL1(...) EVAL0 (EVAL0 (EVAL0 (__VA_ARGS__)))
 #define EVAL2(...) EVAL1 (EVAL1 (EVAL1 (__VA_ARGS__)))
@@ -81,18 +92,38 @@
 #define EVAL4(...) EVAL3 (EVAL3 (EVAL3 (__VA_ARGS__)))
 #define EVAL(...)  EVAL4 (EVAL4 (EVAL4 (__VA_ARGS__)))
 
-#define MAP_END(...)
-#define MAP_OUT
+#define RECUR_END(...)
+#define RECUR_OUT
 
-#define MAP_GET_END() 0, MAP_END
-#define MAP_NEXT0(test, next, ...) next MAP_OUT
-#define MAP_NEXT1(test, next) MAP_NEXT0 (test, next, 0)
-#define MAP_NEXT(test, next)  MAP_NEXT1 (MAP_GET_END test, next)
-
-#define MACRO_MAP0(f, x, peek, ...) f(x) MAP_NEXT (peek, MACRO_MAP1) (f, peek, __VA_ARGS__)
-#define MACRO_MAP1(f, x, peek, ...) f(x) MAP_NEXT (peek, MACRO_MAP0) (f, peek, __VA_ARGS__)
+#define RECUR_GET_END() 0, RECUR_END
+#define RECUR_NEXT0(test, next, ...) next RECUR_OUT
+#define RECUR_NEXT1(test, next) RECUR_NEXT0 (test, next, 0)
+#define RECUR_NEXT(test, next)  RECUR_NEXT1 (RECUR_GET_END test, next)
+/*
+  Map a macro over a set of args.
+*/
+#define MACRO_MAP0(f, x, peek, ...) f(x) RECUR_NEXT (peek, MACRO_MAP1) (f, peek, __VA_ARGS__)
+#define MACRO_MAP1(f, x, peek, ...) f(x) RECUR_NEXT (peek, MACRO_MAP0) (f, peek, __VA_ARGS__)
 #define MACRO_MAP(f, ...) EVAL (MACRO_MAP1(f, __VA_ARGS__ ,(), 0))
 
+//Initialize a structure, Similar to designated initializers but without a leading
+//'.' before the field name.
+//i.e struct point(int x,y,z); point pt; INIT_STRUCT(pt, x = 1, y = 2, z = 3);
+//is the same as: point pt = {.x = 1, .y = 2, .z = 3};
+
+#define INIT_STRUCT(name, ...) EVAL(_INIT_STRUCT1(name, __VA_ARGS__, (), 0))
+
+#define _INIT_STRUCT0(name, field_val, peek, ...)                       \
+  name.field_val; RECUR_NEXT(peek, _INIT_STRUCT1) (name, peek, __VA_ARGS__)
+#define _INIT_STRUCT1(name, field_val, peek, ...)                       \
+  name.field_val; RECUR_NEXT(peek, _INIT_STRUCT0) (name, peek, __VA_ARGS__)
+
+#define INIT_STRUCT_PTR(name, ...) EVAL(_INIT_STRUCT_PTR1(name, __VA_ARGS__, (), 0))
+
+#define _INIT_STRUCT_PTR0(name, field_val, peek, ...)                       \
+  name->field_val; RECUR_NEXT(peek, _INIT_STRUCT_PTR1) (name, peek, __VA_ARGS__)
+#define _INIT_STRUCT_PTR1(name, field_val, peek, ...)                       \
+  name->field_val; RECUR_NEXT(peek, _INIT_STRUCT_PTR0) (name, peek, __VA_ARGS__)
 /**
    C++ specific macros.
  */

@@ -411,21 +411,25 @@ struct svector {
 template<typename T,
          std::enable_if_t<std::is_move_constructible_v<T>, int> = 0>
 struct dyn_svector : svector<T> {
-  using svector::svector;
+  //Stupid C++ rules make these next lines necessary
+  using size_type = typename svector<T>::size_type;
+  using reference = typename svector<T>::reference;
+  using const_reference = typename svector<T>::const_reference;
+  using svector<T>::svector;
   using ssize_type = std::make_signed_t<size_type>;
   reference do_index(size_type n) const {
     ssize_type idx = n;
     if(idx < 0){
-      idx = (idx % sz) + sz;
-    } else if(idx >= sz){
+      idx = (idx % this->sz) + this->sz;
+    } else if(idx >= this->sz){
       resize(NEXT_POW_OF_2(idx+1));
     }
-    return vec[idx];
+    return this->vec[idx];
   }
-  reference operator[](size_type n) override noexcept {
+  reference operator[](size_type n) noexcept {
     return do_index(n);
   }
-  const_reference operator[](size_type n) override const noexcept {
+  const_reference operator[](size_type n) const noexcept {
     return do_index(n);
   }  
 };
