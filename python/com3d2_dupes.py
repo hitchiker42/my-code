@@ -10,9 +10,9 @@ def main():
   if len(sys.argv) >= 3:
     basedir = sys.argv[2]
   dupes = {}
-  #TODO: Check if file is utf16 or shift-jis
+  #File is actually in utf-8 surprisingly
   for line in fileinput.input(dupefile,
-                              openhook=fileinput.hook_encoded("utf-16")):
+                              openhook=fileinput.hook_encoded("utf-8")):
     line = line.rstrip('\r\n')
     dupes[line] = []
   os.chdir(basedir)
@@ -20,7 +20,7 @@ def main():
     for file in files:
       if file in dupes:
         dupes[file].append(os.path.join(rootdir, file))
-  out = open("com3d2_dupes_fullpath.log", "w", encoding="utf-16")
+  out = open("com3d2_dupes_fullpath.log", "w", encoding="utf-8")
   for dupe in dupes:
     paths = dupes[dupe]
     print(dupe, file=out)
