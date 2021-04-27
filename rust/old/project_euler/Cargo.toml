@@ -1,0 +1,17 @@
+[package]
+name = "project_euler"
+version = "0.1.0"
+authors = ["Tucker DiNapoli <T.DiNapoli42@gmail.com>"]
+
+[dependencies]
+num = "0.1.37"
+libc = "0.2.21"
+rand = "0.3.15"
+# Prime number library, only for checking things, I want to try to
+# do most prime algorithms myself.
+primal = "0.2.3"
+nalgebra = "0.11.2"
+#rust_gmp = "0.4.0"
+# Rust 1.2 will have a bitvector in the standard library but
+# for now we need a crate
+bit-vec = "0.4.3"
