@@ -1,7 +1,7 @@
 {
   "name": "gelbooru",
   "version": "1.0.0",
-  "description": "",
+  "description": "Command line app to manage gelbooru image tags",
   "main": "gelbooru.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -11,8 +11,6 @@
   "dependencies": {
     "cli-progress": "^3.9.0",
     "dirty": "^1.1.1",
-    "level": "^6.0.1",
-    "leveldown": "^5.6.0",
     "minimist": "^1.2.5",
     "node-fetch": "^2.6.1"
   }

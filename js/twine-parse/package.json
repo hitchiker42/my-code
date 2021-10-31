@@ -1,0 +1,14 @@
+{
+  "name": "twine-parse",
+  "version": "1.0.0",
+  "description": "Decompose twine html documents into their sources",
+  "main": "twine_parse.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Tucker DiNapoli",
+  "license": "ISC",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.6"
+  }
+}
