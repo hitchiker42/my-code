@@ -1,0 +1,18 @@
+{
+  "name": "ksk",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "cli-progress": "^3.12.0",
+    "js-yaml": "^4.1.0",
+    "jsdom": "^22.1.0",
+    "jszip": "^3.10.1"
+  }
+}
